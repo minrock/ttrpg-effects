@@ -13,6 +13,7 @@ import type { MapImageState } from "../../domain/map/map-image";
 import type {
   SceneDarkness,
   SceneEffect,
+  SceneFogOfWar,
   SceneGrid,
   SceneLight,
   SceneSettings,
@@ -20,6 +21,7 @@ import type {
 } from "../../domain/sessions/scene-document";
 import { measureDistance } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
+import { getVisibleAreasFromLights } from "../../domain/vision/vision";
 
 interface PointerDragState {
   readonly pointerId: number;
@@ -33,7 +35,8 @@ interface PointerDragState {
     | "element-move"
     | "light-rotate"
     | "shape-end-move"
-    | "shape-rotate";
+    | "shape-rotate"
+    | "fog-reveal";
   readonly elementId?: string;
 }
 
@@ -56,6 +59,7 @@ export interface PixiViewportOptions {
   readonly onLightDirectionChange?: (elementId: string, direction: number) => void;
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
+  readonly onFogReveal?: (x: number, y: number) => void;
 }
 
 export class PixiViewport {
@@ -70,6 +74,7 @@ export class PixiViewport {
   private grid: SceneGrid | null = null;
   private settings: SceneSettings | null = null;
   private darkness: SceneDarkness | null = null;
+  private fogOfWar: SceneFogOfWar | null = null;
   private mapSprite: Sprite | null = null;
   private mapLoadVersion = 0;
   private loadedMapUrl: string | null = null;
@@ -80,9 +85,12 @@ export class PixiViewport {
   private selectedElementId: string | null = null;
   private isZoomLocked = false;
   private isMapAdjustMode = false;
+  private isGrabMode = false;
+  private isFogRevealMode = false;
   private dragState: PointerDragState | null = null;
   private fireAnimationPhase = 0;
   private _darknessTexture: RenderTexture | null = null;
+  private _fogOfWarTexture: RenderTexture | null = null;
   private disposed = false;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
@@ -117,12 +125,14 @@ export class PixiViewport {
   setLights(lights: readonly SceneLight[]): void {
     this.lights = lights;
     this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
     this.drawInteractiveElements();
   }
 
   setEffects(effects: readonly SceneEffect[]): void {
     this.effects = effects;
     this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
     this.drawInteractiveElements();
   }
 
@@ -139,6 +149,14 @@ export class PixiViewport {
     this.isMapAdjustMode = isMapAdjustMode;
   }
 
+  setGrabMode(isGrabMode: boolean): void {
+    this.isGrabMode = isGrabMode;
+  }
+
+  setFogRevealMode(isFogRevealMode: boolean): void {
+    this.isFogRevealMode = isFogRevealMode;
+  }
+
   setMap(map: MapImageState | null): void {
     const prevUrl = this.map?.imageUrl ?? null;
     this.map = map;
@@ -151,6 +169,7 @@ export class PixiViewport {
         this.mapSprite.scale.set(map.scale);
       }
       this.drawDarknessLayer();
+      this.drawFogOfWarLayer();
     }
 
     this.drawGrid();
@@ -160,6 +179,7 @@ export class PixiViewport {
     this.grid = grid;
     this.drawGrid();
     this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
     this.drawInteractiveElements();
   }
 
@@ -168,6 +188,12 @@ export class PixiViewport {
     this.updateBaseMapVisibility();
     this.drawDarknessLayer();
     this.drawInteractiveElements();
+  }
+
+  setFogOfWar(fogOfWar: SceneFogOfWar): void {
+    this.fogOfWar = fogOfWar;
+    this.drawFogOfWarLayer();
+    this.drawVisionObstaclesLayer();
   }
 
   destroy(): void {
@@ -180,6 +206,8 @@ export class PixiViewport {
     this.removeInputListeners();
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
+    this._fogOfWarTexture?.destroy();
+    this._fogOfWarTexture = null;
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -359,34 +387,41 @@ export class PixiViewport {
     let mode: PointerDragState["mode"] = "pan";
     let elementId: string | undefined;
     if (event.button === 0) {
-      const hitRotationElementId = this.hitTestConeRotationHandle(point);
-      const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
-      const hitShapeEndElementId = this.hitTestLinearShapeEndHandle(point);
-      const hitElementId = this.hitTestElement(point);
+      if (this.isGrabMode) {
+        mode = "pan";
+      } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
+        mode = "fog-reveal";
+        this.revealFogAtScreenPoint(point);
+      } else {
+        const hitRotationElementId = this.hitTestConeRotationHandle(point);
+        const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
+        const hitShapeEndElementId = this.hitTestLinearShapeEndHandle(point);
+        const hitElementId = this.hitTestElement(point);
 
-      if (hitRotationElementId !== null) {
-        mode = "light-rotate";
-        elementId = hitRotationElementId;
-        this.options.onElementSelect?.(hitRotationElementId);
-        this.updateLightDirectionFromScreenPoint(hitRotationElementId, point);
-      } else if (hitShapeRotationElementId !== null) {
-        mode = "shape-rotate";
-        elementId = hitShapeRotationElementId;
-        this.options.onElementSelect?.(hitShapeRotationElementId);
-        this.updateLinearShapeDirectionFromScreenPoint(hitShapeRotationElementId, point);
-      } else if (hitShapeEndElementId !== null) {
-        mode = "shape-end-move";
-        elementId = hitShapeEndElementId;
-        this.options.onElementSelect?.(hitShapeEndElementId);
-        this.updateLinearShapeEndFromScreenPoint(hitShapeEndElementId, point);
-      } else if (hitElementId !== null) {
-        mode = "element-move";
-        elementId = hitElementId;
-        this.options.onElementSelect?.(hitElementId);
-      } else if (this.isMapAdjustMode && this.mapSprite !== null) {
-        mode = "map-move";
-      } else if (this.hitTestCalibrationHandle(point)) {
-        mode = "calibrate";
+        if (hitRotationElementId !== null) {
+          mode = "light-rotate";
+          elementId = hitRotationElementId;
+          this.options.onElementSelect?.(hitRotationElementId);
+          this.updateLightDirectionFromScreenPoint(hitRotationElementId, point);
+        } else if (hitShapeRotationElementId !== null) {
+          mode = "shape-rotate";
+          elementId = hitShapeRotationElementId;
+          this.options.onElementSelect?.(hitShapeRotationElementId);
+          this.updateLinearShapeDirectionFromScreenPoint(hitShapeRotationElementId, point);
+        } else if (hitShapeEndElementId !== null) {
+          mode = "shape-end-move";
+          elementId = hitShapeEndElementId;
+          this.options.onElementSelect?.(hitShapeEndElementId);
+          this.updateLinearShapeEndFromScreenPoint(hitShapeEndElementId, point);
+        } else if (hitElementId !== null) {
+          mode = "element-move";
+          elementId = hitElementId;
+          this.options.onElementSelect?.(hitElementId);
+        } else if (this.isMapAdjustMode && this.mapSprite !== null) {
+          mode = "map-move";
+        } else if (this.hitTestCalibrationHandle(point)) {
+          mode = "calibrate";
+        }
       }
     }
 
@@ -428,6 +463,8 @@ export class PixiViewport {
       this.updateLinearShapeEndFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-rotate" && this.dragState.elementId !== undefined) {
       this.updateLinearShapeDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "fog-reveal") {
+      this.revealFogAtScreenPoint(nextPoint);
     } else if (this.dragState.button === 0 || this.dragState.button === 1) {
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
@@ -599,6 +636,91 @@ export class PixiViewport {
     }
   }
 
+  private drawFogOfWarLayer(): void {
+    const layer = this.getLayer("fogOfWar");
+    layer.removeChildren();
+    this._fogOfWarTexture?.destroy();
+    this._fogOfWarTexture = null;
+
+    if (this.fogOfWar === null || !this.fogOfWar.enabled || this.fogOfWar.opacity <= 0) {
+      return;
+    }
+
+    const bounds = this.getGridBounds();
+    const width = Math.ceil(bounds.right - bounds.left);
+    const height = Math.ceil(bounds.bottom - bounds.top);
+    const fogTexture = RenderTexture.create({ width, height });
+    this._fogOfWarTexture = fogTexture;
+
+    const fogRect = new Graphics()
+      .rect(0, 0, width, height)
+      .fill({ color: parseHexColor(this.fogOfWar.color), alpha: this.fogOfWar.opacity });
+    this.app.renderer.render({ container: fogRect, target: fogTexture, clear: true });
+    fogRect.destroy();
+
+    const reveals = [...this.fogOfWar.revealedAreas, ...getVisibleAreasFromLights(this.lights)];
+    const fireReveals = this.effects
+      .filter((effect) => effect.visible && effect.emitsLight)
+      .map((effect) => ({
+        id: `vision-${effect.id}`,
+        kind: "circle" as const,
+        center: effect.position,
+        radius: effect.lightRadius
+      }));
+
+    if (reveals.length > 0 || fireReveals.length > 0) {
+      const eraseContainer = new Container();
+
+      for (const area of [...reveals, ...fireReveals]) {
+        const reveal = new Graphics()
+          .circle(area.center.x - bounds.left, area.center.y - bounds.top, area.radius)
+          .fill({ color: 0xffffff, alpha: 1 });
+        reveal.blendMode = "erase";
+        eraseContainer.addChild(reveal);
+      }
+
+      this.app.renderer.render({ container: eraseContainer, target: fogTexture, clear: false });
+      eraseContainer.destroy({ children: true });
+    }
+
+    const fogSprite = new Sprite(fogTexture);
+    fogSprite.position.set(bounds.left, bounds.top);
+    layer.addChild(fogSprite);
+  }
+
+  private drawVisionObstaclesLayer(): void {
+    const layer = this.getLayer("walls");
+    layer.removeChildren();
+
+    if (this.fogOfWar === null || this.fogOfWar.obstacles.length === 0) {
+      return;
+    }
+
+    const walls = new Graphics();
+
+    for (const obstacle of this.fogOfWar.obstacles) {
+      const [firstPoint, ...rest] = obstacle.points;
+
+      if (firstPoint === undefined) {
+        continue;
+      }
+
+      walls.moveTo(firstPoint.x, firstPoint.y);
+
+      for (const point of rest) {
+        walls.lineTo(point.x, point.y);
+      }
+    }
+
+    walls.stroke({ color: 0xffd28a, width: 4, alpha: 0.75 });
+    layer.addChild(walls);
+  }
+
+  private revealFogAtScreenPoint(screenPoint: ScreenPoint): void {
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    this.options.onFogReveal?.(worldPoint.x, worldPoint.y);
+  }
+
   private hitTestElement(screenPoint: ScreenPoint): string | null {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
 
@@ -766,11 +888,13 @@ export class PixiViewport {
 
     if (this.map === null) {
       this.drawMapPlaceholder();
+      this.drawFogOfWarLayer();
       return;
     }
 
     if (typeof this.map.imageUrl !== "string" || this.map.imageUrl.length === 0) {
       this.drawMapPlaceholder();
+      this.drawFogOfWarLayer();
       this.options.onMapRenderError?.("La imagen del mapa no tiene una URL valida para renderizar.");
       return;
     }
@@ -792,9 +916,11 @@ export class PixiViewport {
       layer.addChild(sprite);
       this.drawGrid();
       this.drawDarknessLayer();
+      this.drawFogOfWarLayer();
       this.options.onMapRendered?.(`Mapa renderizado (${texture.width} x ${texture.height})`);
     } catch {
       this.drawMapPlaceholder();
+      this.drawFogOfWarLayer();
       this.options.onMapRenderError?.(
         "No se pudo decodificar la imagen del mapa. Si es HEIC, puede depender del soporte del sistema."
       );

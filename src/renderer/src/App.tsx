@@ -6,6 +6,7 @@ import {
   deleteSelectedElement,
   openContextMenu,
   selectElement,
+  setActiveTool,
   setMapAdjustMode,
   setZoomLocked
 } from "../../domain/interaction/interaction-state";
@@ -31,6 +32,12 @@ import {
   type ShapePatch,
   type TacticalShapeKind
 } from "../../domain/shapes/shapes";
+import {
+  addRevealedArea,
+  clearRevealedAreas,
+  createCircleRevealArea,
+  updateFogOfWar
+} from "../../domain/vision/vision";
 import type { FirePatch } from "../../domain/effects/fire";
 import {
   getTacticalElementLabel,
@@ -58,6 +65,7 @@ export function App(): JSX.Element {
   const nextShapeId = useRef(1);
   const nextLightId = useRef(1);
   const nextEffectId = useRef(1);
+  const nextRevealId = useRef(1);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     setInteraction((current) => openContextMenu(current, request));
@@ -317,6 +325,49 @@ export function App(): JSX.Element {
     }));
   }
 
+  function handleFogEnabledChange(): void {
+    const nextEnabled = !scene.fogOfWar.enabled;
+
+    setScene((current) => ({
+      ...current,
+      fogOfWar: updateFogOfWar(current.fogOfWar, {
+        enabled: nextEnabled
+      })
+    }));
+
+    if (!nextEnabled && interaction.activeTool === "fog-reveal") {
+      setInteraction((current) => setActiveTool(current, "grab"));
+    }
+  }
+
+  function handleFogOpacityChange(opacity: number): void {
+    setScene((current) => ({
+      ...current,
+      fogOfWar: updateFogOfWar(current.fogOfWar, { opacity })
+    }));
+  }
+
+  function handleFogColorChange(color: string): void {
+    setScene((current) => ({
+      ...current,
+      fogOfWar: updateFogOfWar(current.fogOfWar, { color })
+    }));
+  }
+
+  function handleFogRevealRadiusChange(radius: number): void {
+    setScene((current) => ({
+      ...current,
+      fogOfWar: updateFogOfWar(current.fogOfWar, { revealRadius: radius })
+    }));
+  }
+
+  function handleClearFogReveals(): void {
+    setScene((current) => ({
+      ...current,
+      fogOfWar: clearRevealedAreas(current.fogOfWar)
+    }));
+  }
+
   const handleGridCellSizeChange = useCallback((cellSizeWorld: number): void => {
     setScene((current) => ({
       ...current,
@@ -387,8 +438,65 @@ export function App(): JSX.Element {
     }));
   }, []);
 
+  const handleFogReveal = useCallback((x: number, y: number): void => {
+    setScene((current) => {
+      if (!current.fogOfWar.enabled) {
+        return current;
+      }
+
+      const revealArea = createCircleRevealArea({
+        id: `reveal-${nextRevealId.current}`,
+        center: { x, y },
+        radius: current.fogOfWar.revealRadius
+      });
+      nextRevealId.current += 1;
+
+      return {
+        ...current,
+        fogOfWar: addRevealedArea(current.fogOfWar, revealArea)
+      };
+    });
+  }, []);
+
   function handleToggleMapAdjust(): void {
     setInteraction((current) => setMapAdjustMode(current, !current.isMapAdjustMode));
+  }
+
+  function handleToggleGrabMode(): void {
+    setInteraction((current) =>
+      setActiveTool(current, current.activeTool === "grab" ? "select" : "grab")
+    );
+  }
+
+  function handleToggleFogRevealMode(): void {
+    if (!scene.fogOfWar.enabled) {
+      return;
+    }
+
+    setInteraction((current) =>
+      setActiveTool(current, current.activeTool === "fog-reveal" ? "grab" : "fog-reveal")
+    );
+  }
+
+  function handleToggleContextMenuNavigationMode(): void {
+    if (interaction.activeTool !== "fog-reveal" && !scene.fogOfWar.enabled) {
+      return;
+    }
+
+    setInteraction((current) =>
+      setActiveTool(current, current.activeTool === "fog-reveal" ? "grab" : "fog-reveal")
+    );
+  }
+
+  function handleToggleContextMenuZoomLock(): void {
+    setInteraction((current) => setZoomLocked(current, !current.isZoomLocked));
+    setScene((current) => ({
+      ...current,
+      grid: {
+        ...current.grid,
+        locked: !current.grid.locked
+      }
+    }));
   }
 
   function handleGridPresetChange(presetId: string): void {
@@ -526,6 +634,23 @@ export function App(): JSX.Element {
           </button>
           <button
             type="button"
+            className={interaction.activeTool === "grab" ? "is-active" : ""}
+            onClick={handleToggleGrabMode}
+            aria-pressed={interaction.activeTool === "grab"}
+          >
+            Grab
+          </button>
+          <button
+            type="button"
+            className={interaction.activeTool === "fog-reveal" ? "is-active" : ""}
+            onClick={handleToggleFogRevealMode}
+            disabled={!scene.fogOfWar.enabled}
+            aria-pressed={interaction.activeTool === "fog-reveal"}
+          >
+            Modo niebla
+          </button>
+          <button
+            type="button"
             className={interaction.isZoomLocked ? "is-active" : ""}
             onClick={handleToggleZoomLock}
             aria-pressed={interaction.isZoomLocked}
@@ -656,6 +781,50 @@ export function App(): JSX.Element {
             onChange={(event) => handleDarknessOpacityChange(event.currentTarget.valueAsNumber)}
           />
         </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={scene.fogOfWar.enabled}
+            onChange={handleFogEnabledChange}
+          />
+          Niebla
+        </label>
+        <label>
+          Fog
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={scene.fogOfWar.opacity}
+            onChange={(event) => handleFogOpacityChange(event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        <label>
+          Color
+          <input
+            type="color"
+            value={scene.fogOfWar.color}
+            onChange={(event) => handleFogColorChange(event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          Reveal
+          <input
+            type="number"
+            min="8"
+            max="3000"
+            value={scene.fogOfWar.revealRadius}
+            onChange={(event) => handleFogRevealRadiusChange(event.currentTarget.valueAsNumber)}
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handleClearFogReveals}
+          disabled={scene.fogOfWar.revealedAreas.length === 0}
+        >
+          Reset niebla
+        </button>
       </section>
       {selectedLight !== undefined ? (
         <section className="properties-panel" aria-label="Propiedades de luz">
@@ -879,6 +1048,7 @@ export function App(): JSX.Element {
         grid={scene.grid}
         settings={scene.settings}
         darkness={scene.darkness}
+        fogOfWar={scene.fogOfWar}
         elements={interaction.elements}
         shapes={scene.shapes}
         lights={scene.lights}
@@ -886,6 +1056,8 @@ export function App(): JSX.Element {
         selectedElementId={interaction.selectedElementId}
         isZoomLocked={interaction.isZoomLocked}
         isMapAdjustMode={interaction.isMapAdjustMode}
+        isGrabMode={interaction.activeTool === "grab"}
+        isFogRevealMode={interaction.activeTool === "fog-reveal"}
         onContextMenuRequest={handleContextMenuRequest}
         onElementSelect={handleElementSelect}
         onGridCellSizeChange={handleGridCellSizeChange}
@@ -896,6 +1068,7 @@ export function App(): JSX.Element {
         onLightDirectionChange={handleLightDirectionChange}
         onShapeEndMove={handleShapeEndMove}
         onShapeDirectionChange={handleShapeDirectionChange}
+        onFogReveal={handleFogReveal}
       />
       {interaction.contextMenu !== null ? (
         <div
@@ -916,6 +1089,17 @@ export function App(): JSX.Element {
               event.stopPropagation();
             }}
           >
+            <button
+              type="button"
+              onClick={handleToggleContextMenuNavigationMode}
+              disabled={interaction.activeTool !== "fog-reveal" && !scene.fogOfWar.enabled}
+            >
+              {interaction.activeTool === "fog-reveal" ? "Cambiar a Grab" : "Cambiar a Modo niebla"}
+            </button>
+            <button type="button" onClick={handleToggleContextMenuZoomLock}>
+              {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
+            </button>
+            <hr aria-hidden="true" />
             {tacticalElementKinds.map((kind) => (
               <button key={kind} type="button" onClick={() => handleCreateElement(kind)}>
                 {getTacticalElementLabel(kind)}

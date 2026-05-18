@@ -34,6 +34,34 @@ export interface SceneDarkness {
   readonly color: string;
 }
 
+export interface SceneFogRevealArea {
+  readonly id: string;
+  readonly kind: "circle";
+  readonly center: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly radius: number;
+}
+
+export interface SceneFogObstacle {
+  readonly id: string;
+  readonly kind: "wall";
+  readonly points: ReadonlyArray<{
+    readonly x: number;
+    readonly y: number;
+  }>;
+}
+
+export interface SceneFogOfWar {
+  readonly enabled: boolean;
+  readonly opacity: number;
+  readonly color: string;
+  readonly revealRadius: number;
+  readonly revealedAreas: readonly SceneFogRevealArea[];
+  readonly obstacles: readonly SceneFogObstacle[];
+}
+
 export interface SceneSettings {
   readonly diagonalMode: DiagonalMode;
   readonly snapToGrid: boolean;
@@ -91,6 +119,7 @@ export interface SceneDocumentV1 {
   readonly camera: SceneCamera;
   readonly grid: SceneGrid;
   readonly darkness: SceneDarkness;
+  readonly fogOfWar: SceneFogOfWar;
   readonly settings: SceneSettings;
   readonly lights: readonly SceneLight[];
   readonly effects: readonly SceneEffect[];

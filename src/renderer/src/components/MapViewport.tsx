@@ -8,6 +8,7 @@ import type { MapImageState } from "../../../domain/map/map-image";
 import type {
   SceneDarkness,
   SceneEffect,
+  SceneFogOfWar,
   SceneGrid,
   SceneLight,
   SceneSettings,
@@ -19,6 +20,7 @@ interface MapViewportProps {
   readonly grid: SceneGrid;
   readonly settings: SceneSettings;
   readonly darkness: SceneDarkness;
+  readonly fogOfWar: SceneFogOfWar;
   readonly elements: readonly TacticalElement[];
   readonly shapes: readonly SceneShape[];
   readonly lights: readonly SceneLight[];
@@ -26,6 +28,8 @@ interface MapViewportProps {
   readonly selectedElementId: string | null;
   readonly isZoomLocked: boolean;
   readonly isMapAdjustMode: boolean;
+  readonly isGrabMode: boolean;
+  readonly isFogRevealMode: boolean;
   readonly onContextMenuRequest: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect: (elementId: string | null) => void;
   readonly onGridCellSizeChange: (cellSizeWorld: number) => void;
@@ -36,6 +40,7 @@ interface MapViewportProps {
   readonly onLightDirectionChange: (elementId: string, direction: number) => void;
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
+  readonly onFogReveal: (x: number, y: number) => void;
 }
 
 export function MapViewport({
@@ -43,6 +48,7 @@ export function MapViewport({
   grid,
   settings,
   darkness,
+  fogOfWar,
   elements,
   shapes,
   lights,
@@ -50,6 +56,8 @@ export function MapViewport({
   selectedElementId,
   isZoomLocked,
   isMapAdjustMode,
+  isGrabMode,
+  isFogRevealMode,
   onContextMenuRequest,
   onElementSelect,
   onGridCellSizeChange,
@@ -59,7 +67,8 @@ export function MapViewport({
   onElementMove,
   onLightDirectionChange,
   onShapeEndMove,
-  onShapeDirectionChange
+  onShapeDirectionChange,
+  onFogReveal
 }: MapViewportProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
@@ -83,7 +92,8 @@ export function MapViewport({
       onElementMove,
       onLightDirectionChange,
       onShapeEndMove,
-      onShapeDirectionChange
+      onShapeDirectionChange,
+      onFogReveal
     }).then((createdViewport) => {
       if (cancelled) {
         createdViewport.destroy();
@@ -96,12 +106,15 @@ export function MapViewport({
       createdViewport.setGrid(grid);
       createdViewport.setSettings(settings);
       createdViewport.setDarkness(darkness);
+      createdViewport.setFogOfWar(fogOfWar);
       createdViewport.setElements(elements);
       createdViewport.setShapes(shapes);
       createdViewport.setLights(lights);
       createdViewport.setEffects(effects);
       createdViewport.setSelectedElementId(selectedElementId);
       createdViewport.setZoomLocked(isZoomLocked);
+      createdViewport.setGrabMode(isGrabMode);
+      createdViewport.setFogRevealMode(isFogRevealMode);
     });
 
     return () => {
@@ -109,7 +122,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange, onFogReveal]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -126,6 +139,10 @@ export function MapViewport({
   useEffect(() => {
     viewportRef.current?.setDarkness(darkness);
   }, [darkness]);
+
+  useEffect(() => {
+    viewportRef.current?.setFogOfWar(fogOfWar);
+  }, [fogOfWar]);
 
   useEffect(() => {
     viewportRef.current?.setElements(elements);
@@ -155,5 +172,19 @@ export function MapViewport({
     viewportRef.current?.setMapAdjustMode(isMapAdjustMode);
   }, [isMapAdjustMode]);
 
-  return <div ref={hostRef} className="map-viewport" aria-label="Lienzo del mapa" />;
+  useEffect(() => {
+    viewportRef.current?.setGrabMode(isGrabMode);
+  }, [isGrabMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setFogRevealMode(isFogRevealMode);
+  }, [isFogRevealMode]);
+
+  return (
+    <div
+      ref={hostRef}
+      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}`}
+      aria-label="Lienzo del mapa"
+    />
+  );
 }

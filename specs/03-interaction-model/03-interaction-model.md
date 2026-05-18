@@ -19,6 +19,7 @@ Definir los controles base para navegar, calibrar, seleccionar, borrar y agregar
 - Click izquierdo: seleccionar o interactuar con la herramienta activa.
 - Arrastrar con herramienta de pan: mover camara.
 - Rueda del mouse: zoom solo cuando el zoom/escala no este bloqueado.
+- Menu contextual: alternar bloqueo/desbloqueo de zoom sin volver a la toolbar.
 - Delete o Backspace: borrar elemento seleccionado.
 - Escape: cancelar herramienta activa o cerrar menu contextual.
 
@@ -43,6 +44,7 @@ Cuando esta bloqueado:
 
 El menu contextual debe permitir crear:
 
+- Alternar bloqueo/desbloqueo de zoom.
 - Medicion.
 - Circulo/esfera 2D.
 - Cono.
@@ -58,6 +60,7 @@ El menu contextual debe permitir crear:
 - El usuario puede borrar el elemento seleccionado con boton visible.
 - El usuario puede borrar el elemento seleccionado con Delete o Backspace.
 - El zoom no cambia cuando la escala esta bloqueada.
+- El usuario puede bloquear o desbloquear zoom desde el menu contextual.
 - La app no confunde navegacion con calibracion de grilla.
 
 ## Riesgos
@@ -71,4 +74,3 @@ El menu contextual debe permitir crear:
 - Separar estado de herramienta activa de estado de seleccion.
 - Mantener una maquina de estados simple para interacciones.
 - Evitar acciones destructivas sin seleccion clara.
-

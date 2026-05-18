@@ -5,7 +5,7 @@ import {
   type TacticalElementKind
 } from "../tools/tactical-elements";
 
-export type InteractionTool = "select" | "pan";
+export type InteractionTool = "select" | "grab" | "fog-reveal";
 
 export interface ContextMenuState {
   readonly screen: ScreenPoint;
@@ -95,7 +95,7 @@ export function cancelInteraction(state: InteractionState): InteractionState {
 
   return {
     ...state,
-    activeTool: "select"
+    activeTool: "grab"
   };
 }
 
@@ -110,7 +110,8 @@ export function setActiveTool(state: InteractionState, activeTool: InteractionTo
   return {
     ...state,
     activeTool,
-    contextMenu: null
+    contextMenu: null,
+    isMapAdjustMode: activeTool === "select" ? state.isMapAdjustMode : false
   };
 }
 
@@ -118,6 +119,7 @@ export function setMapAdjustMode(state: InteractionState, isMapAdjustMode: boole
   return {
     ...state,
     isMapAdjustMode,
+    activeTool: isMapAdjustMode ? "select" : state.activeTool,
     contextMenu: null
   };
 }

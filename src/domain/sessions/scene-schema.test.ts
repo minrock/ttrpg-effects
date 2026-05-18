@@ -104,6 +104,47 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("adds default fog of war data to older v1 scenes", () => {
+    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    delete legacyScene.fogOfWar;
+
+    expect(parseSceneDocument(legacyScene)).toMatchObject({
+      fogOfWar: createDefaultScene().fogOfWar
+    });
+  });
+
+  it("accepts fog of war revealed areas and wall obstacles", () => {
+    const scene = {
+      ...createDefaultScene(),
+      fogOfWar: {
+        enabled: true,
+        opacity: 0.95,
+        color: "#000000",
+        revealRadius: 160,
+        revealedAreas: [
+          {
+            id: "reveal-1",
+            kind: "circle",
+            center: { x: 20, y: 30 },
+            radius: 120
+          }
+        ],
+        obstacles: [
+          {
+            id: "wall-1",
+            kind: "wall",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 }
+            ]
+          }
+        ]
+      }
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
   it("returns a friendly error for invalid JSON", () => {
     expect(() => parseSceneJson("{ nope")).toThrow("JSON valido");
   });

@@ -4,7 +4,9 @@ export const renderLayerNames = [
   "darkness",
   "grid",
   "lights",
+  "fogOfWar",
   "effects",
+  "walls",
   "shapesAndMeasurements",
   "selection"
 ] as const;

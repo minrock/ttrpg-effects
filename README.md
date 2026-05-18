@@ -83,6 +83,20 @@ La oscuridad global se puede activar/desactivar y ajustar desde la barra de cont
 - Al seleccionar una luz o fuego aparece un panel compacto para ajustar visibilidad, color, opacidad, intensidad, radio o escala segun corresponda.
 - Guardar y cargar escena conserva luces y fuego en el archivo `.ttrpgscene`.
 
+## Niebla de guerra y vision
+
+La niebla de guerra es independiente de la oscuridad ambiental.
+
+- `Niebla` activa una capa que oculta las zonas no reveladas.
+- `Fog` ajusta la opacidad de esa capa.
+- `Reveal` define el radio circular de revelado manual en coordenadas de mundo.
+- `Modo niebla` permite descubrir areas con click o arrastre sobre el mapa.
+- `Grab` vuelve al modo de navegacion para mover la vista sin revelar accidentalmente.
+- El menu de click derecho permite alternar rapido entre `Grab` y `Modo niebla`.
+- `Reset niebla` borra las areas reveladas manuales.
+- Las luces visibles y el fuego que emite luz aportan vision actual mientras existan.
+- Las paredes/obstaculos quedan guardables en el modelo para una futura linea de vision automatica, pero todavia no recortan la vision.
+
 ## Escenas locales
 
 La UI incluye acciones para guardar y cargar escenas locales con extension `.ttrpgscene`.

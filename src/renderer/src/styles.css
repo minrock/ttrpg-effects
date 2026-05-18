@@ -165,6 +165,33 @@ body {
   width: 78px;
 }
 
+.grid-controls button {
+  min-height: 30px;
+  border: 1px solid rgb(244 241 232 / 16%);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #fff8e7;
+  background: #22282a;
+  font: inherit;
+  cursor: pointer;
+}
+
+.grid-controls button:hover:not(:disabled) {
+  border-color: rgb(255 197 107 / 60%);
+  background: #2e3638;
+}
+
+.grid-controls button.is-active {
+  border-color: rgb(255 210 138 / 70%);
+  color: #1a1d1f;
+  background: #ffd28a;
+}
+
+.grid-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .grid-controls input,
 .grid-controls select {
   accent-color: #ffd28a;
@@ -179,6 +206,15 @@ body {
   color: #f4f1e8;
   background: #22282a;
   font: inherit;
+}
+
+.grid-controls input[type="color"] {
+  width: 34px;
+  height: 30px;
+  border: 1px solid rgb(244 241 232 / 16%);
+  border-radius: 8px;
+  padding: 2px;
+  background: #22282a;
 }
 
 .properties-panel {
@@ -246,6 +282,13 @@ body {
   cursor: grabbing;
 }
 
+.map-viewport.is-fog-reveal-mode,
+.map-viewport.is-fog-reveal-mode:active {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M20.7 2.5 25.5 7.3 11.2 21.6 6.4 16.8z' fill='%23ffd28a' stroke='%23111315' stroke-width='1.6'/%3E%3Cpath d='M5.2 17.8 10.2 22.8 4.5 24.8 3.2 23.5z' fill='%23f4f1e8' stroke='%23111315' stroke-width='1.4'/%3E%3Ccircle cx='7' cy='21' r='2.6' fill='%23ffd28a'/%3E%3C/svg%3E") 5 23,
+    crosshair;
+}
+
 .pixi-canvas {
   display: block;
   width: 100%;
@@ -288,6 +331,24 @@ body {
 .context-menu button:hover {
   color: #1a1d1f;
   background: #ffd28a;
+}
+
+.context-menu button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.context-menu button:disabled:hover {
+  color: #f4f1e8;
+  background: transparent;
+}
+
+.context-menu hr {
+  width: 100%;
+  height: 1px;
+  margin: 6px 0;
+  border: 0;
+  background: rgb(244 241 232 / 12%);
 }
 
 @media (max-width: 520px) {

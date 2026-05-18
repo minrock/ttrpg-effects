@@ -22,6 +22,7 @@
 - Mantener estados de herramienta activa, seleccion y menu contextual separados.
 - Implementar bloqueo de zoom con indicador visible.
 - Evitar que la rueda cambie zoom cuando el bloqueo esta activo.
+- Permitir alternar bloqueo/desbloqueo de zoom desde el menu contextual de click derecho.
 - Mantener pan disponible como navegacion basica.
 
 ### Fuera de alcance
@@ -81,6 +82,7 @@
 ### `renderer`
 
 - Agregar menu contextual React posicionado sobre el canvas.
+- Agregar accion compacta de bloqueo/desbloqueo de zoom dentro del menu contextual.
 - Agregar toolbar compacta para herramienta activa, bloqueo de zoom y borrar seleccionado.
 - Escuchar `Delete`, `Backspace` y `Escape` a nivel de app con cleanup correcto.
 - Mantener estado visual de seleccion, menu y lock sin acceso directo a filesystem/Electron.
@@ -106,9 +108,10 @@
 4. Implementar render placeholder de medicion, circulo, cono, rectangulo, luz puntual, luz conica y fuego.
 5. Implementar hit testing simple en coordenadas de mundo.
 6. Agregar menu contextual React con acciones de creacion en posicion de mundo.
-7. Agregar toolbar compacta con herramienta activa, bloqueo de zoom y borrar seleccionado.
-8. Agregar atajos `Delete`, `Backspace` y `Escape`.
-9. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
+7. Agregar toggle de bloqueo/desbloqueo de zoom dentro del menu contextual.
+8. Agregar toolbar compacta con herramienta activa, bloqueo de zoom y borrar seleccionado.
+9. Agregar atajos `Delete`, `Backspace` y `Escape`.
+10. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
 
 ## 7. Testing y verificacion
 
@@ -118,6 +121,7 @@
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, click derecho sobre el canvas, crear varios elementos, seleccionar uno, borrarlo con boton, crear otro, borrarlo con `Delete`, abrir menu y cerrarlo con `Escape`, activar bloqueo de zoom y confirmar que la rueda no cambia el zoom.
+- **Manual / smoke contextual:** Abrir menu con click derecho, alternar bloqueo de zoom desde el menu y confirmar que el boton de toolbar refleja el mismo estado.
 
 ## 8. Riesgos y mitigaciones
 
@@ -142,6 +146,7 @@
 - El usuario puede borrar el elemento seleccionado con `Delete` o `Backspace`.
 - `Escape` cierra menu contextual o cancela herramienta activa.
 - El zoom no cambia cuando el bloqueo esta activo.
+- El menu contextual permite bloquear/desbloquear zoom.
 - Pan sigue funcionando para navegar.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
@@ -157,6 +162,7 @@
 - [x] Tipos de interaccion y elementos tacticos creados.
 - [x] Tests de interaccion agregados.
 - [x] Menu contextual implementado.
+- [x] Toggle de bloqueo/desbloqueo de zoom en menu contextual implementado/documentado.
 - [x] Creacion de elementos visibles desde menu implementada.
 - [x] Seleccion visual implementada.
 - [x] Borrado con boton implementado.

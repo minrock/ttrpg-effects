@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
+import { createDefaultFogOfWar } from "../vision/vision";
 
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
@@ -41,6 +42,28 @@ const rectangleShapeSchema = z.object({
   height: positiveNumber
 });
 
+const fogRevealAreaSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("circle"),
+  center: worldPointSchema,
+  radius: positiveNumber
+});
+
+const fogObstacleSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("wall"),
+  points: z.array(worldPointSchema).min(2)
+});
+
+const fogOfWarSchema = z.object({
+  enabled: z.boolean(),
+  opacity,
+  color: hexColor,
+  revealRadius: positiveNumber,
+  revealedAreas: z.array(fogRevealAreaSchema),
+  obstacles: z.array(fogObstacleSchema)
+});
+
 export const sceneDocumentV1Schema = z.object({
   version: z.literal(SCENE_DOCUMENT_VERSION),
   map: z.object({
@@ -67,6 +90,11 @@ export const sceneDocumentV1Schema = z.object({
     opacity,
     color: hexColor
   }),
+  fogOfWar: fogOfWarSchema.default(() => ({
+    ...createDefaultFogOfWar(),
+    revealedAreas: [],
+    obstacles: []
+  })),
   settings: z.object({
     diagonalMode: z.enum(["dnd5e-default", "manhattan", "euclidean"]),
     snapToGrid: z.boolean()

@@ -1,4 +1,5 @@
 import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
+import { createDefaultFogOfWar } from "../vision/vision";
 
 export function createDefaultScene(): SceneDocument {
   return {
@@ -27,6 +28,7 @@ export function createDefaultScene(): SceneDocument {
       opacity: 0.65,
       color: "#000000"
     },
+    fogOfWar: createDefaultFogOfWar(),
     settings: {
       diagonalMode: "dnd5e-default",
       snapToGrid: true

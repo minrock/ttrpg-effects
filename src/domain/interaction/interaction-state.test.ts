@@ -61,12 +61,24 @@ describe("interaction state", () => {
   });
 
   it("cancels an open context menu before resetting the active tool", () => {
-    const opened = openContextMenu(setActiveTool(createInitialInteractionState(), "pan"), contextMenu);
+    const opened = openContextMenu(setActiveTool(createInitialInteractionState(), "fog-reveal"), contextMenu);
 
     expect(cancelInteraction(opened).contextMenu).toBeNull();
-    expect(cancelInteraction(setActiveTool(createInitialInteractionState(), "pan")).activeTool).toBe(
-      "select"
+    expect(cancelInteraction(setActiveTool(createInitialInteractionState(), "fog-reveal")).activeTool).toBe(
+      "grab"
     );
+  });
+
+  it("uses exclusive tool modes for grab, fog reveal and map adjust", () => {
+    const fogTool = setActiveTool(setMapAdjustMode(createInitialInteractionState(), true), "fog-reveal");
+
+    expect(fogTool.activeTool).toBe("fog-reveal");
+    expect(fogTool.isMapAdjustMode).toBe(false);
+
+    const mapAdjust = setMapAdjustMode(setActiveTool(fogTool, "grab"), true);
+
+    expect(mapAdjust.activeTool).toBe("select");
+    expect(mapAdjust.isMapAdjustMode).toBe(true);
   });
 
   it("tracks zoom lock independently from selection and tools", () => {
