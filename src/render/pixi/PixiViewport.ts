@@ -19,7 +19,7 @@ import type {
   SceneSettings,
   SceneShape
 } from "../../domain/sessions/scene-document";
-import { measureDistance } from "../../domain/measurement/measurement";
+import { formatDistance, measureDistance } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getVisibleAreasFromLights } from "../../domain/vision/vision";
 import type { FireCell } from "../../domain/effects/fire";
@@ -294,10 +294,12 @@ export class PixiViewport {
     const grid = new Graphics();
     const cellSize = this.grid.cellSizeWorld;
     const bounds = this.getGridBounds();
-    const startX = Math.floor(bounds.left / cellSize) * cellSize;
-    const endX = Math.ceil(bounds.right / cellSize) * cellSize;
-    const startY = Math.floor(bounds.top / cellSize) * cellSize;
-    const endY = Math.ceil(bounds.bottom / cellSize) * cellSize;
+    const originX = this.map?.position.x ?? 0;
+    const originY = this.map?.position.y ?? 0;
+    const startX = Math.floor((bounds.left - originX) / cellSize) * cellSize + originX;
+    const endX = Math.ceil((bounds.right - originX) / cellSize) * cellSize + originX;
+    const startY = Math.floor((bounds.top - originY) / cellSize) * cellSize + originY;
+    const endY = Math.ceil((bounds.bottom - originY) / cellSize) * cellSize + originY;
 
     for (let x = startX; x <= endX; x += cellSize) {
       grid
@@ -852,16 +854,18 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const cellSize = this.grid.cellSizeWorld;
     const radius = this.getFirePaintRadius();
-    const startColumn = Math.floor((worldPoint.x - radius) / cellSize);
-    const endColumn = Math.floor((worldPoint.x + radius) / cellSize);
-    const startRow = Math.floor((worldPoint.y - radius) / cellSize);
-    const endRow = Math.floor((worldPoint.y + radius) / cellSize);
+    const originX = this.map?.position.x ?? 0;
+    const originY = this.map?.position.y ?? 0;
+    const startColumn = Math.floor((worldPoint.x - radius - originX) / cellSize);
+    const endColumn = Math.floor((worldPoint.x + radius - originX) / cellSize);
+    const startRow = Math.floor((worldPoint.y - radius - originY) / cellSize);
+    const endRow = Math.floor((worldPoint.y + radius - originY) / cellSize);
     const cells: FireCell[] = [];
 
     for (let row = startRow; row <= endRow; row += 1) {
       for (let column = startColumn; column <= endColumn; column += 1) {
-        const x = column * cellSize;
-        const y = row * cellSize;
+        const x = column * cellSize + originX;
+        const y = row * cellSize + originY;
         const centerX = x + cellSize / 2;
         const centerY = y + cellSize / 2;
 
@@ -872,11 +876,11 @@ export class PixiViewport {
     }
 
     if (cells.length === 0) {
-      const column = Math.floor(worldPoint.x / cellSize);
-      const row = Math.floor(worldPoint.y / cellSize);
+      const column = Math.floor((worldPoint.x - originX) / cellSize);
+      const row = Math.floor((worldPoint.y - originY) / cellSize);
       cells.push({
-        x: column * cellSize,
-        y: row * cellSize,
+        x: column * cellSize + originX,
+        y: row * cellSize + originY,
         size: cellSize
       });
     }
@@ -1460,6 +1464,14 @@ function drawElement(element: TacticalElement): Graphics {
   }
 }
 
+function worldLengthLabel(worldUnits: number, grid: SceneGrid): string {
+  const cells = worldUnits / grid.cellSizeWorld;
+  const value = grid.unit === "ft"
+    ? cells * grid.distancePerCell
+    : cells * grid.metricDistancePerCell;
+  return formatDistance(value, grid.unit);
+}
+
 function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSettings): Container {
   const container = new Container();
   const graphic = new Graphics();
@@ -1486,36 +1498,44 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
         container.addChild(label);
       }
       break;
-    case "circle":
+    case "circle": {
+      const radius = shape.radius ?? grid.cellSizeWorld;
       graphic
-        .circle(anchor.x, anchor.y, shape.radius ?? grid.cellSizeWorld)
+        .circle(anchor.x, anchor.y, radius)
         .fill({ color: 0x3d8dff, alpha: 0.18 })
         .stroke({ color: 0x7fb8ff, width: 4, alpha: 0.92 });
+      const label = drawShapeLabel(worldLengthLabel(radius, grid));
+      label.position.set(anchor.x + 10, anchor.y - radius - 28);
+      container.addChild(label);
       break;
-    case "cone":
-      drawConeShape(
-        graphic,
-        anchor.x,
-        anchor.y,
-        shape.radius ?? grid.cellSizeWorld * 3,
-        shape.angle ?? 60,
-        shape.direction ?? 0
-      )
+    }
+    case "cone": {
+      const radius = shape.radius ?? grid.cellSizeWorld * 3;
+      const angle = shape.angle ?? 60;
+      const direction = shape.direction ?? 0;
+      drawConeShape(graphic, anchor.x, anchor.y, radius, angle, direction)
         .fill({ color: 0x60c8a6, alpha: 0.2 })
         .stroke({ color: 0x79e1bf, width: 4, alpha: 0.9 });
+      const radians = (direction * Math.PI) / 180;
+      const tipX = anchor.x + Math.cos(radians) * radius;
+      const tipY = anchor.y + Math.sin(radians) * radius;
+      const label = drawShapeLabel(`${Math.round(angle)}° · ${worldLengthLabel(radius, grid)}`);
+      label.position.set(tipX + 12, tipY - 10);
+      container.addChild(label);
       break;
-    case "rectangle":
+    }
+    case "rectangle": {
+      const width = shape.width ?? grid.cellSizeWorld;
+      const height = shape.height ?? grid.cellSizeWorld;
       graphic
-        .roundRect(
-          anchor.x - (shape.width ?? grid.cellSizeWorld) / 2,
-          anchor.y - (shape.height ?? grid.cellSizeWorld) / 2,
-          shape.width ?? grid.cellSizeWorld,
-          shape.height ?? grid.cellSizeWorld,
-          8
-        )
+        .roundRect(anchor.x - width / 2, anchor.y - height / 2, width, height, 8)
         .fill({ color: 0xd7a34f, alpha: 0.2 })
         .stroke({ color: 0xffd28a, width: 4, alpha: 0.9 });
+      const label = drawShapeLabel(`${worldLengthLabel(width, grid)} × ${worldLengthLabel(height, grid)}`);
+      label.position.set(anchor.x + 10, anchor.y + height / 2 + 10);
+      container.addChild(label);
       break;
+    }
   }
 
   container.addChildAt(graphic, 0);

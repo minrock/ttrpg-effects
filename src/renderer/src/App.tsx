@@ -105,7 +105,8 @@ export function App(): JSX.Element {
       kind,
       position: interaction.contextMenu.world,
       grid: scene.grid,
-      settings: scene.settings
+      settings: scene.settings,
+      mapPosition: scene.map.position
     });
 
     setScene((current) => ({
@@ -405,7 +406,8 @@ export function App(): JSX.Element {
           ? moveShape(
               shape,
               { x, y },
-              current.settings.snapToGrid ? current.grid.cellSizeWorld : undefined
+              current.settings.snapToGrid ? current.grid.cellSizeWorld : undefined,
+              current.map.position
             )
           : shape
       ),

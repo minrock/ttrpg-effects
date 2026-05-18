@@ -31,6 +31,21 @@ describe("tactical shapes", () => {
     });
   });
 
+  it("snaps rectangle top-left corner to grid, not center", () => {
+    // Click at (149, 49) with snap ON → top-left snaps to (100, 0)
+    // Width=300, height=200 → center at (100+150, 0+100) = (250, 100)
+    const shape = createTacticalShape({
+      id: "rect-1",
+      kind: "rectangle",
+      position: { x: 149, y: 49 },
+      grid,
+      settings: { snapToGrid: true }
+    });
+
+    expect(shape).toMatchObject({ type: "rectangle", width: 300, height: 200 });
+    expect(shape.points[0]).toEqual({ x: 250, y: 100 });
+  });
+
   it("creates circle, cone, and rectangle defaults in world units", () => {
     expect(
       createTacticalShape({

@@ -55,16 +55,19 @@ export function measureCells(dxCells: number, dyCells: number, diagonalMode: Dia
   }
 }
 
-export function snapWorldPoint(point: WorldPoint, cellSizeWorld: number): WorldPoint {
+export function snapWorldPoint(point: WorldPoint, cellSizeWorld: number, origin?: WorldPoint): WorldPoint {
   assertFinitePoint(point);
 
   if (!Number.isFinite(cellSizeWorld) || cellSizeWorld <= 0) {
     throw new Error("Cell size must be a positive number.");
   }
 
+  const ox = origin?.x ?? 0;
+  const oy = origin?.y ?? 0;
+
   return {
-    x: Math.round(point.x / cellSizeWorld) * cellSizeWorld,
-    y: Math.round(point.y / cellSizeWorld) * cellSizeWorld
+    x: Math.round((point.x - ox) / cellSizeWorld) * cellSizeWorld + ox,
+    y: Math.round((point.y - oy) / cellSizeWorld) * cellSizeWorld + oy
   };
 }
 
