@@ -29,6 +29,7 @@ import {
 } from "../../domain/lighting/lights";
 import { createMapImageState, type MapImageState } from "../../domain/map/map-image";
 import { measureDistance } from "../../domain/measurement/measurement";
+import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import type { SceneDocument, SceneOperationResult } from "../../domain/sessions/scene-document";
 import {
@@ -79,6 +80,7 @@ export function App(): JSX.Element {
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
+  const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
@@ -224,6 +226,44 @@ export function App(): JSX.Element {
     [scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
   );
 
+  const canCreateNewScene = useMemo(
+    () => hasSceneContent(scene, interaction.elements.length),
+    [scene, interaction.elements.length]
+  );
+
+  const resetToNewScene = useCallback((): void => {
+    setScene(createDefaultScene());
+    setMapImageUrl(null);
+    setCurrentFilePath(null);
+    setFeedback("Escena default en memoria");
+    setWarnings([]);
+    setInteraction(createInitialInteractionState());
+    setIsSpaceDragActive(false);
+    setGridAdjustMode(false);
+    setIsSelectedPropertiesOpen(true);
+    nextShapeId.current = 1;
+    nextLightId.current = 1;
+    nextEffectId.current = 1;
+    nextRevealId.current = 1;
+  }, [setGridAdjustMode]);
+
+  const handleRequestNewScene = useCallback((): void => {
+    if (!canCreateNewScene) {
+      return;
+    }
+
+    setIsNewSceneDialogOpen(true);
+  }, [canCreateNewScene]);
+
+  const handleCancelNewScene = useCallback((): void => {
+    setIsNewSceneDialogOpen(false);
+  }, []);
+
+  const handleDiscardAndCreateNewScene = useCallback((): void => {
+    resetToNewScene();
+    setIsNewSceneDialogOpen(false);
+  }, [resetToNewScene]);
+
   useEffect(() => {
     const shouldIgnoreSpaceDrag = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -243,6 +283,14 @@ export function App(): JSX.Element {
     };
 
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (isNewSceneDialogOpen) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          handleCancelNewScene();
+        }
+        return;
+      }
+
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
         setInteraction((current) =>
@@ -306,16 +354,44 @@ export function App(): JSX.Element {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [handleDeleteSelectedElement, isGridAdjustMode, setGridAdjustMode]);
+  }, [
+    handleCancelNewScene,
+    handleDeleteSelectedElement,
+    isGridAdjustMode,
+    isNewSceneDialogOpen,
+    setGridAdjustMode
+  ]);
+
+  async function saveCurrentScene(): Promise<SceneOperationResult> {
+    if (window.ttrpg === undefined) {
+      return { ok: false, error: "La API de preload no esta disponible." };
+    }
+
+    return window.ttrpg.saveScene(scene);
+  }
 
   async function handleSaveScene(): Promise<void> {
-    await runSceneOperation("guardada", async () => {
-      if (window.ttrpg === undefined) {
-        return { ok: false, error: "La API de preload no esta disponible." };
+    await runSceneOperation("guardada", saveCurrentScene);
+  }
+
+  async function handleSaveAndCreateNewScene(): Promise<void> {
+    setIsBusy(true);
+    setWarnings([]);
+
+    try {
+      const result = await saveCurrentScene();
+
+      if (!result.ok) {
+        setFeedback(result.error);
+        return;
       }
 
-      return window.ttrpg.saveScene(scene);
-    });
+      resetToNewScene();
+      setIsNewSceneDialogOpen(false);
+      setFeedback("Escena guardada. Nueva escena lista.");
+    } finally {
+      setIsBusy(false);
+    }
   }
 
   async function handleLoadScene(): Promise<void> {
@@ -980,6 +1056,11 @@ export function App(): JSX.Element {
           >
             Borrar seleccionado
           </button>
+          {canCreateNewScene ? (
+            <button type="button" onClick={handleRequestNewScene} disabled={isBusy}>
+              Nueva escena
+            </button>
+          ) : null}
           <button type="button" onClick={handleSaveScene} disabled={isBusy}>
             Guardar escena
           </button>
@@ -1539,6 +1620,38 @@ export function App(): JSX.Element {
           {isSidebarVisible ? "›" : "‹"}
         </button>
       </div>
+      {isNewSceneDialogOpen ? (
+        <div className="modal-backdrop" onClick={handleCancelNewScene}>
+          <section
+            className="confirmation-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-scene-dialog-title"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <div>
+              <h2 id="new-scene-dialog-title">Crear nueva escena</h2>
+              <p>
+                La escena actual tiene contenido. Puedes guardarla antes de limpiar el mapa, luces,
+                efectos, niebla y selecciones.
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button type="button" onClick={handleCancelNewScene} disabled={isBusy} autoFocus>
+                Cancelar
+              </button>
+              <button type="button" className="is-danger" onClick={handleDiscardAndCreateNewScene} disabled={isBusy}>
+                Descartar cambios
+              </button>
+              <button type="button" className="is-primary" onClick={handleSaveAndCreateNewScene} disabled={isBusy}>
+                Guardar y crear nueva
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {interaction.contextMenu !== null ? (
         <div
           className="context-menu-backdrop"
