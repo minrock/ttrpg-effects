@@ -9,6 +9,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "map-asset", privileges: { bypassCSP: true, corsEnabled: true, secure: true, stream: true, supportFetchAPI: true } }
 ]);
 
+app.setName("TTRPG Effects");
+
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
 const appIconPath = isDevelopment
   ? join(app.getAppPath(), "assets/logo/ttrpg-effects-logo.png")
@@ -48,6 +50,8 @@ function createMainWindow(): void {
 }
 
 app.whenReady().then(() => {
+  app.dock?.setIcon(appIconPath);
+
   protocol.handle("map-asset", (request) => {
     const fileUrl = request.url.replace("map-asset:", "file:");
     return net.fetch(fileUrl);
