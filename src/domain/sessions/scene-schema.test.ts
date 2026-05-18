@@ -29,6 +29,31 @@ describe("scene document schema", () => {
     expect(() => parseSceneDocument(scene)).toThrow();
   });
 
+  it("adds darkvision disabled to older v1 scenes", () => {
+    const legacyScene = {
+      ...createDefaultScene(),
+      darkness: {
+        enabled: true,
+        opacity: 0.65,
+        color: "#000000"
+      }
+    };
+
+    expect(parseSceneDocument(legacyScene).darkness.darkvisionEnabled).toBe(false);
+  });
+
+  it("preserves enabled darkvision in scene darkness", () => {
+    const scene = {
+      ...createDefaultScene(),
+      darkness: {
+        ...createDefaultScene().darkness,
+        darkvisionEnabled: true
+      }
+    };
+
+    expect(parseSceneDocument(scene).darkness.darkvisionEnabled).toBe(true);
+  });
+
   it("accepts lights and fire effects with complete properties", () => {
     const scene = {
       ...createDefaultScene(),

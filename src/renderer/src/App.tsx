@@ -340,6 +340,16 @@ export function App(): JSX.Element {
     }));
   }
 
+  function handleDarkvisionEnabledChange(): void {
+    setScene((current) => ({
+      ...current,
+      darkness: {
+        ...current.darkness,
+        darkvisionEnabled: !current.darkness.darkvisionEnabled
+      }
+    }));
+  }
+
   function handleFogEnabledChange(): void {
     const nextEnabled = !scene.fogOfWar.enabled;
 
@@ -1291,6 +1301,14 @@ export function App(): JSX.Element {
                 value={scene.darkness.opacity}
                 onChange={(event) => handleDarknessOpacityChange(event.currentTarget.valueAsNumber)}
               />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={scene.darkness.darkvisionEnabled}
+                onChange={handleDarkvisionEnabledChange}
+              />
+              Visión en la oscuridad
             </label>
           </SidebarAccordion>
 

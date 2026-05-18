@@ -32,6 +32,7 @@ export interface SceneDarkness {
   readonly enabled: boolean;
   readonly opacity: number;
   readonly color: string;
+  readonly darkvisionEnabled: boolean;
 }
 
 export interface SceneFogRevealArea {

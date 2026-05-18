@@ -113,7 +113,8 @@ export const sceneDocumentV1Schema = z.object({
   darkness: z.object({
     enabled: z.boolean(),
     opacity,
-    color: hexColor
+    color: hexColor,
+    darkvisionEnabled: z.boolean().default(false)
   }),
   fogOfWar: fogOfWarSchema.default(() => ({
     ...createDefaultFogOfWar(),

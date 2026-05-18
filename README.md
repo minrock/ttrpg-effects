@@ -89,6 +89,7 @@ La oscuridad global y la niebla se pueden activar/desactivar y ajustar desde el 
 
 La niebla de guerra es independiente de la oscuridad ambiental.
 
+- `Visión en la oscuridad` vive en el panel de `Oscuridad`: muestra el mapa base en blanco y negro, ignora visualmente el overlay negro y recupera color dentro de luces visibles y fuego emisor de luz.
 - `Niebla` activa una capa que oculta las zonas no reveladas.
 - `Fog` ajusta la opacidad de esa capa.
 - `Reveal` define el radio circular de revelado manual en coordenadas de mundo.

@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, RenderTexture, Sprite, Text } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text } from "pixi.js";
 import {
   createCameraState,
   panCamera,
@@ -90,6 +90,9 @@ export class PixiViewport {
   private darkness: SceneDarkness | null = null;
   private fogOfWar: SceneFogOfWar | null = null;
   private mapSprite: Sprite | null = null;
+  private colorMapSprite: Sprite | null = null;
+  private darkvisionMask: Graphics | null = null;
+  private readonly grayscaleFilter = new ColorMatrixFilter();
   private mapLoadVersion = 0;
   private loadedMapUrl: string | null = null;
   private elements: readonly TacticalElement[] = [];
@@ -110,6 +113,7 @@ export class PixiViewport {
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
     this.options = options;
+    this.grayscaleFilter.desaturate();
     this.resizeObserver = new ResizeObserver(() => {
       this.resize();
     });
@@ -138,6 +142,7 @@ export class PixiViewport {
 
   setLights(lights: readonly SceneLight[]): void {
     this.lights = lights;
+    this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
     this.drawInteractiveElements();
@@ -145,6 +150,7 @@ export class PixiViewport {
 
   setEffects(effects: readonly SceneEffect[]): void {
     this.effects = effects;
+    this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
     this.drawInteractiveElements();
@@ -185,7 +191,10 @@ export class PixiViewport {
       if (this.mapSprite !== null && map !== null) {
         this.mapSprite.position.set(map.position.x, map.position.y);
         this.mapSprite.scale.set(map.scale);
+        this.colorMapSprite?.position.set(map.position.x, map.position.y);
+        this.colorMapSprite?.scale.set(map.scale);
       }
+      this.drawDarkvisionLayer();
       this.drawDarknessLayer();
       this.drawFogOfWarLayer();
     }
@@ -204,6 +213,7 @@ export class PixiViewport {
   setDarkness(darkness: SceneDarkness): void {
     this.darkness = darkness;
     this.updateBaseMapVisibility();
+    this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawInteractiveElements();
   }
@@ -226,6 +236,11 @@ export class PixiViewport {
     this._darknessTexture = null;
     this._fogOfWarTexture?.destroy();
     this._fogOfWarTexture = null;
+    if (this.colorMapSprite !== null) {
+      this.colorMapSprite.mask = null;
+    }
+    this.darkvisionMask?.destroy();
+    this.darkvisionMask = null;
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -322,7 +337,12 @@ export class PixiViewport {
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
 
-    if (this.darkness === null || !this.darkness.enabled || this.darkness.opacity <= 0) {
+    if (
+      this.darkness === null ||
+      this.darkness.darkvisionEnabled ||
+      !this.darkness.enabled ||
+      this.darkness.opacity <= 0
+    ) {
       return;
     }
 
@@ -364,7 +384,42 @@ export class PixiViewport {
   private updateBaseMapVisibility(): void {
     if (this.mapSprite !== null) {
       this.mapSprite.alpha = 1;
+      this.mapSprite.filters = this.darkness?.darkvisionEnabled ? [this.grayscaleFilter] : null;
     }
+
+    if (this.colorMapSprite !== null) {
+      this.colorMapSprite.visible = false;
+      this.colorMapSprite.mask = null;
+    }
+  }
+
+  private drawDarkvisionLayer(): void {
+    if (this.colorMapSprite !== null) {
+      this.colorMapSprite.mask = null;
+    }
+    this.darkvisionMask?.destroy();
+    this.darkvisionMask = null;
+
+    this.updateBaseMapVisibility();
+
+    if (
+      this.mapSprite === null ||
+      this.colorMapSprite === null ||
+      this.darkness?.darkvisionEnabled !== true
+    ) {
+      return;
+    }
+
+    const mask = buildDarkvisionColorMask(this.lights, this.effects);
+
+    if (mask === null) {
+      return;
+    }
+
+    this.darkvisionMask = mask;
+    this.getLayer("map").addChild(mask);
+    this.colorMapSprite.visible = true;
+    this.colorMapSprite.setMask({ mask });
   }
 
 
@@ -502,7 +557,9 @@ export class PixiViewport {
       const dy = (nextPoint.y - this.dragState.lastPoint.y) / this.camera.zoom;
       this.mapSprite.position.x += dx;
       this.mapSprite.position.y += dy;
+      this.colorMapSprite?.position.set(this.mapSprite.position.x, this.mapSprite.position.y);
       this.drawGrid();
+      this.drawDarkvisionLayer();
       this.drawDarknessLayer();
       this.drawFogOfWarLayer();
       this.options.onMapPositionChange?.(this.mapSprite.position.x, this.mapSprite.position.y);
@@ -1268,8 +1325,14 @@ export class PixiViewport {
   private async drawMapImage(): Promise<void> {
     const layer = this.getLayer("map");
     const loadVersion = ++this.mapLoadVersion;
+    if (this.colorMapSprite !== null) {
+      this.colorMapSprite.mask = null;
+    }
+    this.darkvisionMask?.destroy();
     layer.removeChildren();
     this.mapSprite = null;
+    this.colorMapSprite = null;
+    this.darkvisionMask = null;
 
     if (this.loadedMapUrl !== null) {
       await Assets.unload(this.loadedMapUrl);
@@ -1298,12 +1361,20 @@ export class PixiViewport {
 
       this.loadedMapUrl = this.map.imageUrl;
       const sprite = new Sprite(texture);
+      const colorSprite = new Sprite(texture);
       sprite.anchor.set(0.5);
       sprite.position.set(this.map.position.x, this.map.position.y);
       sprite.scale.set(this.map.scale);
+      colorSprite.anchor.set(0.5);
+      colorSprite.position.set(this.map.position.x, this.map.position.y);
+      colorSprite.scale.set(this.map.scale);
+      colorSprite.visible = false;
       this.mapSprite = sprite;
+      this.colorMapSprite = colorSprite;
       this.updateBaseMapVisibility();
       layer.addChild(sprite);
+      layer.addChild(colorSprite);
+      this.drawDarkvisionLayer();
       this.drawGrid();
       this.drawDarknessLayer();
       this.drawFogOfWarLayer();
@@ -1625,6 +1696,66 @@ function buildFireLightEraseGraphic(
     .fill({ color: 0xffffff, alpha: 1 });
 
   graphic.blendMode = "erase";
+  return graphic;
+}
+
+function buildDarkvisionColorMask(
+  lights: readonly SceneLight[],
+  effects: readonly SceneEffect[]
+): Graphics | null {
+  const graphic = new Graphics();
+  let hasMaskGeometry = false;
+
+  for (const light of lights) {
+    if (!light.visible) {
+      continue;
+    }
+
+    if (light.kind === "point") {
+      graphic
+        .circle(light.position.x, light.position.y, light.radius)
+        .fill({ color: 0xffffff, alpha: 1 });
+    } else {
+      drawConeShape(
+        graphic,
+        light.position.x,
+        light.position.y,
+        light.radius,
+        getLightRenderAngle(light),
+        light.direction
+      ).fill({ color: 0xffffff, alpha: 1 });
+    }
+
+    hasMaskGeometry = true;
+  }
+
+  for (const effect of effects) {
+    if (!effect.visible || !effect.emitsLight) {
+      continue;
+    }
+
+    if (effect.zone.kind === "cells") {
+      const { bright, dim } = computeCellRings(effect.zone.cells);
+
+      for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
+        graphic
+          .rect(cell.x, cell.y, cell.size, cell.size)
+          .fill({ color: 0xffffff, alpha: 1 });
+      }
+    } else {
+      graphic
+        .circle(effect.position.x, effect.position.y, effect.lightRadius)
+        .fill({ color: 0xffffff, alpha: 1 });
+    }
+
+    hasMaskGeometry = true;
+  }
+
+  if (!hasMaskGeometry) {
+    graphic.destroy();
+    return null;
+  }
+
   return graphic;
 }
 

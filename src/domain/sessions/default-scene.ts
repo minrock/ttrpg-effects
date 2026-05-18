@@ -26,7 +26,8 @@ export function createDefaultScene(): SceneDocument {
     darkness: {
       enabled: true,
       opacity: 0.65,
-      color: "#000000"
+      color: "#000000",
+      darkvisionEnabled: false
     },
     fogOfWar: createDefaultFogOfWar(),
     settings: {
