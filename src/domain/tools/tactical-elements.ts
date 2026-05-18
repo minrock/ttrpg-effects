@@ -2,7 +2,6 @@ import type { WorldPoint } from "../shared/coordinates";
 
 export const tacticalElementKinds = [
   "measurement",
-  "line",
   "circle",
   "cone",
   "rectangle",
@@ -38,8 +37,6 @@ export function createTacticalElement(
 export function getTacticalElementLabel(kind: TacticalElementKind): string {
   switch (kind) {
     case "measurement":
-      return "Medicion";
-    case "line":
       return "Linea";
     case "circle":
       return "Circulo";

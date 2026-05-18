@@ -167,6 +167,35 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("silently drops legacy line shapes from older scenes", () => {
+    const scene = {
+      ...createDefaultScene(),
+      shapes: [
+        {
+          id: "line-old",
+          type: "line",
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 }
+          ]
+        },
+        {
+          id: "measurement-1",
+          type: "measurement",
+          points: [
+            { x: 0, y: 0 },
+            { x: 300, y: 0 }
+          ]
+        }
+      ]
+    };
+
+    const parsed = parseSceneDocument(scene);
+
+    expect(parsed.shapes).toHaveLength(1);
+    expect(parsed.shapes[0].id).toBe("measurement-1");
+  });
+
   it("adds default fog of war data to older v1 scenes", () => {
     const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
     delete legacyScene.fogOfWar;

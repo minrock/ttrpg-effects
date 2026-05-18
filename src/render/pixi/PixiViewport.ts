@@ -37,11 +37,16 @@ interface PointerDragState {
     | "light-rotate"
     | "shape-end-move"
     | "shape-rotate"
+    | "shape-circle-resize"
+    | "shape-cone-rotate"
+    | "shape-cone-resize"
+    | "shape-rect-resize"
     | "fog-reveal"
     | "fire-paint"
     | "fire-zone-resize"
     | "fire-light-resize";
   readonly elementId?: string;
+  readonly handleIndex?: number;
 }
 
 export interface PixiContextMenuRequest {
@@ -67,6 +72,8 @@ export interface PixiViewportOptions {
   readonly onFirePaint?: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange?: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange?: (elementId: string, radius: number) => void;
+  readonly onShapeRadiusChange?: (elementId: string, radius: number) => void;
+  readonly onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
 }
 
 export class PixiViewport {
@@ -392,6 +399,7 @@ export class PixiViewport {
 
     let mode: PointerDragState["mode"] = "pan";
     let elementId: string | undefined;
+    let handleIndex: number | undefined;
     if (event.button === 0) {
       if (this.isGrabMode) {
         mode = "pan";
@@ -407,6 +415,10 @@ export class PixiViewport {
         const hitRotationElementId = this.hitTestConeRotationHandle(point);
         const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
         const hitShapeEndElementId = this.hitTestLinearShapeEndHandle(point);
+        const hitCircleResizeElementId = this.hitTestCircleResizeHandle(point);
+        const hitConeResizeElementId = this.hitTestConeShapeResizeHandle(point);
+        const hitConeRotateElementId = this.hitTestConeShapeRotationHandle(point);
+        const hitRectCornerIndex = this.hitTestRectCornerHandle(point);
         const hitElementId = this.hitTestElement(point);
 
         if (hitFireZoneResizeElementId !== null) {
@@ -434,6 +446,23 @@ export class PixiViewport {
           elementId = hitShapeEndElementId;
           this.options.onElementSelect?.(hitShapeEndElementId);
           this.updateLinearShapeEndFromScreenPoint(hitShapeEndElementId, point);
+        } else if (hitCircleResizeElementId !== null) {
+          mode = "shape-circle-resize";
+          elementId = hitCircleResizeElementId;
+          this.updateShapeCircleRadiusFromScreenPoint(hitCircleResizeElementId, point);
+        } else if (hitConeResizeElementId !== null) {
+          mode = "shape-cone-resize";
+          elementId = hitConeResizeElementId;
+          this.updateShapeConeRadiusFromScreenPoint(hitConeResizeElementId, point);
+        } else if (hitConeRotateElementId !== null) {
+          mode = "shape-cone-rotate";
+          elementId = hitConeRotateElementId;
+          this.updateShapeConeDirectionFromScreenPoint(hitConeRotateElementId, point);
+        } else if (hitRectCornerIndex !== null && this.selectedElementId !== null) {
+          mode = "shape-rect-resize";
+          elementId = this.selectedElementId;
+          handleIndex = hitRectCornerIndex;
+          this.updateShapeRectCornerFromScreenPoint(this.selectedElementId, hitRectCornerIndex, point);
         } else if (hitElementId !== null) {
           mode = "element-move";
           elementId = hitElementId;
@@ -452,7 +481,8 @@ export class PixiViewport {
       lastPoint: point,
       button: event.button,
       mode,
-      elementId
+      elementId,
+      handleIndex
     };
   };
 
@@ -493,6 +523,14 @@ export class PixiViewport {
       this.updateFireZoneRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "fire-light-resize" && this.dragState.elementId !== undefined) {
       this.updateFireLightRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "shape-circle-resize" && this.dragState.elementId !== undefined) {
+      this.updateShapeCircleRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "shape-cone-resize" && this.dragState.elementId !== undefined) {
+      this.updateShapeConeRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "shape-cone-rotate" && this.dragState.elementId !== undefined) {
+      this.updateShapeConeDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "shape-rect-resize" && this.dragState.elementId !== undefined && this.dragState.handleIndex !== undefined) {
+      this.updateShapeRectCornerFromScreenPoint(this.dragState.elementId, this.dragState.handleIndex, nextPoint);
     } else if (this.dragState.button === 0 || this.dragState.button === 1) {
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
@@ -507,7 +545,8 @@ export class PixiViewport {
       lastPoint: nextPoint,
       button: this.dragState.button,
       mode: this.dragState.mode,
-      elementId: this.dragState.elementId
+      elementId: this.dragState.elementId,
+      handleIndex: this.dragState.handleIndex
     };
   };
 
@@ -647,7 +686,7 @@ export class PixiViewport {
       const selectedLinearShape = this.shapes.find(
         (shape) =>
           shape.id === this.selectedElementId &&
-          (shape.type === "measurement" || shape.type === "line")
+          shape.type === "measurement"
       );
 
       if (selectedLinearShape !== undefined) {
@@ -666,6 +705,30 @@ export class PixiViewport {
 
       if (selectedFireEffect !== undefined) {
         selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect));
+      }
+
+      const selectedCircleShape = this.shapes.find(
+        (s) => s.id === this.selectedElementId && s.type === "circle"
+      );
+
+      if (selectedCircleShape !== undefined) {
+        selectionLayer.addChild(drawCircleResizeHandle(selectedCircleShape));
+      }
+
+      const selectedConeShape = this.shapes.find(
+        (s) => s.id === this.selectedElementId && s.type === "cone"
+      );
+
+      if (selectedConeShape !== undefined) {
+        selectionLayer.addChild(drawConeShapeHandles(selectedConeShape));
+      }
+
+      const selectedRectShape = this.shapes.find(
+        (s) => s.id === this.selectedElementId && s.type === "rectangle"
+      );
+
+      if (selectedRectShape !== undefined) {
+        selectionLayer.addChild(drawRectCornerHandles(selectedRectShape));
       }
     }
   }
@@ -952,7 +1015,7 @@ export class PixiViewport {
       this.shapes.find(
         (shape) =>
           shape.id === this.selectedElementId &&
-          (shape.type === "measurement" || shape.type === "line")
+          shape.type === "measurement"
       ) ?? null
     );
   }
@@ -978,7 +1041,7 @@ export class PixiViewport {
   private updateLinearShapeDirectionFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
     const shape = this.shapes.find(
       (candidate) =>
-        candidate.id === elementId && (candidate.type === "measurement" || candidate.type === "line")
+        candidate.id === elementId && candidate.type === "measurement"
     );
 
     if (shape === undefined) {
@@ -1013,6 +1076,158 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
     this.options.onFireLightRadiusChange?.(elementId, Math.max(1, radius));
+  }
+
+  private hitTestCircleResizeHandle(screenPoint: ScreenPoint): string | null {
+    const shape = this.shapes.find(
+      (s) => s.id === this.selectedElementId && s.type === "circle"
+    );
+
+    if (shape === undefined) return null;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return null;
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = shape.radius ?? 1;
+    const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+
+    return distance >= radius - 16 && distance <= radius + 18 ? shape.id : null;
+  }
+
+  private hitTestConeShapeResizeHandle(screenPoint: ScreenPoint): string | null {
+    const shape = this.shapes.find(
+      (s) => s.id === this.selectedElementId && s.type === "cone"
+    );
+
+    if (shape === undefined) return null;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return null;
+
+    const radius = shape.radius ?? 1;
+    const direction = ((shape.direction ?? 0) * Math.PI) / 180;
+    const tipX = anchor.x + Math.cos(direction) * radius;
+    const tipY = anchor.y + Math.sin(direction) * radius;
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+
+    return Math.hypot(worldPoint.x - tipX, worldPoint.y - tipY) <= 18 ? shape.id : null;
+  }
+
+  private hitTestConeShapeRotationHandle(screenPoint: ScreenPoint): string | null {
+    const shape = this.shapes.find(
+      (s) => s.id === this.selectedElementId && s.type === "cone"
+    );
+
+    if (shape === undefined) return null;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return null;
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+
+    return distance >= SHAPE_CONE_ROTATION_RING_RADIUS - 16 &&
+      distance <= SHAPE_CONE_ROTATION_RING_RADIUS + 18
+      ? shape.id
+      : null;
+  }
+
+  private hitTestRectCornerHandle(screenPoint: ScreenPoint): number | null {
+    const shape = this.shapes.find(
+      (s) => s.id === this.selectedElementId && s.type === "rectangle"
+    );
+
+    if (shape === undefined) return null;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return null;
+
+    const halfW = (shape.width ?? 1) / 2;
+    const halfH = (shape.height ?? 1) / 2;
+    const corners = [
+      { x: anchor.x - halfW, y: anchor.y - halfH },
+      { x: anchor.x + halfW, y: anchor.y - halfH },
+      { x: anchor.x + halfW, y: anchor.y + halfH },
+      { x: anchor.x - halfW, y: anchor.y + halfH }
+    ];
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+
+    for (let i = 0; i < corners.length; i++) {
+      const corner = corners[i];
+      if (corner !== undefined && Math.hypot(worldPoint.x - corner.x, worldPoint.y - corner.y) <= 16) {
+        return i;
+      }
+    }
+
+    return null;
+  }
+
+  private updateShapeCircleRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const shape = this.shapes.find((s) => s.id === elementId && s.type === "circle");
+    if (shape === undefined) return;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return;
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+    this.options.onShapeRadiusChange?.(elementId, Math.max(10, radius));
+  }
+
+  private updateShapeConeRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const shape = this.shapes.find((s) => s.id === elementId && s.type === "cone");
+    if (shape === undefined) return;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return;
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+    this.options.onShapeRadiusChange?.(elementId, Math.max(10, radius));
+  }
+
+  private updateShapeConeDirectionFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const shape = this.shapes.find((s) => s.id === elementId && s.type === "cone");
+    if (shape === undefined) return;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return;
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const direction =
+      (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
+    this.options.onShapeDirectionChange?.(elementId, direction);
+  }
+
+  private updateShapeRectCornerFromScreenPoint(
+    elementId: string,
+    cornerIndex: number,
+    screenPoint: ScreenPoint
+  ): void {
+    const shape = this.shapes.find((s) => s.id === elementId && s.type === "rectangle");
+    if (shape === undefined) return;
+
+    const anchor = shape.points[0];
+    if (anchor === undefined) return;
+
+    const halfW = (shape.width ?? 1) / 2;
+    const halfH = (shape.height ?? 1) / 2;
+    const corners = [
+      { x: anchor.x - halfW, y: anchor.y - halfH },
+      { x: anchor.x + halfW, y: anchor.y - halfH },
+      { x: anchor.x + halfW, y: anchor.y + halfH },
+      { x: anchor.x - halfW, y: anchor.y + halfH }
+    ];
+    const fixed = corners[(cornerIndex + 2) % 4];
+    if (fixed === undefined) return;
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const newWidth = Math.max(10, Math.abs(worldPoint.x - fixed.x));
+    const newHeight = Math.max(10, Math.abs(worldPoint.y - fixed.y));
+    const anchorX = (worldPoint.x + fixed.x) / 2;
+    const anchorY = (worldPoint.y + fixed.y) / 2;
+    this.options.onShapeRectResize?.(elementId, newWidth, newHeight, anchorX, anchorY);
   }
 
   private getSelectableElements(): readonly SelectableRenderElement[] {
@@ -1169,6 +1384,7 @@ interface SelectableRenderElement {
 }
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
+const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
 }
@@ -1191,7 +1407,6 @@ function drawElement(element: TacticalElement): Graphics {
 
   switch (element.kind) {
     case "measurement":
-    case "line":
       return graphic
         .moveTo(x, y)
         .lineTo(x + 150, y)
@@ -1269,18 +1484,6 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
         const label = drawShapeLabel(distance.label);
         label.position.set((anchor.x + endPoint.x) / 2 + 10, (anchor.y + endPoint.y) / 2 - 28);
         container.addChild(label);
-      }
-      break;
-    case "line":
-      if (endPoint !== null) {
-        graphic
-          .moveTo(anchor.x, anchor.y)
-          .lineTo(endPoint.x, endPoint.y)
-          .stroke({ color: 0xa7d7ff, width: 4, alpha: 0.9 })
-          .circle(anchor.x, anchor.y, 8)
-          .fill({ color: 0xa7d7ff })
-          .circle(endPoint.x, endPoint.y, 8)
-          .fill({ color: 0xa7d7ff });
       }
       break;
     case "circle":
@@ -1622,10 +1825,81 @@ function getLightRenderAngle(light: SceneLight): number {
   return light.kind === "cone" ? 60 : light.angle;
 }
 
+function drawCircleResizeHandle(shape: SceneShape): Graphics {
+  const anchor = shape.points[0];
+  if (anchor === undefined) return new Graphics();
+
+  const radius = shape.radius ?? 1;
+
+  return new Graphics()
+    .circle(anchor.x, anchor.y, radius)
+    .stroke({ color: 0x7fb8ff, width: 2, alpha: 0.75 })
+    .circle(anchor.x + radius, anchor.y, 10)
+    .fill({ color: 0x101315, alpha: 0.9 })
+    .circle(anchor.x + radius, anchor.y, 7)
+    .fill({ color: 0x7fb8ff, alpha: 0.95 });
+}
+
+function drawConeShapeHandles(shape: SceneShape): Graphics {
+  const anchor = shape.points[0];
+  if (anchor === undefined) return new Graphics();
+
+  const radius = shape.radius ?? 1;
+  const angle = ((shape.direction ?? 0) * Math.PI) / 180;
+  const tipX = anchor.x + Math.cos(angle) * radius;
+  const tipY = anchor.y + Math.sin(angle) * radius;
+  const ringHandleX = anchor.x + Math.cos(angle) * SHAPE_CONE_ROTATION_RING_RADIUS;
+  const ringHandleY = anchor.y + Math.sin(angle) * SHAPE_CONE_ROTATION_RING_RADIUS;
+
+  return new Graphics()
+    .circle(anchor.x, anchor.y, SHAPE_CONE_ROTATION_RING_RADIUS)
+    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.72 })
+    .moveTo(anchor.x, anchor.y)
+    .lineTo(ringHandleX, ringHandleY)
+    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.8 })
+    .circle(ringHandleX, ringHandleY, 8)
+    .fill({ color: 0xfff0a8, alpha: 0.95 })
+    .moveTo(anchor.x, anchor.y)
+    .lineTo(tipX, tipY)
+    .stroke({ color: 0x79e1bf, width: 2, alpha: 0.7 })
+    .circle(tipX, tipY, 10)
+    .fill({ color: 0x101315, alpha: 0.9 })
+    .circle(tipX, tipY, 7)
+    .fill({ color: 0x79e1bf, alpha: 0.95 });
+}
+
+function drawRectCornerHandles(shape: SceneShape): Graphics {
+  const anchor = shape.points[0];
+  if (anchor === undefined) return new Graphics();
+
+  const halfW = (shape.width ?? 1) / 2;
+  const halfH = (shape.height ?? 1) / 2;
+  const corners = [
+    { x: anchor.x - halfW, y: anchor.y - halfH },
+    { x: anchor.x + halfW, y: anchor.y - halfH },
+    { x: anchor.x + halfW, y: anchor.y + halfH },
+    { x: anchor.x - halfW, y: anchor.y + halfH }
+  ];
+  const graphic = new Graphics();
+
+  graphic
+    .rect(anchor.x - halfW, anchor.y - halfH, halfW * 2, halfH * 2)
+    .stroke({ color: 0xffd28a, width: 2, alpha: 0.65 });
+
+  for (const corner of corners) {
+    graphic
+      .circle(corner.x, corner.y, 10)
+      .fill({ color: 0x101315, alpha: 0.9 })
+      .circle(corner.x, corner.y, 7)
+      .fill({ color: 0xffd28a, alpha: 0.95 });
+  }
+
+  return graphic;
+}
+
 function getHitRadius(kind: SelectableRenderElement["kind"]): number {
   switch (kind) {
     case "measurement":
-    case "line":
       return 90;
     case "rectangle":
       return 86;

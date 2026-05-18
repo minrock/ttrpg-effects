@@ -14,9 +14,14 @@ const worldPointSchema = z.object({
 
 const linearShapeSchema = z.object({
   id: z.string().min(1),
-  type: z.enum(["measurement", "line"]),
+  type: z.literal("measurement"),
   points: z.array(worldPointSchema).min(2)
 });
+
+const legacyLineShapeSchema = z
+  .object({ type: z.literal("line") })
+  .passthrough()
+  .transform(() => null);
 
 const circleShapeSchema = z.object({
   id: z.string().min(1),
@@ -153,14 +158,19 @@ export const sceneDocumentV1Schema = z.object({
       lightRadius: positiveNumber
     })
   ),
-  shapes: z.array(
-    z.discriminatedUnion("type", [
-      linearShapeSchema,
-      circleShapeSchema,
-      coneShapeSchema,
-      rectangleShapeSchema
-    ])
-  )
+  shapes: z
+    .array(
+      z.union([
+        legacyLineShapeSchema,
+        z.discriminatedUnion("type", [
+          linearShapeSchema,
+          circleShapeSchema,
+          coneShapeSchema,
+          rectangleShapeSchema
+        ])
+      ])
+    )
+    .transform((arr) => arr.filter((s): s is NonNullable<typeof s> => s !== null))
 });
 
 export function parseSceneDocument(input: unknown): SceneDocument {

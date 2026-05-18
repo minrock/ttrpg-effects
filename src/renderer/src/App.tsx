@@ -35,6 +35,7 @@ import {
   moveShape,
   rotateLinearShape,
   setLinearShapeEnd,
+  setShapeRadius,
   updateShape,
   type ShapePatch,
   type TacticalShapeKind
@@ -46,11 +47,7 @@ import {
   updateFogOfWar
 } from "../../domain/vision/vision";
 import type { FirePatch } from "../../domain/effects/fire";
-import {
-  getTacticalElementLabel,
-  tacticalElementKinds,
-  type TacticalElementKind
-} from "../../domain/tools/tactical-elements";
+import type { TacticalElementKind } from "../../domain/tools/tactical-elements";
 import { MapViewport } from "./components/MapViewport";
 import type { PixiContextMenuRequest } from "../../render/pixi/PixiViewport";
 
@@ -439,8 +436,30 @@ export function App(): JSX.Element {
   const handleShapeDirectionChange = useCallback((elementId: string, direction: number): void => {
     setScene((current) => ({
       ...current,
+      shapes: current.shapes.map((shape) => {
+        if (shape.id !== elementId) return shape;
+        if (shape.type === "cone") return updateShape(shape, { direction });
+        return rotateLinearShape(shape, direction);
+      })
+    }));
+  }, []);
+
+  const handleShapeRadiusChange = useCallback((elementId: string, radius: number): void => {
+    setScene((current) => ({
+      ...current,
       shapes: current.shapes.map((shape) =>
-        shape.id === elementId ? rotateLinearShape(shape, direction) : shape
+        shape.id === elementId ? setShapeRadius(shape, radius) : shape
+      )
+    }));
+  }, []);
+
+  const handleShapeRectResize = useCallback((elementId: string, width: number, height: number, anchorX: number, anchorY: number): void => {
+    setScene((current) => ({
+      ...current,
+      shapes: current.shapes.map((shape) =>
+        shape.id === elementId
+          ? updateShape(moveShape(shape, { x: anchorX, y: anchorY }), { width, height })
+          : shape
       )
     }));
   }, []);
@@ -611,7 +630,7 @@ export function App(): JSX.Element {
       ? undefined
       : scene.shapes.find((shape) => shape.id === interaction.selectedElementId);
   const selectedMeasurement =
-    selectedShape?.type === "measurement" || selectedShape?.type === "line"
+    selectedShape?.type === "measurement"
       ? measureDistance(selectedShape.points[0], selectedShape.points[1], {
           grid: scene.grid,
           diagonalMode: scene.settings.diagonalMode
@@ -1110,14 +1129,12 @@ export function App(): JSX.Element {
         <section className="properties-panel" aria-label="Propiedades de forma tactica">
           <strong>
             {selectedShape.type === "measurement"
-              ? "Medicion"
-              : selectedShape.type === "line"
-                ? "Linea"
-                : selectedShape.type === "circle"
-                  ? "Circulo"
-                  : selectedShape.type === "cone"
-                    ? "Cono"
-                    : "Rectangulo"}
+              ? "Linea"
+              : selectedShape.type === "circle"
+                ? "Circulo"
+                : selectedShape.type === "cone"
+                  ? "Cono"
+                  : "Rectangulo"}
           </strong>
           {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
           {selectedShape.type === "circle" || selectedShape.type === "cone" ? (
@@ -1208,6 +1225,8 @@ export function App(): JSX.Element {
         onLightDirectionChange={handleLightDirectionChange}
         onShapeEndMove={handleShapeEndMove}
         onShapeDirectionChange={handleShapeDirectionChange}
+        onShapeRadiusChange={handleShapeRadiusChange}
+        onShapeRectResize={handleShapeRectResize}
         onFogReveal={handleFogReveal}
         onFirePaint={handleFirePaint}
         onFireZoneRadiusChange={handleFireZoneRadiusChange}
@@ -1246,11 +1265,18 @@ export function App(): JSX.Element {
               {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
             </button>
             <hr aria-hidden="true" />
-            {tacticalElementKinds.map((kind) => (
-              <button key={kind} type="button" onClick={() => handleCreateElement(kind)}>
-                {getTacticalElementLabel(kind)}
-              </button>
-            ))}
+            <li className="has-submenu">
+              <button type="button">Herramientas de área ▶</button>
+              <menu className="context-submenu">
+                <button type="button" onClick={() => handleCreateElement("measurement")}>Línea</button>
+                <button type="button" onClick={() => handleCreateElement("circle")}>Círculo</button>
+                <button type="button" onClick={() => handleCreateElement("cone")}>Cono</button>
+                <button type="button" onClick={() => handleCreateElement("rectangle")}>Rectángulo</button>
+              </menu>
+            </li>
+            <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
+            <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
+            <button type="button" onClick={() => handleCreateElement("fire")}>Fuego</button>
           </menu>
         </div>
       ) : null}

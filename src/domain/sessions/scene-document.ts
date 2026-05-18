@@ -119,7 +119,7 @@ export type SceneFireZone =
 
 export interface SceneShape {
   readonly id: string;
-  readonly type: "measurement" | "line" | "circle" | "cone" | "rectangle";
+  readonly type: "measurement" | "circle" | "cone" | "rectangle";
   readonly points: ReadonlyArray<{
     readonly x: number;
     readonly y: number;

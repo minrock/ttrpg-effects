@@ -2,7 +2,7 @@ import type { SceneGrid, SceneShape, SceneSettings } from "../sessions/scene-doc
 import type { WorldPoint } from "../shared/coordinates";
 import { snapWorldPoint } from "../measurement/measurement";
 
-export type TacticalShapeKind = "measurement" | "line" | "circle" | "cone" | "rectangle";
+export type TacticalShapeKind = "measurement" | "circle" | "cone" | "rectangle";
 
 export interface CreateShapeOptions {
   readonly id: string;
@@ -37,12 +37,6 @@ export function createTacticalShape({
         type: "measurement",
         points: [origin, { x: origin.x + grid.cellSizeWorld * 3, y: origin.y }]
       };
-    case "line":
-      return {
-        id,
-        type: "line",
-        points: [origin, { x: origin.x + grid.cellSizeWorld * 3, y: origin.y }]
-      };
     case "circle":
       return {
         id,
@@ -71,7 +65,7 @@ export function createTacticalShape({
 }
 
 export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: number): SceneShape {
-  const shouldSnap = snapCellSize !== undefined && shape.type !== "measurement" && shape.type !== "line";
+  const shouldSnap = snapCellSize !== undefined && shape.type !== "measurement";
   const nextAnchor = shouldSnap ? snapWorldPoint(position, snapCellSize) : position;
   const currentAnchor = getShapeAnchor(shape);
   const dx = nextAnchor.x - currentAnchor.x;
@@ -87,7 +81,7 @@ export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?
 }
 
 export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint): SceneShape {
-  if (shape.type !== "measurement" && shape.type !== "line") {
+  if (shape.type !== "measurement") {
     return shape;
   }
 
@@ -99,7 +93,7 @@ export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint): Scen
 }
 
 export function rotateLinearShape(shape: SceneShape, direction: number): SceneShape {
-  if (shape.type !== "measurement" && shape.type !== "line") {
+  if (shape.type !== "measurement") {
     return shape;
   }
 
@@ -153,7 +147,7 @@ export function getShapeEndPoint(shape: SceneShape): WorldPoint | null {
 export function validateShape(shape: SceneShape): void {
   assertId(shape.id);
 
-  if (!["measurement", "line", "circle", "cone", "rectangle"].includes(shape.type)) {
+  if (!["measurement", "circle", "cone", "rectangle"].includes(shape.type)) {
     throw new Error("Unsupported tactical shape type.");
   }
 
@@ -165,7 +159,7 @@ export function validateShape(shape: SceneShape): void {
     assertFinitePoint(point);
   }
 
-  if ((shape.type === "measurement" || shape.type === "line") && shape.points.length < 2) {
+  if (shape.type === "measurement" && shape.points.length < 2) {
     throw new Error("Linear shapes must contain at least two points.");
   }
 
@@ -178,6 +172,46 @@ export function validateShape(shape: SceneShape): void {
       throw new Error("Rectangle shapes must have positive dimensions.");
     }
   }
+}
+
+export function setShapeRadius(shape: SceneShape, radius: number): SceneShape {
+  if (shape.type !== "circle" && shape.type !== "cone") {
+    return shape;
+  }
+
+  return updateShape(shape, { radius: Math.max(10, radius) });
+}
+
+export function setRectangleCorner(
+  shape: SceneShape,
+  cornerIndex: 0 | 1 | 2 | 3,
+  cursor: WorldPoint
+): SceneShape {
+  if (shape.type !== "rectangle") {
+    return shape;
+  }
+
+  const anchor = getShapeAnchor(shape);
+  const halfW = (shape.width ?? 1) / 2;
+  const halfH = (shape.height ?? 1) / 2;
+
+  const corners: [WorldPoint, WorldPoint, WorldPoint, WorldPoint] = [
+    { x: anchor.x - halfW, y: anchor.y - halfH },
+    { x: anchor.x + halfW, y: anchor.y - halfH },
+    { x: anchor.x + halfW, y: anchor.y + halfH },
+    { x: anchor.x - halfW, y: anchor.y + halfH }
+  ];
+
+  const fixed = corners[(cornerIndex + 2) % 4];
+  const newWidth = Math.max(10, Math.abs(cursor.x - fixed.x));
+  const newHeight = Math.max(10, Math.abs(cursor.y - fixed.y));
+  const newAnchorX = (cursor.x + fixed.x) / 2;
+  const newAnchorY = (cursor.y + fixed.y) / 2;
+
+  return updateShape(moveShape(shape, { x: newAnchorX, y: newAnchorY }), {
+    width: newWidth,
+    height: newHeight
+  });
 }
 
 export function normalizeDirection(value: number): number {

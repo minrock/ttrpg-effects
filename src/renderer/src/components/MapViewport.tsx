@@ -42,6 +42,8 @@ interface MapViewportProps {
   readonly onLightDirectionChange: (elementId: string, direction: number) => void;
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
+  readonly onShapeRadiusChange: (elementId: string, radius: number) => void;
+  readonly onShapeRectResize: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
   readonly onFogReveal: (x: number, y: number) => void;
   readonly onFirePaint: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange: (elementId: string, radius: number) => void;
@@ -74,6 +76,8 @@ export function MapViewport({
   onLightDirectionChange,
   onShapeEndMove,
   onShapeDirectionChange,
+  onShapeRadiusChange,
+  onShapeRectResize,
   onFogReveal,
   onFirePaint,
   onFireZoneRadiusChange,
@@ -102,6 +106,8 @@ export function MapViewport({
       onLightDirectionChange,
       onShapeEndMove,
       onShapeDirectionChange,
+      onShapeRadiusChange,
+      onShapeRectResize,
       onFogReveal,
       onFirePaint,
       onFireZoneRadiusChange,
@@ -135,7 +141,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange, onFogReveal, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogReveal, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);

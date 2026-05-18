@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createTacticalShape, moveShape, rotateLinearShape, setLinearShapeEnd, updateShape } from "./shapes";
+import {
+  createTacticalShape,
+  moveShape,
+  rotateLinearShape,
+  setLinearShapeEnd,
+  setRectangleCorner,
+  setShapeRadius,
+  updateShape
+} from "./shapes";
 
 const grid = { cellSizeWorld: 100 };
 
@@ -57,8 +65,8 @@ describe("tactical shapes", () => {
 
   it("moves all points by the anchor delta", () => {
     const shape = createTacticalShape({
-      id: "line-1",
-      kind: "line",
+      id: "measurement-1",
+      kind: "measurement",
       position: { x: 0, y: 0 },
       grid,
       settings: { snapToGrid: false }
@@ -114,5 +122,67 @@ describe("tactical shapes", () => {
       width: 1,
       height: 50
     });
+  });
+
+  it("setShapeRadius clamps to minimum 10 for circle", () => {
+    const shape = createTacticalShape({
+      id: "circle-1",
+      kind: "circle",
+      position: { x: 0, y: 0 },
+      grid,
+      settings: { snapToGrid: false }
+    });
+
+    expect(setShapeRadius(shape, 200).radius).toBe(200);
+    expect(setShapeRadius(shape, 5).radius).toBe(10);
+  });
+
+  it("setShapeRadius clamps to minimum 10 for cone", () => {
+    const shape = createTacticalShape({
+      id: "cone-1",
+      kind: "cone",
+      position: { x: 0, y: 0 },
+      grid,
+      settings: { snapToGrid: false }
+    });
+
+    expect(setShapeRadius(shape, 150).radius).toBe(150);
+    expect(setShapeRadius(shape, 3).radius).toBe(10);
+  });
+
+  it("setRectangleCorner resizes keeping opposite corner fixed", () => {
+    // Rectangle centered at (0,0), 300x200 → corners at (±150, ±100)
+    const shape = createTacticalShape({
+      id: "rect-1",
+      kind: "rectangle",
+      position: { x: 0, y: 0 },
+      grid,
+      settings: { snapToGrid: false }
+    });
+
+    // Drag top-left corner (index 0) to (-200, -150)
+    // Fixed corner (index 2 = bottom-right) stays at (150, 100)
+    const resized = setRectangleCorner(shape, 0, { x: -200, y: -150 });
+
+    expect(resized.width).toBe(350);
+    expect(resized.height).toBe(250);
+    // New center = midpoint of (-200,-150) and (150,100)
+    expect(resized.points[0].x).toBeCloseTo(-25);
+    expect(resized.points[0].y).toBeCloseTo(-25);
+  });
+
+  it("setRectangleCorner enforces minimum 10 width and height", () => {
+    const shape = createTacticalShape({
+      id: "rect-1",
+      kind: "rectangle",
+      position: { x: 0, y: 0 },
+      grid,
+      settings: { snapToGrid: false }
+    });
+
+    // Drag bottom-right (index 2) to nearly the same x as left side → min width
+    const resized = setRectangleCorner(shape, 2, { x: -148, y: 100 });
+
+    expect(resized.width).toBe(10);
   });
 });
