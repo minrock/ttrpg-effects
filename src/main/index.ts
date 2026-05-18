@@ -53,11 +53,7 @@ app.whenReady().then(() => {
   app.dock?.setIcon(appIconPath);
 
   protocol.handle("map-asset", (request) => {
-    const url = new URL(request.url);
-    url.protocol = "file:";
-    url.search = "";
-    url.hash = "";
-    const fileUrl = url.toString();
+    const fileUrl = request.url.replace("map-asset:", "file:");
     return net.fetch(fileUrl);
   });
 
