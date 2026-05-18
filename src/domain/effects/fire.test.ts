@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateFireTileCenters,
   createAnimatedFireEffect,
+  createCircleFireZone,
+  createFreehandFireZone,
   moveAnimatedFireEffect,
   toggleFireVisibility,
+  toggleCircleFireMode,
   updateAnimatedFireEffect
 } from "./fire";
 
@@ -11,6 +15,11 @@ describe("fire effects", () => {
     expect(createAnimatedFireEffect("fire-1", { x: 12, y: 24 })).toMatchObject({
       id: "fire-1",
       kind: "fire",
+      zone: {
+        kind: "circle",
+        mode: "closed",
+        radius: 90
+      },
       scale: 1,
       opacity: 0.95,
       emitsLight: true,
@@ -36,6 +45,58 @@ describe("fire effects", () => {
 
     expect(moved.position).toEqual({ x: -20, y: 8 });
     expect(toggleFireVisibility(moved).visible).toBe(false);
+  });
+
+  it("toggles circular fire between closed and open modes", () => {
+    const effect = createAnimatedFireEffect("fire-1", { x: 0, y: 0 });
+    const open = toggleCircleFireMode(effect);
+
+    expect(open.zone).toMatchObject({
+      kind: "circle",
+      mode: "open",
+      radius: 90
+    });
+    expect(toggleCircleFireMode(open).zone).toMatchObject({
+      kind: "circle",
+      mode: "closed"
+    });
+  });
+
+  it("creates freehand zones and moves their points with the effect", () => {
+    const zone = createFreehandFireZone([
+      { x: 0, y: 0 },
+      { x: 40, y: 0 },
+      { x: 40, y: 40 },
+      { x: 0, y: 40 }
+    ]);
+    const effect = updateAnimatedFireEffect(createAnimatedFireEffect("fire-1", { x: 20, y: 20 }), {
+      zone
+    });
+    const moved = moveAnimatedFireEffect(effect, { x: 30, y: 35 });
+
+    expect(moved.zone).toEqual({
+      kind: "freehand",
+      points: [
+        { x: 10, y: 15 },
+        { x: 50, y: 15 },
+        { x: 50, y: 55 },
+        { x: 10, y: 55 }
+      ]
+    });
+  });
+
+  it("rejects freehand zones with too few points", () => {
+    expect(() => createFreehandFireZone([{ x: 0, y: 0 }, { x: 10, y: 0 }])).toThrow(
+      "at least three points"
+    );
+  });
+
+  it("calculates tile centers inside the zone bounds", () => {
+    const effect = updateAnimatedFireEffect(createAnimatedFireEffect("fire-1", { x: 0, y: 0 }), {
+      zone: createCircleFireZone(100)
+    });
+
+    expect(calculateFireTileCenters(effect, 80, 4)).toHaveLength(4);
   });
 
   it("rejects invalid colors", () => {

@@ -57,11 +57,17 @@ El fuego debe ser un efecto visual animado superpuesto al mapa.
 
 Requerimientos:
 
-- Usar sprite sheet o secuencia transparente.
+- Usar sprite sheet, secuencia transparente o GIF animado transparente.
 - Poder colocarse con click derecho.
 - Poder moverse, seleccionar y borrar.
 - Poder ajustar escala/opacidad.
 - Idealmente emitir o asociarse a una luz calida.
+
+Decision posterior:
+
+- Spec 09 reemplaza el fuego procedural por `assets/effects/fire.gif`.
+- El render debe preservar la transparencia del GIF para evitar fondos cuadrados u opacos.
+- El fuego puede ser circular cerrado, circular abierto tipo aro o zona dibujada a mano alzada.
 
 Fuente de asset:
 

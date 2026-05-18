@@ -289,6 +289,11 @@ body {
     crosshair;
 }
 
+.map-viewport.is-fire-freehand-mode,
+.map-viewport.is-fire-freehand-mode:active {
+  cursor: crosshair;
+}
+
 .pixi-canvas {
   display: block;
   width: 100%;

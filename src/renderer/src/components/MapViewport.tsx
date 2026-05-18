@@ -30,6 +30,7 @@ interface MapViewportProps {
   readonly isMapAdjustMode: boolean;
   readonly isGrabMode: boolean;
   readonly isFogRevealMode: boolean;
+  readonly isFireFreehandMode: boolean;
   readonly onContextMenuRequest: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect: (elementId: string | null) => void;
   readonly onGridCellSizeChange: (cellSizeWorld: number) => void;
@@ -41,6 +42,9 @@ interface MapViewportProps {
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
   readonly onFogReveal: (x: number, y: number) => void;
+  readonly onFireFreehandComplete: (points: readonly { readonly x: number; readonly y: number }[]) => void;
+  readonly onFireZoneRadiusChange: (elementId: string, radius: number) => void;
+  readonly onFireLightRadiusChange: (elementId: string, radius: number) => void;
 }
 
 export function MapViewport({
@@ -58,6 +62,7 @@ export function MapViewport({
   isMapAdjustMode,
   isGrabMode,
   isFogRevealMode,
+  isFireFreehandMode,
   onContextMenuRequest,
   onElementSelect,
   onGridCellSizeChange,
@@ -68,7 +73,10 @@ export function MapViewport({
   onLightDirectionChange,
   onShapeEndMove,
   onShapeDirectionChange,
-  onFogReveal
+  onFogReveal,
+  onFireFreehandComplete,
+  onFireZoneRadiusChange,
+  onFireLightRadiusChange
 }: MapViewportProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
@@ -93,7 +101,10 @@ export function MapViewport({
       onLightDirectionChange,
       onShapeEndMove,
       onShapeDirectionChange,
-      onFogReveal
+      onFogReveal,
+      onFireFreehandComplete,
+      onFireZoneRadiusChange,
+      onFireLightRadiusChange
     }).then((createdViewport) => {
       if (cancelled) {
         createdViewport.destroy();
@@ -115,6 +126,7 @@ export function MapViewport({
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setGrabMode(isGrabMode);
       createdViewport.setFogRevealMode(isFogRevealMode);
+      createdViewport.setFireFreehandMode(isFireFreehandMode);
     });
 
     return () => {
@@ -122,7 +134,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange, onFogReveal]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange, onFogReveal, onFireFreehandComplete, onFireZoneRadiusChange, onFireLightRadiusChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -180,10 +192,14 @@ export function MapViewport({
     viewportRef.current?.setFogRevealMode(isFogRevealMode);
   }, [isFogRevealMode]);
 
+  useEffect(() => {
+    viewportRef.current?.setFireFreehandMode(isFireFreehandMode);
+  }, [isFireFreehandMode]);
+
   return (
     <div
       ref={hostRef}
-      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}`}
+      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFireFreehandMode ? " is-fire-freehand-mode" : ""}`}
       aria-label="Lienzo del mapa"
     />
   );

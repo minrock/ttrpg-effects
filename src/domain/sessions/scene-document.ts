@@ -91,6 +91,7 @@ export interface SceneEffect {
     readonly x: number;
     readonly y: number;
   };
+  readonly zone: SceneFireZone;
   readonly scale: number;
   readonly opacity: number;
   readonly color: string;
@@ -98,6 +99,21 @@ export interface SceneEffect {
   readonly emitsLight: boolean;
   readonly lightRadius: number;
 }
+
+export type SceneFireZone =
+  | {
+      readonly kind: "circle";
+      readonly mode: "closed" | "open";
+      readonly radius: number;
+      readonly innerRadiusRatio: number;
+    }
+  | {
+      readonly kind: "freehand";
+      readonly points: ReadonlyArray<{
+        readonly x: number;
+        readonly y: number;
+      }>;
+    };
 
 export interface SceneShape {
   readonly id: string;

@@ -79,8 +79,10 @@ La oscuridad global se puede activar/desactivar y ajustar desde la barra de cont
 
 - La luz puntual ilumina un area circular configurable.
 - La luz conica ilumina un sector configurable por radio, angulo y direccion.
-- El fuego es procedural, animado y puede emitir una luz calida sin depender de assets externos.
+- El fuego usa el GIF interno `assets/effects/fire.gif`, conserva su transparencia y puede emitir una luz calida.
+- `Dibujar fuego` permite crear una zona a mano alzada que se rellena con el GIF en mosaico.
 - Al seleccionar una luz o fuego aparece un panel compacto para ajustar visibilidad, color, opacidad, intensidad, radio o escala segun corresponda.
+- Al seleccionar fuego circular se puede alternar entre circulo cerrado y circulo abierto tipo aro.
 - Guardar y cargar escena conserva luces y fuego en el archivo `.ttrpgscene`.
 
 ## Niebla de guerra y vision

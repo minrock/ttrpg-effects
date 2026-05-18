@@ -64,6 +64,19 @@ const fogOfWarSchema = z.object({
   obstacles: z.array(fogObstacleSchema)
 });
 
+const fireZoneSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("circle"),
+    mode: z.enum(["closed", "open"]),
+    radius: positiveNumber,
+    innerRadiusRatio: opacity
+  }),
+  z.object({
+    kind: z.literal("freehand"),
+    points: z.array(worldPointSchema).min(3)
+  })
+]);
+
 export const sceneDocumentV1Schema = z.object({
   version: z.literal(SCENE_DOCUMENT_VERSION),
   map: z.object({
@@ -119,6 +132,12 @@ export const sceneDocumentV1Schema = z.object({
       id: z.string().min(1),
       kind: z.literal("fire"),
       position: worldPointSchema,
+      zone: fireZoneSchema.default({
+        kind: "circle",
+        mode: "closed",
+        radius: 90,
+        innerRadiusRatio: 0
+      }),
       scale: positiveNumber,
       opacity,
       color: hexColor,

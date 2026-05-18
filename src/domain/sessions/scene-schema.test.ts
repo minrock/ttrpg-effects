@@ -52,6 +52,70 @@ describe("scene document schema", () => {
           id: "fire-1",
           kind: "fire",
           position: { x: -30, y: 80 },
+          zone: {
+            kind: "circle",
+            mode: "closed",
+            radius: 90,
+            innerRadiusRatio: 0
+          },
+          scale: 1,
+          opacity: 0.95,
+          color: "#ff7a38",
+          visible: true,
+          emitsLight: true,
+          lightRadius: 150
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
+  it("adds a default circular zone to older fire effects", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "fire-1",
+          kind: "fire",
+          position: { x: 0, y: 0 },
+          scale: 1,
+          opacity: 0.95,
+          color: "#ff7a38",
+          visible: true,
+          emitsLight: true,
+          lightRadius: 150
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene).effects[0]).toMatchObject({
+      zone: {
+        kind: "circle",
+        mode: "closed",
+        radius: 90,
+        innerRadiusRatio: 0
+      }
+    });
+  });
+
+  it("accepts freehand fire zones", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "fire-1",
+          kind: "fire",
+          position: { x: 20, y: 20 },
+          zone: {
+            kind: "freehand",
+            points: [
+              { x: 0, y: 0 },
+              { x: 80, y: 0 },
+              { x: 80, y: 80 },
+              { x: 0, y: 80 }
+            ]
+          },
           scale: 1,
           opacity: 0.95,
           color: "#ff7a38",

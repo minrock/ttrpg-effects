@@ -11,7 +11,13 @@ import {
   setZoomLocked
 } from "../../domain/interaction/interaction-state";
 import { applyGridPreset, gridPresets, setGridCellSize, setGridOpacity } from "../../domain/grid/grid";
-import { createAnimatedFireEffect, updateAnimatedFireEffect } from "../../domain/effects/fire";
+import {
+  createAnimatedFireEffect,
+  createCircleFireZone,
+  createFreehandFireZone,
+  toggleCircleFireMode,
+  updateAnimatedFireEffect
+} from "../../domain/effects/fire";
 import {
   createLightSource,
   moveLightSource,
@@ -458,6 +464,47 @@ export function App(): JSX.Element {
     });
   }, []);
 
+  const handleFireFreehandComplete = useCallback((points: readonly { readonly x: number; readonly y: number }[]): void => {
+    if (points.length < 3) {
+      return;
+    }
+
+    const center = getPointCentroid(points);
+    const id = `fire-${nextEffectId.current}`;
+    nextEffectId.current += 1;
+    const effect = updateAnimatedFireEffect(createAnimatedFireEffect(id, center), {
+      zone: createFreehandFireZone(points)
+    });
+
+    setScene((current) => ({
+      ...current,
+      effects: [...current.effects, effect]
+    }));
+    setInteraction((current) => selectElement(setActiveTool(current, "grab"), id));
+  }, []);
+
+  const handleFireZoneRadiusChange = useCallback((elementId: string, radius: number): void => {
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === elementId && effect.zone.kind === "circle"
+          ? updateAnimatedFireEffect(effect, {
+              zone: createCircleFireZone(radius, effect.zone.mode)
+            })
+          : effect
+      )
+    }));
+  }, []);
+
+  const handleFireLightRadiusChange = useCallback((elementId: string, radius: number): void => {
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === elementId ? updateAnimatedFireEffect(effect, { lightRadius: radius }) : effect
+      )
+    }));
+  }, []);
+
   function handleToggleMapAdjust(): void {
     setInteraction((current) => setMapAdjustMode(current, !current.isMapAdjustMode));
   }
@@ -475,6 +522,12 @@ export function App(): JSX.Element {
 
     setInteraction((current) =>
       setActiveTool(current, current.activeTool === "fog-reveal" ? "grab" : "fog-reveal")
+    );
+  }
+
+  function handleToggleFireFreehandMode(): void {
+    setInteraction((current) =>
+      setActiveTool(current, current.activeTool === "fire-freehand" ? "grab" : "fire-freehand")
     );
   }
 
@@ -648,6 +701,14 @@ export function App(): JSX.Element {
             aria-pressed={interaction.activeTool === "fog-reveal"}
           >
             Modo niebla
+          </button>
+          <button
+            type="button"
+            className={interaction.activeTool === "fire-freehand" ? "is-active" : ""}
+            onClick={handleToggleFireFreehandMode}
+            aria-pressed={interaction.activeTool === "fire-freehand"}
+          >
+            Dibujar fuego
           </button>
           <button
             type="button"
@@ -936,6 +997,32 @@ export function App(): JSX.Element {
               onChange={(event) => updateSelectedEffect({ scale: event.currentTarget.valueAsNumber })}
             />
           </label>
+          {selectedEffect.zone.kind === "circle" ? (
+            <>
+              <button type="button" onClick={() => updateSelectedEffect({ zone: toggleCircleFireMode(selectedEffect).zone })}>
+                {selectedEffect.zone.mode === "closed" ? "Abrir circulo" : "Cerrar circulo"}
+              </button>
+              <label>
+                Radio
+                <input
+                  type="number"
+                  min="10"
+                  max="3000"
+                  value={selectedEffect.zone.radius}
+                  onChange={(event) =>
+                    updateSelectedEffect({
+                      zone: createCircleFireZone(
+                        event.currentTarget.valueAsNumber,
+                        selectedEffect.zone.kind === "circle" ? selectedEffect.zone.mode : "closed"
+                      )
+                    })
+                  }
+                />
+              </label>
+            </>
+          ) : (
+            <span>Zona a mano alzada</span>
+          )}
           <label>
             Opacidad
             <input
@@ -1058,6 +1145,7 @@ export function App(): JSX.Element {
         isMapAdjustMode={interaction.isMapAdjustMode}
         isGrabMode={interaction.activeTool === "grab"}
         isFogRevealMode={interaction.activeTool === "fog-reveal"}
+        isFireFreehandMode={interaction.activeTool === "fire-freehand"}
         onContextMenuRequest={handleContextMenuRequest}
         onElementSelect={handleElementSelect}
         onGridCellSizeChange={handleGridCellSizeChange}
@@ -1069,6 +1157,9 @@ export function App(): JSX.Element {
         onShapeEndMove={handleShapeEndMove}
         onShapeDirectionChange={handleShapeDirectionChange}
         onFogReveal={handleFogReveal}
+        onFireFreehandComplete={handleFireFreehandComplete}
+        onFireZoneRadiusChange={handleFireZoneRadiusChange}
+        onFireLightRadiusChange={handleFireLightRadiusChange}
       />
       {interaction.contextMenu !== null ? (
         <div
@@ -1099,6 +1190,9 @@ export function App(): JSX.Element {
             <button type="button" onClick={handleToggleContextMenuZoomLock}>
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
             </button>
+            <button type="button" onClick={handleToggleFireFreehandMode}>
+              {interaction.activeTool === "fire-freehand" ? "Cancelar dibujo de fuego" : "Dibujar fuego libre"}
+            </button>
             <hr aria-hidden="true" />
             {tacticalElementKinds.map((kind) => (
               <button key={kind} type="button" onClick={() => handleCreateElement(kind)}>
@@ -1110,4 +1204,22 @@ export function App(): JSX.Element {
       ) : null}
     </main>
   );
+}
+
+function getPointCentroid(points: readonly { readonly x: number; readonly y: number }[]): {
+  readonly x: number;
+  readonly y: number;
+} {
+  const total = points.reduce(
+    (sum, point) => ({
+      x: sum.x + point.x,
+      y: sum.y + point.y
+    }),
+    { x: 0, y: 0 }
+  );
+
+  return {
+    x: total.x / points.length,
+    y: total.y / points.length
+  };
 }

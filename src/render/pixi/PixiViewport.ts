@@ -1,4 +1,5 @@
 import { Application, Assets, Container, Graphics, RenderTexture, Sprite, Text } from "pixi.js";
+import { GifSource, GifSprite } from "pixi.js/gif";
 import {
   createCameraState,
   panCamera,
@@ -22,6 +23,8 @@ import type {
 import { measureDistance } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getVisibleAreasFromLights } from "../../domain/vision/vision";
+import { calculateFireTileCenters } from "../../domain/effects/fire";
+import fireGifUrl from "../../../assets/effects/fire.gif";
 
 interface PointerDragState {
   readonly pointerId: number;
@@ -36,7 +39,10 @@ interface PointerDragState {
     | "light-rotate"
     | "shape-end-move"
     | "shape-rotate"
-    | "fog-reveal";
+    | "fog-reveal"
+    | "fire-freehand"
+    | "fire-zone-resize"
+    | "fire-light-resize";
   readonly elementId?: string;
 }
 
@@ -60,6 +66,9 @@ export interface PixiViewportOptions {
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
   readonly onFogReveal?: (x: number, y: number) => void;
+  readonly onFireFreehandComplete?: (points: readonly { readonly x: number; readonly y: number }[]) => void;
+  readonly onFireZoneRadiusChange?: (elementId: string, radius: number) => void;
+  readonly onFireLightRadiusChange?: (elementId: string, radius: number) => void;
 }
 
 export class PixiViewport {
@@ -87,7 +96,11 @@ export class PixiViewport {
   private isMapAdjustMode = false;
   private isGrabMode = false;
   private isFogRevealMode = false;
+  private isFireFreehandMode = false;
   private dragState: PointerDragState | null = null;
+  private fireFreehandDraft: readonly { readonly x: number; readonly y: number }[] = [];
+  private fireGifSource: GifSource | null = null;
+  private isFireGifLoading = false;
   private fireAnimationPhase = 0;
   private _darknessTexture: RenderTexture | null = null;
   private _fogOfWarTexture: RenderTexture | null = null;
@@ -157,6 +170,15 @@ export class PixiViewport {
     this.isFogRevealMode = isFogRevealMode;
   }
 
+  setFireFreehandMode(isFireFreehandMode: boolean): void {
+    this.isFireFreehandMode = isFireFreehandMode;
+
+    if (!isFireFreehandMode && this.fireFreehandDraft.length > 0) {
+      this.fireFreehandDraft = [];
+      this.drawInteractiveElements();
+    }
+  }
+
   setMap(map: MapImageState | null): void {
     const prevUrl = this.map?.imageUrl ?? null;
     this.map = map;
@@ -208,6 +230,8 @@ export class PixiViewport {
     this._darknessTexture = null;
     this._fogOfWarTexture?.destroy();
     this._fogOfWarTexture = null;
+    this.fireGifSource?.destroy();
+    this.fireGifSource = null;
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -224,6 +248,7 @@ export class PixiViewport {
     this.app.stage.addChild(this.world);
 
     this.createLayers();
+    void this.loadFireGif();
     this.drawStaticScene();
     this.addInputListeners();
     this.app.ticker.add(this.animateFire);
@@ -332,11 +357,7 @@ export class PixiViewport {
         eraseContainer.addChild(buildLightEraseGraphic(light, bounds.left, bounds.top));
       }
       for (const effect of activeFireEffects) {
-        const g = new Graphics()
-          .circle(effect.position.x - bounds.left, effect.position.y - bounds.top, effect.lightRadius)
-          .fill({ color: 0xffffff, alpha: 1 });
-        g.blendMode = "erase";
-        eraseContainer.addChild(g);
+        eraseContainer.addChild(buildFireLightEraseGraphic(effect, bounds.left, bounds.top));
       }
       this.app.renderer.render({ container: eraseContainer, target: rt, clear: false });
       eraseContainer.destroy({ children: true });
@@ -392,13 +413,29 @@ export class PixiViewport {
       } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
         this.revealFogAtScreenPoint(point);
+      } else if (this.isFireFreehandMode) {
+        mode = "fire-freehand";
+        this.fireFreehandDraft = [screenToWorld(point, this.camera, this.getViewportSize())];
+        this.drawInteractiveElements();
       } else {
+        const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
+        const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
         const hitRotationElementId = this.hitTestConeRotationHandle(point);
         const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
         const hitShapeEndElementId = this.hitTestLinearShapeEndHandle(point);
         const hitElementId = this.hitTestElement(point);
 
-        if (hitRotationElementId !== null) {
+        if (hitFireZoneResizeElementId !== null) {
+          mode = "fire-zone-resize";
+          elementId = hitFireZoneResizeElementId;
+          this.options.onElementSelect?.(hitFireZoneResizeElementId);
+          this.updateFireZoneRadiusFromScreenPoint(hitFireZoneResizeElementId, point);
+        } else if (hitFireLightResizeElementId !== null) {
+          mode = "fire-light-resize";
+          elementId = hitFireLightResizeElementId;
+          this.options.onElementSelect?.(hitFireLightResizeElementId);
+          this.updateFireLightRadiusFromScreenPoint(hitFireLightResizeElementId, point);
+        } else if (hitRotationElementId !== null) {
           mode = "light-rotate";
           elementId = hitRotationElementId;
           this.options.onElementSelect?.(hitRotationElementId);
@@ -453,6 +490,7 @@ export class PixiViewport {
       this.mapSprite.position.y += dy;
       this.drawGrid();
       this.drawDarknessLayer();
+      this.drawFogOfWarLayer();
       this.options.onMapPositionChange?.(this.mapSprite.position.x, this.mapSprite.position.y);
     } else if (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
@@ -465,6 +503,12 @@ export class PixiViewport {
       this.updateLinearShapeDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "fog-reveal") {
       this.revealFogAtScreenPoint(nextPoint);
+    } else if (this.dragState.mode === "fire-freehand") {
+      this.addFireFreehandDraftPoint(nextPoint);
+    } else if (this.dragState.mode === "fire-zone-resize" && this.dragState.elementId !== undefined) {
+      this.updateFireZoneRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "fire-light-resize" && this.dragState.elementId !== undefined) {
+      this.updateFireLightRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.button === 0 || this.dragState.button === 1) {
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
@@ -505,6 +549,18 @@ export class PixiViewport {
 
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "pan") {
       this.options.onElementSelect?.(this.hitTestElement(releasePoint));
+    }
+
+    if (this.dragState.mode === "fire-freehand") {
+      this.addFireFreehandDraftPoint(releasePoint);
+      const draft = this.fireFreehandDraft;
+      this.fireFreehandDraft = [];
+
+      if (draft.length >= 3) {
+        this.options.onFireFreehandComplete?.(draft);
+      }
+
+      this.drawInteractiveElements();
     }
 
     this.dragState = null;
@@ -575,7 +631,7 @@ export class PixiViewport {
 
     shapesLayer.removeChildren();
     lightsLayer.removeChildren();
-    effectsLayer.removeChildren();
+    destroyChildrenPreservingGifSource(effectsLayer);
     selectionLayer.removeChildren();
 
     for (const effect of this.effects) {
@@ -605,8 +661,12 @@ export class PixiViewport {
 
     for (const effect of this.effects) {
       if (effect.visible) {
-        effectsLayer.addChild(drawSceneEffect(effect, this.fireAnimationPhase));
+        effectsLayer.addChild(drawSceneEffect(effect, this.fireGifSource, this.fireAnimationPhase));
       }
+    }
+
+    if (this.fireFreehandDraft.length > 0) {
+      effectsLayer.addChild(drawFireFreehandDraft(this.fireFreehandDraft));
     }
 
     if (this.selectedElementId !== null) {
@@ -632,6 +692,12 @@ export class PixiViewport {
 
       if (selectedConeLight !== undefined) {
         selectionLayer.addChild(drawConeRotationHandle(selectedConeLight));
+      }
+
+      const selectedFireEffect = this.effects.find((effect) => effect.id === this.selectedElementId);
+
+      if (selectedFireEffect !== undefined) {
+        selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect));
       }
     }
   }
@@ -721,6 +787,18 @@ export class PixiViewport {
     this.options.onFogReveal?.(worldPoint.x, worldPoint.y);
   }
 
+  private addFireFreehandDraftPoint(screenPoint: ScreenPoint): void {
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const previous = this.fireFreehandDraft.at(-1);
+
+    if (previous !== undefined && Math.hypot(worldPoint.x - previous.x, worldPoint.y - previous.y) < 8) {
+      return;
+    }
+
+    this.fireFreehandDraft = [...this.fireFreehandDraft, worldPoint];
+    this.drawInteractiveElements();
+  }
+
   private hitTestElement(screenPoint: ScreenPoint): string | null {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
 
@@ -792,6 +870,43 @@ export class PixiViewport {
       : null;
   }
 
+  private hitTestFireZoneResizeHandle(screenPoint: ScreenPoint): string | null {
+    const selectedFire = this.getSelectedFireEffect();
+
+    if (selectedFire === null || selectedFire.zone.kind !== "circle") {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = selectedFire.zone.radius * selectedFire.scale;
+    const distance = Math.hypot(worldPoint.x - selectedFire.position.x, worldPoint.y - selectedFire.position.y);
+
+    return distance >= radius - 16 && distance <= radius + 18 ? selectedFire.id : null;
+  }
+
+  private hitTestFireLightResizeHandle(screenPoint: ScreenPoint): string | null {
+    const selectedFire = this.getSelectedFireEffect();
+
+    if (selectedFire === null || !selectedFire.emitsLight) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const distance = Math.hypot(worldPoint.x - selectedFire.position.x, worldPoint.y - selectedFire.position.y);
+
+    return distance >= selectedFire.lightRadius - 16 && distance <= selectedFire.lightRadius + 18
+      ? selectedFire.id
+      : null;
+  }
+
+  private getSelectedFireEffect(): SceneEffect | null {
+    if (this.selectedElementId === null) {
+      return null;
+    }
+
+    return this.effects.find((effect) => effect.id === this.selectedElementId) ?? null;
+  }
+
   private getSelectedLinearShape(): SceneShape | null {
     if (this.selectedElementId === null) {
       return null;
@@ -838,6 +953,30 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const direction = (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
     this.options.onShapeDirectionChange?.(elementId, direction);
+  }
+
+  private updateFireZoneRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const effect = this.effects.find((candidate) => candidate.id === elementId && candidate.zone.kind === "circle");
+
+    if (effect === undefined) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const visualRadius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
+    this.options.onFireZoneRadiusChange?.(elementId, Math.max(1, visualRadius / effect.scale));
+  }
+
+  private updateFireLightRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const effect = this.effects.find((candidate) => candidate.id === elementId);
+
+    if (effect === undefined) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
+    this.options.onFireLightRadiusChange?.(elementId, Math.max(1, radius));
   }
 
   private getSelectableElements(): readonly SelectableRenderElement[] {
@@ -986,13 +1125,38 @@ export class PixiViewport {
   }
 
   private readonly animateFire = (): void => {
-    if (this.effects.length === 0) {
+    if (this.fireGifSource !== null && this.fireFreehandDraft.length === 0) {
+      return;
+    }
+
+    if (this.effects.length === 0 && this.fireFreehandDraft.length === 0) {
       return;
     }
 
     this.fireAnimationPhase += 0.08;
     this.drawInteractiveElements();
   };
+
+  private async loadFireGif(): Promise<void> {
+    if (this.fireGifSource !== null || this.isFireGifLoading) {
+      return;
+    }
+
+    this.isFireGifLoading = true;
+
+    try {
+      const buffer = await fetch(fireGifUrl).then((response) => response.arrayBuffer());
+
+      if (this.disposed) {
+        return;
+      }
+
+      this.fireGifSource = GifSource.from(buffer);
+      this.drawInteractiveElements();
+    } finally {
+      this.isFireGifLoading = false;
+    }
+  }
 }
 
 interface SelectableRenderElement {
@@ -1002,6 +1166,7 @@ interface SelectableRenderElement {
 }
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
+const FIRE_TILE_WORLD_SIZE = 96;
 
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
@@ -1214,6 +1379,21 @@ function buildLightEraseGraphic(
   return g;
 }
 
+function buildFireLightEraseGraphic(
+  effect: SceneEffect,
+  offsetX: number,
+  offsetY: number
+): Graphics {
+  const x = effect.position.x - offsetX;
+  const y = effect.position.y - offsetY;
+  const graphic = new Graphics()
+    .circle(x, y, effect.lightRadius)
+    .fill({ color: 0xffffff, alpha: 1 });
+
+  graphic.blendMode = "erase";
+  return graphic;
+}
+
 function drawFireLight(effect: SceneEffect): Graphics {
   return new Graphics()
     .circle(effect.position.x, effect.position.y, effect.lightRadius)
@@ -1222,7 +1402,103 @@ function drawFireLight(effect: SceneEffect): Graphics {
     .fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
 }
 
-function drawSceneEffect(effect: SceneEffect, phase: number): Graphics {
+function drawSceneEffect(effect: SceneEffect, fireGifSource: GifSource | null, phase: number): Container {
+  if (fireGifSource !== null) {
+    return drawGifFireEffect(effect, fireGifSource);
+  }
+
+  const container = new Container();
+  container.addChild(drawProceduralFireEffect(effect, phase));
+  return container;
+}
+
+function drawGifFireEffect(effect: SceneEffect, fireGifSource: GifSource): Container {
+  const container = new Container();
+  const tiles = new Container();
+  const mask = drawFireZoneMask(effect);
+  const tileWorldSize = FIRE_TILE_WORLD_SIZE * effect.scale;
+  const tileScale = tileWorldSize / fireGifSource.width;
+
+  for (const center of calculateFireTileCenters(effect, FIRE_TILE_WORLD_SIZE)) {
+    const tile = new GifSprite({
+      source: fireGifSource,
+      autoPlay: true,
+      autoUpdate: true,
+      loop: true
+    });
+    tile.anchor.set(0.5);
+    tile.position.set(center.x, center.y);
+    tile.scale.set(tileScale);
+    tile.alpha = effect.opacity;
+    tiles.addChild(tile);
+  }
+
+  tiles.mask = mask;
+  mask.renderable = false;
+  container.addChild(tiles);
+  container.addChild(mask);
+
+  return container;
+}
+
+function drawFireZoneMask(effect: SceneEffect): Graphics {
+  const mask = new Graphics();
+
+  if (effect.zone.kind === "circle") {
+    const radius = effect.zone.radius * effect.scale;
+    mask.circle(effect.position.x, effect.position.y, radius).fill({ color: 0xffffff });
+
+    if (effect.zone.mode === "open") {
+      mask
+        .circle(effect.position.x, effect.position.y, radius * effect.zone.innerRadiusRatio)
+        .cut();
+    }
+
+    return mask;
+  }
+
+  const [firstPoint, ...rest] = effect.zone.points;
+
+  if (firstPoint === undefined) {
+    return mask;
+  }
+
+  mask.moveTo(firstPoint.x, firstPoint.y);
+
+  for (const point of rest) {
+    mask.lineTo(point.x, point.y);
+  }
+
+  return mask.closePath().fill({ color: 0xffffff });
+}
+
+function drawFireFreehandDraft(points: readonly { readonly x: number; readonly y: number }[]): Container {
+  const container = new Container();
+  const fill = new Graphics();
+  const line = new Graphics();
+  const [firstPoint, ...rest] = points;
+
+  if (firstPoint === undefined) {
+    return container;
+  }
+
+  fill.moveTo(firstPoint.x, firstPoint.y);
+  line.moveTo(firstPoint.x, firstPoint.y);
+
+  for (const point of rest) {
+    fill.lineTo(point.x, point.y);
+    line.lineTo(point.x, point.y);
+  }
+
+  container.addChild(
+    fill.closePath().fill({ color: 0xff6b35, alpha: points.length >= 3 ? 0.22 : 0 }),
+    line.stroke({ color: 0xffd28a, width: 4, alpha: 0.85 })
+  );
+
+  return container;
+}
+
+function drawProceduralFireEffect(effect: SceneEffect, phase: number): Graphics {
   const flicker = Math.sin(phase + effect.position.x * 0.01) * 0.12;
   const scale = effect.scale * (1 + flicker);
   const x = effect.position.x;
@@ -1238,6 +1514,29 @@ function drawSceneEffect(effect: SceneEffect, phase: number): Graphics {
     .fill({ color: 0xffe39a, alpha: 0.92 * effect.opacity })
     .ellipse(x - 7 * scale, y - 4 * scale, 8 * scale, 20 * scale)
     .fill({ color: 0xffb74d, alpha: 0.84 * effect.opacity });
+}
+
+function destroyChildrenPreservingGifSource(container: Container): void {
+  const removedChildren = container.removeChildren();
+
+  for (const child of removedChildren) {
+    destroyDisplayObjectPreservingGifSource(child);
+  }
+}
+
+function destroyDisplayObjectPreservingGifSource(displayObject: Container): void {
+  if (displayObject instanceof GifSprite) {
+    displayObject.destroy(false);
+    return;
+  }
+
+  const children = displayObject.removeChildren();
+
+  for (const child of children) {
+    destroyDisplayObjectPreservingGifSource(child);
+  }
+
+  displayObject.destroy();
 }
 
 function drawSelection(element: SelectableRenderElement): Graphics {
@@ -1291,6 +1590,33 @@ function drawConeRotationHandle(light: SceneLight): Graphics {
     .stroke({ color: 0xfff0a8, width: 3, alpha: 0.85 })
     .circle(handleX, handleY, 8)
     .fill({ color: 0xfff0a8, alpha: 0.95 });
+}
+
+function drawFireResizeHandles(effect: SceneEffect): Graphics {
+  const graphic = new Graphics();
+
+  if (effect.zone.kind === "circle") {
+    const fireRadius = effect.zone.radius * effect.scale;
+    graphic
+      .circle(effect.position.x, effect.position.y, fireRadius)
+      .stroke({ color: 0xff8a38, width: 3, alpha: 0.9 })
+      .circle(effect.position.x + fireRadius, effect.position.y, 9)
+      .fill({ color: 0x101315, alpha: 0.9 })
+      .circle(effect.position.x + fireRadius, effect.position.y, 6)
+      .fill({ color: 0xff8a38, alpha: 0.95 });
+  }
+
+  if (effect.emitsLight) {
+    graphic
+      .circle(effect.position.x, effect.position.y, effect.lightRadius)
+      .stroke({ color: 0xfff0a8, width: 2, alpha: 0.78 })
+      .circle(effect.position.x + effect.lightRadius, effect.position.y, 10)
+      .fill({ color: 0x101315, alpha: 0.9 })
+      .circle(effect.position.x + effect.lightRadius, effect.position.y, 7)
+      .fill({ color: 0xfff0a8, alpha: 0.95 });
+  }
+
+  return graphic;
 }
 
 function drawConeShape(

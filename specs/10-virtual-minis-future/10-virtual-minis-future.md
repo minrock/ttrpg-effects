@@ -1,4 +1,4 @@
-# Spec 08 - Minis Virtuales y Marcadores Futuros
+# Spec 10 - Minis Virtuales y Marcadores Futuros
 
 ## Objetivo
 
@@ -39,4 +39,3 @@ Definir un modulo futuro opcional para tokens, minis virtuales o marcadores sin 
 - Convertir la app en un VTT completo antes de resolver la mesa fisica.
 - Agregar complejidad visual innecesaria sobre la proyeccion.
 - Confundir tokens virtuales con minis reales durante una sesion.
-
