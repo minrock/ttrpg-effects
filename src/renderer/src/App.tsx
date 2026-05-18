@@ -614,9 +614,12 @@ export function App(): JSX.Element {
   }
 
   function handleToggleFirePaintMode(): void {
-    setInteraction((current) =>
-      setActiveTool(current, current.activeTool === "fire-paint" ? "grab" : "fire-paint")
-    );
+    setInteraction((current) => {
+      if (current.activeTool === "fire-paint") {
+        return selectElement(setActiveTool(current, "grab"), null);
+      }
+      return setActiveTool(current, "fire-paint");
+    });
   }
 
   function handleToggleContextMenuNavigationMode(): void {

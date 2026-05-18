@@ -741,6 +741,9 @@ export class PixiViewport {
     for (const effect of this.effects) {
       if (effect.visible) {
         effectsLayer.addChild(drawSceneEffect(effect, this.grid));
+        if (effect.id !== this.selectedElementId) {
+          selectionLayer.addChild(drawFireZoneHint(effect));
+        }
       }
     }
 
@@ -2416,4 +2419,23 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
     case "fire":
       return 42;
   }
+}
+
+function drawFireZoneHint(effect: SceneEffect): Graphics {
+  const graphic = new Graphics();
+
+  if (effect.zone.kind === "circle") {
+    const radius = effect.zone.radius * effect.scale;
+    graphic
+      .circle(effect.position.x, effect.position.y, radius)
+      .stroke({ color: 0xff8a38, width: 2, alpha: 0.28 });
+  } else {
+    for (const cell of effect.zone.cells) {
+      graphic
+        .rect(cell.x, cell.y, cell.size, cell.size)
+        .stroke({ color: 0xff8a38, width: 1, alpha: 0.28 });
+    }
+  }
+
+  return graphic;
 }
