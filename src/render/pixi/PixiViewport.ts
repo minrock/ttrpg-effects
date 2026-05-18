@@ -13,9 +13,11 @@ import type { MapImageState } from "../../domain/map/map-image";
 import type {
   SceneDarkness,
   SceneEffect,
+  SceneFireEffect,
   SceneFogOfWar,
   SceneGrid,
   SceneLight,
+  SceneMagicalDarknessEffect,
   SceneSettings,
   SceneShape
 } from "../../domain/sessions/scene-document";
@@ -47,7 +49,8 @@ interface PointerDragState {
     | "fog-reveal"
     | "fire-paint"
     | "fire-zone-resize"
-    | "fire-light-resize";
+    | "fire-light-resize"
+    | "magical-darkness-resize";
   readonly elementId?: string;
   readonly handleIndex?: number;
 }
@@ -76,6 +79,7 @@ export interface PixiViewportOptions {
   readonly onFirePaint?: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange?: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange?: (elementId: string, radius: number) => void;
+  readonly onMagicalDarknessRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
 }
@@ -372,7 +376,7 @@ export class PixiViewport {
 
     // Pass 2: erase light areas from the texture
     const activeLights = this.lights.filter((l) => l.visible);
-    const activeFireEffects = this.effects.filter((e) => e.visible && e.emitsLight);
+    const activeFireEffects = this.effects.filter(isVisibleLightEmittingFireEffect);
     if (activeLights.length > 0 || activeFireEffects.length > 0) {
       const eraseContainer = new Container();
       for (const light of activeLights) {
@@ -477,6 +481,7 @@ export class PixiViewport {
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
         const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
+        const hitMagicalDarknessResizeElementId = this.hitTestMagicalDarknessResizeHandle(point);
         const hitLightResizeElementId = this.hitTestLightResizeHandle(point);
         const hitRotationElementId = this.hitTestConeRotationHandle(point);
         const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
@@ -497,6 +502,11 @@ export class PixiViewport {
           elementId = hitFireLightResizeElementId;
           this.options.onElementSelect?.(hitFireLightResizeElementId);
           this.updateFireLightRadiusFromScreenPoint(hitFireLightResizeElementId, point);
+        } else if (hitMagicalDarknessResizeElementId !== null) {
+          mode = "magical-darkness-resize";
+          elementId = hitMagicalDarknessResizeElementId;
+          this.options.onElementSelect?.(hitMagicalDarknessResizeElementId);
+          this.updateMagicalDarknessRadiusFromScreenPoint(hitMagicalDarknessResizeElementId, point);
         } else if (hitLightResizeElementId !== null) {
           mode = "light-resize";
           elementId = hitLightResizeElementId;
@@ -598,6 +608,8 @@ export class PixiViewport {
       this.updateFireZoneRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "fire-light-resize" && this.dragState.elementId !== undefined) {
       this.updateFireLightRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "magical-darkness-resize" && this.dragState.elementId !== undefined) {
+      this.updateMagicalDarknessRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-circle-resize" && this.dragState.elementId !== undefined) {
       this.updateShapeCircleRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-cone-resize" && this.dragState.elementId !== undefined) {
@@ -717,17 +729,17 @@ export class PixiViewport {
     const shapesLayer = this.getLayer("shapesAndMeasurements");
     const lightsLayer = this.getLayer("lights");
     const effectsLayer = this.getLayer("effects");
+    const magicalDarknessLayer = this.getLayer("magicalDarkness");
     const selectionLayer = this.getLayer("selection");
 
     shapesLayer.removeChildren();
     lightsLayer.removeChildren();
     effectsLayer.removeChildren();
+    magicalDarknessLayer.removeChildren();
     selectionLayer.removeChildren();
 
-    for (const effect of this.effects) {
-      if (effect.visible && effect.emitsLight) {
+    for (const effect of this.effects.filter(isVisibleLightEmittingFireEffect)) {
         lightsLayer.addChild(drawFireLight(effect));
-      }
     }
 
     for (const light of this.lights) {
@@ -750,11 +762,13 @@ export class PixiViewport {
     }
 
     for (const effect of this.effects) {
-      if (effect.visible) {
+      if (effect.visible && effect.kind === "fire") {
         effectsLayer.addChild(drawSceneEffect(effect, this.grid));
         if (effect.id !== this.selectedElementId) {
           selectionLayer.addChild(drawFireZoneHint(effect));
         }
+      } else if (effect.visible && effect.kind === "magical-darkness") {
+        magicalDarknessLayer.addChild(drawMagicalDarknessEffect(effect));
       }
     }
 
@@ -793,10 +807,22 @@ export class PixiViewport {
         selectionLayer.addChild(drawLightResizeHandle(selectedLight));
       }
 
-      const selectedFireEffect = this.effects.find((effect) => effect.id === this.selectedElementId);
+      const selectedFireEffect = this.effects.find(
+        (effect): effect is SceneFireEffect =>
+          effect.id === this.selectedElementId && effect.kind === "fire"
+      );
 
       if (selectedFireEffect !== undefined) {
         selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect));
+      }
+
+      const selectedMagicalDarkness = this.effects.find(
+        (effect): effect is SceneMagicalDarknessEffect =>
+          effect.id === this.selectedElementId && effect.kind === "magical-darkness"
+      );
+
+      if (selectedMagicalDarkness !== undefined) {
+        selectionLayer.addChild(drawMagicalDarknessResizeHandle(selectedMagicalDarkness));
       }
 
       const selectedCircleShape = this.shapes.find(
@@ -864,7 +890,10 @@ export class PixiViewport {
       ...getVisibleAreasFromLights(this.lights)
     ];
     const circleFireReveals = this.effects
-      .filter((effect) => effect.visible && effect.emitsLight && effect.zone.kind !== "cells")
+      .filter(
+        (effect): effect is SceneFireEffect =>
+          effect.kind === "fire" && effect.visible && effect.emitsLight && effect.zone.kind !== "cells"
+      )
       .map((effect) => ({
         id: `vision-${effect.id}`,
         kind: "circle" as const,
@@ -873,7 +902,8 @@ export class PixiViewport {
       }));
 
     const cellFireEffects = this.effects.filter(
-      (effect) => effect.visible && effect.emitsLight && effect.zone.kind === "cells"
+      (effect): effect is SceneFireEffect =>
+        effect.kind === "fire" && effect.visible && effect.emitsLight && effect.zone.kind === "cells"
     );
 
     if (reveals.length > 0 || circleFireReveals.length > 0 || cellFireEffects.length > 0) {
@@ -1047,7 +1077,7 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
 
     for (const element of [...this.getSelectableElements()].reverse()) {
-      const radius = getHitRadius(element.kind);
+      const radius = element.hitRadius ?? getHitRadius(element.kind);
       const distance = Math.hypot(worldPoint.x - element.position.x, worldPoint.y - element.position.y);
 
       if (distance <= radius) {
@@ -1158,12 +1188,49 @@ export class PixiViewport {
       : null;
   }
 
-  private getSelectedFireEffect(): SceneEffect | null {
+  private hitTestMagicalDarknessResizeHandle(screenPoint: ScreenPoint): string | null {
+    const selectedMagicalDarkness = this.getSelectedMagicalDarknessEffect();
+
+    if (selectedMagicalDarkness === null) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const distance = Math.hypot(
+      worldPoint.x - selectedMagicalDarkness.position.x,
+      worldPoint.y - selectedMagicalDarkness.position.y
+    );
+
+    return distance >= selectedMagicalDarkness.radius - 16 &&
+      distance <= selectedMagicalDarkness.radius + 18
+      ? selectedMagicalDarkness.id
+      : null;
+  }
+
+  private getSelectedFireEffect(): SceneFireEffect | null {
     if (this.selectedElementId === null) {
       return null;
     }
 
-    return this.effects.find((effect) => effect.id === this.selectedElementId) ?? null;
+    return (
+      this.effects.find(
+        (effect): effect is SceneFireEffect =>
+          effect.id === this.selectedElementId && effect.kind === "fire"
+      ) ?? null
+    );
+  }
+
+  private getSelectedMagicalDarknessEffect(): SceneMagicalDarknessEffect | null {
+    if (this.selectedElementId === null) {
+      return null;
+    }
+
+    return (
+      this.effects.find(
+        (effect): effect is SceneMagicalDarknessEffect =>
+          effect.id === this.selectedElementId && effect.kind === "magical-darkness"
+      ) ?? null
+    );
   }
 
   private getSelectedLight(): SceneLight | null {
@@ -1235,7 +1302,10 @@ export class PixiViewport {
   }
 
   private updateFireZoneRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
-    const effect = this.effects.find((candidate) => candidate.id === elementId);
+    const effect = this.effects.find(
+      (candidate): candidate is SceneFireEffect =>
+        candidate.id === elementId && candidate.kind === "fire"
+    );
 
     if (effect === undefined) {
       return;
@@ -1247,7 +1317,10 @@ export class PixiViewport {
   }
 
   private updateFireLightRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
-    const effect = this.effects.find((candidate) => candidate.id === elementId);
+    const effect = this.effects.find(
+      (candidate): candidate is SceneFireEffect =>
+        candidate.id === elementId && candidate.kind === "fire"
+    );
 
     if (effect === undefined) {
       return;
@@ -1256,6 +1329,21 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
     this.options.onFireLightRadiusChange?.(elementId, Math.max(1, radius));
+  }
+
+  private updateMagicalDarknessRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const effect = this.effects.find(
+      (candidate): candidate is SceneMagicalDarknessEffect =>
+        candidate.id === elementId && candidate.kind === "magical-darkness"
+    );
+
+    if (effect === undefined) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
+    this.options.onMagicalDarknessRadiusChange?.(elementId, Math.max(1, radius));
   }
 
   private hitTestCircleResizeHandle(screenPoint: ScreenPoint): string | null {
@@ -1425,8 +1513,9 @@ export class PixiViewport {
       })),
       ...this.effects.map((effect) => ({
         id: effect.id,
-        kind: "fire" as const,
-        position: effect.position
+        kind: effect.kind === "fire" ? "fire" as const : "magical-darkness" as const,
+        position: effect.position,
+        hitRadius: effect.kind === "magical-darkness" ? effect.radius : undefined
       }))
     ];
   }
@@ -1573,8 +1662,9 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"];
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness";
   readonly position: { readonly x: number; readonly y: number };
+  readonly hitRadius?: number;
 }
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
@@ -1583,6 +1673,10 @@ const FIRE_EMOJI = "🔥";
 const MAX_EMOJIS_PER_ELEMENT = 120;
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
+}
+
+function isVisibleLightEmittingFireEffect(effect: SceneEffect): effect is SceneFireEffect {
+  return effect.kind === "fire" && effect.visible && effect.emitsLight;
 }
 
 function getLayerForElementKind(kind: TacticalElement["kind"]): "shapes" | "lights" | "effects" {
@@ -2033,7 +2127,7 @@ function buildLightEraseGraphic(
 }
 
 function buildFireLightEraseGraphic(
-  effect: SceneEffect,
+  effect: SceneFireEffect,
   offsetX: number,
   offsetY: number
 ): Graphics {
@@ -2092,7 +2186,7 @@ function buildDarkvisionColorMask(
   }
 
   for (const effect of effects) {
-    if (!effect.visible || !effect.emitsLight) {
+    if (!isVisibleLightEmittingFireEffect(effect)) {
       continue;
     }
 
@@ -2121,7 +2215,7 @@ function buildDarkvisionColorMask(
   return graphic;
 }
 
-function drawFireLight(effect: SceneEffect): Graphics {
+function drawFireLight(effect: SceneFireEffect): Graphics {
   if (effect.zone.kind === "cells") {
     const graphic = new Graphics();
     const { bright, dim } = computeCellRings(effect.zone.cells);
@@ -2191,7 +2285,7 @@ function computeCellRings(
   };
 }
 
-function drawSceneEffect(effect: SceneEffect, grid: SceneGrid | null): Container {
+function drawSceneEffect(effect: SceneFireEffect, grid: SceneGrid | null): Container {
   const container = new Container();
   const graphic = new Graphics();
   const color = parseHexColor(effect.color);
@@ -2246,6 +2340,13 @@ function drawSceneEffect(effect: SceneEffect, grid: SceneGrid | null): Container
   );
 
   return container;
+}
+
+function drawMagicalDarknessEffect(effect: SceneMagicalDarknessEffect): Graphics {
+  return new Graphics()
+    .circle(effect.position.x, effect.position.y, effect.radius)
+    .fill({ color: 0x000000, alpha: effect.opacity })
+    .stroke({ color: 0x000000, width: 4, alpha: 0.95 });
 }
 
 function drawSelection(element: SelectableRenderElement): Graphics {
@@ -2339,7 +2440,7 @@ function getLightResizeHandlePosition(light: SceneLight): { x: number; y: number
   };
 }
 
-function drawFireResizeHandles(effect: SceneEffect): Graphics {
+function drawFireResizeHandles(effect: SceneFireEffect): Graphics {
   const graphic = new Graphics();
 
   if (effect.zone.kind === "cells") {
@@ -2369,7 +2470,17 @@ function drawFireResizeHandles(effect: SceneEffect): Graphics {
   return graphic;
 }
 
-function getFireVisualRadius(effect: SceneEffect): number {
+function drawMagicalDarknessResizeHandle(effect: SceneMagicalDarknessEffect): Graphics {
+  return new Graphics()
+    .circle(effect.position.x, effect.position.y, effect.radius)
+    .stroke({ color: 0x111315, width: 4, alpha: 0.92 })
+    .circle(effect.position.x + effect.radius, effect.position.y, 10)
+    .fill({ color: 0xf4f1e8, alpha: 0.9 })
+    .circle(effect.position.x + effect.radius, effect.position.y, 6)
+    .fill({ color: 0x111315, alpha: 0.95 });
+}
+
+function getFireVisualRadius(effect: SceneFireEffect): number {
   return effect.zone.radius * effect.scale;
 }
 
@@ -2486,10 +2597,12 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
       return 72;
     case "fire":
       return 42;
+    case "magical-darkness":
+      return 72;
   }
 }
 
-function drawFireZoneHint(effect: SceneEffect): Graphics {
+function drawFireZoneHint(effect: SceneFireEffect): Graphics {
   const graphic = new Graphics();
 
   graphic

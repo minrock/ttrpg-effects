@@ -153,6 +153,42 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("accepts magical darkness effects", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "magical-darkness-1",
+          kind: "magical-darkness",
+          position: { x: 40, y: -20 },
+          radius: 150,
+          opacity: 0.35,
+          visible: true
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
+  it("rejects invalid magical darkness ranges", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "magical-darkness-1",
+          kind: "magical-darkness",
+          position: { x: 0, y: 0 },
+          radius: 0,
+          opacity: 2,
+          visible: true
+        }
+      ]
+    };
+
+    expect(() => parseSceneDocument(scene)).toThrow();
+  });
+
   it("accepts tactical shapes with optional dimensions", () => {
     const scene = {
       ...createDefaultScene(),

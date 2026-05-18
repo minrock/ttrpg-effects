@@ -1,4 +1,5 @@
 import { clampPositive, clampUnit, normalizeHexColor } from "../lighting/lights";
+import type { SceneFireEffect } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 
 export type EffectKind = "fire";
@@ -23,18 +24,7 @@ export interface FireCell {
   readonly size: number;
 }
 
-export interface AnimatedFireEffect {
-  readonly id: string;
-  readonly kind: EffectKind;
-  readonly position: WorldPoint;
-  readonly zone: FireZone;
-  readonly scale: number;
-  readonly opacity: number;
-  readonly color: string;
-  readonly visible: boolean;
-  readonly emitsLight: boolean;
-  readonly lightRadius: number;
-}
+export type AnimatedFireEffect = SceneFireEffect;
 
 export interface FirePatch {
   readonly position?: WorldPoint;

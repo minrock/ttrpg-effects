@@ -6,6 +6,7 @@ export const renderLayerNames = [
   "lights",
   "fogOfWar",
   "effects",
+  "magicalDarkness",
   "walls",
   "shapesAndMeasurements",
   "selection"

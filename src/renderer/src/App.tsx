@@ -21,6 +21,11 @@ import {
   type FireCell
 } from "../../domain/effects/fire";
 import {
+  createMagicalDarknessEffect,
+  updateMagicalDarknessEffect,
+  type MagicalDarknessPatch
+} from "../../domain/effects/magical-darkness";
+import {
   createLightSource,
   moveLightSource,
   updateLightSource,
@@ -28,10 +33,14 @@ import {
   type LightPatch
 } from "../../domain/lighting/lights";
 import { createMapImageState, type MapImageState } from "../../domain/map/map-image";
-import { measureDistance } from "../../domain/measurement/measurement";
+import { formatDistance, measureDistance } from "../../domain/measurement/measurement";
 import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
-import type { SceneDocument, SceneOperationResult } from "../../domain/sessions/scene-document";
+import type {
+  SceneDocument,
+  SceneFireEffect,
+  SceneOperationResult
+} from "../../domain/sessions/scene-document";
 import {
   createTacticalShape,
   moveShape,
@@ -174,6 +183,22 @@ export function App(): JSX.Element {
     const id = `fire-${nextEffectId.current}`;
     nextEffectId.current += 1;
     const effect = createAnimatedFireEffect(id, interaction.contextMenu.world);
+
+    setScene((current) => ({
+      ...current,
+      effects: [...current.effects, effect]
+    }));
+    setInteraction((current) => selectElement(closeContextMenu(current), id));
+  };
+
+  const handleCreateMagicalDarkness = (): void => {
+    if (interaction.contextMenu === null) {
+      return;
+    }
+
+    const id = `magical-darkness-${nextEffectId.current}`;
+    nextEffectId.current += 1;
+    const effect = createMagicalDarknessEffect(id, interaction.contextMenu.world);
 
     setScene((current) => ({
       ...current,
@@ -593,7 +618,11 @@ export function App(): JSX.Element {
           : shape
       ),
       effects: current.effects.map((effect) =>
-        effect.id === elementId ? updateAnimatedFireEffect(effect, { position: { x, y } }) : effect
+        effect.id === elementId
+          ? effect.kind === "fire"
+            ? updateAnimatedFireEffect(effect, { position: { x, y } })
+            : updateMagicalDarknessEffect(effect, { position: { x, y } })
+          : effect
       )
     }));
   }, []);
@@ -682,9 +711,15 @@ export function App(): JSX.Element {
     }
 
     setScene((current) => {
-      const activeFire = current.effects.find((effect) => effect.id === selectedElementIdRef.current);
+      const activeFire = current.effects.find(
+        (effect): effect is SceneFireEffect =>
+          effect.id === selectedElementIdRef.current && effect.kind === "fire"
+      );
       const selectedEffect = current.effects.find(
-        (effect) => effect.id === selectedElementIdRef.current && effect.zone.kind === "cells"
+        (effect): effect is SceneFireEffect =>
+          effect.id === selectedElementIdRef.current &&
+          effect.kind === "fire" &&
+          effect.zone.kind === "cells"
       );
 
       if (selectedEffect !== undefined && selectedEffect.zone.kind === "cells") {
@@ -693,7 +728,7 @@ export function App(): JSX.Element {
         return {
           ...current,
           effects: current.effects.map((effect) =>
-            effect.id === selectedEffect.id
+            effect.id === selectedEffect.id && effect.kind === "fire"
               ? updateAnimatedFireEffect(effect, {
                   zone: createCellFireZone(mergedCells, selectedEffect.zone.radius)
                 })
@@ -727,11 +762,11 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       effects: current.effects.map((effect) =>
-        effect.id === elementId && effect.zone.kind === "circle"
+        effect.id === elementId && effect.kind === "fire" && effect.zone.kind === "circle"
           ? updateAnimatedFireEffect(effect, {
               zone: createCircleFireZone(radius, effect.zone.mode)
             })
-          : effect.id === elementId && effect.zone.kind === "cells"
+          : effect.id === elementId && effect.kind === "fire" && effect.zone.kind === "cells"
             ? updateAnimatedFireEffect(effect, {
                 zone: createCellFireZone(effect.zone.cells, radius)
               })
@@ -744,7 +779,20 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       effects: current.effects.map((effect) =>
-        effect.id === elementId ? updateAnimatedFireEffect(effect, { lightRadius: radius }) : effect
+        effect.id === elementId && effect.kind === "fire"
+          ? updateAnimatedFireEffect(effect, { lightRadius: radius })
+          : effect
+      )
+    }));
+  }, []);
+
+  const handleMagicalDarknessRadiusChange = useCallback((elementId: string, radius: number): void => {
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === elementId && effect.kind === "magical-darkness"
+          ? updateMagicalDarknessEffect(effect, { radius })
+          : effect
       )
     }));
   }, []);
@@ -815,6 +863,10 @@ export function App(): JSX.Element {
     interaction.selectedElementId === null
       ? undefined
       : scene.effects.find((effect) => effect.id === interaction.selectedElementId);
+  const selectedFireEffect =
+    selectedEffect?.kind === "fire" ? selectedEffect : undefined;
+  const selectedMagicalDarkness =
+    selectedEffect?.kind === "magical-darkness" ? selectedEffect : undefined;
   const selectedShape =
     interaction.selectedElementId === null
       ? undefined
@@ -851,15 +903,32 @@ export function App(): JSX.Element {
     }));
   }
 
-  function updateSelectedEffect(patch: FirePatch): void {
-    if (selectedEffect === undefined) {
+  function updateSelectedFireEffect(patch: FirePatch): void {
+    if (selectedFireEffect === undefined) {
       return;
     }
 
     setScene((current) => ({
       ...current,
       effects: current.effects.map((effect) =>
-        effect.id === selectedEffect.id ? updateAnimatedFireEffect(effect, patch) : effect
+        effect.id === selectedFireEffect.id && effect.kind === "fire"
+          ? updateAnimatedFireEffect(effect, patch)
+          : effect
+      )
+    }));
+  }
+
+  function updateSelectedMagicalDarkness(patch: MagicalDarknessPatch): void {
+    if (selectedMagicalDarkness === undefined) {
+      return;
+    }
+
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === selectedMagicalDarkness.id && effect.kind === "magical-darkness"
+          ? updateMagicalDarknessEffect(effect, patch)
+          : effect
       )
     }));
   }
@@ -947,8 +1016,10 @@ export function App(): JSX.Element {
       ? selectedLight.kind === "point"
         ? "Luz puntual"
         : "Luz conica"
-      : selectedEffect !== undefined
+      : selectedFireEffect !== undefined
         ? "Fuego"
+        : selectedMagicalDarkness !== undefined
+          ? "Oscuridad magica"
         : selectedShape?.type === "measurement"
           ? "Linea"
           : selectedShape?.type === "circle"
@@ -963,15 +1034,26 @@ export function App(): JSX.Element {
       ? selectedLight.kind === "point"
         ? "●"
         : "◖"
-      : selectedEffect !== undefined
+      : selectedFireEffect !== undefined
         ? "火"
+        : selectedMagicalDarkness !== undefined
+          ? "●"
         : selectedShape?.type === "measurement"
           ? "╱"
           : selectedShape?.type === "circle"
             ? "○"
             : selectedShape?.type === "cone"
-              ? "◺"
-              : "▭";
+          ? "◺"
+          : "▭";
+  const selectedMagicalDarknessRadiusCells =
+    selectedMagicalDarkness === undefined
+      ? 1
+      : Number((selectedMagicalDarkness.radius / scene.grid.cellSizeWorld).toFixed(2));
+  const selectedMagicalDarknessRadiusLabel = formatDistance(
+    selectedMagicalDarknessRadiusCells *
+      (scene.grid.unit === "ft" ? scene.grid.distancePerCell : scene.grid.metricDistancePerCell),
+    scene.grid.unit
+  );
 
   return (
     <main className="app-shell" aria-label="TTRPG Effects">
@@ -1060,6 +1142,7 @@ export function App(): JSX.Element {
           onFirePaint={handleFirePaint}
           onFireZoneRadiusChange={handleFireZoneRadiusChange}
           onFireLightRadiusChange={handleFireLightRadiusChange}
+          onMagicalDarknessRadiusChange={handleMagicalDarknessRadiusChange}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
           {hasSelectedObject ? (
@@ -1151,13 +1234,13 @@ export function App(): JSX.Element {
                   ) : null}
                 </div>
               ) : null}
-              {selectedEffect !== undefined ? (
+              {selectedFireEffect !== undefined ? (
                 <div className="selected-properties-content" aria-label="Propiedades de fuego">
                   <label>
                     <input
                       type="checkbox"
-                      checked={selectedEffect.visible}
-                      onChange={(event) => updateSelectedEffect({ visible: event.currentTarget.checked })}
+                      checked={selectedFireEffect.visible}
+                      onChange={(event) => updateSelectedFireEffect({ visible: event.currentTarget.checked })}
                     />
                     Visible
                   </label>
@@ -1165,8 +1248,8 @@ export function App(): JSX.Element {
                     Color
                     <input
                       type="color"
-                      value={selectedEffect.color}
-                      onChange={(event) => updateSelectedEffect({ color: event.currentTarget.value })}
+                      value={selectedFireEffect.color}
+                      onChange={(event) => updateSelectedFireEffect({ color: event.currentTarget.value })}
                     />
                   </label>
                   <label>
@@ -1176,17 +1259,17 @@ export function App(): JSX.Element {
                       min="0.1"
                       max="8"
                       step="0.1"
-                      value={selectedEffect.scale}
-                      onChange={(event) => updateSelectedEffect({ scale: event.currentTarget.valueAsNumber })}
+                      value={selectedFireEffect.scale}
+                      onChange={(event) => updateSelectedFireEffect({ scale: event.currentTarget.valueAsNumber })}
                     />
                   </label>
-                  {selectedEffect.zone.kind === "circle" ? (
+                  {selectedFireEffect.zone.kind === "circle" ? (
                     <>
                       <button
                         type="button"
-                        onClick={() => updateSelectedEffect({ zone: toggleCircleFireMode(selectedEffect).zone })}
+                        onClick={() => updateSelectedFireEffect({ zone: toggleCircleFireMode(selectedFireEffect).zone })}
                       >
-                        {selectedEffect.zone.mode === "closed" ? "Abrir circulo" : "Cerrar circulo"}
+                        {selectedFireEffect.zone.mode === "closed" ? "Abrir circulo" : "Cerrar circulo"}
                       </button>
                       <label>
                         Radio
@@ -1194,12 +1277,12 @@ export function App(): JSX.Element {
                           type="number"
                           min="10"
                           max="3000"
-                          value={selectedEffect.zone.radius}
+                          value={selectedFireEffect.zone.radius}
                           onChange={(event) =>
-                            updateSelectedEffect({
+                            updateSelectedFireEffect({
                               zone: createCircleFireZone(
                                 event.currentTarget.valueAsNumber,
-                                selectedEffect.zone.kind === "circle" ? selectedEffect.zone.mode : "closed"
+                                selectedFireEffect.zone.kind === "circle" ? selectedFireEffect.zone.mode : "closed"
                               )
                             })
                           }
@@ -1208,18 +1291,18 @@ export function App(): JSX.Element {
                     </>
                   ) : (
                     <>
-                      <span>{selectedEffect.zone.cells.length} celdas en fuego</span>
+                      <span>{selectedFireEffect.zone.cells.length} celdas en fuego</span>
                       <label>
                         Pincel
                         <input
                           type="number"
                           min="1"
                           max="3000"
-                          value={selectedEffect.zone.radius}
+                          value={selectedFireEffect.zone.radius}
                           onChange={(event) =>
-                            updateSelectedEffect({
+                            updateSelectedFireEffect({
                               zone: createCellFireZone(
-                                selectedEffect.zone.kind === "cells" ? selectedEffect.zone.cells : [],
+                                selectedFireEffect.zone.kind === "cells" ? selectedFireEffect.zone.cells : [],
                                 event.currentTarget.valueAsNumber
                               )
                             })
@@ -1235,15 +1318,15 @@ export function App(): JSX.Element {
                       min="0"
                       max="1"
                       step="0.05"
-                      value={selectedEffect.opacity}
-                      onChange={(event) => updateSelectedEffect({ opacity: event.currentTarget.valueAsNumber })}
+                      value={selectedFireEffect.opacity}
+                      onChange={(event) => updateSelectedFireEffect({ opacity: event.currentTarget.valueAsNumber })}
                     />
                   </label>
                   <label>
                     <input
                       type="checkbox"
-                      checked={selectedEffect.emitsLight}
-                      onChange={(event) => updateSelectedEffect({ emitsLight: event.currentTarget.checked })}
+                      checked={selectedFireEffect.emitsLight}
+                      onChange={(event) => updateSelectedFireEffect({ emitsLight: event.currentTarget.checked })}
                     />
                     Emite luz
                   </label>
@@ -1253,8 +1336,51 @@ export function App(): JSX.Element {
                       type="number"
                       min="1"
                       max="1000"
-                      value={selectedEffect.lightRadius}
-                      onChange={(event) => updateSelectedEffect({ lightRadius: event.currentTarget.valueAsNumber })}
+                      value={selectedFireEffect.lightRadius}
+                      onChange={(event) => updateSelectedFireEffect({ lightRadius: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {selectedMagicalDarkness !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de oscuridad magica">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedMagicalDarkness.visible}
+                      onChange={(event) =>
+                        updateSelectedMagicalDarkness({ visible: event.currentTarget.checked })
+                      }
+                    />
+                    Visible
+                  </label>
+                  <label>
+                    Radio
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      step="0.5"
+                      value={selectedMagicalDarknessRadiusCells}
+                      onChange={(event) =>
+                        updateSelectedMagicalDarkness({
+                          radius: Math.max(1, event.currentTarget.valueAsNumber) * scene.grid.cellSizeWorld
+                        })
+                      }
+                    />
+                    <span>{selectedMagicalDarknessRadiusLabel}</span>
+                  </label>
+                  <label>
+                    Opacidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedMagicalDarkness.opacity}
+                      onChange={(event) =>
+                        updateSelectedMagicalDarkness({ opacity: event.currentTarget.valueAsNumber })
+                      }
                     />
                   </label>
                 </div>
@@ -1666,9 +1792,6 @@ export function App(): JSX.Element {
             <button type="button" onClick={handleToggleContextMenuZoomLock}>
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
             </button>
-            <button type="button" onClick={handleToggleFirePaintMode}>
-              {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
-            </button>
             <hr aria-hidden="true" />
             <li className="has-submenu">
               <button type="button">Herramientas de área ▶</button>
@@ -1679,9 +1802,18 @@ export function App(): JSX.Element {
                 <button type="button" onClick={() => handleCreateElement("rectangle")}>Rectángulo</button>
               </menu>
             </li>
-            <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
-            <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
-            <button type="button" onClick={() => handleCreateElement("fire")}>Fuego</button>
+            <li className="has-submenu">
+              <button type="button">Efectos ▶</button>
+              <menu className="context-submenu">
+                <button type="button" onClick={() => handleCreateElement("fire")}>Fuego</button>
+                <button type="button" onClick={handleToggleFirePaintMode}>
+                  {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
+                </button>
+                <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
+                <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
+                <button type="button" onClick={handleCreateMagicalDarkness}>Oscuridad magica</button>
+              </menu>
+            </li>
           </menu>
         </div>
       ) : null}

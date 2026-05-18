@@ -107,6 +107,33 @@ const fireZoneSchema = z.discriminatedUnion("kind", [
   })
 ]);
 
+const fireEffectSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("fire"),
+  position: worldPointSchema,
+  zone: fireZoneSchema.default({
+    kind: "circle",
+    mode: "closed",
+    radius: 90,
+    innerRadiusRatio: 0
+  }),
+  scale: positiveNumber,
+  opacity,
+  color: hexColor,
+  visible: z.boolean(),
+  emitsLight: z.boolean(),
+  lightRadius: positiveNumber
+});
+
+const magicalDarknessEffectSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("magical-darkness"),
+  position: worldPointSchema,
+  radius: positiveNumber,
+  opacity,
+  visible: z.boolean()
+});
+
 export const sceneDocumentV1Schema = z.object({
   version: z.literal(SCENE_DOCUMENT_VERSION),
   map: z.object({
@@ -158,25 +185,7 @@ export const sceneDocumentV1Schema = z.object({
       snapToGrid: z.boolean()
     })
   ),
-  effects: z.array(
-    z.object({
-      id: z.string().min(1),
-      kind: z.literal("fire"),
-      position: worldPointSchema,
-      zone: fireZoneSchema.default({
-        kind: "circle",
-        mode: "closed",
-        radius: 90,
-        innerRadiusRatio: 0
-      }),
-      scale: positiveNumber,
-      opacity,
-      color: hexColor,
-      visible: z.boolean(),
-      emitsLight: z.boolean(),
-      lightRadius: positiveNumber
-    })
-  ),
+  effects: z.array(z.discriminatedUnion("kind", [fireEffectSchema, magicalDarknessEffectSchema])),
   shapes: z
     .array(
       z.union([

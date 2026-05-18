@@ -95,7 +95,9 @@ export interface SceneLight {
   readonly snapToGrid: boolean;
 }
 
-export interface SceneEffect {
+export type SceneEffect = SceneFireEffect | SceneMagicalDarknessEffect;
+
+export interface SceneFireEffect {
   readonly id: string;
   readonly kind: "fire";
   readonly position: {
@@ -109,6 +111,18 @@ export interface SceneEffect {
   readonly visible: boolean;
   readonly emitsLight: boolean;
   readonly lightRadius: number;
+}
+
+export interface SceneMagicalDarknessEffect {
+  readonly id: string;
+  readonly kind: "magical-darkness";
+  readonly position: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly radius: number;
+  readonly opacity: number;
+  readonly visible: boolean;
 }
 
 export type SceneFireZone =

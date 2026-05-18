@@ -50,6 +50,7 @@ interface MapViewportProps {
   readonly onFirePaint: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange: (elementId: string, radius: number) => void;
+  readonly onMagicalDarknessRadiusChange: (elementId: string, radius: number) => void;
 }
 
 export function MapViewport({
@@ -85,7 +86,8 @@ export function MapViewport({
   onFogRevealStroke,
   onFirePaint,
   onFireZoneRadiusChange,
-  onFireLightRadiusChange
+  onFireLightRadiusChange,
+  onMagicalDarknessRadiusChange
 }: MapViewportProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
@@ -116,7 +118,8 @@ export function MapViewport({
       onFogRevealStroke,
       onFirePaint,
       onFireZoneRadiusChange,
-      onFireLightRadiusChange
+      onFireLightRadiusChange,
+      onMagicalDarknessRadiusChange
     }).then((createdViewport) => {
       if (cancelled) {
         createdViewport.destroy();
@@ -147,7 +150,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
