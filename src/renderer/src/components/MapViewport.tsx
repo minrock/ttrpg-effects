@@ -1,4 +1,5 @@
 import { useEffect, useRef, type JSX } from "react";
+import { NavigationLegend } from "./NavigationLegend";
 import {
   PixiViewport,
   type PixiContextMenuRequest
@@ -249,6 +250,8 @@ export function MapViewport({
       ref={hostRef}
       className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
       aria-label="Lienzo del mapa"
-    />
+    >
+      <NavigationLegend />
+    </div>
   );
 }

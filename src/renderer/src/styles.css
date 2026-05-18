@@ -600,6 +600,60 @@ body {
   touch-action: none;
 }
 
+.navigation-legend {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background: rgba(16, 19, 21, 0.82);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+.nav-legend-label {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.nav-legend-key {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 11px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.6;
+}
+
+.nav-legend-or,
+.nav-legend-plus {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 11px;
+}
+
+.nav-legend-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.15);
+  margin: 0 4px;
+}
+
 .modal-backdrop {
   position: absolute;
   inset: 0;
