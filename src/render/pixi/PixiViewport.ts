@@ -7,7 +7,7 @@ import {
   type CameraState
 } from "../../domain/map/camera";
 import { renderLayerNames, type RenderLayerName } from "../../domain/map/render-layers";
-import type { ScreenPoint, ViewportSize } from "../../domain/shared/coordinates";
+import type { ScreenPoint, ViewportSize, WorldPoint } from "../../domain/shared/coordinates";
 import type { TacticalElement } from "../../domain/tools/tactical-elements";
 import type { MapImageState } from "../../domain/map/map-image";
 import type {
@@ -31,6 +31,7 @@ interface PointerDragState {
   readonly lastPoint: ScreenPoint;
   readonly button: number;
   readonly mode:
+    | "idle"
     | "pan"
     | "calibrate"
     | "map-move"
@@ -71,7 +72,7 @@ export interface PixiViewportOptions {
   readonly onLightRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
-  readonly onFogReveal?: (x: number, y: number) => void;
+  readonly onFogRevealStroke?: (points: readonly WorldPoint[]) => void;
   readonly onFirePaint?: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange?: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange?: (elementId: string, radius: number) => void;
@@ -108,6 +109,7 @@ export class PixiViewport {
   private isGrabMode = false;
   private isFogRevealMode = false;
   private isFirePaintMode = false;
+  private fogRevealStrokePoints: WorldPoint[] = [];
   private dragState: PointerDragState | null = null;
   private _darknessTexture: RenderTexture | null = null;
   private _fogOfWarTexture: RenderTexture | null = null;
@@ -455,7 +457,7 @@ export class PixiViewport {
     this.app.canvas.setPointerCapture(event.pointerId);
     const point = this.eventToScreenPoint(event);
 
-    let mode: PointerDragState["mode"] = "pan";
+    let mode: PointerDragState["mode"] = "idle";
     let elementId: string | undefined;
     let handleIndex: number | undefined;
     if (event.button === 0) {
@@ -463,7 +465,7 @@ export class PixiViewport {
         mode = "pan";
       } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
-        this.revealFogAtScreenPoint(point);
+        this.startFogRevealStroke(point);
       } else if (this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
@@ -584,7 +586,7 @@ export class PixiViewport {
     } else if (this.dragState.mode === "shape-rotate" && this.dragState.elementId !== undefined) {
       this.updateLinearShapeDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "fog-reveal") {
-      this.revealFogAtScreenPoint(nextPoint);
+      this.appendFogRevealStrokePoint(nextPoint);
     } else if (this.dragState.mode === "fire-paint") {
       this.paintFireAtScreenPoint(nextPoint);
     } else if (this.dragState.mode === "fire-zone-resize" && this.dragState.elementId !== undefined) {
@@ -599,7 +601,7 @@ export class PixiViewport {
       this.updateShapeConeDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-rect-resize" && this.dragState.elementId !== undefined && this.dragState.handleIndex !== undefined) {
       this.updateShapeRectCornerFromScreenPoint(this.dragState.elementId, this.dragState.handleIndex, nextPoint);
-    } else if (this.dragState.button === 0 || this.dragState.button === 1) {
+    } else if (this.dragState.mode === "pan") {
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
         y: nextPoint.y - this.dragState.lastPoint.y
@@ -638,7 +640,11 @@ export class PixiViewport {
       });
     }
 
-    if (isClick && this.dragState.button === 0 && this.dragState.mode === "pan") {
+    if (this.dragState.mode === "fog-reveal") {
+      this.finishFogRevealStroke(releasePoint);
+    }
+
+    if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
       this.options.onElementSelect?.(this.hitTestElement(releasePoint));
     }
 
@@ -832,7 +838,22 @@ export class PixiViewport {
     this.app.renderer.render({ container: fogRect, target: fogTexture, clear: true });
     fogRect.destroy();
 
-    const reveals = [...this.fogOfWar.revealedAreas, ...getVisibleAreasFromLights(this.lights)];
+    const activeStrokeReveal =
+      this.fogRevealStrokePoints.length > 0
+        ? [
+            {
+              id: "__active-fog-stroke",
+              kind: "stroke" as const,
+              points: this.fogRevealStrokePoints,
+              radius: this.fogOfWar.revealRadius
+            }
+          ]
+        : [];
+    const reveals = [
+      ...this.fogOfWar.revealedAreas,
+      ...activeStrokeReveal,
+      ...getVisibleAreasFromLights(this.lights)
+    ];
     const circleFireReveals = this.effects
       .filter((effect) => effect.visible && effect.emitsLight && effect.zone.kind !== "cells")
       .map((effect) => ({
@@ -850,9 +871,17 @@ export class PixiViewport {
       const eraseContainer = new Container();
 
       for (const area of [...reveals, ...circleFireReveals]) {
-        const reveal = new Graphics()
-          .circle(area.center.x - bounds.left, area.center.y - bounds.top, area.radius)
-          .fill({ color: 0xffffff, alpha: 1 });
+        const reveal = new Graphics();
+
+        if (area.kind === "circle") {
+          reveal.circle(area.center.x - bounds.left, area.center.y - bounds.top, area.radius);
+        } else {
+          for (const point of area.points) {
+            reveal.circle(point.x - bounds.left, point.y - bounds.top, area.radius);
+          }
+        }
+
+        reveal.fill({ color: 0xffffff, alpha: 1 });
         reveal.blendMode = "erase";
         eraseContainer.addChild(reveal);
       }
@@ -906,9 +935,39 @@ export class PixiViewport {
     layer.addChild(walls);
   }
 
-  private revealFogAtScreenPoint(screenPoint: ScreenPoint): void {
+  private startFogRevealStroke(screenPoint: ScreenPoint): void {
+    this.fogRevealStrokePoints = [screenToWorld(screenPoint, this.camera, this.getViewportSize())];
+    this.drawFogOfWarLayer();
+  }
+
+  private appendFogRevealStrokePoint(screenPoint: ScreenPoint): void {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    this.options.onFogReveal?.(worldPoint.x, worldPoint.y);
+    const previous = this.fogRevealStrokePoints[this.fogRevealStrokePoints.length - 1];
+
+    if (previous === undefined) {
+      this.fogRevealStrokePoints = [worldPoint];
+      this.drawFogOfWarLayer();
+      return;
+    }
+
+    const radius = this.fogOfWar?.revealRadius ?? 50;
+    const minDistance = Math.max(8, radius * 0.35);
+
+    if (Math.hypot(worldPoint.x - previous.x, worldPoint.y - previous.y) >= minDistance) {
+      this.fogRevealStrokePoints = [...this.fogRevealStrokePoints, worldPoint];
+      this.drawFogOfWarLayer();
+    }
+  }
+
+  private finishFogRevealStroke(screenPoint: ScreenPoint): void {
+    this.appendFogRevealStrokePoint(screenPoint);
+
+    if (this.fogRevealStrokePoints.length > 0) {
+      this.options.onFogRevealStroke?.(this.fogRevealStrokePoints);
+    }
+
+    this.fogRevealStrokePoints = [];
+    this.drawFogOfWarLayer();
   }
 
   private paintFireAtScreenPoint(screenPoint: ScreenPoint): void {

@@ -15,7 +15,7 @@
 - Integrar PixiJS dentro del renderer sin acoplarlo a reglas de dominio.
 - Crear el canvas principal de la aplicacion.
 - Definir tipos y funciones puras para coordenadas de pantalla, mundo y camara.
-- Implementar pan y zoom basicos sobre la camara.
+- Implementar pan temporal con `Space` + arrastre y zoom basico sobre la camara.
 - Crear una jerarquia de capas con el orden recomendado por el spec.
 - Dibujar elementos de prueba en capas distintas para validar orden, zoom y pan.
 - Limpiar correctamente PixiJS, listeners y recursos al desmontar la vista.
@@ -34,7 +34,7 @@
 - **Arquitectura:** El renderer React monta un componente contenedor, pero la logica de camara, coordenadas y orden de capas vive en modulos testeables fuera de React. PixiJS queda encapsulado en `src/render/pixi`.
 - **Persistencia:** No se implementa persistencia en esta spec. Las posiciones de prueba pueden vivir en memoria y no deben tocar SQLite ni filesystem.
 - **IPC / Electron:** No se agregan canales IPC. El renderer no necesita APIs privilegiadas para esta fase.
-- **Render / PixiJS:** Usar PixiJS como motor visual. Crear una clase/adaptador de escena que inicialice `Application`, contenedores de capas, resize, pan/zoom y destruccion limpia.
+- **Render / PixiJS:** Usar PixiJS como motor visual. Crear una clase/adaptador de escena que inicialice `Application`, contenedores de capas, resize, pan/zoom y destruccion limpia. El pan debe activarse solo mientras `Space` esta presionado.
 - **Validacion:** Validar matematicamente conversiones pantalla <-> mundo con tests unitarios. Validar manualmente que el canvas aparece y que pan/zoom no rompe el layout.
 - **Dependencias nuevas:** Agregar `pixi.js`. No agregar librerias extra de gestos, estado global o UI salvo necesidad posterior.
 
@@ -78,6 +78,7 @@
 - Reemplazar o evolucionar la pantalla tecnica inicial hacia una vista de herramienta con canvas central.
 - Crear un componente React para montar el viewport PixiJS, por ejemplo `MapViewport`.
 - Mantener UI discreta: nombre/estado compacto y controles minimos si son utiles para reset de camara.
+- No exponer `Grab` como boton o modo persistente en la UI; la navegacion por drag usa exclusivamente la barra espaciadora.
 - Usar hooks para ciclo de vida del viewport y eventos de resize, sin meter calculos de coordenadas en componentes.
 
 ### `render`
@@ -85,7 +86,12 @@
 - Crear `src/render/pixi/PixiViewport.ts` o adaptador equivalente.
 - Crear contenedores de capas en orden: fondo, mapa, grilla, oscuridad, luces, efectos, formas/mediciones, seleccion.
 - Implementar resize del renderer al contenedor.
-- Implementar eventos de puntero para pan y rueda para zoom.
+- Implementar eventos de puntero para pan temporal y rueda para zoom.
+- El pan temporal debe:
+  - activarse solo mientras `Space` esta oprimido,
+  - cambiar el cursor a mano,
+  - bloquear seleccion/edicion de elementos mientras esta activo,
+  - volver a herramienta de seleccion al soltar `Space`, sin restaurar modos previos como fuego o niebla.
 - Dibujar elementos de prueba, por ejemplo fondo, grilla simple y marcadores en dos capas, para comprobar orden visual.
 - Destruir `Application`, contenedores, texturas/listeners y observers al desmontar.
 
@@ -96,7 +102,7 @@
 3. Agregar tests unitarios minimos para conversiones y limites de zoom.
 4. Crear adaptador PixiJS con inicializacion, capas, resize, destruccion y elementos de prueba.
 5. Crear componente React `MapViewport` que monte el adaptador sin exponer PixiJS al resto de la UI.
-6. Implementar pan con pointer drag y zoom con rueda centrado en el cursor.
+6. Implementar pan con `Space` + pointer drag y zoom con rueda centrado en el cursor.
 7. Ajustar estilos para que el canvas ocupe el area principal de la ventana al 100%.
 8. Ejecutar typecheck, lint, build y smoke manual con `pnpm dev`.
 
@@ -107,7 +113,7 @@
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Manual / smoke:** Ejecutar `pnpm dev`, confirmar que el canvas aparece, los elementos de prueba se ven en capas distintas, pan y zoom responden fluidamente, y la ventana puede cerrarse sin errores.
+- **Manual / smoke:** Ejecutar `pnpm dev`, confirmar que el canvas aparece, los elementos de prueba se ven en capas distintas, `Space` + drag hace pan, soltar `Space` vuelve a seleccion, zoom responde fluidamente y la ventana puede cerrarse sin errores.
 
 ## 8. Riesgos y mitigaciones
 
@@ -127,6 +133,9 @@
 - Existe un canvas principal renderizado dentro de la ventana Electron.
 - PixiJS inicializa sin errores visibles.
 - La camara permite pan y zoom.
+- El pan solo se activa con `Space` presionado.
+- Mientras `Space` esta presionado, el cursor cambia a mano y no hay seleccion de objetos.
+- Al soltar `Space`, la herramienta activa queda en seleccion, incluso si antes estaba en otro modo.
 - La conversion pantalla <-> mundo esta centralizada y cubierta por tests.
 - El orden de capas esta representado explicitamente en codigo.
 - Hay elementos de prueba visibles en capas distintas.
@@ -147,7 +156,7 @@
 - [x] Tests unitarios de coordenadas/camara agregados.
 - [x] Canvas PixiJS visible dentro de Electron.
 - [x] Capas de render creadas en orden explicito.
-- [x] Pan y zoom basicos funcionando.
+- [x] Pan con `Space` + drag y zoom basicos funcionando.
 - [x] Cleanup de PixiJS, listeners y observers implementado.
 - [x] `pnpm typecheck` ejecutado.
 - [x] `pnpm lint` ejecutado.

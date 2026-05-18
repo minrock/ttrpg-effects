@@ -53,12 +53,24 @@ const rectangleShapeSchema = z.object({
   height: positiveNumber
 });
 
-const fogRevealAreaSchema = z.object({
+const circleFogRevealAreaSchema = z.object({
   id: z.string().min(1),
   kind: z.literal("circle"),
   center: worldPointSchema,
   radius: positiveNumber
 });
+
+const strokeFogRevealAreaSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("stroke"),
+  points: z.array(worldPointSchema).min(1),
+  radius: positiveNumber
+});
+
+const fogRevealAreaSchema = z.discriminatedUnion("kind", [
+  circleFogRevealAreaSchema,
+  strokeFogRevealAreaSchema
+]);
 
 const fogObstacleSchema = z.object({
   id: z.string().min(1),

@@ -45,7 +45,7 @@ interface MapViewportProps {
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
   readonly onShapeRadiusChange: (elementId: string, radius: number) => void;
   readonly onShapeRectResize: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
-  readonly onFogReveal: (x: number, y: number) => void;
+  readonly onFogRevealStroke: (points: readonly { readonly x: number; readonly y: number }[]) => void;
   readonly onFirePaint: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange: (elementId: string, radius: number) => void;
@@ -80,7 +80,7 @@ export function MapViewport({
   onShapeDirectionChange,
   onShapeRadiusChange,
   onShapeRectResize,
-  onFogReveal,
+  onFogRevealStroke,
   onFirePaint,
   onFireZoneRadiusChange,
   onFireLightRadiusChange
@@ -111,7 +111,7 @@ export function MapViewport({
       onShapeDirectionChange,
       onShapeRadiusChange,
       onShapeRectResize,
-      onFogReveal,
+      onFogRevealStroke,
       onFirePaint,
       onFireZoneRadiusChange,
       onFireLightRadiusChange
@@ -144,7 +144,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogReveal, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -209,7 +209,7 @@ export function MapViewport({
   return (
     <div
       ref={hostRef}
-      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}`}
+      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
       aria-label="Lienzo del mapa"
     />
   );

@@ -10,9 +10,11 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - Activar/desactivar la niebla sin afectar la oscuridad ambiental existente.
 - Configurar opacidad, color y radio de revelado manual.
 - Usar `50` como radio default de revelado para empezar con un pincel controlado.
-- Revelar areas circulares con click o arrastre sobre el mapa.
-- Separar `Modo niebla` de `Grab` para evitar revelar zonas mientras se navega el mapa.
-- Permitir alternar entre `Modo niebla` y `Grab` desde el menu contextual de click derecho.
+- Revelar areas circulares con click o trazos compuestos al arrastrar sobre el mapa.
+- Consolidar cada trazo de revelado en una sola area compuesta por puntos simplificados con radio, evitando persistir un circulo por cada movimiento del cursor.
+- Separar `Modo niebla` del pan temporal con `Space` para evitar revelar zonas mientras se navega el mapa.
+- Permitir salir de `Modo niebla` desde el menu contextual de click derecho.
+- Permitir entrar/salir de `Modo niebla` con `Cmd+F` en macOS y `Ctrl+F` en Windows/Linux.
 - Mostrar un cursor tipo pincel/crosshair cuando `Modo niebla` este activo.
 - Resetear las zonas reveladas de la escena.
 - Guardar y cargar las zonas reveladas dentro del archivo `.ttrpgscene`.
@@ -41,10 +43,13 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - El usuario puede activar fog of war desde la barra de controles.
 - La niebla cubre el mapa no revelado con opacidad configurable.
 - El radio default de revelado manual es `50`.
-- `Modo niebla` permite descubrir areas circulares con click o arrastre.
+- `Modo niebla` permite descubrir areas circulares con click o trazos compuestos al arrastrar.
+- Cada trazo de arrastre se guarda como una sola zona revelada compuesta, no como cientos o miles de circulos independientes.
+- La simplificacion del trazo conserva la forma visual aproximada y reduce objetos renderizados/serializados.
 - `Modo niebla` cambia el puntero del canvas para indicar que se va a revelar niebla.
-- `Grab` permite mover la vista sin revelar fog accidentalmente.
-- El menu contextual permite cambiar rapidamente de `Grab` a `Modo niebla` y viceversa.
+- `Space` + arrastrar permite mover la vista sin revelar fog accidentalmente.
+- El menu contextual permite activar o salir de `Modo niebla`; `Grab` no existe como modo persistente.
+- `Cmd+F` / `Ctrl+F` activa o desactiva `Modo niebla` y habilita fog of war si estaba apagado.
 - El boton `Reset niebla` borra las areas reveladas manuales.
 - Las luces y fuegos visibles aportan vision actual mientras existan.
 - Las escenas antiguas sin datos de fog siguen cargando con defaults.

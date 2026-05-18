@@ -65,17 +65,22 @@ describe("interaction state", () => {
 
     expect(cancelInteraction(opened).contextMenu).toBeNull();
     expect(cancelInteraction(setActiveTool(createInitialInteractionState(), "fog-reveal")).activeTool).toBe(
-      "grab"
+      "select"
     );
   });
 
-  it("uses exclusive tool modes for grab, fog reveal and map adjust", () => {
+  it("uses exclusive tool modes for fog reveal, fire paint and map adjust", () => {
     const fogTool = setActiveTool(setMapAdjustMode(createInitialInteractionState(), true), "fog-reveal");
 
     expect(fogTool.activeTool).toBe("fog-reveal");
     expect(fogTool.isMapAdjustMode).toBe(false);
 
-    const mapAdjust = setMapAdjustMode(setActiveTool(fogTool, "grab"), true);
+    const firePaint = setActiveTool(setMapAdjustMode(createInitialInteractionState(), true), "fire-paint");
+
+    expect(firePaint.activeTool).toBe("fire-paint");
+    expect(firePaint.isMapAdjustMode).toBe(false);
+
+    const mapAdjust = setMapAdjustMode(fogTool, true);
 
     expect(mapAdjust.activeTool).toBe("select");
     expect(mapAdjust.isMapAdjustMode).toBe(true);

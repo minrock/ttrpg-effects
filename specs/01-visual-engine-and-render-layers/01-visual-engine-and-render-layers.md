@@ -11,6 +11,7 @@ Definir e implementar la base visual donde se renderizaran el mapa, grilla, oscu
 - Definir orden de capas.
 - Integrar el motor visual elegido.
 - Preparar soporte para pan, zoom y render de alta fluidez.
+- El pan/drag del mapa se activa solo mientras la barra espaciadora esta oprimida.
 
 ## Tecnologia propuesta
 
@@ -50,12 +51,19 @@ Orden recomendado de abajo hacia arriba:
 - La conversion pantalla <-> mundo debe ser centralizada.
 - Las herramientas tacticas deben almacenar posiciones en coordenadas de mundo.
 - La camara debe controlar pan y zoom.
+- El pan de camara no debe ser un modo persistente ni un boton de UI.
+- Al mantener `Space`, el cursor cambia a mano y el viewport entra temporalmente en modo drag.
+- Mientras `Space` esta oprimido no se pueden seleccionar ni editar elementos del mapa.
+- Al soltar `Space`, el cursor vuelve al puntero normal y la herramienta activa vuelve a seleccion, incluso si antes estaba en otro modo como pintar fuego o niebla.
 
 ## Criterios de aceptacion
 
 - Existe un lienzo principal renderizado dentro de la ventana Electron.
 - El motor visual inicializa sin errores.
 - Hay una camara basica con pan y zoom.
+- El pan funciona solo con `Space` presionado y arrastre del puntero.
+- El cursor cambia a mano mientras `Space` esta presionado.
+- Al soltar `Space`, la interaccion vuelve a seleccion.
 - El orden de capas esta implementado o preparado de forma explicita.
 - Es posible dibujar elementos de prueba en capas distintas.
 - La base permite agregar mapa, grilla y luces sin reescritura mayor.
@@ -71,4 +79,3 @@ Orden recomendado de abajo hacia arriba:
 - React debe controlar paneles, menus e inputs.
 - PixiJS debe controlar render interactivo del mapa.
 - Evitar que cada herramienta implemente su propia conversion de coordenadas.
-

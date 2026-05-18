@@ -5,8 +5,10 @@ import {
   clearRevealedAreas,
   createCircleRevealArea,
   createDefaultFogOfWar,
+  createStrokeRevealArea,
   createWallObstacle,
   getVisibleAreasFromLights,
+  simplifyStrokePoints,
   updateFogOfWar
 } from "./vision";
 
@@ -49,6 +51,46 @@ describe("vision and fog of war", () => {
     expect(withArea.revealedAreas).toEqual([area]);
     expect(fog.revealedAreas).toEqual([]);
     expect(clearRevealedAreas(withArea).revealedAreas).toEqual([]);
+  });
+
+  it("creates stroke reveal areas from simplified brush points", () => {
+    expect(
+      createStrokeRevealArea({
+        id: "reveal-stroke-1",
+        points: [
+          { x: 0, y: 0 },
+          { x: 2, y: 2 },
+          { x: 100, y: 0 }
+        ],
+        radius: 50
+      })
+    ).toEqual({
+      id: "reveal-stroke-1",
+      kind: "stroke",
+      points: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 }
+      ],
+      radius: 50
+    });
+  });
+
+  it("simplifies stroke points with radius-aware spacing", () => {
+    expect(
+      simplifyStrokePoints(
+        [
+          { x: 0, y: 0 },
+          { x: 5, y: 0 },
+          { x: 20, y: 0 },
+          { x: 35, y: 0 }
+        ],
+        40
+      )
+    ).toEqual([
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+      { x: 35, y: 0 }
+    ]);
   });
 
   it("clamps editable fog values", () => {

@@ -47,7 +47,7 @@ import {
 import {
   addRevealedArea,
   clearRevealedAreas,
-  createCircleRevealArea,
+  createStrokeRevealArea,
   updateFogOfWar
 } from "../../domain/vision/vision";
 import type { FirePatch } from "../../domain/effects/fire";
@@ -76,6 +76,7 @@ export function App(): JSX.Element {
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
+  const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
@@ -86,6 +87,8 @@ export function App(): JSX.Element {
   const nextLightId = useRef(1);
   const nextEffectId = useRef(1);
   const nextRevealId = useRef(1);
+  const isSpaceDragActiveRef = useRef(isSpaceDragActive);
+  isSpaceDragActiveRef.current = isSpaceDragActive;
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
 
@@ -210,7 +213,43 @@ export function App(): JSX.Element {
   );
 
   useEffect(() => {
+    const shouldIgnoreSpaceDrag = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) {
+        return false;
+      }
+
+      return (
+        target.isContentEditable ||
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT"
+      );
+    };
+
+    const resetToSelection = (): void => {
+      setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
+    };
+
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setInteraction((current) =>
+          setActiveTool(current, current.activeTool === "fog-reveal" ? "select" : "fog-reveal")
+        );
+        setScene((current) => ({
+          ...current,
+          fogOfWar: updateFogOfWar(current.fogOfWar, { enabled: true })
+        }));
+        return;
+      }
+
+      if (event.code === "Space" && !shouldIgnoreSpaceDrag(event.target)) {
+        event.preventDefault();
+        setIsSpaceDragActive(true);
+        resetToSelection();
+        return;
+      }
+
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         handleDeleteSelectedElement();
@@ -222,10 +261,32 @@ export function App(): JSX.Element {
       }
     };
 
+    const handleKeyUp = (event: KeyboardEvent): void => {
+      if (event.code !== "Space") {
+        return;
+      }
+
+      if (!isSpaceDragActiveRef.current && shouldIgnoreSpaceDrag(event.target)) {
+        return;
+      }
+
+      event.preventDefault();
+      setIsSpaceDragActive(false);
+      resetToSelection();
+    };
+
+    const handleWindowBlur = (): void => {
+      setIsSpaceDragActive(false);
+    };
+
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleWindowBlur);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleWindowBlur);
     };
   }, [handleDeleteSelectedElement]);
 
@@ -368,7 +429,7 @@ export function App(): JSX.Element {
     }));
 
     if (!nextEnabled && interaction.activeTool === "fog-reveal") {
-      setInteraction((current) => setActiveTool(current, "grab"));
+      setInteraction((current) => setActiveTool(current, "select"));
     }
   }
 
@@ -501,15 +562,15 @@ export function App(): JSX.Element {
     }));
   }, []);
 
-  const handleFogReveal = useCallback((x: number, y: number): void => {
+  const handleFogRevealStroke = useCallback((points: readonly { readonly x: number; readonly y: number }[]): void => {
     setScene((current) => {
-      if (!current.fogOfWar.enabled) {
+      if (!current.fogOfWar.enabled || points.length === 0) {
         return current;
       }
 
-      const revealArea = createCircleRevealArea({
+      const revealArea = createStrokeRevealArea({
         id: `reveal-${nextRevealId.current}`,
-        center: { x, y },
+        points,
         radius: current.fogOfWar.revealRadius
       });
       nextRevealId.current += 1;
@@ -598,38 +659,32 @@ export function App(): JSX.Element {
     setInteraction((current) => setMapAdjustMode(current, !current.isMapAdjustMode));
   }
 
-  function handleToggleGrabMode(): void {
-    setInteraction((current) =>
-      setActiveTool(current, current.activeTool === "grab" ? "select" : "grab")
-    );
-  }
-
   function handleToggleFogRevealMode(): void {
     if (!scene.fogOfWar.enabled) {
       return;
     }
 
     setInteraction((current) =>
-      setActiveTool(current, current.activeTool === "fog-reveal" ? "grab" : "fog-reveal")
+      setActiveTool(current, current.activeTool === "fog-reveal" ? "select" : "fog-reveal")
     );
   }
 
   function handleToggleFirePaintMode(): void {
     setInteraction((current) => {
       if (current.activeTool === "fire-paint") {
-        return selectElement(setActiveTool(current, "grab"), null);
+        return selectElement(setActiveTool(current, "select"), null);
       }
       return setActiveTool(current, "fire-paint");
     });
   }
 
-  function handleToggleContextMenuNavigationMode(): void {
+  function handleToggleContextMenuFogMode(): void {
     if (interaction.activeTool !== "fog-reveal" && !scene.fogOfWar.enabled) {
       return;
     }
 
     setInteraction((current) =>
-      setActiveTool(current, current.activeTool === "fog-reveal" ? "grab" : "fog-reveal")
+      setActiveTool(current, current.activeTool === "fog-reveal" ? "select" : "fog-reveal")
     );
   }
 
@@ -876,14 +931,6 @@ export function App(): JSX.Element {
           ) : null}
           <button
             type="button"
-            className={interaction.activeTool === "grab" ? "is-active" : ""}
-            onClick={handleToggleGrabMode}
-            aria-pressed={interaction.activeTool === "grab"}
-          >
-            Grab
-          </button>
-          <button
-            type="button"
             className={interaction.activeTool === "fog-reveal" ? "is-active" : ""}
             onClick={handleToggleFogRevealMode}
             disabled={!scene.fogOfWar.enabled}
@@ -953,7 +1000,7 @@ export function App(): JSX.Element {
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
-          isGrabMode={interaction.activeTool === "grab"}
+          isGrabMode={isSpaceDragActive}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
           isFirePaintMode={interaction.activeTool === "fire-paint"}
           onContextMenuRequest={handleContextMenuRequest}
@@ -969,7 +1016,7 @@ export function App(): JSX.Element {
           onShapeDirectionChange={handleShapeDirectionChange}
           onShapeRadiusChange={handleShapeRadiusChange}
           onShapeRectResize={handleShapeRectResize}
-          onFogReveal={handleFogReveal}
+          onFogRevealStroke={handleFogRevealStroke}
           onFirePaint={handleFirePaint}
           onFireZoneRadiusChange={handleFireZoneRadiusChange}
           onFireLightRadiusChange={handleFireLightRadiusChange}
@@ -1477,10 +1524,10 @@ export function App(): JSX.Element {
           >
             <button
               type="button"
-              onClick={handleToggleContextMenuNavigationMode}
+              onClick={handleToggleContextMenuFogMode}
               disabled={interaction.activeTool !== "fog-reveal" && !scene.fogOfWar.enabled}
             >
-              {interaction.activeTool === "fog-reveal" ? "Cambiar a Grab" : "Cambiar a Modo niebla"}
+              {interaction.activeTool === "fog-reveal" ? "Salir de Modo niebla" : "Cambiar a Modo niebla"}
             </button>
             <button type="button" onClick={handleToggleContextMenuZoomLock}>
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}

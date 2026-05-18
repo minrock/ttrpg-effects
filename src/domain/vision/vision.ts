@@ -9,6 +9,12 @@ export interface CreateRevealAreaOptions {
   readonly radius: number;
 }
 
+export interface CreateRevealStrokeOptions {
+  readonly id: string;
+  readonly points: readonly WorldPoint[];
+  readonly radius: number;
+}
+
 export function createDefaultFogOfWar(): SceneFogOfWar {
   return {
     enabled: false,
@@ -36,6 +42,29 @@ export function createCircleRevealArea({
   };
 }
 
+export function createStrokeRevealArea({
+  id,
+  points,
+  radius
+}: CreateRevealStrokeOptions): SceneFogOfWar["revealedAreas"][number] {
+  assertId(id);
+
+  if (points.length === 0) {
+    throw new Error("Vision stroke must include at least one point.");
+  }
+
+  for (const point of points) {
+    assertFinitePoint(point);
+  }
+
+  return {
+    id,
+    kind: "stroke",
+    points: simplifyStrokePoints(points, sanitizePositive(radius)),
+    radius: sanitizePositive(radius)
+  };
+}
+
 export function addRevealedArea(
   fogOfWar: SceneFogOfWar,
   area: SceneFogOfWar["revealedAreas"][number]
@@ -44,6 +73,34 @@ export function addRevealedArea(
     ...fogOfWar,
     revealedAreas: [...fogOfWar.revealedAreas, area]
   };
+}
+
+export function simplifyStrokePoints(
+  points: readonly WorldPoint[],
+  radius: number
+): readonly WorldPoint[] {
+  if (points.length <= 1) {
+    return points;
+  }
+
+  const minDistance = Math.max(8, sanitizePositive(radius) * 0.35);
+  const simplified: WorldPoint[] = [points[0]];
+
+  for (const point of points.slice(1, -1)) {
+    const previous = simplified[simplified.length - 1];
+    if (Math.hypot(point.x - previous.x, point.y - previous.y) >= minDistance) {
+      simplified.push(point);
+    }
+  }
+
+  const last = points[points.length - 1];
+  const previous = simplified[simplified.length - 1];
+
+  if (Math.hypot(last.x - previous.x, last.y - previous.y) >= 1) {
+    simplified.push(last);
+  }
+
+  return simplified;
 }
 
 export function clearRevealedAreas(fogOfWar: SceneFogOfWar): SceneFogOfWar {

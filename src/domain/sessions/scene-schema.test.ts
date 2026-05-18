@@ -286,6 +286,15 @@ describe("scene document schema", () => {
             kind: "circle",
             center: { x: 20, y: 30 },
             radius: 120
+          },
+          {
+            id: "reveal-stroke-1",
+            kind: "stroke",
+            points: [
+              { x: 40, y: 50 },
+              { x: 80, y: 90 }
+            ],
+            radius: 60
           }
         ],
         obstacles: [

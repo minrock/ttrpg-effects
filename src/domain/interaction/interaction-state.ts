@@ -5,7 +5,7 @@ import {
   type TacticalElementKind
 } from "../tools/tactical-elements";
 
-export type InteractionTool = "select" | "grab" | "fog-reveal" | "fire-paint";
+export type InteractionTool = "select" | "fog-reveal" | "fire-paint";
 
 export interface ContextMenuState {
   readonly screen: ScreenPoint;
@@ -95,7 +95,8 @@ export function cancelInteraction(state: InteractionState): InteractionState {
 
   return {
     ...state,
-    activeTool: "grab"
+    activeTool: "select",
+    isMapAdjustMode: false
   };
 }
 

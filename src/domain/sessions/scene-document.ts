@@ -35,15 +35,25 @@ export interface SceneDarkness {
   readonly darkvisionEnabled: boolean;
 }
 
-export interface SceneFogRevealArea {
-  readonly id: string;
-  readonly kind: "circle";
-  readonly center: {
-    readonly x: number;
-    readonly y: number;
-  };
-  readonly radius: number;
-}
+export type SceneFogRevealArea =
+  | {
+      readonly id: string;
+      readonly kind: "circle";
+      readonly center: {
+        readonly x: number;
+        readonly y: number;
+      };
+      readonly radius: number;
+    }
+  | {
+      readonly id: string;
+      readonly kind: "stroke";
+      readonly points: ReadonlyArray<{
+        readonly x: number;
+        readonly y: number;
+      }>;
+      readonly radius: number;
+    };
 
 export interface SceneFogObstacle {
   readonly id: string;

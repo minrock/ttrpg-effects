@@ -490,11 +490,7 @@ body {
   background:
     linear-gradient(135deg, rgb(17 19 21 / 98%), rgb(21 24 26 / 94%)),
     radial-gradient(circle at 50% 30%, rgb(216 175 95 / 12%), transparent 45%);
-  cursor: grab;
-}
-
-.map-viewport:active {
-  cursor: grabbing;
+  cursor: default;
 }
 
 .map-viewport.is-fog-reveal-mode,
@@ -507,6 +503,15 @@ body {
 .map-viewport.is-fire-paint-mode,
 .map-viewport.is-fire-paint-mode:active {
   cursor: crosshair;
+}
+
+.map-viewport.is-space-drag-mode,
+.map-viewport.is-space-drag-mode:active {
+  cursor: grab;
+}
+
+.map-viewport.is-space-drag-mode:active {
+  cursor: grabbing;
 }
 
 .pixi-canvas {
