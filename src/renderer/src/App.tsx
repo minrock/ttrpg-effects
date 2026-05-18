@@ -496,7 +496,7 @@ export function App(): JSX.Element {
       const radius =
         activeFire?.zone.kind === "circle" || activeFire?.zone.kind === "cells"
           ? activeFire.zone.radius
-          : Math.max(current.grid.cellSizeWorld / 2, current.grid.cellSizeWorld);
+          : 25;
       const effect = updateAnimatedFireEffect(createAnimatedFireEffect(id, center), {
         color: "#ff3030",
         opacity: 0.68,

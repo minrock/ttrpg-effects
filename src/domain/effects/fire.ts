@@ -114,7 +114,7 @@ export function createCircleFireZone(
   };
 }
 
-export function createCellFireZone(cells: readonly FireCell[], radius = 50): FireZone {
+export function createCellFireZone(cells: readonly FireCell[], radius = 25): FireZone {
   const uniqueCells = new Map<string, FireCell>();
 
   for (const cell of cells) {

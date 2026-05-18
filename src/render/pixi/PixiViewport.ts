@@ -693,8 +693,8 @@ export class PixiViewport {
     fogRect.destroy();
 
     const reveals = [...this.fogOfWar.revealedAreas, ...getVisibleAreasFromLights(this.lights)];
-    const fireReveals = this.effects
-      .filter((effect) => effect.visible && effect.emitsLight)
+    const circleFireReveals = this.effects
+      .filter((effect) => effect.visible && effect.emitsLight && effect.zone.kind !== "cells")
       .map((effect) => ({
         id: `vision-${effect.id}`,
         kind: "circle" as const,
@@ -702,15 +702,31 @@ export class PixiViewport {
         radius: effect.lightRadius
       }));
 
-    if (reveals.length > 0 || fireReveals.length > 0) {
+    const cellFireEffects = this.effects.filter(
+      (effect) => effect.visible && effect.emitsLight && effect.zone.kind === "cells"
+    );
+
+    if (reveals.length > 0 || circleFireReveals.length > 0 || cellFireEffects.length > 0) {
       const eraseContainer = new Container();
 
-      for (const area of [...reveals, ...fireReveals]) {
+      for (const area of [...reveals, ...circleFireReveals]) {
         const reveal = new Graphics()
           .circle(area.center.x - bounds.left, area.center.y - bounds.top, area.radius)
           .fill({ color: 0xffffff, alpha: 1 });
         reveal.blendMode = "erase";
         eraseContainer.addChild(reveal);
+      }
+
+      for (const effect of cellFireEffects) {
+        if (effect.zone.kind !== "cells") continue;
+        const { bright, dim } = computeCellRings(effect.zone.cells);
+        for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
+          const reveal = new Graphics()
+            .rect(cell.x - bounds.left, cell.y - bounds.top, cell.size, cell.size)
+            .fill({ color: 0xffffff, alpha: 1 });
+          reveal.blendMode = "erase";
+          eraseContainer.addChild(reveal);
+        }
       }
 
       this.app.renderer.render({ container: eraseContainer, target: fogTexture, clear: false });
@@ -772,18 +788,17 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const cellSize = this.grid.cellSizeWorld;
-    const origin = this.getCalibrationOrigin();
     const radius = this.getFirePaintRadius();
-    const startColumn = Math.floor((worldPoint.x - radius - origin.x) / cellSize);
-    const endColumn = Math.floor((worldPoint.x + radius - origin.x) / cellSize);
-    const startRow = Math.floor((worldPoint.y - radius - origin.y) / cellSize);
-    const endRow = Math.floor((worldPoint.y + radius - origin.y) / cellSize);
+    const startColumn = Math.floor((worldPoint.x - radius) / cellSize);
+    const endColumn = Math.floor((worldPoint.x + radius) / cellSize);
+    const startRow = Math.floor((worldPoint.y - radius) / cellSize);
+    const endRow = Math.floor((worldPoint.y + radius) / cellSize);
     const cells: FireCell[] = [];
 
     for (let row = startRow; row <= endRow; row += 1) {
       for (let column = startColumn; column <= endColumn; column += 1) {
-        const x = origin.x + column * cellSize;
-        const y = origin.y + row * cellSize;
+        const x = column * cellSize;
+        const y = row * cellSize;
         const centerX = x + cellSize / 2;
         const centerY = y + cellSize / 2;
 
@@ -794,11 +809,11 @@ export class PixiViewport {
     }
 
     if (cells.length === 0) {
-      const column = Math.floor((worldPoint.x - origin.x) / cellSize);
-      const row = Math.floor((worldPoint.y - origin.y) / cellSize);
+      const column = Math.floor(worldPoint.x / cellSize);
+      const row = Math.floor(worldPoint.y / cellSize);
       cells.push({
-        x: origin.x + column * cellSize,
-        y: origin.y + row * cellSize,
+        x: column * cellSize,
+        y: row * cellSize,
         size: cellSize
       });
     }
@@ -817,7 +832,7 @@ export class PixiViewport {
       return selectedFire.zone.radius * selectedFire.scale;
     }
 
-    return this.grid?.cellSizeWorld ?? 50;
+    return 25;
   }
 
   private hitTestElement(screenPoint: ScreenPoint): string | null {
@@ -894,7 +909,7 @@ export class PixiViewport {
   private hitTestFireZoneResizeHandle(screenPoint: ScreenPoint): string | null {
     const selectedFire = this.getSelectedFireEffect();
 
-    if (selectedFire === null) {
+    if (selectedFire === null || selectedFire.zone.kind === "cells") {
       return null;
     }
 
@@ -908,7 +923,7 @@ export class PixiViewport {
   private hitTestFireLightResizeHandle(screenPoint: ScreenPoint): string | null {
     const selectedFire = this.getSelectedFireEffect();
 
-    if (selectedFire === null || !selectedFire.emitsLight) {
+    if (selectedFire === null || !selectedFire.emitsLight || selectedFire.zone.kind === "cells") {
       return null;
     }
 
@@ -1370,6 +1385,20 @@ function buildFireLightEraseGraphic(
   offsetX: number,
   offsetY: number
 ): Graphics {
+  if (effect.zone.kind === "cells") {
+    const graphic = new Graphics();
+    const { bright, dim } = computeCellRings(effect.zone.cells);
+
+    for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
+      graphic
+        .rect(cell.x - offsetX, cell.y - offsetY, cell.size, cell.size)
+        .fill({ color: 0xffffff, alpha: 1 });
+    }
+
+    graphic.blendMode = "erase";
+    return graphic;
+  }
+
   const x = effect.position.x - offsetX;
   const y = effect.position.y - offsetY;
   const graphic = new Graphics()
@@ -1381,11 +1410,73 @@ function buildFireLightEraseGraphic(
 }
 
 function drawFireLight(effect: SceneEffect): Graphics {
+  if (effect.zone.kind === "cells") {
+    const graphic = new Graphics();
+    const { bright, dim } = computeCellRings(effect.zone.cells);
+
+    for (const cell of dim) {
+      graphic
+        .rect(cell.x, cell.y, cell.size, cell.size)
+        .fill({ color: 0xffa54f, alpha: 0.08 * effect.opacity });
+    }
+
+    for (const cell of bright) {
+      graphic
+        .rect(cell.x, cell.y, cell.size, cell.size)
+        .fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
+    }
+
+    return graphic;
+  }
+
   return new Graphics()
     .circle(effect.position.x, effect.position.y, effect.lightRadius)
     .fill({ color: 0xffa54f, alpha: 0.12 * effect.opacity })
     .circle(effect.position.x, effect.position.y, effect.lightRadius * 0.5)
     .fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
+}
+
+function computeCellRings(
+  cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]
+): {
+  bright: Array<{ x: number; y: number; size: number }>;
+  dim: Array<{ x: number; y: number; size: number }>;
+} {
+  if (cells.length === 0) return { bright: [], dim: [] };
+
+  const cellSize = cells[0].size;
+  const fireSet = new Set(cells.map((c) => `${c.x}:${c.y}`));
+  const brightSet = new Set<string>();
+
+  for (const cell of cells) {
+    for (const [dx, dy] of [[-cellSize, 0], [cellSize, 0], [0, -cellSize], [0, cellSize]]) {
+      const key = `${cell.x + dx}:${cell.y + dy}`;
+      if (!fireSet.has(key)) brightSet.add(key);
+    }
+  }
+
+  const dimSet = new Set<string>();
+
+  for (const key of brightSet) {
+    const [xs, ys] = key.split(":");
+    const x = Number(xs);
+    const y = Number(ys);
+
+    for (const [dx, dy] of [[-cellSize, 0], [cellSize, 0], [0, -cellSize], [0, cellSize]]) {
+      const nKey = `${x + dx}:${y + dy}`;
+      if (!fireSet.has(nKey) && !brightSet.has(nKey)) dimSet.add(nKey);
+    }
+  }
+
+  const keyToCell = (key: string): { x: number; y: number; size: number } => {
+    const [xs, ys] = key.split(":");
+    return { x: Number(xs), y: Number(ys), size: cellSize };
+  };
+
+  return {
+    bright: [...brightSet].map(keyToCell),
+    dim: [...dimSet].map(keyToCell)
+  };
 }
 
 function drawSceneEffect(effect: SceneEffect): Graphics {
@@ -1473,6 +1564,11 @@ function drawConeRotationHandle(light: SceneLight): Graphics {
 
 function drawFireResizeHandles(effect: SceneEffect): Graphics {
   const graphic = new Graphics();
+
+  if (effect.zone.kind === "cells") {
+    return graphic;
+  }
+
   const fireRadius = getFireVisualRadius(effect);
 
   graphic

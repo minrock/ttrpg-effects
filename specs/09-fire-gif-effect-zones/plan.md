@@ -13,18 +13,20 @@
 - Remover carga y render de GIF para fuego.
 - Remover herramienta freehand de fuego.
 - Mantener fuego circular como area roja opaca.
-- Mantener handles para radio visual del fuego y radio de luz.
+- Mantener handles para radio visual del fuego y radio de luz (solo en modo `circle`).
 - Agregar zona `cells` para fuego pintado en cuadrados de grilla.
 - Agregar modo `Pintar fuego` en toolbar y menu contextual.
 - Convertir click/drag del pincel a celdas de grilla en coordenadas de mundo.
+- Radio de pincel por defecto: 25 unidades de mundo.
 - Guardar/cargar zonas `cells` en `.ttrpgscene`.
-- Mantener la luz del fuego integrada al erase mask de oscuridad.
+- Iluminacion por celdas: anillo 1 (luz brillante) y anillo 2 (luz tenue) calculados geometricamente desde el contorno de celdas pintadas.
+- Mantener la luz del fuego integrada al erase mask de oscuridad y fog of war.
 
 ## 3. Decisiones tecnicas
 
 - **Dominio:** `FireZone` queda como union `circle | cells`; `cells` guarda celdas `{ x, y, size }` y `radius` para el pincel.
 - **Render:** El fuego se dibuja con `Graphics` de Pixi: circulos o rectangulos rojos opacos, sin assets externos.
-- **Pintado:** El viewport calcula las celdas tocadas usando el origen de calibracion de grilla y `cellSizeWorld`.
+- **Pintado:** El viewport calcula las celdas tocadas usando el origen mundial (0, 0) y `cellSizeWorld`, alineado al grid visual independientemente de la posicion del mapa.
 - **Persistencia:** El schema acepta zonas `cells` y mantiene default circular para escenas viejas sin `zone`.
 - **Seguridad:** No hay IPC ni acceso filesystem nuevo.
 
@@ -51,8 +53,10 @@
 - Remover `GifSource`, `GifSprite`, carga de `assets/effects/fire.gif` y destructores especiales.
 - Renderizar zona circular como rojo opaco.
 - Renderizar zona `cells` como cuadrados rojos opacos.
-- Mantener handles naranja y luz para resize.
-- Mantener luz del fuego en capa `lights` y como erase mask de oscuridad/fog.
+- Mantener handles naranja y luz para resize solo en modo `circle`; en modo `cells` no se muestran.
+- Luz del fuego en modo `cells`: calcular anillo brillante (adyacentes al fuego) y anillo tenue (adyacentes al anillo brillante) con `computeCellRings`.
+- Mantener luz del fuego en capa `lights` y como erase mask de oscuridad/fog para ambos modos.
+- Celdas pintadas usan origen (0,0) mundial para garantizar alineacion con el grid al mover el mapa.
 
 ## 5. Plan de trabajo
 
@@ -72,10 +76,12 @@
 - No queda carga de GIF en el render.
 - No queda modo freehand para fuego en UI.
 - `Pintar fuego` crea o extiende zonas por celdas.
-- Las celdas pintadas se alinean a la grilla.
-- El radio del pincel decide cuantas celdas se pintan.
-- El fuego circular se ve como area roja opaca.
-- El fuego por celdas se ve como cuadrados rojos opacos.
+- Las celdas pintadas se alinean al grid visual aunque el mapa se haya movido.
+- El radio del pincel por defecto es 25; decide cuantas celdas se pintan.
+- El fuego circular se ve como area roja opaca con handles de resize.
+- El fuego por celdas se ve como cuadrados rojos opacos sin handles de resize.
+- En modo `cells`, el anillo 1 adyacente emite luz brillante y el anillo 2 emite luz tenue.
+- La oscuridad y el fog of war se revelan sobre fuego + anillo 1 + anillo 2.
 - Guardar/cargar conserva zonas `cells`.
 - La luz del fuego revela oscuridad igual que una luz normal.
 
@@ -95,7 +101,11 @@
 - [x] Zona `cells` agregada.
 - [x] Pintado por celdas implementado.
 - [x] Render rojo vectorial implementado.
-- [x] Handles de fuego/luz conservados.
+- [x] Handles de fuego/luz solo en modo `circle`.
+- [x] Handles ocultos en modo `cells` (sin circulo naranja ni amarillo).
+- [x] Iluminacion por anillos de celdas implementada (`computeCellRings`).
+- [x] Alineacion de celdas al grid corregida (origen 0,0 en vez de map.position).
+- [x] Radio de pincel por defecto fijado en 25.
 - [x] Documentacion actualizada.
 - [x] Verificacion automatica ejecutada.
 - [ ] Smoke manual ejecutado.

@@ -72,7 +72,7 @@ describe("fire effects", () => {
 
     expect(moved.zone).toEqual({
       kind: "cells",
-      radius: 50,
+      radius: 25,
       cells: [
         { x: 10, y: 15, size: 40 },
         { x: 50, y: 15, size: 40 }
