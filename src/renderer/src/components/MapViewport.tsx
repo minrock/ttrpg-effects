@@ -106,6 +106,8 @@ export function MapViewport({
 }: MapViewportProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
+  const mapRef = useRef(map);
+  mapRef.current = map;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -147,7 +149,7 @@ export function MapViewport({
 
       viewport = createdViewport;
       viewportRef.current = createdViewport;
-      createdViewport.setMap(map);
+      createdViewport.setMap(mapRef.current);
       createdViewport.setGrid(grid);
       createdViewport.setSettings(settings);
       createdViewport.setDarkness(darkness);

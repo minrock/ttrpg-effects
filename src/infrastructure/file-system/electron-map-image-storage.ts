@@ -44,4 +44,13 @@ export class ElectronMapImageStorage {
       return { ok: false, error: "No se pudo leer la imagen seleccionada." };
     }
   }
+
+  async resolveMapUrl(imagePath: string): Promise<string | null> {
+    try {
+      await access(imagePath);
+      return pathToFileURL(imagePath).toString().replace("file:", "map-asset:");
+    } catch {
+      return null;
+    }
+  }
 }

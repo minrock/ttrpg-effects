@@ -10,7 +10,7 @@ Este bug debe investigarse como un problema de recuperacion de estado del render
 
 ## Estado
 
-- **Estado:** Abierto — documentado para investigacion futura.
+- **Estado:** Resuelto.
 - **Prioridad:** Alta — puede simular perdida total de trabajo durante una sesion.
 - **Area:** Electron renderer lifecycle, React state, PixiJS canvas/context recovery, mapa runtime, autosave/recovery.
 - **Detectado durante:** Prueba manual dejando la app abierta, bloqueando la maquina y regresando despues de un tiempo.

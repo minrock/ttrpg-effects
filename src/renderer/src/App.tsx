@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
+import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import * as Switch from "@radix-ui/react-switch";
 import {
   cancelInteraction,
@@ -86,7 +87,17 @@ interface PathDraftState {
 
 export function App(): JSX.Element {
   const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
-  const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
+  const [scene, setScene] = useState<SceneDocument>(() => {
+    try {
+      const snapshot = sessionStorage.getItem("ttrpg:session-scene");
+      if (snapshot !== null) {
+        return parseSceneJson(snapshot);
+      }
+    } catch {
+      sessionStorage.removeItem("ttrpg:session-scene");
+    }
+    return createDefaultScene();
+  });
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("Escena default en memoria");
@@ -118,6 +129,33 @@ export function App(): JSX.Element {
   pathDraftRef.current = pathDraft;
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
+
+  // Phase 1: Reconstruct the runtime map URL on mount if the scene has a map but no URL yet.
+  // This covers renderer remounts where scene was restored from sessionStorage but mapImageUrl was lost.
+  useEffect(() => {
+    if (scene.map.imagePath === null || mapImageUrl !== null || window.ttrpg === undefined) {
+      return;
+    }
+    window.ttrpg.resolveMapUrl(scene.map.imagePath).then((url) => {
+      if (url !== null) {
+        setMapImageUrl(url);
+      }
+    });
+  }, []);
+
+  // Phase 2: Autosave scene to sessionStorage on every change (debounced).
+  // sessionStorage survives renderer reloads within the same Electron window session
+  // but is cleared automatically when the window is closed, preventing cross-session leakage.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      try {
+        sessionStorage.setItem("ttrpg:session-scene", JSON.stringify(scene));
+      } catch {
+        // Storage full or unavailable — skip silently
+      }
+    }, 500);
+    return () => clearTimeout(handle);
+  }, [scene]);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     setInteraction((current) => openContextMenu(current, request));
@@ -276,6 +314,7 @@ export function App(): JSX.Element {
   );
 
   const resetToNewScene = useCallback((): void => {
+    sessionStorage.removeItem("ttrpg:session-scene");
     setScene(createDefaultScene());
     setMapImageUrl(null);
     setCurrentFilePath(null);
