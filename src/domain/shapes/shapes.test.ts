@@ -148,8 +148,8 @@ describe("tactical shapes", () => {
       settings: { snapToGrid: false }
     });
 
-    const withEmoji = updateShape(shape, { emoji: " 💧💨 " });
-    expect(withEmoji.emoji).toBe("💧💨");
+    const withEmoji = updateShape(shape, { emoji: " ❄️💨 " });
+    expect(withEmoji.emoji).toBe("❄️💨");
 
     expect(updateShape(withEmoji, { emoji: undefined }).emoji).toBeUndefined();
   });

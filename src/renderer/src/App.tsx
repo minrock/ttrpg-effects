@@ -1096,9 +1096,9 @@ export function App(): JSX.Element {
               onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
             >
               <option value="">Sin emoji</option>
-              {ALLOWED_SHAPE_EMOJIS.map((emoji) => (
+              {ALLOWED_SHAPE_EMOJIS.map(([emoji, element]) => (
                 <option key={emoji} value={emoji}>
-                  {emoji}
+                  {emoji} {element}
                 </option>
               ))}
             </select>
