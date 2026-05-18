@@ -72,8 +72,15 @@ const fireZoneSchema = z.discriminatedUnion("kind", [
     innerRadiusRatio: opacity
   }),
   z.object({
-    kind: z.literal("freehand"),
-    points: z.array(worldPointSchema).min(3)
+    kind: z.literal("cells"),
+    radius: positiveNumber.default(50),
+    cells: z.array(
+      z.object({
+        x: finiteNumber,
+        y: finiteNumber,
+        size: positiveNumber
+      })
+    ).min(1)
   })
 ]);
 

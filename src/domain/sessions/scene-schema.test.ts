@@ -99,7 +99,7 @@ describe("scene document schema", () => {
     });
   });
 
-  it("accepts freehand fire zones", () => {
+  it("accepts painted cell fire zones", () => {
     const scene = {
       ...createDefaultScene(),
       effects: [
@@ -108,12 +108,11 @@ describe("scene document schema", () => {
           kind: "fire",
           position: { x: 20, y: 20 },
           zone: {
-            kind: "freehand",
-            points: [
-              { x: 0, y: 0 },
-              { x: 80, y: 0 },
-              { x: 80, y: 80 },
-              { x: 0, y: 80 }
+            kind: "cells",
+            radius: 50,
+            cells: [
+              { x: 0, y: 0, size: 80 },
+              { x: 80, y: 0, size: 80 }
             ]
           },
           scale: 1,

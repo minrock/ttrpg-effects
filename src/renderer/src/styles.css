@@ -289,8 +289,8 @@ body {
     crosshair;
 }
 
-.map-viewport.is-fire-freehand-mode,
-.map-viewport.is-fire-freehand-mode:active {
+.map-viewport.is-fire-paint-mode,
+.map-viewport.is-fire-paint-mode:active {
   cursor: crosshair;
 }
 

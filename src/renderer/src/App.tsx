@@ -13,10 +13,11 @@ import {
 import { applyGridPreset, gridPresets, setGridCellSize, setGridOpacity } from "../../domain/grid/grid";
 import {
   createAnimatedFireEffect,
+  createCellFireZone,
   createCircleFireZone,
-  createFreehandFireZone,
   toggleCircleFireMode,
-  updateAnimatedFireEffect
+  updateAnimatedFireEffect,
+  type FireCell
 } from "../../domain/effects/fire";
 import {
   createLightSource,
@@ -464,24 +465,52 @@ export function App(): JSX.Element {
     });
   }, []);
 
-  const handleFireFreehandComplete = useCallback((points: readonly { readonly x: number; readonly y: number }[]): void => {
-    if (points.length < 3) {
+  const handleFirePaint = useCallback((cells: readonly FireCell[], center: { readonly x: number; readonly y: number }): void => {
+    if (cells.length === 0) {
       return;
     }
 
-    const center = getPointCentroid(points);
-    const id = `fire-${nextEffectId.current}`;
-    nextEffectId.current += 1;
-    const effect = updateAnimatedFireEffect(createAnimatedFireEffect(id, center), {
-      zone: createFreehandFireZone(points)
-    });
+    setScene((current) => {
+      const activeFire = current.effects.find((effect) => effect.id === interaction.selectedElementId);
+      const selectedEffect = current.effects.find(
+        (effect) => effect.id === interaction.selectedElementId && effect.zone.kind === "cells"
+      );
 
-    setScene((current) => ({
-      ...current,
-      effects: [...current.effects, effect]
-    }));
-    setInteraction((current) => selectElement(setActiveTool(current, "grab"), id));
-  }, []);
+      if (selectedEffect !== undefined && selectedEffect.zone.kind === "cells") {
+        const mergedCells = mergeFireCells(selectedEffect.zone.cells, cells);
+
+        return {
+          ...current,
+          effects: current.effects.map((effect) =>
+            effect.id === selectedEffect.id
+              ? updateAnimatedFireEffect(effect, {
+                  zone: createCellFireZone(mergedCells, selectedEffect.zone.radius)
+                })
+              : effect
+          )
+        };
+      }
+
+      const id = `fire-${nextEffectId.current}`;
+      nextEffectId.current += 1;
+      const radius =
+        activeFire?.zone.kind === "circle" || activeFire?.zone.kind === "cells"
+          ? activeFire.zone.radius
+          : Math.max(current.grid.cellSizeWorld / 2, current.grid.cellSizeWorld);
+      const effect = updateAnimatedFireEffect(createAnimatedFireEffect(id, center), {
+        color: "#ff3030",
+        opacity: 0.68,
+        zone: createCellFireZone(cells, radius)
+      });
+
+      setInteraction((currentInteraction) => selectElement(currentInteraction, id));
+
+      return {
+        ...current,
+        effects: [...current.effects, effect]
+      };
+    });
+  }, [interaction.selectedElementId]);
 
   const handleFireZoneRadiusChange = useCallback((elementId: string, radius: number): void => {
     setScene((current) => ({
@@ -491,6 +520,10 @@ export function App(): JSX.Element {
           ? updateAnimatedFireEffect(effect, {
               zone: createCircleFireZone(radius, effect.zone.mode)
             })
+          : effect.id === elementId && effect.zone.kind === "cells"
+            ? updateAnimatedFireEffect(effect, {
+                zone: createCellFireZone(effect.zone.cells, radius)
+              })
           : effect
       )
     }));
@@ -525,9 +558,9 @@ export function App(): JSX.Element {
     );
   }
 
-  function handleToggleFireFreehandMode(): void {
+  function handleToggleFirePaintMode(): void {
     setInteraction((current) =>
-      setActiveTool(current, current.activeTool === "fire-freehand" ? "grab" : "fire-freehand")
+      setActiveTool(current, current.activeTool === "fire-paint" ? "grab" : "fire-paint")
     );
   }
 
@@ -704,11 +737,11 @@ export function App(): JSX.Element {
           </button>
           <button
             type="button"
-            className={interaction.activeTool === "fire-freehand" ? "is-active" : ""}
-            onClick={handleToggleFireFreehandMode}
-            aria-pressed={interaction.activeTool === "fire-freehand"}
+            className={interaction.activeTool === "fire-paint" ? "is-active" : ""}
+            onClick={handleToggleFirePaintMode}
+            aria-pressed={interaction.activeTool === "fire-paint"}
           >
-            Dibujar fuego
+            Pintar fuego
           </button>
           <button
             type="button"
@@ -1021,7 +1054,26 @@ export function App(): JSX.Element {
               </label>
             </>
           ) : (
-            <span>Zona a mano alzada</span>
+            <>
+              <span>{selectedEffect.zone.cells.length} celdas en fuego</span>
+              <label>
+                Pincel
+                <input
+                  type="number"
+                  min="1"
+                  max="3000"
+                  value={selectedEffect.zone.radius}
+                  onChange={(event) =>
+                    updateSelectedEffect({
+                      zone: createCellFireZone(
+                        selectedEffect.zone.kind === "cells" ? selectedEffect.zone.cells : [],
+                        event.currentTarget.valueAsNumber
+                      )
+                    })
+                  }
+                />
+              </label>
+            </>
           )}
           <label>
             Opacidad
@@ -1145,7 +1197,7 @@ export function App(): JSX.Element {
         isMapAdjustMode={interaction.isMapAdjustMode}
         isGrabMode={interaction.activeTool === "grab"}
         isFogRevealMode={interaction.activeTool === "fog-reveal"}
-        isFireFreehandMode={interaction.activeTool === "fire-freehand"}
+        isFirePaintMode={interaction.activeTool === "fire-paint"}
         onContextMenuRequest={handleContextMenuRequest}
         onElementSelect={handleElementSelect}
         onGridCellSizeChange={handleGridCellSizeChange}
@@ -1157,7 +1209,7 @@ export function App(): JSX.Element {
         onShapeEndMove={handleShapeEndMove}
         onShapeDirectionChange={handleShapeDirectionChange}
         onFogReveal={handleFogReveal}
-        onFireFreehandComplete={handleFireFreehandComplete}
+        onFirePaint={handleFirePaint}
         onFireZoneRadiusChange={handleFireZoneRadiusChange}
         onFireLightRadiusChange={handleFireLightRadiusChange}
       />
@@ -1190,8 +1242,8 @@ export function App(): JSX.Element {
             <button type="button" onClick={handleToggleContextMenuZoomLock}>
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
             </button>
-            <button type="button" onClick={handleToggleFireFreehandMode}>
-              {interaction.activeTool === "fire-freehand" ? "Cancelar dibujo de fuego" : "Dibujar fuego libre"}
+            <button type="button" onClick={handleToggleFirePaintMode}>
+              {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
             </button>
             <hr aria-hidden="true" />
             {tacticalElementKinds.map((kind) => (
@@ -1206,20 +1258,12 @@ export function App(): JSX.Element {
   );
 }
 
-function getPointCentroid(points: readonly { readonly x: number; readonly y: number }[]): {
-  readonly x: number;
-  readonly y: number;
-} {
-  const total = points.reduce(
-    (sum, point) => ({
-      x: sum.x + point.x,
-      y: sum.y + point.y
-    }),
-    { x: 0, y: 0 }
-  );
+function mergeFireCells(existing: readonly FireCell[], incoming: readonly FireCell[]): readonly FireCell[] {
+  const cells = new Map<string, FireCell>();
 
-  return {
-    x: total.x / points.length,
-    y: total.y / points.length
-  };
+  for (const cell of [...existing, ...incoming]) {
+    cells.set(`${cell.x}:${cell.y}:${cell.size}`, cell);
+  }
+
+  return [...cells.values()];
 }

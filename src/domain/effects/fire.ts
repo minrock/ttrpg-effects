@@ -12,9 +12,16 @@ export type FireZone =
       readonly innerRadiusRatio: number;
     }
   | {
-      readonly kind: "freehand";
-      readonly points: readonly WorldPoint[];
+      readonly kind: "cells";
+      readonly radius: number;
+      readonly cells: readonly FireCell[];
     };
+
+export interface FireCell {
+  readonly x: number;
+  readonly y: number;
+  readonly size: number;
+}
 
 export interface AnimatedFireEffect {
   readonly id: string;
@@ -50,8 +57,8 @@ export function createAnimatedFireEffect(id: string, position: WorldPoint): Anim
     position,
     zone: createCircleFireZone(),
     scale: 1,
-    opacity: 0.95,
-    color: "#ff7a38",
+    opacity: 0.68,
+    color: "#ff3030",
     visible: true,
     emitsLight: true,
     lightRadius: 150
@@ -65,7 +72,7 @@ export function updateAnimatedFireEffect(
   const nextPosition = patch.position ?? effect.position;
   const zone =
     patch.zone === undefined
-      ? translateFreehandZone(effect.zone, effect.position, nextPosition)
+      ? translateCellZone(effect.zone, effect.position, nextPosition)
       : sanitizeFireZone(patch.zone);
   const next = {
     ...effect,
@@ -107,16 +114,28 @@ export function createCircleFireZone(
   };
 }
 
-export function createFreehandFireZone(points: readonly WorldPoint[]): FireZone {
-  const simplifiedPoints = simplifyFreehandPoints(points, 12);
+export function createCellFireZone(cells: readonly FireCell[], radius = 50): FireZone {
+  const uniqueCells = new Map<string, FireCell>();
 
-  if (simplifiedPoints.length < 3) {
-    throw new Error("Freehand fire zone needs at least three points.");
+  for (const cell of cells) {
+    assertFinitePoint(cell);
+    const size = clampPositive(cell.size, 1);
+    const normalized = {
+      x: cell.x,
+      y: cell.y,
+      size
+    };
+    uniqueCells.set(getCellKey(normalized), normalized);
+  }
+
+  if (uniqueCells.size === 0) {
+    throw new Error("Cell fire zone needs at least one cell.");
   }
 
   return {
-    kind: "freehand",
-    points: simplifiedPoints
+    kind: "cells",
+    radius: clampPositive(radius, 1),
+    cells: [...uniqueCells.values()]
   };
 }
 
@@ -146,8 +165,8 @@ export function getFireZoneBounds(
     };
   }
 
-  const xs = effect.zone.points.map((point) => point.x);
-  const ys = effect.zone.points.map((point) => point.y);
+  const xs = effect.zone.cells.flatMap((cell) => [cell.x, cell.x + cell.size]);
+  const ys = effect.zone.cells.flatMap((cell) => [cell.y, cell.y + cell.size]);
 
   return {
     left: Math.min(...xs),
@@ -155,28 +174,6 @@ export function getFireZoneBounds(
     top: Math.min(...ys),
     bottom: Math.max(...ys)
   };
-}
-
-export function calculateFireTileCenters(
-  effect: Pick<AnimatedFireEffect, "position" | "zone" | "scale">,
-  tileSize: number,
-  maxTiles = 160
-): readonly WorldPoint[] {
-  const bounds = getFireZoneBounds(effect);
-  const spacing = Math.max(1, tileSize * 0.82 * effect.scale);
-  const centers: WorldPoint[] = [];
-
-  for (let y = bounds.top + spacing / 2; y <= bounds.bottom; y += spacing) {
-    for (let x = bounds.left + spacing / 2; x <= bounds.right; x += spacing) {
-      if (centers.length >= maxTiles) {
-        return centers;
-      }
-
-      centers.push({ x, y });
-    }
-  }
-
-  return centers.length > 0 ? centers : [effect.position];
 }
 
 export function sanitizeFireZone(zone: FireZone): FireZone {
@@ -192,29 +189,11 @@ export function sanitizeFireZone(zone: FireZone): FireZone {
     };
   }
 
-  return createFreehandFireZone(zone.points);
+  return createCellFireZone(zone.cells, zone.radius);
 }
 
-export function simplifyFreehandPoints(
-  points: readonly WorldPoint[],
-  minDistance: number
-): readonly WorldPoint[] {
-  const simplified: WorldPoint[] = [];
-
-  for (const point of points) {
-    assertFinitePoint(point);
-    const previous = simplified.at(-1);
-
-    if (previous === undefined || Math.hypot(point.x - previous.x, point.y - previous.y) >= minDistance) {
-      simplified.push(point);
-    }
-  }
-
-  return simplified;
-}
-
-function translateFreehandZone(zone: FireZone, from: WorldPoint, to: WorldPoint): FireZone {
-  if (zone.kind !== "freehand" || (from.x === to.x && from.y === to.y)) {
+function translateCellZone(zone: FireZone, from: WorldPoint, to: WorldPoint): FireZone {
+  if (zone.kind !== "cells" || (from.x === to.x && from.y === to.y)) {
     return zone;
   }
 
@@ -222,12 +201,18 @@ function translateFreehandZone(zone: FireZone, from: WorldPoint, to: WorldPoint)
   const dy = to.y - from.y;
 
   return {
-    kind: "freehand",
-    points: zone.points.map((point) => ({
-      x: point.x + dx,
-      y: point.y + dy
+    kind: "cells",
+    radius: zone.radius,
+    cells: zone.cells.map((cell) => ({
+      x: cell.x + dx,
+      y: cell.y + dy,
+      size: cell.size
     }))
   };
+}
+
+function getCellKey(cell: FireCell): string {
+  return `${cell.x}:${cell.y}:${cell.size}`;
 }
 
 function assertId(id: string): void {

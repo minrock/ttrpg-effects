@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  calculateFireTileCenters,
   createAnimatedFireEffect,
-  createCircleFireZone,
-  createFreehandFireZone,
+  createCellFireZone,
   moveAnimatedFireEffect,
   toggleFireVisibility,
   toggleCircleFireMode,
@@ -21,7 +19,7 @@ describe("fire effects", () => {
         radius: 90
       },
       scale: 1,
-      opacity: 0.95,
+      opacity: 0.68,
       emitsLight: true,
       lightRadius: 150
     });
@@ -62,12 +60,10 @@ describe("fire effects", () => {
     });
   });
 
-  it("creates freehand zones and moves their points with the effect", () => {
-    const zone = createFreehandFireZone([
-      { x: 0, y: 0 },
-      { x: 40, y: 0 },
-      { x: 40, y: 40 },
-      { x: 0, y: 40 }
+  it("creates painted cell zones and moves their cells with the effect", () => {
+    const zone = createCellFireZone([
+      { x: 0, y: 0, size: 40 },
+      { x: 40, y: 0, size: 40 }
     ]);
     const effect = updateAnimatedFireEffect(createAnimatedFireEffect("fire-1", { x: 20, y: 20 }), {
       zone
@@ -75,28 +71,17 @@ describe("fire effects", () => {
     const moved = moveAnimatedFireEffect(effect, { x: 30, y: 35 });
 
     expect(moved.zone).toEqual({
-      kind: "freehand",
-      points: [
-        { x: 10, y: 15 },
-        { x: 50, y: 15 },
-        { x: 50, y: 55 },
-        { x: 10, y: 55 }
+      kind: "cells",
+      radius: 50,
+      cells: [
+        { x: 10, y: 15, size: 40 },
+        { x: 50, y: 15, size: 40 }
       ]
     });
   });
 
-  it("rejects freehand zones with too few points", () => {
-    expect(() => createFreehandFireZone([{ x: 0, y: 0 }, { x: 10, y: 0 }])).toThrow(
-      "at least three points"
-    );
-  });
-
-  it("calculates tile centers inside the zone bounds", () => {
-    const effect = updateAnimatedFireEffect(createAnimatedFireEffect("fire-1", { x: 0, y: 0 }), {
-      zone: createCircleFireZone(100)
-    });
-
-    expect(calculateFireTileCenters(effect, 80, 4)).toHaveLength(4);
+  it("rejects empty cell zones", () => {
+    expect(() => createCellFireZone([])).toThrow("at least one cell");
   });
 
   it("rejects invalid colors", () => {

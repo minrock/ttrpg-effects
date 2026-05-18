@@ -108,10 +108,12 @@ export type SceneFireZone =
       readonly innerRadiusRatio: number;
     }
   | {
-      readonly kind: "freehand";
-      readonly points: ReadonlyArray<{
+      readonly kind: "cells";
+      readonly radius: number;
+      readonly cells: ReadonlyArray<{
         readonly x: number;
         readonly y: number;
+        readonly size: number;
       }>;
     };
 

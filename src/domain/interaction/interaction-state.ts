@@ -5,7 +5,7 @@ import {
   type TacticalElementKind
 } from "../tools/tactical-elements";
 
-export type InteractionTool = "select" | "grab" | "fog-reveal" | "fire-freehand";
+export type InteractionTool = "select" | "grab" | "fog-reveal" | "fire-paint";
 
 export interface ContextMenuState {
   readonly screen: ScreenPoint;

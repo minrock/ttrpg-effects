@@ -51,13 +51,12 @@ Reglas especificas:
 - La luz conica revela un sector conico del mapa debajo de la oscuridad.
 - El motor visual puede usar blend modes para perforar la oscuridad, pero debe tener un resultado claro en Electron: una estrategia aceptada es renderizar una copia del mapa encima del overlay y enmascararla con la geometria de cada luz.
 
-## Fuego animado
+## Fuego visual
 
-El fuego debe ser un efecto visual animado superpuesto al mapa.
+El fuego debe ser un efecto visual superpuesto al mapa.
 
 Requerimientos:
 
-- Usar sprite sheet, secuencia transparente o GIF animado transparente.
 - Poder colocarse con click derecho.
 - Poder moverse, seleccionar y borrar.
 - Poder ajustar escala/opacidad.
@@ -65,13 +64,13 @@ Requerimientos:
 
 Decision posterior:
 
-- Spec 09 reemplaza el fuego procedural por `assets/effects/fire.gif`.
-- El render debe preservar la transparencia del GIF para evitar fondos cuadrados u opacos.
-- El fuego puede ser circular cerrado, circular abierto tipo aro o zona dibujada a mano alzada.
+- Spec 09 usa fuego vectorial rojo sin GIF.
+- El fuego puede ser circular o pintado como cuadrados de grilla con un pincel circular.
+- El area en fuego se representa como rojo opaco y la luz asociada sigue revelando oscuridad.
 
 Fuente de asset:
 
-- Preferir asset CC0 o generado para el proyecto.
+- No se requiere asset para el fuego vectorial actual.
 - Candidato inicial: OpenGameArt "Animated flame / Fire sprite Sheet", CC0.
 - Si se usa asset externo no CC0, guardar licencia y atribucion.
 
