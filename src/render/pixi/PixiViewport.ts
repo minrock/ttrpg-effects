@@ -140,8 +140,19 @@ export class PixiViewport {
   }
 
   setMap(map: MapImageState | null): void {
+    const prevUrl = this.map?.imageUrl ?? null;
     this.map = map;
-    void this.drawMapImage();
+
+    if (map?.imageUrl !== prevUrl) {
+      void this.drawMapImage();
+    } else {
+      if (this.mapSprite !== null && map !== null) {
+        this.mapSprite.position.set(map.position.x, map.position.y);
+        this.mapSprite.scale.set(map.scale);
+      }
+      this.drawDarknessLayer();
+    }
+
     this.drawGrid();
   }
 
@@ -794,8 +805,8 @@ export class PixiViewport {
     if (this.mapSprite !== null) {
       const halfWidth = (this.mapSprite.texture.width * (this.map?.scale ?? 1)) / 2;
       const halfHeight = (this.mapSprite.texture.height * (this.map?.scale ?? 1)) / 2;
-      const x = this.map?.position.x ?? 0;
-      const y = this.map?.position.y ?? 0;
+      const x = this.mapSprite.position.x;
+      const y = this.mapSprite.position.y;
       return {
         left: x - halfWidth - 400,
         right: x + halfWidth + 400,

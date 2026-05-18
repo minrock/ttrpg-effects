@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import {
   cancelInteraction,
   closeContextMenu,
@@ -166,15 +166,18 @@ export function App(): JSX.Element {
     }));
   };
 
-  const mapState: MapImageState | null =
-    scene.map.imagePath !== null && mapImageUrl !== null
-      ? {
-          imagePath: scene.map.imagePath,
-          imageUrl: mapImageUrl,
-          position: scene.map.position,
-          scale: scene.map.scale
-        }
-      : null;
+  const mapState = useMemo<MapImageState | null>(
+    () =>
+      scene.map.imagePath !== null && mapImageUrl !== null
+        ? {
+            imagePath: scene.map.imagePath,
+            imageUrl: mapImageUrl,
+            position: scene.map.position,
+            scale: scene.map.scale
+          }
+        : null,
+    [scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
+  );
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
