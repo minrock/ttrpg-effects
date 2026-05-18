@@ -21,6 +21,7 @@ import type {
 } from "../../domain/sessions/scene-document";
 import { formatDistance, measureDistance } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
+import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
 import { getVisibleAreasFromLights } from "../../domain/vision/vision";
 import type { FireCell } from "../../domain/effects/fire";
 
@@ -1597,7 +1598,7 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
   const graphic = new Graphics();
   const anchor = getShapeAnchor(shape);
   const endPoint = getShapeEndPoint(shape);
-  const emoji = normalizeEmojiForRender(shape.emoji);
+  const emojis = getSelectedShapeEmojis(shape.emoji);
 
   switch (shape.type) {
     case "measurement":
@@ -1617,10 +1618,10 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
         const label = drawShapeLabel(distance.label);
         label.position.set((anchor.x + endPoint.x) / 2 + 10, (anchor.y + endPoint.y) / 2 - 28);
         container.addChild(label);
-        if (emoji !== null) {
+        if (emojis.length > 0) {
           addEmojiTexts(
             container,
-            emoji,
+            emojis,
             getLineEmojiPoints(shape.id, anchor, endPoint, grid.cellSizeWorld),
             grid.cellSizeWorld
           );
@@ -1636,10 +1637,10 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(worldLengthLabel(radius, grid));
       label.position.set(anchor.x + 10, anchor.y - radius - 28);
       container.addChild(label);
-      if (emoji !== null) {
+      if (emojis.length > 0) {
         addEmojiTexts(
           container,
-          emoji,
+          emojis,
           getCircleEmojiPoints(shape.id, anchor, radius, grid.cellSizeWorld),
           grid.cellSizeWorld
         );
@@ -1659,10 +1660,10 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(`${Math.round(angle)}° · ${worldLengthLabel(radius, grid)}`);
       label.position.set(tipX + 12, tipY - 10);
       container.addChild(label);
-      if (emoji !== null) {
+      if (emojis.length > 0) {
         addEmojiTexts(
           container,
-          emoji,
+          emojis,
           getConeEmojiPoints(shape.id, anchor, radius, angle, direction, grid.cellSizeWorld),
           grid.cellSizeWorld
         );
@@ -1679,10 +1680,10 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(`${worldLengthLabel(width, grid)} × ${worldLengthLabel(height, grid)}`);
       label.position.set(anchor.x + 10, anchor.y + height / 2 + 10);
       container.addChild(label);
-      if (emoji !== null) {
+      if (emojis.length > 0) {
         addEmojiTexts(
           container,
-          emoji,
+          emojis,
           getRectangleEmojiPoints(shape.id, anchor, width, height, grid.cellSizeWorld),
           grid.cellSizeWorld
         );
@@ -1726,18 +1727,18 @@ function drawEmojiText(emoji: string, x: number, y: number, cellSizeWorld: numbe
 
 function addEmojiTexts(
   container: Container,
-  emoji: string,
+  emojis: readonly string[],
   points: readonly { readonly x: number; readonly y: number }[],
   cellSizeWorld: number
 ): void {
-  for (const point of points.slice(0, MAX_EMOJIS_PER_ELEMENT)) {
+  const visiblePoints = points.slice(0, MAX_EMOJIS_PER_ELEMENT);
+
+  for (let index = 0; index < visiblePoints.length; index += 1) {
+    const point = visiblePoints[index];
+    const emoji = emojis[index % emojis.length];
+    if (point === undefined || emoji === undefined) continue;
     container.addChild(drawEmojiText(emoji, point.x, point.y, cellSizeWorld));
   }
-}
-
-function normalizeEmojiForRender(emoji: string | undefined): string | null {
-  const normalized = emoji?.trim();
-  return normalized === undefined || normalized.length === 0 ? null : normalized.slice(0, 8);
 }
 
 function getLineEmojiPoints(
@@ -2142,7 +2143,7 @@ function drawSceneEffect(effect: SceneEffect, grid: SceneGrid | null): Container
     container.addChild(graphic);
     addEmojiTexts(
       container,
-      FIRE_EMOJI,
+      [FIRE_EMOJI],
       getCircleEmojiPoints(
         effect.id,
         effect.position,
@@ -2165,7 +2166,7 @@ function drawSceneEffect(effect: SceneEffect, grid: SceneGrid | null): Container
   container.addChild(graphic);
   addEmojiTexts(
     container,
-    FIRE_EMOJI,
+    [FIRE_EMOJI],
     effect.zone.cells.map((cell, index) => ({
       x: cell.x + cell.size / 2 + stableJitter(effect.id, index, cell.size * 0.12),
       y: cell.y + cell.size / 2 + stableJitter(`${effect.id}:y`, index, cell.size * 0.12)

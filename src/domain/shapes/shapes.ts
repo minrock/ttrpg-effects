@@ -1,6 +1,7 @@
 import type { SceneGrid, SceneShape, SceneSettings } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import { snapWorldPoint } from "../measurement/measurement";
+import { getSelectedShapeEmojis, serializeShapeEmojis } from "./shape-emojis";
 
 export type TacticalShapeKind = "measurement" | "circle" | "cone" | "rectangle";
 
@@ -152,7 +153,7 @@ function normalizeEmoji(emoji: string | undefined): string | undefined {
   }
 
   const normalized = emoji.trim();
-  return normalized.length === 0 ? undefined : normalized.slice(0, 8);
+  return serializeShapeEmojis(getSelectedShapeEmojis(normalized));
 }
 
 export function getShapeAnchor(shape: SceneShape): WorldPoint {

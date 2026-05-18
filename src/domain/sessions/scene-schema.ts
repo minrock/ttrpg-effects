@@ -12,7 +12,7 @@ const worldPointSchema = z.object({
   y: finiteNumber
 });
 
-const emojiSchema = z.string().trim().min(1).max(8).optional();
+const emojiSchema = z.string().trim().min(1).max(32).optional();
 
 const linearShapeSchema = z.object({
   id: z.string().min(1),

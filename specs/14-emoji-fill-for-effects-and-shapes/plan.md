@@ -19,8 +19,9 @@
 - Distribución tipo mosaico con jitter determinista para áreas.
 - Distribución equitativa en líneas, al menos un emoji por tamaño de celda aproximado.
 - Campo opcional `emoji?: string` en `SceneShape`.
+- Archivo TypeScript compartido con emojis permitidos: `💧`, `💨`, `🤐`, `🤢`, `💀`, `☠️`, `🔮`.
 - Schema compatible con escenas antiguas sin emoji.
-- UI mínima para configurar emoji de la forma seleccionada.
+- UI mínima con un selector único para configurar emoji de la forma seleccionada.
 - Documentación de comportamiento.
 
 ### Fuera de alcance
@@ -36,10 +37,11 @@
 ## 3. Decisiones tecnicas
 
 - **Arquitectura:** El dato persistente de emoji vive en `domain/sessions` como propiedad opcional de `SceneShape`; la UI solo edita ese campo; Pixi renderiza el patrón sin introducir reglas de negocio en React.
-- **Persistencia:** Extender `SceneShape` con `emoji?: string`; el schema acepta ausencia del campo y normaliza strings vacíos como sin emoji o los deja fuera según implementación.
+- **Persistencia:** Extender `SceneShape` con `emoji?: string`; el schema acepta ausencia del campo y la UI solo guarda uno de los emojis permitidos.
 - **IPC / Electron:** Sin canales nuevos. Guardar/cargar usa el flujo existente de `.ttrpgscene`.
 - **Render / PixiJS:** Usar `Text` de Pixi para emojis en las capas existentes de efectos y formas. Selección y handles permanecen en la capa `selection`, por encima.
 - **Validacion:** Limitar emoji a string corto, sugerido máximo 8 unidades UTF-16 para permitir secuencias emoji compuestas sin aceptar textos largos.
+- **Emojis permitidos:** Centralizar el set en `src/domain/shapes/shape-emojis.ts` para que UI, dominio y render compartan fuente.
 - **Dependencias nuevas:** Ninguna.
 
 ## 4. Diseno de dominio
@@ -84,7 +86,7 @@
 ### `renderer`
 
 - En `src/renderer/src/App.tsx`:
-  - Agregar control compacto para editar emoji de forma seleccionada.
+  - Agregar selector compacto para editar emoji de forma seleccionada.
   - Permitir limpiar emoji.
   - Usar `updateSelectedShape({ emoji })` o helper equivalente.
 - No agregar control para fuego, porque fuego siempre usa `🔥`.
@@ -104,7 +106,7 @@
 1. [x] Extender `SceneShape` con `emoji?: string`.
 2. [x] Actualizar schema para aceptar `emoji` opcional y mantener compatibilidad.
 3. [x] Agregar tests de schema para formas con y sin emoji.
-4. [x] Agregar UI mínima en panel de forma seleccionada para editar emoji.
+4. [x] Agregar UI mínima en panel de forma seleccionada con selector único de emoji.
 5. [x] Implementar helpers de distribución para área y línea.
 6. [x] Implementar render de emojis en fuego circular y fuego por celdas.
 7. [x] Implementar render de emojis en círculo, cono y rectángulo.
@@ -141,6 +143,7 @@
 - Fuego circular muestra `🔥` dentro del círculo.
 - Fuego por celdas muestra `🔥` dentro de celdas pintadas.
 - Círculo, cono y rectángulo pueden mostrar emoji dentro del área.
+- El selector de formas permite elegir un solo emoji entre `💧`, `💨`, `🤐`, `🤢`, `💀`, `☠️`, `🔮` o limpiar la selección.
 - Línea/measurement muestra emojis distribuidos a lo largo del segmento.
 - La línea muestra al menos un emoji por cuadro de grilla aproximado y mínimo uno si es corta.
 - El patrón no parpadea al re-renderizar sin cambios.

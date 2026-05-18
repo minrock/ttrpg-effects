@@ -22,7 +22,8 @@ Actualmente las áreas se representan con rellenos de color y bordes. Esta spec 
 - Renderizar emojis dentro de formas de área, excepto línea.
 - Renderizar emojis distribuidos sobre líneas.
 - Usar `🔥` como emoji obligatorio para fuego.
-- Usar un emoji configurable o asociado para formas tácticas.
+- Usar un emoji configurable para formas tácticas desde un selector único.
+- Mantener un conjunto permitido de emojis en un archivo TypeScript compartido.
 - Distribuir emojis en patrón tipo mosaico con ligera aleatoriedad visual dentro del área.
 - Para líneas, distribuir emojis de manera equitativa a lo largo del segmento, al menos uno por cada cuadro de grilla.
 - Mantener selección, movimiento, resize y borrado funcionando.
@@ -90,11 +91,14 @@ Decisión inicial propuesta:
 
 - Fuego: fijo en `🔥`.
 - Formas tácticas: agregar una propiedad opcional de emoji por forma, por ejemplo `emoji?: string`.
-- Si una forma no tiene emoji configurado, no renderiza emojis o usa un default según tipo si se decide en el plan.
+- La UI debe ofrecer un único selector con opción vacía y los emojis permitidos.
+- El conjunto permitido inicial vive en TypeScript y contiene: `💧`, `💨`, `🤐`, `🤢`, `💀`, `☠️`, `🔮`.
+- Si una forma no tiene emoji configurado, no renderiza emojis.
 
 Requisitos:
 
 - El emoji debe ser una cadena corta.
+- El selector permite escoger solo un emoji a la vez.
 - Si se persiste, debe guardarse dentro del modelo de escena de la forma.
 - Escenas antiguas sin emoji deben cargar sin cambios.
 - El renderer debe tolerar emojis vacíos o inválidos sin romper.
@@ -154,6 +158,7 @@ Formas:
 - El fuego pintado en celdas muestra emojis `🔥` dentro de las celdas pintadas.
 - Los emojis de fuego no aparecen fuera del círculo o fuera de las celdas.
 - Círculos, conos y rectángulos pueden renderizar un emoji dentro del área.
+- El emoji de formas se elige desde un selector único con el conjunto permitido.
 - La línea puede renderizar emojis distribuidos a lo largo del segmento.
 - La línea muestra al menos un emoji por cuadro de grilla de longitud aproximada.
 - El patrón de área usa posiciones tipo mosaico con variación visual estable.

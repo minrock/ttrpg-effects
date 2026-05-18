@@ -41,6 +41,10 @@ import {
   type TacticalShapeKind
 } from "../../domain/shapes/shapes";
 import {
+  ALLOWED_SHAPE_EMOJIS,
+  getSelectedShapeEmojis
+} from "../../domain/shapes/shape-emojis";
+import {
   addRevealedArea,
   clearRevealedAreas,
   createCircleRevealArea,
@@ -1087,15 +1091,17 @@ export function App(): JSX.Element {
           {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
           <label>
             Emoji
-            <input
-              type="text"
-              maxLength={8}
-              value={selectedShape.emoji ?? ""}
-              placeholder={selectedShape.type === "measurement" ? "⚡" : "✨"}
-              onChange={(event) =>
-                updateSelectedShape({ emoji: event.currentTarget.value || undefined })
-              }
-            />
+            <select
+              value={getSelectedShapeEmojis(selectedShape.emoji)[0] ?? ""}
+              onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
+            >
+              <option value="">Sin emoji</option>
+              {ALLOWED_SHAPE_EMOJIS.map((emoji) => (
+                <option key={emoji} value={emoji}>
+                  {emoji}
+                </option>
+              ))}
+            </select>
           </label>
           {selectedShape.type === "circle" || selectedShape.type === "cone" ? (
             <label>
