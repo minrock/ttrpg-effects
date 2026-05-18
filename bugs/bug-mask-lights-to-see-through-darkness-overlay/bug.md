@@ -8,7 +8,7 @@ El comportamiento esperado es que la oscuridad oculte todo el mapa y que cada lu
 
 ## Estado
 
-- **Estado:** Cerrado — resuelto en rama `fix/light-mask-reveal`.
+- **Estado:** Cerrado — resuelto en rama `fix/light-mask-reveal`, correcciones adicionales en `main` (commit `697c7f5`).
 - **Prioridad:** Alta para la experiencia visual de luces.
 - **Area:** PixiJS render, capas `map`, `darkness`, `lights`, mascaras.
 - **Detectado durante:** Spec 06 - Iluminacion, Oscuridad y Fuego Animado.
@@ -23,6 +23,26 @@ El enfoque de stencil mask (`setMask` / `container.mask`) fue descartado porque 
 3. El resultado se muestra como un `Sprite` normal en world space.
 
 Esto elimina todo uso de stencil/mask, el mapa base queda en `alpha = 1` siempre, y la oscuridad compuesta revela el mapa solo en las zonas iluminadas.
+
+## Correcciones adicionales (commit `697c7f5`)
+
+Durante el diagnostico del bug de parpadeo de mapa se detecto un problema relacionado con la oscuridad: `getGridBounds()` en `PixiViewport.ts` leia la posicion del modelo de dominio (`this.map?.position`) en lugar de la posicion visual actual del sprite (`this.mapSprite.position`).
+
+Durante el arrastre del mapa (`map-move`), el sprite se movia visualmente antes de que React sincronizara el estado, por lo que `drawDarknessLayer()` calculaba los bounds con la posicion desactualizada y generaba una textura de oscuridad desalineada respecto al mapa hasta el proximo ciclo de estado.
+
+**Cambio aplicado en `src/render/pixi/PixiViewport.ts` (`getGridBounds`):**
+
+```ts
+// Antes
+const x = this.map?.position.x ?? 0;
+const y = this.map?.position.y ?? 0;
+
+// Despues
+const x = this.mapSprite.position.x;
+const y = this.mapSprite.position.y;
+```
+
+Este cambio garantiza que la oscuridad siempre se alinee con la posicion visual del sprite, independientemente del estado React.
 
 ## Comportamiento esperado
 
