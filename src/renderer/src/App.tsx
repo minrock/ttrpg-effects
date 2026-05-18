@@ -75,6 +75,7 @@ export function App(): JSX.Element {
   const [isBusy, setIsBusy] = useState(false);
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
@@ -675,6 +676,17 @@ export function App(): JSX.Element {
           diagonalMode: scene.settings.diagonalMode
         })
       : undefined;
+  const hasSelectedObject =
+    selectedLight !== undefined || selectedEffect !== undefined || selectedShape !== undefined;
+
+  useEffect(() => {
+    if (!hasSelectedObject) {
+      return;
+    }
+
+    setIsSidebarVisible(true);
+    setIsSelectedPropertiesOpen(true);
+  }, [hasSelectedObject, interaction.selectedElementId]);
 
   function updateSelectedLight(patch: LightPatch): void {
     if (selectedLight === undefined) {
@@ -779,6 +791,37 @@ export function App(): JSX.Element {
       [sectionId]: !current[sectionId]
     }));
   }
+
+  const selectedPropertiesTitle =
+    selectedLight !== undefined
+      ? selectedLight.kind === "point"
+        ? "Luz puntual"
+        : "Luz conica"
+      : selectedEffect !== undefined
+        ? "Fuego"
+        : selectedShape?.type === "measurement"
+          ? "Linea"
+          : selectedShape?.type === "circle"
+            ? "Circulo"
+            : selectedShape?.type === "cone"
+              ? "Cono"
+              : selectedShape?.type === "rectangle"
+                ? "Rectangulo"
+                : "Propiedades";
+  const selectedPropertiesIcon =
+    selectedLight !== undefined
+      ? selectedLight.kind === "point"
+        ? "●"
+        : "◖"
+      : selectedEffect !== undefined
+        ? "火"
+        : selectedShape?.type === "measurement"
+          ? "╱"
+          : selectedShape?.type === "circle"
+            ? "○"
+            : selectedShape?.type === "cone"
+              ? "◺"
+              : "▭";
 
   return (
     <main className="app-shell" aria-label="TTRPG Effects">
@@ -896,280 +939,6 @@ export function App(): JSX.Element {
           <strong key={warning}>{warning}</strong>
         ))}
       </aside>
-      {selectedLight !== undefined ? (
-        <section className="properties-panel" aria-label="Propiedades de luz">
-          <strong>{selectedLight.kind === "point" ? "Luz puntual" : "Luz conica"}</strong>
-          <label>
-            Visible
-            <input
-              type="checkbox"
-              checked={selectedLight.visible}
-              onChange={(event) => updateSelectedLight({ visible: event.currentTarget.checked })}
-            />
-          </label>
-          <label>
-            Color
-            <input
-              type="color"
-              value={selectedLight.color}
-              onChange={(event) => updateSelectedLight({ color: event.currentTarget.value })}
-            />
-          </label>
-          {selectedLight.kind === "cone" ? (
-            <label>
-              Longitud
-              <input
-                type="number"
-                min="1"
-                max="40"
-                step="1"
-                value={Math.max(1, Math.round(selectedLight.radius / scene.grid.cellSizeWorld))}
-                onChange={(event) => handleConeLengthChange(event.currentTarget.valueAsNumber)}
-              />
-              <span>{Math.round((selectedLight.radius / scene.grid.cellSizeWorld) * scene.grid.distancePerCell)} ft</span>
-            </label>
-          ) : (
-            <label>
-              Radio
-              <input
-                type="number"
-                min="1"
-                max="1200"
-                value={selectedLight.radius}
-                onChange={(event) => updateSelectedLight({ radius: event.currentTarget.valueAsNumber })}
-              />
-            </label>
-          )}
-          <label>
-            Intensidad
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={selectedLight.intensity}
-              onChange={(event) => updateSelectedLight({ intensity: event.currentTarget.valueAsNumber })}
-            />
-          </label>
-          <label>
-            Opacidad
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={selectedLight.opacity}
-              onChange={(event) => updateSelectedLight({ opacity: event.currentTarget.valueAsNumber })}
-            />
-          </label>
-          {selectedLight.kind === "cone" ? (
-            <label>
-              Direccion
-              <input
-                type="number"
-                min="0"
-                max="360"
-                value={selectedLight.direction}
-                onChange={(event) => updateSelectedLight({ direction: event.currentTarget.valueAsNumber })}
-              />
-            </label>
-          ) : null}
-        </section>
-      ) : null}
-      {selectedEffect !== undefined ? (
-        <section className="properties-panel" aria-label="Propiedades de fuego">
-          <strong>Fuego</strong>
-          <label>
-            Visible
-            <input
-              type="checkbox"
-              checked={selectedEffect.visible}
-              onChange={(event) => updateSelectedEffect({ visible: event.currentTarget.checked })}
-            />
-          </label>
-          <label>
-            Color
-            <input
-              type="color"
-              value={selectedEffect.color}
-              onChange={(event) => updateSelectedEffect({ color: event.currentTarget.value })}
-            />
-          </label>
-          <label>
-            Escala
-            <input
-              type="number"
-              min="0.1"
-              max="8"
-              step="0.1"
-              value={selectedEffect.scale}
-              onChange={(event) => updateSelectedEffect({ scale: event.currentTarget.valueAsNumber })}
-            />
-          </label>
-          {selectedEffect.zone.kind === "circle" ? (
-            <>
-              <button type="button" onClick={() => updateSelectedEffect({ zone: toggleCircleFireMode(selectedEffect).zone })}>
-                {selectedEffect.zone.mode === "closed" ? "Abrir circulo" : "Cerrar circulo"}
-              </button>
-              <label>
-                Radio
-                <input
-                  type="number"
-                  min="10"
-                  max="3000"
-                  value={selectedEffect.zone.radius}
-                  onChange={(event) =>
-                    updateSelectedEffect({
-                      zone: createCircleFireZone(
-                        event.currentTarget.valueAsNumber,
-                        selectedEffect.zone.kind === "circle" ? selectedEffect.zone.mode : "closed"
-                      )
-                    })
-                  }
-                />
-              </label>
-            </>
-          ) : (
-            <>
-              <span>{selectedEffect.zone.cells.length} celdas en fuego</span>
-              <label>
-                Pincel
-                <input
-                  type="number"
-                  min="1"
-                  max="3000"
-                  value={selectedEffect.zone.radius}
-                  onChange={(event) =>
-                    updateSelectedEffect({
-                      zone: createCellFireZone(
-                        selectedEffect.zone.kind === "cells" ? selectedEffect.zone.cells : [],
-                        event.currentTarget.valueAsNumber
-                      )
-                    })
-                  }
-                />
-              </label>
-            </>
-          )}
-          <label>
-            Opacidad
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={selectedEffect.opacity}
-              onChange={(event) => updateSelectedEffect({ opacity: event.currentTarget.valueAsNumber })}
-            />
-          </label>
-          <label>
-            Emite luz
-            <input
-              type="checkbox"
-              checked={selectedEffect.emitsLight}
-              onChange={(event) => updateSelectedEffect({ emitsLight: event.currentTarget.checked })}
-            />
-          </label>
-          <label>
-            Radio luz
-            <input
-              type="number"
-              min="1"
-              max="1000"
-              value={selectedEffect.lightRadius}
-              onChange={(event) => updateSelectedEffect({ lightRadius: event.currentTarget.valueAsNumber })}
-            />
-          </label>
-        </section>
-      ) : null}
-      {selectedShape !== undefined ? (
-        <section className="properties-panel" aria-label="Propiedades de forma tactica">
-          <strong>
-            {selectedShape.type === "measurement"
-              ? "Linea"
-              : selectedShape.type === "circle"
-                ? "Circulo"
-                : selectedShape.type === "cone"
-                  ? "Cono"
-                  : "Rectangulo"}
-          </strong>
-          {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
-          <label>
-            Emoji
-            <select
-              value={getSelectedShapeEmojis(selectedShape.emoji)[0] ?? ""}
-              onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
-            >
-              <option value="">Sin emoji</option>
-              {ALLOWED_SHAPE_EMOJIS.map(([emoji, element]) => (
-                <option key={emoji} value={emoji}>
-                  {emoji} {element}
-                </option>
-              ))}
-            </select>
-          </label>
-          {selectedShape.type === "circle" || selectedShape.type === "cone" ? (
-            <label>
-              Radio
-              <input
-                type="number"
-                min="1"
-                max="2000"
-                value={selectedShape.radius ?? scene.grid.cellSizeWorld}
-                onChange={(event) => updateSelectedShape({ radius: event.currentTarget.valueAsNumber })}
-              />
-            </label>
-          ) : null}
-          {selectedShape.type === "cone" ? (
-            <>
-              <label>
-                Angulo
-                <input
-                  type="number"
-                  min="1"
-                  max="360"
-                  value={selectedShape.angle ?? 60}
-                  onChange={(event) => updateSelectedShape({ angle: event.currentTarget.valueAsNumber })}
-                />
-              </label>
-              <label>
-                Direccion
-                <input
-                  type="number"
-                  min="0"
-                  max="360"
-                  value={selectedShape.direction ?? 0}
-                  onChange={(event) => updateSelectedShape({ direction: event.currentTarget.valueAsNumber })}
-                />
-              </label>
-            </>
-          ) : null}
-          {selectedShape.type === "rectangle" ? (
-            <>
-              <label>
-                Ancho
-                <input
-                  type="number"
-                  min="1"
-                  max="3000"
-                  value={selectedShape.width ?? scene.grid.cellSizeWorld}
-                  onChange={(event) => updateSelectedShape({ width: event.currentTarget.valueAsNumber })}
-                />
-              </label>
-              <label>
-                Alto
-                <input
-                  type="number"
-                  min="1"
-                  max="3000"
-                  value={selectedShape.height ?? scene.grid.cellSizeWorld}
-                  onChange={(event) => updateSelectedShape({ height: event.currentTarget.valueAsNumber })}
-                />
-              </label>
-            </>
-          ) : null}
-        </section>
-      ) : null}
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}`}>
         <MapViewport
           map={mapState}
@@ -1206,6 +975,285 @@ export function App(): JSX.Element {
           onFireLightRadiusChange={handleFireLightRadiusChange}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
+          {hasSelectedObject ? (
+            <SidebarAccordion
+              id="selected-object-properties-panel"
+              icon={selectedPropertiesIcon}
+              title={selectedPropertiesTitle}
+              isOpen={isSelectedPropertiesOpen}
+              onToggle={() => setIsSelectedPropertiesOpen((current) => !current)}
+            >
+              {selectedLight !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de luz">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedLight.visible}
+                      onChange={(event) => updateSelectedLight({ visible: event.currentTarget.checked })}
+                    />
+                    Visible
+                  </label>
+                  <label>
+                    Color
+                    <input
+                      type="color"
+                      value={selectedLight.color}
+                      onChange={(event) => updateSelectedLight({ color: event.currentTarget.value })}
+                    />
+                  </label>
+                  {selectedLight.kind === "cone" ? (
+                    <label>
+                      Longitud
+                      <input
+                        type="number"
+                        min="1"
+                        max="40"
+                        step="1"
+                        value={Math.max(1, Math.round(selectedLight.radius / scene.grid.cellSizeWorld))}
+                        onChange={(event) => handleConeLengthChange(event.currentTarget.valueAsNumber)}
+                      />
+                      <span>
+                        {Math.round((selectedLight.radius / scene.grid.cellSizeWorld) * scene.grid.distancePerCell)} ft
+                      </span>
+                    </label>
+                  ) : (
+                    <label>
+                      Radio
+                      <input
+                        type="number"
+                        min="1"
+                        max="1200"
+                        value={selectedLight.radius}
+                        onChange={(event) => updateSelectedLight({ radius: event.currentTarget.valueAsNumber })}
+                      />
+                    </label>
+                  )}
+                  <label>
+                    Intensidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedLight.intensity}
+                      onChange={(event) => updateSelectedLight({ intensity: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    Opacidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedLight.opacity}
+                      onChange={(event) => updateSelectedLight({ opacity: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  {selectedLight.kind === "cone" ? (
+                    <label>
+                      Direccion
+                      <input
+                        type="number"
+                        min="0"
+                        max="360"
+                        value={selectedLight.direction}
+                        onChange={(event) => updateSelectedLight({ direction: event.currentTarget.valueAsNumber })}
+                      />
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+              {selectedEffect !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de fuego">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedEffect.visible}
+                      onChange={(event) => updateSelectedEffect({ visible: event.currentTarget.checked })}
+                    />
+                    Visible
+                  </label>
+                  <label>
+                    Color
+                    <input
+                      type="color"
+                      value={selectedEffect.color}
+                      onChange={(event) => updateSelectedEffect({ color: event.currentTarget.value })}
+                    />
+                  </label>
+                  <label>
+                    Escala
+                    <input
+                      type="number"
+                      min="0.1"
+                      max="8"
+                      step="0.1"
+                      value={selectedEffect.scale}
+                      onChange={(event) => updateSelectedEffect({ scale: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  {selectedEffect.zone.kind === "circle" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => updateSelectedEffect({ zone: toggleCircleFireMode(selectedEffect).zone })}
+                      >
+                        {selectedEffect.zone.mode === "closed" ? "Abrir circulo" : "Cerrar circulo"}
+                      </button>
+                      <label>
+                        Radio
+                        <input
+                          type="number"
+                          min="10"
+                          max="3000"
+                          value={selectedEffect.zone.radius}
+                          onChange={(event) =>
+                            updateSelectedEffect({
+                              zone: createCircleFireZone(
+                                event.currentTarget.valueAsNumber,
+                                selectedEffect.zone.kind === "circle" ? selectedEffect.zone.mode : "closed"
+                              )
+                            })
+                          }
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <span>{selectedEffect.zone.cells.length} celdas en fuego</span>
+                      <label>
+                        Pincel
+                        <input
+                          type="number"
+                          min="1"
+                          max="3000"
+                          value={selectedEffect.zone.radius}
+                          onChange={(event) =>
+                            updateSelectedEffect({
+                              zone: createCellFireZone(
+                                selectedEffect.zone.kind === "cells" ? selectedEffect.zone.cells : [],
+                                event.currentTarget.valueAsNumber
+                              )
+                            })
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
+                  <label>
+                    Opacidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedEffect.opacity}
+                      onChange={(event) => updateSelectedEffect({ opacity: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedEffect.emitsLight}
+                      onChange={(event) => updateSelectedEffect({ emitsLight: event.currentTarget.checked })}
+                    />
+                    Emite luz
+                  </label>
+                  <label>
+                    Radio luz
+                    <input
+                      type="number"
+                      min="1"
+                      max="1000"
+                      value={selectedEffect.lightRadius}
+                      onChange={(event) => updateSelectedEffect({ lightRadius: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {selectedShape !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de forma tactica">
+                  {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
+                  <label>
+                    Emoji
+                    <select
+                      value={getSelectedShapeEmojis(selectedShape.emoji)[0] ?? ""}
+                      onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
+                    >
+                      <option value="">Sin emoji</option>
+                      {ALLOWED_SHAPE_EMOJIS.map(([emoji, element]) => (
+                        <option key={emoji} value={emoji}>
+                          {emoji} {element}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedShape.type === "circle" || selectedShape.type === "cone" ? (
+                    <label>
+                      Radio
+                      <input
+                        type="number"
+                        min="1"
+                        max="2000"
+                        value={selectedShape.radius ?? scene.grid.cellSizeWorld}
+                        onChange={(event) => updateSelectedShape({ radius: event.currentTarget.valueAsNumber })}
+                      />
+                    </label>
+                  ) : null}
+                  {selectedShape.type === "cone" ? (
+                    <>
+                      <label>
+                        Angulo
+                        <input
+                          type="number"
+                          min="1"
+                          max="360"
+                          value={selectedShape.angle ?? 60}
+                          onChange={(event) => updateSelectedShape({ angle: event.currentTarget.valueAsNumber })}
+                        />
+                      </label>
+                      <label>
+                        Direccion
+                        <input
+                          type="number"
+                          min="0"
+                          max="360"
+                          value={selectedShape.direction ?? 0}
+                          onChange={(event) => updateSelectedShape({ direction: event.currentTarget.valueAsNumber })}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                  {selectedShape.type === "rectangle" ? (
+                    <>
+                      <label>
+                        Ancho
+                        <input
+                          type="number"
+                          min="1"
+                          max="3000"
+                          value={selectedShape.width ?? scene.grid.cellSizeWorld}
+                          onChange={(event) => updateSelectedShape({ width: event.currentTarget.valueAsNumber })}
+                        />
+                      </label>
+                      <label>
+                        Alto
+                        <input
+                          type="number"
+                          min="1"
+                          max="3000"
+                          value={selectedShape.height ?? scene.grid.cellSizeWorld}
+                          onChange={(event) => updateSelectedShape({ height: event.currentTarget.valueAsNumber })}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </SidebarAccordion>
+          ) : null}
+
           <SidebarAccordion
             id="grid-controls-panel"
             icon="▦"

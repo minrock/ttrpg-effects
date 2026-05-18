@@ -29,7 +29,7 @@ body {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: 64px auto auto minmax(0, 1fr);
+  grid-template-rows: 64px auto minmax(0, 1fr);
   width: 100%;
   height: 100%;
   background: #111315;
@@ -143,7 +143,7 @@ body {
 }
 
 .app-workspace {
-  grid-row: 4;
+  grid-row: 3;
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 380px);
@@ -331,6 +331,21 @@ body {
 .sidebar-accordion-content button:disabled {
   cursor: not-allowed;
   opacity: 0.52;
+}
+
+.selected-properties-content {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.selected-properties-content > span {
+  overflow-wrap: anywhere;
+  border: 1px solid rgb(244 241 232 / 14%);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #fff8e7;
+  background: rgb(255 255 255 / 4%);
 }
 
 .grid-controls {
