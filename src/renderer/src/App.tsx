@@ -85,6 +85,8 @@ export function App(): JSX.Element {
   const nextLightId = useRef(1);
   const nextEffectId = useRef(1);
   const nextRevealId = useRef(1);
+  const selectedElementIdRef = useRef(interaction.selectedElementId);
+  selectedElementIdRef.current = interaction.selectedElementId;
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     setInteraction((current) => openContextMenu(current, request));
@@ -524,9 +526,9 @@ export function App(): JSX.Element {
     }
 
     setScene((current) => {
-      const activeFire = current.effects.find((effect) => effect.id === interaction.selectedElementId);
+      const activeFire = current.effects.find((effect) => effect.id === selectedElementIdRef.current);
       const selectedEffect = current.effects.find(
-        (effect) => effect.id === interaction.selectedElementId && effect.zone.kind === "cells"
+        (effect) => effect.id === selectedElementIdRef.current && effect.zone.kind === "cells"
       );
 
       if (selectedEffect !== undefined && selectedEffect.zone.kind === "cells") {
@@ -563,7 +565,7 @@ export function App(): JSX.Element {
         effects: [...current.effects, effect]
       };
     });
-  }, [interaction.selectedElementId]);
+  }, []);
 
   const handleFireZoneRadiusChange = useCallback((elementId: string, radius: number): void => {
     setScene((current) => ({
