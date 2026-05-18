@@ -1,0 +1,217 @@
+import type { SceneGrid, SceneShape, SceneSettings } from "../sessions/scene-document";
+import type { WorldPoint } from "../shared/coordinates";
+import { snapWorldPoint } from "../measurement/measurement";
+
+export type TacticalShapeKind = "measurement" | "line" | "circle" | "cone" | "rectangle";
+
+export interface CreateShapeOptions {
+  readonly id: string;
+  readonly kind: TacticalShapeKind;
+  readonly position: WorldPoint;
+  readonly grid: Pick<SceneGrid, "cellSizeWorld">;
+  readonly settings: Pick<SceneSettings, "snapToGrid">;
+}
+
+export type ShapePatch = Partial<
+  Pick<SceneShape, "points" | "radius" | "width" | "height" | "angle" | "direction">
+>;
+
+export function createTacticalShape({
+  id,
+  kind,
+  position,
+  grid,
+  settings
+}: CreateShapeOptions): SceneShape {
+  assertId(id);
+  const origin =
+    settings.snapToGrid && kind !== "measurement"
+      ? snapWorldPoint(position, grid.cellSizeWorld)
+      : position;
+  assertFinitePoint(origin);
+
+  switch (kind) {
+    case "measurement":
+      return {
+        id,
+        type: "measurement",
+        points: [origin, { x: origin.x + grid.cellSizeWorld * 3, y: origin.y }]
+      };
+    case "line":
+      return {
+        id,
+        type: "line",
+        points: [origin, { x: origin.x + grid.cellSizeWorld * 3, y: origin.y }]
+      };
+    case "circle":
+      return {
+        id,
+        type: "circle",
+        points: [origin],
+        radius: grid.cellSizeWorld
+      };
+    case "cone":
+      return {
+        id,
+        type: "cone",
+        points: [origin],
+        radius: grid.cellSizeWorld * 3,
+        angle: 60,
+        direction: 0
+      };
+    case "rectangle":
+      return {
+        id,
+        type: "rectangle",
+        points: [origin],
+        width: grid.cellSizeWorld * 3,
+        height: grid.cellSizeWorld * 2
+      };
+  }
+}
+
+export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: number): SceneShape {
+  const shouldSnap = snapCellSize !== undefined && shape.type !== "measurement" && shape.type !== "line";
+  const nextAnchor = shouldSnap ? snapWorldPoint(position, snapCellSize) : position;
+  const currentAnchor = getShapeAnchor(shape);
+  const dx = nextAnchor.x - currentAnchor.x;
+  const dy = nextAnchor.y - currentAnchor.y;
+
+  return {
+    ...shape,
+    points: shape.points.map((point) => ({
+      x: point.x + dx,
+      y: point.y + dy
+    }))
+  };
+}
+
+export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint): SceneShape {
+  if (shape.type !== "measurement" && shape.type !== "line") {
+    return shape;
+  }
+
+  assertFinitePoint(endPoint);
+
+  return updateShape(shape, {
+    points: [getShapeAnchor(shape), endPoint]
+  });
+}
+
+export function rotateLinearShape(shape: SceneShape, direction: number): SceneShape {
+  if (shape.type !== "measurement" && shape.type !== "line") {
+    return shape;
+  }
+
+  const anchor = getShapeAnchor(shape);
+  const endPoint = getShapeEndPoint(shape);
+
+  if (endPoint === null) {
+    return shape;
+  }
+
+  const length = Math.hypot(endPoint.x - anchor.x, endPoint.y - anchor.y);
+  const radians = (normalizeDirection(direction) * Math.PI) / 180;
+
+  return setLinearShapeEnd(shape, {
+    x: anchor.x + Math.cos(radians) * length,
+    y: anchor.y + Math.sin(radians) * length
+  });
+}
+
+export function updateShape(shape: SceneShape, patch: ShapePatch): SceneShape {
+  const next: SceneShape = {
+    ...shape,
+    ...patch,
+    points: patch.points ?? shape.points,
+    radius: patch.radius === undefined ? shape.radius : sanitizePositive(patch.radius),
+    width: patch.width === undefined ? shape.width : sanitizePositive(patch.width),
+    height: patch.height === undefined ? shape.height : sanitizePositive(patch.height),
+    angle: patch.angle === undefined ? shape.angle : sanitizeAngle(patch.angle),
+    direction:
+      patch.direction === undefined ? shape.direction : normalizeDirection(patch.direction)
+  };
+
+  validateShape(next);
+  return next;
+}
+
+export function getShapeAnchor(shape: SceneShape): WorldPoint {
+  const firstPoint = shape.points[0];
+
+  if (firstPoint === undefined) {
+    throw new Error("Shape must contain at least one point.");
+  }
+
+  return firstPoint;
+}
+
+export function getShapeEndPoint(shape: SceneShape): WorldPoint | null {
+  return shape.points[1] ?? null;
+}
+
+export function validateShape(shape: SceneShape): void {
+  assertId(shape.id);
+
+  if (!["measurement", "line", "circle", "cone", "rectangle"].includes(shape.type)) {
+    throw new Error("Unsupported tactical shape type.");
+  }
+
+  if (shape.points.length < 1) {
+    throw new Error("Shape must contain at least one point.");
+  }
+
+  for (const point of shape.points) {
+    assertFinitePoint(point);
+  }
+
+  if ((shape.type === "measurement" || shape.type === "line") && shape.points.length < 2) {
+    throw new Error("Linear shapes must contain at least two points.");
+  }
+
+  if ((shape.type === "circle" || shape.type === "cone") && sanitizePositive(shape.radius) !== shape.radius) {
+    throw new Error("Radial shapes must have a positive radius.");
+  }
+
+  if (shape.type === "rectangle") {
+    if (sanitizePositive(shape.width) !== shape.width || sanitizePositive(shape.height) !== shape.height) {
+      throw new Error("Rectangle shapes must have positive dimensions.");
+    }
+  }
+}
+
+export function normalizeDirection(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return ((value % 360) + 360) % 360;
+}
+
+function sanitizePositive(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined || value <= 0) {
+    return 1;
+  }
+
+  return value;
+}
+
+function sanitizeAngle(value: number | undefined): number {
+  if (!Number.isFinite(value) || value === undefined) {
+    return 1;
+  }
+
+  return Math.min(360, Math.max(1, value));
+}
+
+function assertId(id: string): void {
+  if (id.trim().length === 0) {
+    throw new Error("Shape id cannot be empty.");
+  }
+}
+
+function assertFinitePoint(point: WorldPoint): void {
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    throw new Error("Shape point must be a finite world coordinate.");
+  }
+}
