@@ -55,15 +55,25 @@ export function measurePathDistance(
 
   let cells = 0;
 
-  for (let index = 1; index < points.length; index += 1) {
-    const from = points[index - 1];
-    const to = points[index];
-
-    if (from === undefined || to === undefined) {
-      continue;
+  if (settings.diagonalMode === "dnd5e-alternating") {
+    let diagonalsBefore = 0;
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      if (from === undefined || to === undefined) continue;
+      const dxCells = Math.abs(to.x - from.x) / settings.grid.cellSizeWorld;
+      const dyCells = Math.abs(to.y - from.y) / settings.grid.cellSizeWorld;
+      const result = measureCellsAlternating(dxCells, dyCells, diagonalsBefore);
+      cells += result.cells;
+      diagonalsBefore += result.diagonals;
     }
-
-    cells += measureDistance(from, to, settings).cells;
+  } else {
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      if (from === undefined || to === undefined) continue;
+      cells += measureDistance(from, to, settings).cells;
+    }
   }
 
   const value =
@@ -79,6 +89,18 @@ export function measurePathDistance(
   };
 }
 
+export function measureCellsAlternating(
+  dxCells: number,
+  dyCells: number,
+  diagonalsBefore: number
+): { cells: number; diagonals: number } {
+  const D = Math.min(dxCells, dyCells);
+  const S = Math.max(dxCells, dyCells) - D;
+  const diagonalCost =
+    D + Math.floor((D + diagonalsBefore) / 2) - Math.floor(diagonalsBefore / 2);
+  return { cells: S + diagonalCost, diagonals: D };
+}
+
 export function measureCells(dxCells: number, dyCells: number, diagonalMode: DiagonalMode): number {
   if (!Number.isFinite(dxCells) || !Number.isFinite(dyCells)) {
     throw new Error("Measurement cell deltas must be finite numbers.");
@@ -87,6 +109,8 @@ export function measureCells(dxCells: number, dyCells: number, diagonalMode: Dia
   switch (diagonalMode) {
     case "dnd5e-default":
       return Math.max(dxCells, dyCells);
+    case "dnd5e-alternating":
+      return measureCellsAlternating(dxCells, dyCells, 0).cells;
     case "manhattan":
       return dxCells + dyCells;
     case "euclidean":

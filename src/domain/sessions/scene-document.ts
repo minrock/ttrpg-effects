@@ -1,7 +1,7 @@
 export const SCENE_DOCUMENT_VERSION = 1;
 
 export type DistanceUnit = "ft" | "m";
-export type DiagonalMode = "dnd5e-default" | "manhattan" | "euclidean";
+export type DiagonalMode = "dnd5e-default" | "dnd5e-alternating" | "manhattan" | "euclidean";
 
 export interface SceneMap {
   readonly imagePath: string | null;

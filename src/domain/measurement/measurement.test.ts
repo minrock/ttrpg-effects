@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatDistance,
   measureCells,
+  measureCellsAlternating,
   measureDistance,
   measurePathDistance,
   snapWorldPoint,
@@ -92,5 +93,58 @@ describe("measurement", () => {
 
   it("formats decimal values without noisy precision", () => {
     expect(formatDistance(4.25, "m")).toBe("4.3 m");
+  });
+
+  describe("dnd5e-alternating diagonal mode", () => {
+    it("1 diagonal sola cuesta 1 casilla", () => {
+      expect(measureCells(1, 1, "dnd5e-alternating")).toBe(1);
+    });
+
+    it("2 diagonales cuestan 3 casillas (5+10 ft)", () => {
+      expect(measureCells(2, 2, "dnd5e-alternating")).toBe(3);
+    });
+
+    it("3 diagonales cuestan 4 casillas (5+10+5 ft)", () => {
+      expect(measureCells(3, 3, "dnd5e-alternating")).toBe(4);
+    });
+
+    it("4 diagonales cuestan 6 casillas (5+10+5+10 ft)", () => {
+      expect(measureCells(4, 4, "dnd5e-alternating")).toBe(6);
+    });
+
+    it("measureDistance 1 diagonal → 5 ft", () => {
+      expect(
+        measureDistance({ x: 0, y: 0 }, { x: 100, y: 100 }, { grid, diagonalMode: "dnd5e-alternating" })
+      ).toMatchObject({ cells: 1, value: 5, label: "5 ft" });
+    });
+
+    it("measureDistance 2 diagonales → 15 ft", () => {
+      expect(
+        measureDistance({ x: 0, y: 0 }, { x: 200, y: 200 }, { grid, diagonalMode: "dnd5e-alternating" })
+      ).toMatchObject({ cells: 3, value: 15, label: "15 ft" });
+    });
+
+    it("path multi-segmento acumula el contador de diagonales entre tramos", () => {
+      expect(
+        measurePathDistance(
+          [{ x: 0, y: 0 }, { x: 100, y: 100 }, { x: 200, y: 200 }],
+          { grid, diagonalMode: "dnd5e-alternating" }
+        )
+      ).toMatchObject({ cells: 3, value: 15, label: "15 ft" });
+    });
+
+    it("path con cardinales no afecta el contador de diagonales", () => {
+      expect(
+        measurePathDistance(
+          [{ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 300, y: 100 }],
+          { grid, diagonalMode: "dnd5e-alternating" }
+        )
+      ).toMatchObject({ cells: 3, value: 15, label: "15 ft" });
+    });
+
+    it("measureCellsAlternating devuelve el número de diagonales del segmento", () => {
+      expect(measureCellsAlternating(2, 3, 0)).toEqual({ cells: 4, diagonals: 2 });
+      expect(measureCellsAlternating(2, 3, 2)).toEqual({ cells: 4, diagonals: 2 });
+    });
   });
 });

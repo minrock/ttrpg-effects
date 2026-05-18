@@ -173,7 +173,7 @@ export const sceneDocumentV1Schema = z.object({
     obstacles: []
   })),
   settings: z.object({
-    diagonalMode: z.enum(["dnd5e-default", "manhattan", "euclidean"]),
+    diagonalMode: z.enum(["dnd5e-default", "dnd5e-alternating", "manhattan", "euclidean"]),
     snapToGrid: z.boolean()
   }),
   lights: z.array(

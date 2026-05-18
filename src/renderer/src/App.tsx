@@ -1755,6 +1755,7 @@ export function App(): JSX.Element {
                 }
               >
                 <option value="dnd5e-default">D&D 5e</option>
+                <option value="dnd5e-alternating">D&D 5e Alt.</option>
                 <option value="manhattan">Manhattan</option>
                 <option value="euclidean">Euclidean</option>
               </select>
