@@ -40,6 +40,7 @@ interface MapViewportProps {
   readonly onMapPositionChange: (x: number, y: number) => void;
   readonly onElementMove: (elementId: string, x: number, y: number) => void;
   readonly onLightDirectionChange: (elementId: string, direction: number) => void;
+  readonly onLightRadiusChange: (elementId: string, radius: number) => void;
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
   readonly onShapeRadiusChange: (elementId: string, radius: number) => void;
@@ -74,6 +75,7 @@ export function MapViewport({
   onMapPositionChange,
   onElementMove,
   onLightDirectionChange,
+  onLightRadiusChange,
   onShapeEndMove,
   onShapeDirectionChange,
   onShapeRadiusChange,
@@ -104,6 +106,7 @@ export function MapViewport({
       onMapPositionChange,
       onElementMove,
       onLightDirectionChange,
+      onLightRadiusChange,
       onShapeEndMove,
       onShapeDirectionChange,
       onShapeRadiusChange,
@@ -141,7 +144,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogReveal, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogReveal, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);

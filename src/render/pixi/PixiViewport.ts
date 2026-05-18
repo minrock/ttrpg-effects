@@ -35,6 +35,7 @@ interface PointerDragState {
     | "map-move"
     | "element-move"
     | "light-rotate"
+    | "light-resize"
     | "shape-end-move"
     | "shape-rotate"
     | "shape-circle-resize"
@@ -66,6 +67,7 @@ export interface PixiViewportOptions {
   readonly onMapPositionChange?: (x: number, y: number) => void;
   readonly onElementMove?: (elementId: string, x: number, y: number) => void;
   readonly onLightDirectionChange?: (elementId: string, direction: number) => void;
+  readonly onLightRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
   readonly onFogReveal?: (x: number, y: number) => void;
@@ -467,6 +469,7 @@ export class PixiViewport {
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
         const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
+        const hitLightResizeElementId = this.hitTestLightResizeHandle(point);
         const hitRotationElementId = this.hitTestConeRotationHandle(point);
         const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
         const hitShapeEndElementId = this.hitTestLinearShapeEndHandle(point);
@@ -486,6 +489,11 @@ export class PixiViewport {
           elementId = hitFireLightResizeElementId;
           this.options.onElementSelect?.(hitFireLightResizeElementId);
           this.updateFireLightRadiusFromScreenPoint(hitFireLightResizeElementId, point);
+        } else if (hitLightResizeElementId !== null) {
+          mode = "light-resize";
+          elementId = hitLightResizeElementId;
+          this.options.onElementSelect?.(hitLightResizeElementId);
+          this.updateLightRadiusFromScreenPoint(hitLightResizeElementId, point);
         } else if (hitRotationElementId !== null) {
           mode = "light-rotate";
           elementId = hitRotationElementId;
@@ -568,6 +576,8 @@ export class PixiViewport {
       this.options.onElementMove?.(this.dragState.elementId, worldPoint.x, worldPoint.y);
     } else if (this.dragState.mode === "light-rotate" && this.dragState.elementId !== undefined) {
       this.updateLightDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "light-resize" && this.dragState.elementId !== undefined) {
+      this.updateLightRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-end-move" && this.dragState.elementId !== undefined) {
       this.updateLinearShapeEndFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-rotate" && this.dragState.elementId !== undefined) {
@@ -756,6 +766,12 @@ export class PixiViewport {
 
       if (selectedConeLight !== undefined) {
         selectionLayer.addChild(drawConeRotationHandle(selectedConeLight));
+      }
+
+      const selectedLight = this.lights.find((light) => light.id === this.selectedElementId);
+
+      if (selectedLight !== undefined && selectedLight.visible) {
+        selectionLayer.addChild(drawLightResizeHandle(selectedLight));
       }
 
       const selectedFireEffect = this.effects.find((effect) => effect.id === this.selectedElementId);
@@ -991,6 +1007,21 @@ export class PixiViewport {
       : null;
   }
 
+  private hitTestLightResizeHandle(screenPoint: ScreenPoint): string | null {
+    const light = this.getSelectedLight();
+
+    if (light === null || !light.visible) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const handle = getLightResizeHandlePosition(light);
+
+    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18
+      ? light.id
+      : null;
+  }
+
   private hitTestLinearShapeEndHandle(screenPoint: ScreenPoint): string | null {
     const selectedShape = this.getSelectedLinearShape();
 
@@ -1063,6 +1094,14 @@ export class PixiViewport {
     return this.effects.find((effect) => effect.id === this.selectedElementId) ?? null;
   }
 
+  private getSelectedLight(): SceneLight | null {
+    if (this.selectedElementId === null) {
+      return null;
+    }
+
+    return this.lights.find((light) => light.id === this.selectedElementId) ?? null;
+  }
+
   private getSelectedLinearShape(): SceneShape | null {
     if (this.selectedElementId === null) {
       return null;
@@ -1088,6 +1127,18 @@ export class PixiViewport {
     const direction =
       (Math.atan2(worldPoint.y - light.position.y, worldPoint.x - light.position.x) * 180) / Math.PI;
     this.options.onLightDirectionChange?.(elementId, direction);
+  }
+
+  private updateLightRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const light = this.lights.find((candidate) => candidate.id === elementId);
+
+    if (light === undefined) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const radius = Math.hypot(worldPoint.x - light.position.x, worldPoint.y - light.position.y);
+    this.options.onLightRadiusChange?.(elementId, Math.max(10, radius));
   }
 
   private updateLinearShapeEndFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1910,6 +1961,44 @@ function drawConeRotationHandle(light: SceneLight): Graphics {
     .stroke({ color: 0xfff0a8, width: 3, alpha: 0.85 })
     .circle(handleX, handleY, 8)
     .fill({ color: 0xfff0a8, alpha: 0.95 });
+}
+
+function drawLightResizeHandle(light: SceneLight): Graphics {
+  const handle = getLightResizeHandlePosition(light);
+  const graphic = new Graphics();
+
+  if (light.kind === "point") {
+    graphic
+      .circle(light.position.x, light.position.y, light.radius)
+      .stroke({ color: 0xfff0a8, width: 2, alpha: 0.78 });
+  } else {
+    graphic
+      .moveTo(light.position.x, light.position.y)
+      .lineTo(handle.x, handle.y)
+      .stroke({ color: 0xfff0a8, width: 2, alpha: 0.72 });
+  }
+
+  return graphic
+    .circle(handle.x, handle.y, 11)
+    .fill({ color: 0x101315, alpha: 0.9 })
+    .circle(handle.x, handle.y, 7)
+    .fill({ color: 0xfff0a8, alpha: 0.95 });
+}
+
+function getLightResizeHandlePosition(light: SceneLight): { x: number; y: number } {
+  if (light.kind === "point") {
+    return {
+      x: light.position.x + light.radius,
+      y: light.position.y
+    };
+  }
+
+  const direction = (light.direction * Math.PI) / 180;
+
+  return {
+    x: light.position.x + Math.cos(direction) * light.radius,
+    y: light.position.y + Math.sin(direction) * light.radius
+  };
 }
 
 function drawFireResizeHandles(effect: SceneEffect): Graphics {

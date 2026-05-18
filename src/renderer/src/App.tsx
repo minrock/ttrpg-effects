@@ -445,6 +445,15 @@ export function App(): JSX.Element {
     }));
   }, []);
 
+  const handleLightRadiusChange = useCallback((elementId: string, radius: number): void => {
+    setScene((current) => ({
+      ...current,
+      lights: current.lights.map((light) =>
+        light.id === elementId ? updateLightSource(light, { radius }) : light
+      )
+    }));
+  }, []);
+
   const handleShapeEndMove = useCallback((elementId: string, x: number, y: number): void => {
     setScene((current) => ({
       ...current,
@@ -1163,6 +1172,7 @@ export function App(): JSX.Element {
           onMapPositionChange={handleMapPositionChange}
           onElementMove={handleElementMove}
           onLightDirectionChange={handleLightDirectionChange}
+          onLightRadiusChange={handleLightRadiusChange}
           onShapeEndMove={handleShapeEndMove}
           onShapeDirectionChange={handleShapeDirectionChange}
           onShapeRadiusChange={handleShapeRadiusChange}

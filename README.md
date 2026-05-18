@@ -79,6 +79,7 @@ La oscuridad global y la niebla se pueden activar/desactivar y ajustar desde el 
 
 - La luz puntual ilumina un area circular configurable.
 - La luz conica ilumina un sector configurable por radio, angulo y direccion.
+- Al seleccionar una luz puntual o conica, puedes arrastrar su handle dorado para agrandar o reducir el radio/longitud desde el canvas.
 - El fuego se renderiza como areas rojas opacas y puede emitir una luz calida.
 - `Pintar fuego` permite pintar cuadrados de grilla con un pincel circular.
 - Al seleccionar una luz o fuego aparece un panel compacto para ajustar visibilidad, color, opacidad, intensidad, radio o escala segun corresponda.
