@@ -29,6 +29,7 @@ interface MapViewportProps {
   readonly selectedElementId: string | null;
   readonly isZoomLocked: boolean;
   readonly isMapAdjustMode: boolean;
+  readonly isGridAdjustMode: boolean;
   readonly isGrabMode: boolean;
   readonly isFogRevealMode: boolean;
   readonly isFirePaintMode: boolean;
@@ -64,6 +65,7 @@ export function MapViewport({
   selectedElementId,
   isZoomLocked,
   isMapAdjustMode,
+  isGridAdjustMode,
   isGrabMode,
   isFogRevealMode,
   isFirePaintMode,
@@ -135,6 +137,7 @@ export function MapViewport({
       createdViewport.setSelectedElementId(selectedElementId);
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setGrabMode(isGrabMode);
+      createdViewport.setGridAdjustMode(isGridAdjustMode);
       createdViewport.setFogRevealMode(isFogRevealMode);
       createdViewport.setFirePaintMode(isFirePaintMode);
     });
@@ -193,6 +196,10 @@ export function MapViewport({
   useEffect(() => {
     viewportRef.current?.setMapAdjustMode(isMapAdjustMode);
   }, [isMapAdjustMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setGridAdjustMode(isGridAdjustMode);
+  }, [isGridAdjustMode]);
 
   useEffect(() => {
     viewportRef.current?.setGrabMode(isGrabMode);

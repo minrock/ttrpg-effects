@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
+import * as Switch from "@radix-ui/react-switch";
 import {
   cancelInteraction,
   closeContextMenu,
@@ -77,6 +78,7 @@ export function App(): JSX.Element {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
+  const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
@@ -98,6 +100,16 @@ export function App(): JSX.Element {
 
   const handleElementSelect = useCallback((elementId: string | null) => {
     setInteraction((current) => selectElement(current, elementId));
+  }, []);
+
+  const setGridAdjustMode = useCallback((enabled: boolean): void => {
+    setIsGridAdjustMode(enabled);
+
+    if (enabled) {
+      setIsSidebarVisible(true);
+      setOpenSidebarSections((current) => ({ ...current, grid: true }));
+      setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
+    }
   }, []);
 
   const handleCreateElement = (kind: TacticalElementKind): void => {
@@ -243,6 +255,12 @@ export function App(): JSX.Element {
         return;
       }
 
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        setGridAdjustMode(!isGridAdjustMode);
+        return;
+      }
+
       if (event.code === "Space" && !shouldIgnoreSpaceDrag(event.target)) {
         event.preventDefault();
         setIsSpaceDragActive(true);
@@ -288,7 +306,7 @@ export function App(): JSX.Element {
       window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("blur", handleWindowBlur);
     };
-  }, [handleDeleteSelectedElement]);
+  }, [handleDeleteSelectedElement, isGridAdjustMode, setGridAdjustMode]);
 
   async function handleSaveScene(): Promise<void> {
     await runSceneOperation("guardada", async () => {
@@ -656,6 +674,7 @@ export function App(): JSX.Element {
   }, []);
 
   function handleToggleMapAdjust(): void {
+    setGridAdjustMode(false);
     setInteraction((current) => setMapAdjustMode(current, !current.isMapAdjustMode));
   }
 
@@ -1000,6 +1019,7 @@ export function App(): JSX.Element {
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
+          isGridAdjustMode={isGridAdjustMode}
           isGrabMode={isSpaceDragActive}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
           isFirePaintMode={interaction.activeTool === "fire-paint"}
@@ -1312,6 +1332,20 @@ export function App(): JSX.Element {
               <input type="checkbox" checked={scene.grid.enabled} onChange={handleGridVisibilityChange} />
               Activar grilla
             </label>
+            <div className="switch-control">
+              <div>
+                <span>Ajustar grilla</span>
+                <small>Shortcut Cmd/Ctrl + G</small>
+              </div>
+              <Switch.Root
+                className="switch-root"
+                checked={isGridAdjustMode}
+                onCheckedChange={setGridAdjustMode}
+                aria-label="Activar modo ajustar grilla"
+              >
+                <Switch.Thumb className="switch-thumb" />
+              </Switch.Root>
+            </div>
             <label>
               Opacidad
               <input
@@ -1323,16 +1357,18 @@ export function App(): JSX.Element {
                 onChange={(event) => handleGridOpacityChange(event.currentTarget.valueAsNumber)}
               />
             </label>
-            <label>
-              Celda
-              <input
-                type="number"
-                min="8"
-                max="1000"
-                value={scene.grid.cellSizeWorld}
-                onChange={(event) => handleGridCellSizeChange(event.currentTarget.valueAsNumber)}
-              />
-            </label>
+            {isGridAdjustMode ? (
+              <label>
+                Celda
+                <input
+                  type="number"
+                  min="8"
+                  max="1000"
+                  value={scene.grid.cellSizeWorld}
+                  onChange={(event) => handleGridCellSizeChange(event.currentTarget.valueAsNumber)}
+                />
+              </label>
+            ) : null}
             <label>
               Unidad
               <select

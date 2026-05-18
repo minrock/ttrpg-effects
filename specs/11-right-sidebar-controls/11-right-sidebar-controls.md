@@ -34,7 +34,8 @@ Sección para controles directamente relacionados con la grilla visual:
 
 - Activar/desactivar grilla.
 - Opacidad de grilla.
-- Tamaño de celda.
+- Switch `Ajustar grilla`.
+- Tamaño de celda, visible solo cuando `Ajustar grilla` esta activo.
 - Unidad.
 - Preset de escala.
 
@@ -142,6 +143,8 @@ La spec es de presentación e interacción de UI. Los valores editados por el pa
 - Los headers usan una fuente aproximadamente entre `1.5rem` y `2rem`.
 - Los valores internos son visualmente más pequeños que los headers.
 - La sección Grilla contiene los controles de grilla actuales.
+- La sección Grilla permite activar `Ajustar grilla` con switch, no checkbox.
+- El tamaño de celda se oculta mientras `Ajustar grilla` esta inactivo.
 - La sección Figuras contiene Snap, Diagonal y Valor por casilla.
 - La sección Oscuridad contiene toggle y overlay de oscuridad.
 - La sección Niebla contiene toggle, opacidad/fog, color, reveal y reset.

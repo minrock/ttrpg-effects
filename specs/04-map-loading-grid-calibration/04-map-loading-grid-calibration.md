@@ -10,19 +10,22 @@ Permitir cargar una imagen de mapa, mostrarla en el lienzo, superponer una grill
 - Mostrar mapa en el lienzo.
 - Crear grilla cuadrada.
 - Ajustar opacidad de grilla.
-- Calibrar por arrastre.
-- Calibrar por valor numerico.
+- Activar un modo `Ajustar grilla` desde el sidebar derecho o con shortcut `Cmd+G` en macOS / `Ctrl+G` en Windows/Linux.
+- Calibrar por arrastre solo cuando `Ajustar grilla` esta activo.
+- Calibrar por valor numerico solo cuando `Ajustar grilla` esta activo.
 - Bloquear zoom/escala para proteger la calibracion.
 
 ## Flujo esperado
 
 1. El usuario carga una imagen.
 2. La app muestra el mapa centrado.
-3. El usuario activa o ajusta la grilla.
-4. El usuario arrastra un control de calibracion hasta que una casilla mida correctamente en la superficie proyectada.
-5. Opcionalmente ajusta valores numericos.
-6. El usuario bloquea la escala.
-7. La sesion entra en modo de uso normal.
+3. El usuario activa la grilla.
+4. El usuario activa `Ajustar grilla` desde el sidebar o con `Cmd/Ctrl+G`.
+5. El usuario arrastra un control de calibracion hasta que una casilla mida correctamente en la superficie proyectada.
+6. Opcionalmente ajusta valores numericos mientras el modo esta activo.
+7. El usuario desactiva `Ajustar grilla`.
+8. El usuario bloquea la escala.
+9. La sesion entra en modo de uso normal.
 
 ## Formatos de imagen
 
@@ -49,8 +52,11 @@ Presets iniciales:
 - El usuario puede cargar una imagen valida.
 - La grilla aparece sobre el mapa.
 - El usuario puede cambiar opacidad de grilla.
-- El usuario puede calibrar por arrastre.
-- El usuario puede calibrar numericamente.
+- El usuario puede activar/desactivar `Ajustar grilla` desde el sidebar con un switch.
+- El usuario puede activar/desactivar `Ajustar grilla` con `Cmd+G` en macOS y `Ctrl+G` en Windows/Linux.
+- El usuario puede calibrar por arrastre solo cuando `Ajustar grilla` esta activo.
+- El usuario puede calibrar numericamente solo cuando `Ajustar grilla` esta activo.
+- El control visual de calibracion queda por encima de niebla/oscuridad y herramientas para poder usarse durante la sesion.
 - Al bloquear escala, la rueda del mouse no rompe el tamano fisico de la grilla.
 - La configuracion de mapa y grilla se puede guardar en el formato de sesion.
 
@@ -65,4 +71,3 @@ Presets iniciales:
 - Modelar por separado escala del mapa, escala de camara y tamano de celda.
 - El margen externo debe permitir centrar esquinas o zonas fuera de la imagen.
 - La grilla del MVP es cuadrada, sin hexagonos.
-

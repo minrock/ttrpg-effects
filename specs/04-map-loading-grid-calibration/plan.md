@@ -20,7 +20,11 @@
 - Encender/apagar grilla.
 - Ajustar opacidad de grilla.
 - Ajustar `cellSizeWorld` por valor numerico.
-- Calibrar por arrastre mediante un control visible sobre el mapa.
+- Calibrar por arrastre mediante un control visible sobre el mapa solo cuando el modo `Ajustar grilla` esta activo.
+- Activar/desactivar `Ajustar grilla` desde el sidebar derecho con un switch accesible.
+- Activar/desactivar `Ajustar grilla` con shortcut `Cmd+G` en macOS y `Ctrl+G` en Windows/Linux.
+- Mostrar el input numerico de `cellSizeWorld` solo mientras `Ajustar grilla` esta activo.
+- Renderizar el handle de calibracion en una capa superior a niebla/oscuridad para que siempre sea usable.
 - Aplicar presets iniciales: 1 inch, 2.5 cm, 5 ft, 1.5 m por casilla.
 - Bloquear escala/zoom desde UI para proteger la calibracion.
 - Guardar/cargar mapa y grilla en `.ttrpgscene`.
@@ -41,9 +45,9 @@
 - **Arquitectura:** El dominio define tipos/reglas de mapa y grilla. La aplicacion orquesta seleccion de imagen y actualizacion de escena. Infraestructura/main accede al filesystem y dialogos. PixiJS solo renderiza mapa/grilla a partir de estado serializable.
 - **Persistencia:** Se reutiliza `SceneDocumentV1`. El mapa guarda ruta local sin copiar archivo. La grilla guarda valores ya existentes del schema: `enabled`, `locked`, `cellSizeWorld`, `opacity`, `unit`, `distancePerCell`, `metricDistancePerCell`.
 - **IPC / Electron:** Agregar una API especifica `map:open-image` en main/preload. No exponer filesystem ni dialogos genericos. La URL de imagen se resuelve via protocolo custom `map-asset://` registrado en el proceso principal (ver decision tecnica resuelta mas abajo).
-- **Render / PixiJS:** Extender `PixiViewport` para cargar textura usando `Assets.load(url)` de PixiJS v8 (API canonica). Renderizar mapa en capa `map` y grilla en capa `grid`. Mantener conversion pantalla <-> mundo centralizada. El CSP del renderer debe incluir `unsafe-eval` para la compilacion de shaders de PixiJS v8.
+- **Render / PixiJS:** Extender `PixiViewport` para cargar textura usando `Assets.load(url)` de PixiJS v8 (API canonica). Renderizar mapa en capa `map` y grilla en capa `grid`. Mantener conversion pantalla <-> mundo centralizada. El handle de calibracion se dibuja en la capa superior de seleccion solo durante `Ajustar grilla`, para no quedar debajo de fog/darkness. El CSP del renderer debe incluir `unsafe-eval` para la compilacion de shaders de PixiJS v8.
 - **Validacion:** Validar extension, existencia de archivo y soporte de carga. HEIC debe intentar cargarse si Chromium/sistema lo permite; si falla, mostrar mensaje claro y recuperable.
-- **Dependencias nuevas:** Ninguna. El protocolo `map-asset://` usa modulos nativos de Electron (`protocol`, `net`).
+- **Dependencias nuevas:** `@radix-ui/react-switch` para el switch accesible de `Ajustar grilla`. El protocolo `map-asset://` usa modulos nativos de Electron (`protocol`, `net`).
 
 ### Decisiones tecnicas resueltas durante implementacion
 
@@ -109,7 +113,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 ### `renderer`
 
 - Agregar boton `Cargar mapa`.
-- Agregar controles compactos de grilla: visible, opacidad, tamano de celda, presets, bloqueo de escala.
+- Agregar controles compactos de grilla: visible, opacidad, switch `Ajustar grilla`, tamano de celda visible solo en ese modo, presets, bloqueo de escala.
 - Mostrar estado visible de mapa cargado o error recuperable.
 - Actualizar escena en memoria al cargar mapa o cambiar grilla.
 - Guardar/cargar `.ttrpgscene` con mapa/grilla actualizados.
@@ -122,7 +126,8 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Liberar textura anterior con `Assets.unload(url)` al cambiar imagen.
 - Renderizar mapa centrado en capa `map`.
 - Renderizar grilla cuadrada en capa `grid` con opacidad configurable.
-- Implementar handle/overlay de calibracion por arrastre.
+- Implementar handle/overlay de calibracion por arrastre visible/interactivo solo en modo `Ajustar grilla`.
+- Dibujar el handle de calibracion en la capa de seleccion para quedar por encima de niebla/oscuridad.
 - Respetar bloqueo de zoom/escala en rueda.
 - Llamar `drawDarknessLayer()` dentro de `drawMapImage()` tras asignar el sprite, para que los bounds del overlay sean correctos.
 - Mantener interacciones existentes de Spec 03.
@@ -140,14 +145,15 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 3. Crear IPC `map:open-image` en main y preload.
 4. Extender estado de escena/UI para cargar mapa y actualizar grilla.
 5. Extender `PixiViewport` para renderizar textura de mapa y grilla.
-6. Agregar controles React compactos: cargar mapa, grilla visible, opacidad, celda, presets, bloqueo.
-7. Implementar calibracion por arrastre con un handle visible.
+6. Agregar controles React compactos: cargar mapa, grilla visible, opacidad, switch `Ajustar grilla`, celda condicional, presets, bloqueo.
+7. Implementar calibracion por arrastre con un handle visible solo en modo `Ajustar grilla`.
 8. Conectar guardar/cargar `.ttrpgscene` para restaurar mapa/grilla.
 9. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
 10. (Resuelto en debug) Registrar protocolo `map-asset://` en main para servir archivos locales sin restriccion de origen cruzado.
 11. (Resuelto en debug) Agregar `'unsafe-eval'` y directivas `map-asset:` al CSP del renderer para PixiJS v8.
 12. (Resuelto en debug) Reemplazar `loadImageElement + Sprite.from` por `Assets.load + new Sprite` para carga correcta de texturas en PixiJS v8.
 13. (Resuelto en debug) Corregir bounds del overlay de oscuridad llamando `drawDarknessLayer()` tras la carga asincrona del mapa.
+14. (Resuelto en iteracion posterior) Mover activacion de calibracion a un switch del sidebar y shortcut `Cmd/Ctrl+G`; ocultar input/handle fuera del modo y renderizar handle por encima de fog.
 
 ## 7. Testing y verificacion
 
@@ -156,7 +162,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Manual / smoke:** Ejecutar `pnpm dev`, cargar PNG/JPG/WEBP, verificar mapa centrado, cambiar opacidad, cambiar tamano de celda, aplicar presets, calibrar por arrastre, bloquear escala, intentar zoom con rueda y guardar/cargar escena.
+- **Manual / smoke:** Ejecutar `pnpm dev`, cargar PNG/JPG/WEBP, verificar mapa centrado, cambiar opacidad, activar `Ajustar grilla` con switch y `Cmd/Ctrl+G`, cambiar tamano de celda, aplicar presets, calibrar por arrastre con niebla activa, bloquear escala, intentar zoom con rueda y guardar/cargar escena.
 
 ## 8. Riesgos y mitigaciones
 
@@ -169,7 +175,9 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - **Riesgo:** La grilla cubre demasiado el mapa o afecta rendimiento.
   **Mitigacion:** Opacidad configurable y render de lineas calculado por viewport visible.
 - **Riesgo:** Calibracion por arrastre compite con pan/seleccion.
-  **Mitigacion:** Estado de herramienta/handle especifico y umbrales claros.
+  **Mitigacion:** Modo explicito `Ajustar grilla`, activado con switch/shortcut, y handle interactivo solo durante ese modo.
+- **Riesgo:** El handle de calibracion queda oculto por niebla/oscuridad.
+  **Mitigacion:** Dibujarlo en la capa de seleccion, por encima de overlays.
 - **Riesgo:** PixiJS v8 no puede compilar shaders por CSP restrictivo. _(Materializado y resuelto)_
   **Mitigacion:** Agregar `'unsafe-eval'` a `script-src` en el meta CSP del renderer. Aceptable para una aplicacion de escritorio donde el renderer no carga contenido remoto arbitrario.
 - **Riesgo:** API de carga de texturas de PixiJS v8 incompatible con `Sprite.from(HTMLImageElement)`. _(Materializado y resuelto)_
@@ -184,8 +192,11 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - El mapa aparece centrado en el lienzo.
 - La grilla cuadrada aparece sobre el mapa.
 - El usuario puede cambiar opacidad de grilla.
-- El usuario puede calibrar por arrastre.
-- El usuario puede calibrar por valor numerico.
+- El usuario puede activar `Ajustar grilla` con switch en sidebar.
+- El usuario puede activar `Ajustar grilla` con `Cmd+G`/`Ctrl+G`.
+- El usuario puede calibrar por arrastre solo con `Ajustar grilla` activo.
+- El usuario puede calibrar por valor numerico solo con `Ajustar grilla` activo.
+- El handle de calibracion queda visible por encima de niebla/oscuridad.
 - Los presets iniciales actualizan la configuracion de grilla.
 - Al bloquear escala, la rueda no rompe el tamano fisico de la grilla.
 - Mapa y grilla se guardan y cargan en `.ttrpgscene`.
@@ -211,6 +222,9 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - [x] Opacidad de grilla configurable.
 - [x] Calibracion numerica implementada.
 - [x] Calibracion por arrastre implementada.
+- [x] Modo `Ajustar grilla` con switch y shortcut implementado.
+- [x] Input numerico y handle ocultos fuera de `Ajustar grilla`.
+- [x] Handle de calibracion renderizado por encima de fog/darkness.
 - [x] Presets iniciales implementados.
 - [x] Bloqueo de escala respeta rueda/zoom.
 - [x] Guardar/cargar escena conserva mapa y grilla.

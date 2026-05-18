@@ -106,6 +106,7 @@ export class PixiViewport {
   private selectedElementId: string | null = null;
   private isZoomLocked = false;
   private isMapAdjustMode = false;
+  private isGridAdjustMode = false;
   private isGrabMode = false;
   private isFogRevealMode = false;
   private isFirePaintMode = false;
@@ -172,6 +173,11 @@ export class PixiViewport {
 
   setMapAdjustMode(isMapAdjustMode: boolean): void {
     this.isMapAdjustMode = isMapAdjustMode;
+  }
+
+  setGridAdjustMode(isGridAdjustMode: boolean): void {
+    this.isGridAdjustMode = isGridAdjustMode;
+    this.drawInteractiveElements();
   }
 
   setGrabMode(isGrabMode: boolean): void {
@@ -333,7 +339,6 @@ export class PixiViewport {
 
     grid.stroke({ color: 0xd9e5df, width: 1, alpha: this.grid.opacity });
     layer.addChild(grid);
-    layer.addChild(this.drawCalibrationHandle());
   }
 
   private drawDarknessLayer(): void {
@@ -535,7 +540,7 @@ export class PixiViewport {
           this.options.onElementSelect?.(hitElementId);
         } else if (this.isMapAdjustMode && this.mapSprite !== null) {
           mode = "map-move";
-        } else if (this.hitTestCalibrationHandle(point)) {
+        } else if (this.isGridAdjustMode && this.hitTestCalibrationHandle(point)) {
           mode = "calibrate";
         }
       }
@@ -751,6 +756,10 @@ export class PixiViewport {
           selectionLayer.addChild(drawFireZoneHint(effect));
         }
       }
+    }
+
+    if (this.isGridAdjustMode && this.grid !== null && this.grid.enabled) {
+      selectionLayer.addChild(this.drawCalibrationHandle());
     }
 
     if (this.selectedElementId !== null) {

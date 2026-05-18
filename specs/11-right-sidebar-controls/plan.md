@@ -23,6 +23,7 @@
 - Mantener varias secciones abiertas simultáneamente.
 - Mantener el panel visible por defecto y permitir ocultarlo/mostrarlo para ampliar el viewport del mapa.
 - Exponer `Valor por casilla` dentro de Figuras.
+- Exponer `Ajustar grilla` como switch dentro de Grilla y mostrar `Celda` solo cuando ese modo este activo.
 - Ajustar el canvas para ocupar el espacio restante sin quedar cubierto.
 - Mantener intactas las reglas de dominio y render.
 - Mantener accesibilidad básica con botones, labels y `aria-expanded`.
@@ -42,7 +43,7 @@
 - **IPC / Electron:** Sin cambios. No se agregan canales IPC ni preload API.
 - **Render / PixiJS:** Sin cambios en adapters Pixi; solo cambia el layout React/CSS alrededor del canvas.
 - **Validacion:** Mantener los mismos límites actuales de inputs. Para `Valor por casilla`, editar `distancePerCell` cuando la unidad sea `ft` y `metricDistancePerCell` cuando la unidad sea `m`.
-- **Dependencias nuevas:** Ninguna. Los iconos se resolverán con caracteres/símbolos simples o CSS, salvo que ya exista una librería disponible.
+- **Dependencias nuevas:** `@radix-ui/react-switch` para el switch accesible de `Ajustar grilla`. Los iconos se resuelven con caracteres/símbolos simples o CSS.
 
 ## 4. Diseno de dominio
 
@@ -83,6 +84,8 @@
   - Agregar estado local para accordions abiertos, por ejemplo `Set` o record booleans.
   - Agregar estado local para visibilidad global del sidebar.
   - Crear una estructura de secciones clara para Grilla, Figuras, Oscuridad y Niebla.
+  - Agregar switch `Ajustar grilla` dentro de Grilla.
+  - Mostrar/ocultar el input `Celda` segun `Ajustar grilla`.
   - Agregar handler para `Valor por casilla`.
   - Mantener todos los handlers existentes conectados.
 - En `src/renderer/src/styles.css`:
@@ -105,16 +108,17 @@
 3. Definir el estado local de visibilidad global del sidebar.
 4. Crear helpers/render blocks para `SidebarAccordion` o una estructura equivalente dentro de `App.tsx`.
 5. Mover controles de Grilla al accordion Grilla.
-6. Mover Snap, Diagonal y `Valor por casilla` al accordion Figuras.
-7. Mover controles de Oscuridad al accordion Oscuridad.
-8. Mover controles de Niebla al accordion Niebla.
-9. Implementar handler de `Valor por casilla` respetando unidad activa.
-10. Agregar botón visible para ocultar/mostrar el sidebar.
-11. Ajustar CSS para layout lateral derecho, modo colapsado y canvas con espacio restante.
-12. Ajustar estilos de headers, iconos, indicadores, controles internos y scroll.
-13. Verificar que toolbar principal, status, propiedades y canvas no se solapen.
-14. Ejecutar validaciones automáticas.
-15. Realizar smoke manual en `pnpm dev`.
+6. Agregar switch `Ajustar grilla` y dejar `Celda` visible solo cuando el switch este activo.
+7. Mover Snap, Diagonal y `Valor por casilla` al accordion Figuras.
+8. Mover controles de Oscuridad al accordion Oscuridad.
+9. Mover controles de Niebla al accordion Niebla.
+10. Implementar handler de `Valor por casilla` respetando unidad activa.
+11. Agregar botón visible para ocultar/mostrar el sidebar.
+12. Ajustar CSS para layout lateral derecho, modo colapsado y canvas con espacio restante.
+13. Ajustar estilos de headers, iconos, indicadores, controles internos y scroll.
+14. Verificar que toolbar principal, status, propiedades y canvas no se solapen.
+15. Ejecutar validaciones automáticas.
+16. Realizar smoke manual en `pnpm dev`.
 
 ## 7. Testing y verificacion
 
@@ -145,7 +149,7 @@
 - Cada accordion tiene icono, título grande e indicador de estado.
 - Los headers usan tamaño de fuente aproximado entre `1.5rem` y `2rem`.
 - Los controles internos se ven más pequeños que los headers.
-- Grilla contiene toggle, opacidad, celda, unidad y preset.
+- Grilla contiene toggle, opacidad, switch `Ajustar grilla`, celda condicional, unidad y preset.
 - Figuras contiene Snap, Diagonal y Valor por casilla.
 - Oscuridad contiene toggle y overlay.
 - Niebla contiene toggle, fog/opacity, color, reveal y reset.
@@ -171,7 +175,7 @@
 - [x] Smoke/manual test realizado si aplica.
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
-- [x] Sin dependencias nuevas no justificadas.
+- [x] Dependencia `@radix-ui/react-switch` justificada para switch accesible.
 
 ## 12. Cierre
 
