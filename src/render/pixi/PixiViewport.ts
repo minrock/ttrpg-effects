@@ -1,4 +1,4 @@
-import { Application, Assets, Container, Graphics, Sprite, Text } from "pixi.js";
+import { Application, Assets, Container, Graphics, RenderTexture, Sprite, Text } from "pixi.js";
 import {
   createCameraState,
   panCamera,
@@ -82,6 +82,7 @@ export class PixiViewport {
   private isMapAdjustMode = false;
   private dragState: PointerDragState | null = null;
   private fireAnimationPhase = 0;
+  private _darknessTexture: RenderTexture | null = null;
   private disposed = false;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
@@ -166,6 +167,8 @@ export class PixiViewport {
     this.disposed = true;
     this.resizeObserver.disconnect();
     this.removeInputListeners();
+    this._darknessTexture?.destroy();
+    this._darknessTexture = null;
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -260,100 +263,58 @@ export class PixiViewport {
   private drawDarknessLayer(): void {
     const layer = this.getLayer("darkness");
     layer.removeChildren();
+    this._darknessTexture?.destroy();
+    this._darknessTexture = null;
 
     if (this.darkness === null || !this.darkness.enabled || this.darkness.opacity <= 0) {
       return;
     }
 
     const bounds = this.getGridBounds();
-    layer.addChild(
-      new Graphics()
-        .rect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top)
-        .fill({ color: parseHexColor(this.darkness.color), alpha: this.darkness.opacity })
-    );
+    const w = Math.ceil(bounds.right - bounds.left);
+    const h = Math.ceil(bounds.bottom - bounds.top);
 
-    for (const effect of this.effects) {
-      if (effect.visible && effect.emitsLight) {
-        layer.addChild(applyEraseBlend(drawFireReveal(effect)));
+    const rt = RenderTexture.create({ width: w, height: h });
+    this._darknessTexture = rt;
+
+    // Pass 1: fill darkness into the texture
+    const darkRect = new Graphics()
+      .rect(0, 0, w, h)
+      .fill({ color: parseHexColor(this.darkness.color), alpha: this.darkness.opacity });
+    this.app.renderer.render({ container: darkRect, target: rt, clear: true });
+    darkRect.destroy();
+
+    // Pass 2: erase light areas from the texture
+    const activeLights = this.lights.filter((l) => l.visible);
+    const activeFireEffects = this.effects.filter((e) => e.visible && e.emitsLight);
+    if (activeLights.length > 0 || activeFireEffects.length > 0) {
+      const eraseContainer = new Container();
+      for (const light of activeLights) {
+        eraseContainer.addChild(buildLightEraseGraphic(light, bounds.left, bounds.top));
       }
+      for (const effect of activeFireEffects) {
+        const g = new Graphics()
+          .circle(effect.position.x - bounds.left, effect.position.y - bounds.top, effect.lightRadius)
+          .fill({ color: 0xffffff, alpha: 1 });
+        g.blendMode = "erase";
+        eraseContainer.addChild(g);
+      }
+      this.app.renderer.render({ container: eraseContainer, target: rt, clear: false });
+      eraseContainer.destroy({ children: true });
     }
 
-    for (const light of this.lights) {
-      if (light.visible) {
-        layer.addChild(applyEraseBlend(drawLightReveal(light)));
-      }
-    }
+    // Display the composited darkness texture as a sprite in world space
+    const darknessSprite = new Sprite(rt);
+    darknessSprite.position.set(bounds.left, bounds.top);
+    layer.addChild(darknessSprite);
   }
 
   private updateBaseMapVisibility(): void {
-    if (this.mapSprite === null) {
-      return;
-    }
-
-    if (this.darkness === null || !this.darkness.enabled) {
+    if (this.mapSprite !== null) {
       this.mapSprite.alpha = 1;
-      return;
     }
-
-    this.mapSprite.alpha = Math.max(0, 1 - this.darkness.opacity);
   }
 
-  private drawLightsLayer(): void {
-    const layer = this.getLayer("lights");
-    layer.addChild(
-      new Graphics()
-        .circle(0, 0, 130)
-        .fill({ color: 0xffc56b, alpha: 0.2 })
-        .circle(0, 0, 72)
-        .fill({ color: 0xffdf91, alpha: 0.32 })
-    );
-  }
-
-  private drawEffectsLayer(): void {
-    const layer = this.getLayer("effects");
-    layer.addChild(
-      new Graphics()
-        .circle(-120, 72, 22)
-        .fill({ color: 0xff7a38, alpha: 0.95 })
-        .circle(-112, 62, 12)
-        .fill({ color: 0xffe38a, alpha: 0.95 })
-    );
-  }
-
-  private drawShapesLayer(): void {
-    const layer = this.getLayer("shapesAndMeasurements");
-    layer.addChild(
-      new Graphics()
-        .moveTo(-260, -160)
-        .lineTo(240, 130)
-        .stroke({ color: 0x7fd3ff, width: 5, alpha: 0.9 })
-        .circle(-260, -160, 10)
-        .fill({ color: 0x7fd3ff })
-        .circle(240, 130, 10)
-        .fill({ color: 0x7fd3ff })
-    );
-
-    const label = new Text({
-      text: "Layer test: mapa, grilla, luz y medicion",
-      style: {
-        fill: 0xf4f1e8,
-        fontFamily: "system-ui, sans-serif",
-        fontSize: 22,
-        fontWeight: "700"
-      }
-    });
-    label.position.set(-330, -305);
-    layer.addChild(label);
-  }
-
-  private drawSelectionLayer(): void {
-    const layer = this.getLayer("selection");
-    layer.addChild(
-      new Graphics()
-        .roundRect(-372, -252, 744, 504, 14)
-        .stroke({ color: 0xfff0a8, width: 3, alpha: 0.85 })
-    );
-  }
 
   private addInputListeners(): void {
     const { canvas } = this.app;
@@ -578,20 +539,6 @@ export class PixiViewport {
     for (const light of this.lights) {
       if (light.visible) {
         lightsLayer.addChild(drawSceneLight(light));
-      }
-    }
-
-    if (this.mapSprite !== null) {
-      for (const effect of this.effects) {
-        if (effect.visible && effect.emitsLight) {
-          addMapReveal(lightsLayer, this.mapSprite, drawFireReveal(effect));
-        }
-      }
-
-      for (const light of this.lights) {
-        if (light.visible) {
-          addMapReveal(lightsLayer, this.mapSprite, drawLightReveal(light));
-        }
       }
     }
 
@@ -907,7 +854,6 @@ export class PixiViewport {
     }
 
     this.fireAnimationPhase += 0.08;
-    this.drawDarknessLayer();
     this.drawInteractiveElements();
   };
 }
@@ -1111,46 +1057,24 @@ function drawSceneLight(light: SceneLight): Graphics {
     .fill({ color, alpha: light.opacity * 0.18 * light.intensity });
 }
 
-function drawLightReveal(light: SceneLight): Graphics {
-  const graphic = new Graphics();
+function buildLightEraseGraphic(
+  light: SceneLight,
+  offsetX: number,
+  offsetY: number
+): Graphics {
+  const x = light.position.x - offsetX;
+  const y = light.position.y - offsetY;
+  const g = new Graphics();
 
   if (light.kind === "point") {
-    return graphic
-      .circle(light.position.x, light.position.y, light.radius)
-      .fill({ color: 0xffffff, alpha: Math.max(0.2, light.opacity * light.intensity) });
+    g.circle(x, y, light.radius).fill({ color: 0xffffff, alpha: 1 });
+  } else {
+    drawConeShape(g, x, y, light.radius, getLightRenderAngle(light), light.direction)
+      .fill({ color: 0xffffff, alpha: 1 });
   }
 
-  return drawConeShape(
-    graphic,
-    light.position.x,
-    light.position.y,
-    light.radius,
-    getLightRenderAngle(light),
-    light.direction
-  )
-    .fill({ color: 0xffffff, alpha: Math.max(0.2, light.opacity * light.intensity) });
-}
-
-function drawFireReveal(effect: SceneEffect): Graphics {
-  return new Graphics()
-    .circle(effect.position.x, effect.position.y, effect.lightRadius)
-    .fill({ color: 0xffffff, alpha: Math.max(0.2, effect.opacity) });
-}
-
-function addMapReveal(
-  layer: Container,
-  sourceMap: Sprite,
-  mask: Graphics
-): void {
-  const revealedMap = new Sprite(sourceMap.texture);
-  revealedMap.anchor.copyFrom(sourceMap.anchor);
-  revealedMap.position.copyFrom(sourceMap.position);
-  revealedMap.scale.copyFrom(sourceMap.scale);
-  revealedMap.rotation = sourceMap.rotation;
-  revealedMap.alpha = 1;
-  layer.addChild(revealedMap);
-  layer.addChild(mask);
-  revealedMap.setMask({ mask, inverse: false });
+  g.blendMode = "erase";
+  return g;
 }
 
 function drawFireLight(effect: SceneEffect): Graphics {
@@ -1252,11 +1176,6 @@ function drawConeShape(
   }
 
   return graphic.closePath();
-}
-
-function applyEraseBlend(graphic: Graphics): Graphics {
-  graphic.blendMode = "erase";
-  return graphic;
 }
 
 function getLightRenderAngle(light: SceneLight): number {

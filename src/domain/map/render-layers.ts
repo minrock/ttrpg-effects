@@ -1,8 +1,8 @@
 export const renderLayerNames = [
   "background",
   "map",
-  "grid",
   "darkness",
+  "grid",
   "lights",
   "effects",
   "shapesAndMeasurements",

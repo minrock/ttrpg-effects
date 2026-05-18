@@ -8,10 +8,21 @@ El comportamiento esperado es que la oscuridad oculte todo el mapa y que cada lu
 
 ## Estado
 
-- **Estado:** Abierto.
+- **Estado:** Cerrado — resuelto en rama `fix/light-mask-reveal`.
 - **Prioridad:** Alta para la experiencia visual de luces.
 - **Area:** PixiJS render, capas `map`, `darkness`, `lights`, mascaras.
 - **Detectado durante:** Spec 06 - Iluminacion, Oscuridad y Fuego Animado.
+
+## Solucion implementada
+
+El enfoque de stencil mask (`setMask` / `container.mask`) fue descartado porque en PixiJS v8 `StencilMaskPipe.pop` llama a `batcher.break`, que itera todos los batches acumulados incluyendo Graphics de capas previas con `texture = null` (rellenos solidos sin textura), causando crash en `getAdjustedBlendModeBlend`.
+
+**Solucion final:** `RenderTexture` + `blendMode = "erase"` en dos pasadas:
+1. Se renderiza el rectangulo de oscuridad en una `RenderTexture` (`clear: true`).
+2. Se renderizan las formas de luz (circulos/conos) con `blendMode = "erase"` sobre la misma textura (`clear: false`), perforando el canal alpha donde hay luz.
+3. El resultado se muestra como un `Sprite` normal en world space.
+
+Esto elimina todo uso de stencil/mask, el mapa base queda en `alpha = 1` siempre, y la oscuridad compuesta revela el mapa solo en las zonas iluminadas.
 
 ## Comportamiento esperado
 
