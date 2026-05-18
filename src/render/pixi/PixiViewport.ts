@@ -231,7 +231,7 @@ export class PixiViewport {
     const prevUrl = this.map?.imageUrl ?? null;
     this.map = map;
 
-    if (map?.imageUrl !== prevUrl) {
+    if (map?.imageUrl !== prevUrl || (map?.imageUrl !== undefined && map !== null && this.mapSprite === null)) {
       void this.drawMapImage();
     } else {
       if (this.mapSprite !== null && map !== null) {
@@ -246,6 +246,10 @@ export class PixiViewport {
     }
 
     this.drawGrid();
+  }
+
+  refreshMapImage(): void {
+    void this.drawMapImage();
   }
 
   setGrid(grid: SceneGrid): void {
@@ -475,7 +479,11 @@ export class PixiViewport {
     canvas.addEventListener("pointermove", this.handlePointerMove);
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
+    canvas.addEventListener("webglcontextlost", this.handleWebglContextLost);
+    canvas.addEventListener("webglcontextrestored", this.handleWebglContextRestored);
     canvas.addEventListener("wheel", this.handleWheel, { passive: false });
+    window.addEventListener("focus", this.handleWindowFocus);
+    document.addEventListener("visibilitychange", this.handleVisibilityChange);
   }
 
   private removeInputListeners(): void {
@@ -485,12 +493,56 @@ export class PixiViewport {
     canvas.removeEventListener("pointermove", this.handlePointerMove);
     canvas.removeEventListener("pointerup", this.handlePointerUp);
     canvas.removeEventListener("pointercancel", this.handlePointerUp);
+    canvas.removeEventListener("webglcontextlost", this.handleWebglContextLost);
+    canvas.removeEventListener("webglcontextrestored", this.handleWebglContextRestored);
     canvas.removeEventListener("wheel", this.handleWheel);
+    window.removeEventListener("focus", this.handleWindowFocus);
+    document.removeEventListener("visibilitychange", this.handleVisibilityChange);
   }
 
   private readonly handleNativeContextMenu = (event: MouseEvent): void => {
     event.preventDefault();
   };
+
+  private readonly handleWebglContextLost = (event: Event): void => {
+    event.preventDefault();
+  };
+
+  private readonly handleWebglContextRestored = (): void => {
+    this.recoverRenderedTextures();
+  };
+
+  private readonly handleWindowFocus = (): void => {
+    this.recoverRenderedTextures();
+  };
+
+  private readonly handleVisibilityChange = (): void => {
+    if (document.visibilityState === "visible") {
+      this.recoverRenderedTextures();
+    }
+  };
+
+  private recoverRenderedTextures(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      if (this.disposed) {
+        return;
+      }
+
+      if (this.map !== null) {
+        void this.drawMapImage();
+      } else {
+        this.drawGrid();
+        this.drawDarkvisionLayer();
+        this.drawDarknessLayer();
+        this.drawFogOfWarLayer();
+        this.drawInteractiveElements();
+      }
+    }, 50);
+  }
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     event.preventDefault();
@@ -1735,29 +1787,33 @@ export class PixiViewport {
       return;
     }
 
-    if (typeof this.map.imageUrl !== "string" || this.map.imageUrl.length === 0) {
+    const currentMap = this.map;
+
+    if (typeof currentMap.imageUrl !== "string" || currentMap.imageUrl.length === 0) {
       this.drawMapPlaceholder();
       this.drawFogOfWarLayer();
       this.options.onMapRenderError?.("La imagen del mapa no tiene una URL valida para renderizar.");
       return;
     }
 
-    try {
-      const texture = await Assets.load(this.map.imageUrl);
+    const assetUrl = createCacheBustedMapUrl(currentMap.imageUrl, loadVersion);
 
-      if (this.disposed || loadVersion !== this.mapLoadVersion) {
+    try {
+      const texture = await Assets.load(assetUrl);
+
+      if (this.disposed || loadVersion !== this.mapLoadVersion || this.map !== currentMap) {
         return;
       }
 
-      this.loadedMapUrl = this.map.imageUrl;
+      this.loadedMapUrl = assetUrl;
       const sprite = new Sprite(texture);
       const colorSprite = new Sprite(texture);
       sprite.anchor.set(0.5);
-      sprite.position.set(this.map.position.x, this.map.position.y);
-      sprite.scale.set(this.map.scale);
+      sprite.position.set(currentMap.position.x, currentMap.position.y);
+      sprite.scale.set(currentMap.scale);
       colorSprite.anchor.set(0.5);
-      colorSprite.position.set(this.map.position.x, this.map.position.y);
-      colorSprite.scale.set(this.map.scale);
+      colorSprite.position.set(currentMap.position.x, currentMap.position.y);
+      colorSprite.scale.set(currentMap.scale);
       colorSprite.visible = false;
       this.mapSprite = sprite;
       this.colorMapSprite = colorSprite;
@@ -1851,6 +1907,11 @@ const FIRE_EMOJI = "🔥";
 const MAX_EMOJIS_PER_ELEMENT = 120;
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
+}
+
+function createCacheBustedMapUrl(imageUrl: string, loadVersion: number): string {
+  const separator = imageUrl.includes("?") ? "&" : "?";
+  return `${imageUrl}${separator}pixiReload=${Date.now()}-${loadVersion}`;
 }
 
 function isVisibleLightEmittingFireEffect(effect: SceneEffect): effect is SceneFireEffect {

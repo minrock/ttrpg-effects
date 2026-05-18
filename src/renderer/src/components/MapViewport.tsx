@@ -238,6 +238,25 @@ export function MapViewport({
   }, [isFirePaintMode]);
 
   useEffect(() => {
+    const refreshMap = (): void => {
+      viewportRef.current?.refreshMapImage();
+    };
+    const refreshVisibleMap = (): void => {
+      if (document.visibilityState === "visible") {
+        refreshMap();
+      }
+    };
+
+    window.addEventListener("focus", refreshMap);
+    document.addEventListener("visibilitychange", refreshVisibleMap);
+
+    return () => {
+      window.removeEventListener("focus", refreshMap);
+      document.removeEventListener("visibilitychange", refreshVisibleMap);
+    };
+  }, []);
+
+  useEffect(() => {
     viewportRef.current?.setPathDrawingMode(isPathDrawingMode);
   }, [isPathDrawingMode]);
 

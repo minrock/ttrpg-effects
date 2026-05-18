@@ -36,6 +36,7 @@ import { createMapImageState, type MapImageState } from "../../domain/map/map-im
 import { formatDistance, measureDistance, measurePathDistance } from "../../domain/measurement/measurement";
 import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
+import { parseSceneDocument, serializeSceneDocument } from "../../domain/sessions/scene-schema";
 import type {
   SceneDocument,
   SceneFireEffect,
@@ -74,6 +75,7 @@ const fallbackAppInfo = {
   name: "TTRPG Effects",
   version: "0.0.0"
 } as const;
+const LOCAL_AUTOSAVE_KEY = "ttrpg-effects.autosave.scene.v1";
 
 type SidebarSectionId = "grid" | "figures" | "darkness" | "fog";
 
@@ -84,10 +86,59 @@ interface PathDraftState {
   readonly hoverPoint: WorldPoint | null;
 }
 
+interface LocalAutosavePayload {
+  readonly scene: SceneDocument;
+  readonly mapImageUrl: string | null;
+}
+
+function createMapAssetUrlFromPath(imagePath: string): string {
+  return `map-asset://${encodeURI(imagePath).replace(/#/g, "%23").replace(/\?/g, "%3F")}`;
+}
+
+function restoreAutosavePayload(): LocalAutosavePayload {
+  try {
+    const rawAutosave = window.localStorage.getItem(LOCAL_AUTOSAVE_KEY);
+
+    if (rawAutosave === null) {
+      return { scene: createDefaultScene(), mapImageUrl: null };
+    }
+
+    const parsed = JSON.parse(rawAutosave) as unknown;
+
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "scene" in parsed
+    ) {
+      const payload = parsed as { readonly scene: unknown; readonly mapImageUrl?: unknown };
+      const scene = parseSceneDocument(payload.scene);
+      const mapImageUrl =
+        typeof payload.mapImageUrl === "string"
+          ? payload.mapImageUrl
+          : scene.map.imagePath === null
+            ? null
+            : createMapAssetUrlFromPath(scene.map.imagePath);
+      return { scene, mapImageUrl };
+    }
+
+    const legacyScene = parseSceneDocument(parsed);
+    return {
+      scene: legacyScene,
+      mapImageUrl:
+        legacyScene.map.imagePath === null
+          ? null
+          : createMapAssetUrlFromPath(legacyScene.map.imagePath)
+    };
+  } catch {
+    return { scene: createDefaultScene(), mapImageUrl: null };
+  }
+}
+
 export function App(): JSX.Element {
   const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
-  const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
-  const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
+  const initialAutosave = useMemo(() => restoreAutosavePayload(), []);
+  const [scene, setScene] = useState<SceneDocument>(() => initialAutosave.scene);
+  const [mapImageUrl, setMapImageUrl] = useState<string | null>(() => initialAutosave.mapImageUrl);
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("Escena default en memoria");
   const [warnings, setWarnings] = useState<readonly string[]>([]);
@@ -118,6 +169,59 @@ export function App(): JSX.Element {
   pathDraftRef.current = pathDraft;
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          LOCAL_AUTOSAVE_KEY,
+          JSON.stringify({
+            scene: JSON.parse(serializeSceneDocument(scene)) as unknown,
+            mapImageUrl
+          })
+        );
+      } catch {
+        // Autosave is best effort; explicit save/load must remain unaffected.
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [mapImageUrl, scene]);
+
+  useEffect(() => {
+    if (scene.map.imagePath === null || mapImageUrl !== null) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function restoreMapImageUrl(): Promise<void> {
+      if (window.ttrpg === undefined || scene.map.imagePath === null) {
+        return;
+      }
+
+      const result = await window.ttrpg.getMapImageUrl(scene.map.imagePath);
+
+      if (cancelled) {
+        return;
+      }
+
+      if (result.ok) {
+        setMapImageUrl(result.imageUrl);
+        setFeedback("Escena recuperada en memoria");
+      } else {
+        setFeedback(result.error);
+      }
+    }
+
+    void restoreMapImageUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mapImageUrl, scene.map.imagePath]);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     setInteraction((current) => openContextMenu(current, request));

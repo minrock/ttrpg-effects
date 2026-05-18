@@ -12,6 +12,7 @@ export interface TtrpgApi {
   saveScene: (scene: SceneDocument) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
   openMapImage: () => Promise<MapOpenResult>;
+  getMapImageUrl: (imagePath: string) => Promise<MapOpenResult>;
 }
 
 declare global {

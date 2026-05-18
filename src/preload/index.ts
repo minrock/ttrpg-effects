@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld("ttrpg", {
   getAppInfo: () => appInfo,
   saveScene: (scene: unknown) => ipcRenderer.invoke("scene:save", scene),
   loadScene: () => ipcRenderer.invoke("scene:load"),
-  openMapImage: () => ipcRenderer.invoke("map:open-image")
+  openMapImage: () => ipcRenderer.invoke("map:open-image"),
+  getMapImageUrl: (imagePath: string) => ipcRenderer.invoke("map:get-image-url", imagePath)
 });

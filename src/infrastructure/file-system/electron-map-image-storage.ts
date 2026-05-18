@@ -8,6 +8,25 @@ import { isSupportedMapImageExtension, type MapOpenResult } from "../../domain/m
 export class ElectronMapImageStorage {
   constructor(private readonly getWindow: () => BrowserWindow | null) {}
 
+  async getMapImageUrl(imagePath: string): Promise<MapOpenResult> {
+    const extension = extname(imagePath).slice(1).toLowerCase();
+
+    if (!isSupportedMapImageExtension(extension)) {
+      return { ok: false, error: "Formato de imagen no soportado." };
+    }
+
+    try {
+      await access(imagePath);
+      return {
+        ok: true,
+        imagePath,
+        imageUrl: pathToFileURL(imagePath).toString().replace("file:", "map-asset:")
+      };
+    } catch {
+      return { ok: false, error: "No se pudo leer la imagen seleccionada." };
+    }
+  }
+
   async openMapImage(): Promise<MapOpenResult> {
     const targetWindow = this.getWindow();
     const options: OpenDialogOptions = {
@@ -36,12 +55,6 @@ export class ElectronMapImageStorage {
       return { ok: false, error: "Formato de imagen no soportado." };
     }
 
-    try {
-      await access(imagePath);
-      const imageUrl = pathToFileURL(imagePath).toString().replace("file:", "map-asset:");
-      return { ok: true, imagePath, imageUrl };
-    } catch {
-      return { ok: false, error: "No se pudo leer la imagen seleccionada." };
-    }
+    return this.getMapImageUrl(imagePath);
   }
 }
