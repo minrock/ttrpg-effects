@@ -2424,6 +2424,10 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
 function drawFireZoneHint(effect: SceneEffect): Graphics {
   const graphic = new Graphics();
 
+  graphic
+    .circle(effect.position.x, effect.position.y, 50)
+    .stroke({ color: 0x7fb8ff, width: 3, alpha: 0.2 });
+
   if (effect.zone.kind === "circle") {
     const radius = effect.zone.radius * effect.scale;
     graphic
