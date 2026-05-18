@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   createTacticalShape,
+  createPathShape,
   moveShape,
+  movePathPoint,
   rotateLinearShape,
   setLinearShapeEnd,
   setRectangleCorner,
@@ -152,6 +154,69 @@ describe("tactical shapes", () => {
     expect(withEmoji.emoji).toBe("❄️💨");
 
     expect(updateShape(withEmoji, { emoji: undefined }).emoji).toBeUndefined();
+  });
+
+  it("creates a path shape with ordered distinct points", () => {
+    expect(
+      createPathShape({
+        id: "path-1",
+        points: [
+          { x: 50, y: 50 },
+          { x: 50, y: 50 },
+          { x: 150, y: 50 },
+          { x: 150, y: 150 }
+        ]
+      })
+    ).toEqual({
+      id: "path-1",
+      type: "path",
+      points: [
+        { x: 50, y: 50 },
+        { x: 150, y: 50 },
+        { x: 150, y: 150 }
+      ]
+    });
+  });
+
+  it("moves a path point while keeping point order", () => {
+    const shape = createPathShape({
+      id: "path-1",
+      points: [
+        { x: 50, y: 50 },
+        { x: 150, y: 50 },
+        { x: 150, y: 150 }
+      ]
+    });
+
+    expect(movePathPoint(shape, 1, { x: 230, y: 260 }, 100).points).toEqual([
+      { x: 50, y: 50 },
+      { x: 250, y: 250 },
+      { x: 150, y: 150 }
+    ]);
+  });
+
+  it("keeps a two-point path valid when a point is dragged onto the other point", () => {
+    const shape = createPathShape({
+      id: "path-1",
+      points: [
+        { x: 50, y: 50 },
+        { x: 150, y: 50 }
+      ]
+    });
+
+    expect(movePathPoint(shape, 1, { x: 50, y: 50 }).points).toEqual(shape.points);
+  });
+
+  it("rejects paths with fewer than two distinct points", () => {
+    expect(() =>
+      createPathShape({
+        id: "path-1",
+        points: [
+          { x: 50, y: 50 },
+          { x: 50, y: 50 }
+        ]
+      })
+    ).toThrow("Path shapes must contain at least two distinct points.");
   });
 
   it("setShapeRadius clamps to minimum 10 for circle", () => {

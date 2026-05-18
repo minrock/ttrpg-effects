@@ -33,6 +33,9 @@ interface MapViewportProps {
   readonly isGrabMode: boolean;
   readonly isFogRevealMode: boolean;
   readonly isFirePaintMode: boolean;
+  readonly isPathDrawingMode: boolean;
+  readonly pathPreviewPoints: readonly { readonly x: number; readonly y: number }[];
+  readonly pathPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
   readonly onContextMenuRequest: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect: (elementId: string | null) => void;
   readonly onGridCellSizeChange: (cellSizeWorld: number) => void;
@@ -43,6 +46,10 @@ interface MapViewportProps {
   readonly onLightDirectionChange: (elementId: string, direction: number) => void;
   readonly onLightRadiusChange: (elementId: string, radius: number) => void;
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
+  readonly onPathPointAdd: (point: { readonly x: number; readonly y: number }) => void;
+  readonly onPathPointerMove: (point: { readonly x: number; readonly y: number } | null) => void;
+  readonly onPathPointMove: (elementId: string, pointIndex: number, x: number, y: number) => void;
+  readonly onPathMove: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
   readonly onShapeRadiusChange: (elementId: string, radius: number) => void;
   readonly onShapeRectResize: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
@@ -70,6 +77,9 @@ export function MapViewport({
   isGrabMode,
   isFogRevealMode,
   isFirePaintMode,
+  isPathDrawingMode,
+  pathPreviewPoints,
+  pathPreviewHoverPoint,
   onContextMenuRequest,
   onElementSelect,
   onGridCellSizeChange,
@@ -80,6 +90,10 @@ export function MapViewport({
   onLightDirectionChange,
   onLightRadiusChange,
   onShapeEndMove,
+  onPathPointAdd,
+  onPathPointerMove,
+  onPathPointMove,
+  onPathMove,
   onShapeDirectionChange,
   onShapeRadiusChange,
   onShapeRectResize,
@@ -112,6 +126,10 @@ export function MapViewport({
       onLightDirectionChange,
       onLightRadiusChange,
       onShapeEndMove,
+      onPathPointAdd,
+      onPathPointerMove,
+      onPathPointMove,
+      onPathMove,
       onShapeDirectionChange,
       onShapeRadiusChange,
       onShapeRectResize,
@@ -143,6 +161,8 @@ export function MapViewport({
       createdViewport.setGridAdjustMode(isGridAdjustMode);
       createdViewport.setFogRevealMode(isFogRevealMode);
       createdViewport.setFirePaintMode(isFirePaintMode);
+      createdViewport.setPathDrawingMode(isPathDrawingMode);
+      createdViewport.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
     });
 
     return () => {
@@ -150,7 +170,7 @@ export function MapViewport({
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -215,6 +235,14 @@ export function MapViewport({
   useEffect(() => {
     viewportRef.current?.setFirePaintMode(isFirePaintMode);
   }, [isFirePaintMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setPathDrawingMode(isPathDrawingMode);
+  }, [isPathDrawingMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
+  }, [pathPreviewPoints, pathPreviewHoverPoint]);
 
   return (
     <div

@@ -202,6 +202,15 @@ describe("scene document schema", () => {
           ]
         },
         {
+          id: "path-1",
+          type: "path",
+          points: [
+            { x: 50, y: 50 },
+            { x: 150, y: 50 },
+            { x: 150, y: 150 }
+          ]
+        },
+        {
           id: "circle-1",
           type: "circle",
           points: [{ x: 10, y: 20 }],
@@ -226,6 +235,21 @@ describe("scene document schema", () => {
     };
 
     expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
+  it("rejects persisted paths with fewer than two points", () => {
+    const scene = {
+      ...createDefaultScene(),
+      shapes: [
+        {
+          id: "path-1",
+          type: "path",
+          points: [{ x: 50, y: 50 }]
+        }
+      ]
+    };
+
+    expect(() => parseSceneDocument(scene)).toThrow();
   });
 
   it("accepts optional emojis on tactical shapes", () => {

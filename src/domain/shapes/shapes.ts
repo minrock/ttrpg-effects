@@ -1,9 +1,9 @@
 import type { SceneGrid, SceneShape, SceneSettings } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
-import { snapWorldPoint } from "../measurement/measurement";
+import { snapWorldPoint, snapWorldPointToCellCenter } from "../measurement/measurement";
 import { getSelectedShapeEmojis, serializeShapeEmojis } from "./shape-emojis";
 
-export type TacticalShapeKind = "measurement" | "circle" | "cone" | "rectangle";
+export type TacticalShapeKind = "measurement" | "circle" | "cone" | "rectangle" | "path";
 
 export interface CreateShapeOptions {
   readonly id: string;
@@ -16,6 +16,11 @@ export interface CreateShapeOptions {
 export type ShapePatch = Partial<
   Pick<SceneShape, "points" | "radius" | "width" | "height" | "angle" | "direction" | "emoji">
 >;
+
+export interface CreatePathShapeOptions {
+  readonly id: string;
+  readonly points: readonly WorldPoint[];
+}
 
 export function createTacticalShape({
   id,
@@ -66,7 +71,24 @@ export function createTacticalShape({
       }
       return { id, type: "rectangle", points: [anchor], width, height };
     }
+    case "path":
+      return createPathShape({
+        id,
+        points: [snapWorldPointToCellCenter(position, grid.cellSizeWorld)]
+      });
   }
+}
+
+export function createPathShape({ id, points }: CreatePathShapeOptions): SceneShape {
+  assertId(id);
+  const normalizedPoints = normalizePathPoints(points);
+  const shape: SceneShape = {
+    id,
+    type: "path",
+    points: normalizedPoints
+  };
+  validateShape(shape);
+  return shape;
 }
 
 export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: number): SceneShape {
@@ -78,6 +100,8 @@ export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?
     const halfH = shape.height / 2;
     const snappedCorner = snapWorldPoint({ x: position.x - halfW, y: position.y - halfH }, snapCellSize!);
     nextAnchor = { x: snappedCorner.x + halfW, y: snappedCorner.y + halfH };
+  } else if (shouldSnap && shape.type === "path") {
+    nextAnchor = snapWorldPointToCellCenter(position, snapCellSize);
   } else {
     nextAnchor = shouldSnap ? snapWorldPoint(position, snapCellSize) : position;
   }
@@ -104,6 +128,34 @@ export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint): Scen
   return updateShape(shape, {
     points: [getShapeAnchor(shape), endPoint]
   });
+}
+
+export function movePathPoint(
+  shape: SceneShape,
+  pointIndex: number,
+  nextPoint: WorldPoint,
+  cellSizeWorld?: number
+): SceneShape {
+  if (shape.type !== "path") {
+    return shape;
+  }
+
+  if (!Number.isInteger(pointIndex) || pointIndex < 0 || pointIndex >= shape.points.length) {
+    return shape;
+  }
+
+  const point = cellSizeWorld === undefined
+    ? nextPoint
+    : snapWorldPointToCellCenter(nextPoint, cellSizeWorld);
+  assertFinitePoint(point);
+
+  const points = shape.points.map((existingPoint, index) => index === pointIndex ? point : existingPoint);
+
+  if (normalizePathPoints(points).length < 2) {
+    return shape;
+  }
+
+  return updateShape(shape, { points });
 }
 
 export function rotateLinearShape(shape: SceneShape, direction: number): SceneShape {
@@ -173,7 +225,7 @@ export function getShapeEndPoint(shape: SceneShape): WorldPoint | null {
 export function validateShape(shape: SceneShape): void {
   assertId(shape.id);
 
-  if (!["measurement", "circle", "cone", "rectangle"].includes(shape.type)) {
+  if (!["measurement", "circle", "cone", "rectangle", "path"].includes(shape.type)) {
     throw new Error("Unsupported tactical shape type.");
   }
 
@@ -189,6 +241,10 @@ export function validateShape(shape: SceneShape): void {
     throw new Error("Linear shapes must contain at least two points.");
   }
 
+  if (shape.type === "path" && normalizePathPoints(shape.points).length < 2) {
+    throw new Error("Path shapes must contain at least two distinct points.");
+  }
+
   if ((shape.type === "circle" || shape.type === "cone") && sanitizePositive(shape.radius) !== shape.radius) {
     throw new Error("Radial shapes must have a positive radius.");
   }
@@ -198,6 +254,21 @@ export function validateShape(shape: SceneShape): void {
       throw new Error("Rectangle shapes must have positive dimensions.");
     }
   }
+}
+
+export function normalizePathPoints(points: readonly WorldPoint[]): readonly WorldPoint[] {
+  const normalized: WorldPoint[] = [];
+
+  for (const point of points) {
+    assertFinitePoint(point);
+    const previous = normalized[normalized.length - 1];
+
+    if (previous === undefined || previous.x !== point.x || previous.y !== point.y) {
+      normalized.push(point);
+    }
+  }
+
+  return normalized;
 }
 
 export function setShapeRadius(shape: SceneShape, radius: number): SceneShape {

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatDistance, measureCells, measureDistance, snapWorldPoint } from "./measurement";
+import {
+  formatDistance,
+  measureCells,
+  measureDistance,
+  measurePathDistance,
+  snapWorldPoint,
+  snapWorldPointToCellCenter
+} from "./measurement";
 
 const grid = {
   cellSizeWorld: 100,
@@ -45,8 +52,42 @@ describe("measurement", () => {
     ).toBe("3 m");
   });
 
+  it("sums path segment distances with the active diagonal rule", () => {
+    expect(
+      measurePathDistance(
+        [
+          { x: 0, y: 0 },
+          { x: 300, y: 0 },
+          { x: 600, y: 400 }
+        ],
+        { grid, diagonalMode: "dnd5e-default" }
+      )
+    ).toMatchObject({
+      cells: 7,
+      value: 35,
+      label: "35 ft"
+    });
+  });
+
+  it("sums metric path distances", () => {
+    expect(
+      measurePathDistance(
+        [
+          { x: 0, y: 0 },
+          { x: 200, y: 0 },
+          { x: 200, y: 100 }
+        ],
+        { grid: { ...grid, unit: "m" }, diagonalMode: "dnd5e-default" }
+      ).label
+    ).toBe("4.5 m");
+  });
+
   it("snaps world points to grid intersections", () => {
     expect(snapWorldPoint({ x: 149, y: -151 }, 100)).toEqual({ x: 100, y: -200 });
+  });
+
+  it("snaps world points to the center of a grid cell", () => {
+    expect(snapWorldPointToCellCenter({ x: 149, y: -151 }, 100)).toEqual({ x: 150, y: -150 });
   });
 
   it("formats decimal values without noisy precision", () => {

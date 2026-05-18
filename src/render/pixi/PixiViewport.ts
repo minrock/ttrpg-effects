@@ -21,7 +21,12 @@ import type {
   SceneSettings,
   SceneShape
 } from "../../domain/sessions/scene-document";
-import { formatDistance, measureDistance } from "../../domain/measurement/measurement";
+import {
+  formatDistance,
+  measureDistance,
+  measurePathDistance,
+  snapWorldPointToCellCenter
+} from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
 import { getVisibleAreasFromLights } from "../../domain/vision/vision";
@@ -46,6 +51,8 @@ interface PointerDragState {
     | "shape-cone-rotate"
     | "shape-cone-resize"
     | "shape-rect-resize"
+    | "path-point-move"
+    | "path-move"
     | "fog-reveal"
     | "fire-paint"
     | "fire-zone-resize"
@@ -53,6 +60,7 @@ interface PointerDragState {
     | "magical-darkness-resize";
   readonly elementId?: string;
   readonly handleIndex?: number;
+  readonly grabOffset?: WorldPoint;
 }
 
 export interface PixiContextMenuRequest {
@@ -74,6 +82,10 @@ export interface PixiViewportOptions {
   readonly onLightDirectionChange?: (elementId: string, direction: number) => void;
   readonly onLightRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
+  readonly onPathPointAdd?: (point: WorldPoint) => void;
+  readonly onPathPointerMove?: (point: WorldPoint | null) => void;
+  readonly onPathPointMove?: (elementId: string, pointIndex: number, x: number, y: number) => void;
+  readonly onPathMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
   readonly onFogRevealStroke?: (points: readonly WorldPoint[]) => void;
   readonly onFirePaint?: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
@@ -114,6 +126,10 @@ export class PixiViewport {
   private isGrabMode = false;
   private isFogRevealMode = false;
   private isFirePaintMode = false;
+  private isPathDrawingMode = false;
+  private pathPreviewPoints: readonly WorldPoint[] = [];
+  private pathPreviewHoverPoint: WorldPoint | null = null;
+  private pathHoverZone: "point" | "circle" | null = null;
   private fogRevealStrokePoints: WorldPoint[] = [];
   private dragState: PointerDragState | null = null;
   private _darknessTexture: RenderTexture | null = null;
@@ -168,6 +184,7 @@ export class PixiViewport {
 
   setSelectedElementId(selectedElementId: string | null): void {
     this.selectedElementId = selectedElementId;
+    this.pathHoverZone = null;
     this.drawInteractiveElements();
   }
 
@@ -186,14 +203,28 @@ export class PixiViewport {
 
   setGrabMode(isGrabMode: boolean): void {
     this.isGrabMode = isGrabMode;
+    this.updateCursor();
   }
 
   setFogRevealMode(isFogRevealMode: boolean): void {
     this.isFogRevealMode = isFogRevealMode;
+    this.updateCursor();
   }
 
   setFirePaintMode(isFirePaintMode: boolean): void {
     this.isFirePaintMode = isFirePaintMode;
+    this.updateCursor();
+  }
+
+  setPathDrawingMode(isPathDrawingMode: boolean): void {
+    this.isPathDrawingMode = isPathDrawingMode;
+    this.updateCursor();
+  }
+
+  setPathPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
+    this.pathPreviewPoints = points;
+    this.pathPreviewHoverPoint = hoverPoint;
+    this.drawInteractiveElements();
   }
 
   setMap(map: MapImageState | null): void {
@@ -469,6 +500,7 @@ export class PixiViewport {
     let mode: PointerDragState["mode"] = "idle";
     let elementId: string | undefined;
     let handleIndex: number | undefined;
+    let grabOffset: WorldPoint | undefined;
     if (event.button === 0) {
       if (this.isGrabMode) {
         mode = "pan";
@@ -478,6 +510,8 @@ export class PixiViewport {
       } else if (this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
+      } else if (this.isPathDrawingMode) {
+        mode = "idle";
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
         const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
@@ -490,6 +524,7 @@ export class PixiViewport {
         const hitConeResizeElementId = this.hitTestConeShapeResizeHandle(point);
         const hitConeRotateElementId = this.hitTestConeShapeRotationHandle(point);
         const hitRectCornerIndex = this.hitTestRectCornerHandle(point);
+        const hitPathHandles = this.hitTestPathHandles(point);
         const hitElementId = this.hitTestElement(point);
 
         if (hitFireZoneResizeElementId !== null) {
@@ -539,13 +574,30 @@ export class PixiViewport {
           mode = "shape-cone-rotate";
           elementId = hitConeRotateElementId;
           this.updateShapeConeDirectionFromScreenPoint(hitConeRotateElementId, point);
+        } else if (hitPathHandles !== null && hitPathHandles.zone === "point") {
+          mode = "path-point-move";
+          elementId = hitPathHandles.elementId;
+          handleIndex = 0;
+          this.options.onElementSelect?.(hitPathHandles.elementId);
+          this.updatePathPointFromScreenPoint(hitPathHandles.elementId, 0, point);
+        } else if (hitPathHandles !== null && hitPathHandles.zone === "circle") {
+          mode = "path-move";
+          elementId = hitPathHandles.elementId;
+          this.options.onElementSelect?.(hitPathHandles.elementId);
+          const pathShape = this.shapes.find((s) => s.id === hitPathHandles.elementId);
+          const firstPoint = pathShape?.points[0];
+          if (firstPoint !== undefined) {
+            const grabWorld = screenToWorld(point, this.camera, this.getViewportSize());
+            grabOffset = { x: grabWorld.x - firstPoint.x, y: grabWorld.y - firstPoint.y };
+          }
         } else if (hitRectCornerIndex !== null && this.selectedElementId !== null) {
           mode = "shape-rect-resize";
           elementId = this.selectedElementId;
           handleIndex = hitRectCornerIndex;
           this.updateShapeRectCornerFromScreenPoint(this.selectedElementId, hitRectCornerIndex, point);
         } else if (hitElementId !== null) {
-          mode = "element-move";
+          const hitIsPath = this.shapes.some((s) => s.id === hitElementId && s.type === "path");
+          mode = hitIsPath ? "idle" : "element-move";
           elementId = hitElementId;
           this.options.onElementSelect?.(hitElementId);
         } else if (this.isMapAdjustMode && this.mapSprite !== null) {
@@ -563,16 +615,32 @@ export class PixiViewport {
       button: event.button,
       mode,
       elementId,
-      handleIndex
+      handleIndex,
+      grabOffset
     };
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (this.dragState === null || this.dragState.pointerId !== event.pointerId) {
+    const screenPoint = this.eventToScreenPoint(event);
+
+    if (this.isPathDrawingMode) {
+      this.options.onPathPointerMove?.(this.snapScreenPointToCellCenter(screenPoint));
+    }
+
+    if (this.dragState === null) {
+      const newZone = this.hitTestPathHandles(screenPoint)?.zone ?? null;
+      if (newZone !== this.pathHoverZone) {
+        this.pathHoverZone = newZone;
+        this.updateCursor();
+      }
       return;
     }
 
-    const nextPoint = this.eventToScreenPoint(event);
+    if (this.dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const nextPoint = screenPoint;
 
     if (this.dragState.mode === "calibrate") {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
@@ -618,6 +686,16 @@ export class PixiViewport {
       this.updateShapeConeDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-rect-resize" && this.dragState.elementId !== undefined && this.dragState.handleIndex !== undefined) {
       this.updateShapeRectCornerFromScreenPoint(this.dragState.elementId, this.dragState.handleIndex, nextPoint);
+    } else if (this.dragState.mode === "path-point-move" && this.dragState.elementId !== undefined && this.dragState.handleIndex !== undefined) {
+      this.updatePathPointFromScreenPoint(this.dragState.elementId, this.dragState.handleIndex, nextPoint);
+    } else if (this.dragState.mode === "path-move" && this.dragState.elementId !== undefined && this.dragState.grabOffset !== undefined) {
+      this.app.canvas.style.cursor = "grabbing";
+      const currentWorld = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      this.options.onPathMove?.(
+        this.dragState.elementId,
+        currentWorld.x - this.dragState.grabOffset.x,
+        currentWorld.y - this.dragState.grabOffset.y
+      );
     } else if (this.dragState.mode === "pan") {
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
@@ -633,7 +711,8 @@ export class PixiViewport {
       button: this.dragState.button,
       mode: this.dragState.mode,
       elementId: this.dragState.elementId,
-      handleIndex: this.dragState.handleIndex
+      handleIndex: this.dragState.handleIndex,
+      grabOffset: this.dragState.grabOffset
     };
   };
 
@@ -662,11 +741,34 @@ export class PixiViewport {
     }
 
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
-      this.options.onElementSelect?.(this.hitTestElement(releasePoint));
+      if (this.isPathDrawingMode) {
+        this.options.onPathPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
+      } else {
+        this.options.onElementSelect?.(this.hitTestElement(releasePoint));
+      }
+    }
+
+    if (this.dragState.mode === "path-move" || this.dragState.mode === "path-point-move") {
+      this.pathHoverZone = null;
+      this.updateCursor();
     }
 
     this.dragState = null;
   };
+
+  private updateCursor(): void {
+    if (this.isGrabMode) {
+      this.app.canvas.style.cursor = "grab";
+    } else if (this.isPathDrawingMode) {
+      this.app.canvas.style.cursor = "crosshair";
+    } else if (this.isFogRevealMode || this.isFirePaintMode) {
+      this.app.canvas.style.cursor = "cell";
+    } else if (this.pathHoverZone === "circle") {
+      this.app.canvas.style.cursor = "grab";
+    } else {
+      this.app.canvas.style.cursor = "default";
+    }
+  }
 
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
@@ -723,6 +825,16 @@ export class PixiViewport {
       x: event.clientX,
       y: event.clientY
     };
+  }
+
+  private snapScreenPointToCellCenter(screenPoint: ScreenPoint): WorldPoint {
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+
+    if (this.grid === null) {
+      return worldPoint;
+    }
+
+    return snapWorldPointToCellCenter(worldPoint, this.grid.cellSizeWorld);
   }
 
   private drawInteractiveElements(): void {
@@ -848,6 +960,25 @@ export class PixiViewport {
       if (selectedRectShape !== undefined) {
         selectionLayer.addChild(drawRectCornerHandles(selectedRectShape));
       }
+
+      const selectedPathShape = this.shapes.find(
+        (s) => s.id === this.selectedElementId && s.type === "path"
+      );
+
+      if (selectedPathShape !== undefined && this.grid !== null) {
+        selectionLayer.addChild(drawPathPointHandles(selectedPathShape, this.grid.cellSizeWorld));
+      }
+    }
+
+    if (this.isPathDrawingMode && this.grid !== null && this.settings !== null) {
+      selectionLayer.addChild(
+        drawPathPreview(
+          this.pathPreviewPoints,
+          this.pathPreviewHoverPoint,
+          this.grid,
+          this.settings
+        )
+      );
     }
   }
 
@@ -1077,12 +1208,54 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
 
     for (const element of [...this.getSelectableElements()].reverse()) {
+      if (element.kind === "path") {
+        const path = this.shapes.find((shape) => shape.id === element.id && shape.type === "path");
+        if (path !== undefined && hitTestPath(path, worldPoint, 14 / this.camera.zoom)) {
+          return element.id;
+        }
+        continue;
+      }
+
       const radius = element.hitRadius ?? getHitRadius(element.kind);
       const distance = Math.hypot(worldPoint.x - element.position.x, worldPoint.y - element.position.y);
 
       if (distance <= radius) {
         return element.id;
       }
+    }
+
+    return null;
+  }
+
+  private hitTestPathHandles(screenPoint: ScreenPoint): { elementId: string; zone: "point" | "circle" } | null {
+    if (this.selectedElementId === null || this.grid === null) {
+      return null;
+    }
+
+    const shape = this.shapes.find(
+      (candidate) => candidate.id === this.selectedElementId && candidate.type === "path"
+    );
+
+    if (shape === undefined) {
+      return null;
+    }
+
+    const firstPoint = shape.points[0];
+    if (firstPoint === undefined) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const distance = Math.hypot(worldPoint.x - firstPoint.x, worldPoint.y - firstPoint.y);
+    const pointTolerance = 18 / this.camera.zoom;
+    const circleTolerance = Math.max(this.grid.cellSizeWorld / 2, 20 / this.camera.zoom);
+
+    if (distance <= pointTolerance) {
+      return { elementId: shape.id, zone: "point" };
+    }
+
+    if (distance <= circleTolerance) {
+      return { elementId: shape.id, zone: "circle" };
     }
 
     return null;
@@ -1283,6 +1456,11 @@ export class PixiViewport {
   private updateLinearShapeEndFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     this.options.onShapeEndMove?.(elementId, worldPoint.x, worldPoint.y);
+  }
+
+  private updatePathPointFromScreenPoint(elementId: string, pointIndex: number, screenPoint: ScreenPoint): void {
+    const worldPoint = this.snapScreenPointToCellCenter(screenPoint);
+    this.options.onPathPointMove?.(elementId, pointIndex, worldPoint.x, worldPoint.y);
   }
 
   private updateLinearShapeDirectionFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1793,6 +1971,20 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
         }
       }
       break;
+    case "path": {
+      drawPathGraphic(graphic, shape.points, 0xfff0a8, 0.94, 5);
+      const distance = measurePathDistance(shape.points, {
+        grid,
+        diagonalMode: settings.diagonalMode
+      });
+      const lastPoint = shape.points[shape.points.length - 1];
+      if (lastPoint !== undefined) {
+        const label = drawShapeLabel(distance.label);
+        label.position.set(lastPoint.x + 12, lastPoint.y - 30);
+        container.addChild(label);
+      }
+      break;
+    }
     case "circle": {
       const radius = shape.radius ?? grid.cellSizeWorld;
       graphic
@@ -1872,6 +2064,85 @@ function drawShapeLabel(text: string): Text {
       stroke: { color: 0x101315, width: 4 }
     }
   });
+}
+
+function drawPathGraphic(
+  graphic: Graphics,
+  points: readonly WorldPoint[],
+  color: number,
+  alpha: number,
+  width: number
+): Graphics {
+  const [firstPoint, ...rest] = points;
+
+  if (firstPoint === undefined) {
+    return graphic;
+  }
+
+  graphic.moveTo(firstPoint.x, firstPoint.y);
+
+  for (const point of rest) {
+    graphic.lineTo(point.x, point.y);
+  }
+
+  graphic.stroke({ color, width, alpha });
+
+  for (const point of points) {
+    graphic
+      .circle(point.x, point.y, 8)
+      .fill({ color: 0x101315, alpha: 0.9 })
+      .circle(point.x, point.y, 5)
+      .fill({ color, alpha });
+  }
+
+  return graphic;
+}
+
+function drawPathPreview(
+  points: readonly WorldPoint[],
+  hoverPoint: WorldPoint | null,
+  grid: SceneGrid,
+  settings: SceneSettings
+): Container {
+  const container = new Container();
+  const graphic = new Graphics();
+  const previewPoints = getPathPreviewPoints(points, hoverPoint);
+
+  drawPathGraphic(graphic, previewPoints, 0xfff0a8, 0.9, 4);
+  container.addChild(graphic);
+
+  if (previewPoints.length >= 2) {
+    const distance = measurePathDistance(previewPoints, {
+      grid,
+      diagonalMode: settings.diagonalMode
+    });
+    const label = drawShapeLabel(distance.label);
+    const lastPoint = previewPoints[previewPoints.length - 1];
+
+    if (lastPoint !== undefined) {
+      label.position.set(lastPoint.x + 12, lastPoint.y - 30);
+      container.addChild(label);
+    }
+  }
+
+  return container;
+}
+
+function getPathPreviewPoints(
+  points: readonly WorldPoint[],
+  hoverPoint: WorldPoint | null
+): readonly WorldPoint[] {
+  if (hoverPoint === null) {
+    return points;
+  }
+
+  const lastPoint = points[points.length - 1];
+
+  if (lastPoint !== undefined && lastPoint.x === hoverPoint.x && lastPoint.y === hoverPoint.y) {
+    return points;
+  }
+
+  return [...points, hoverPoint];
 }
 
 function drawEmojiText(emoji: string, x: number, y: number, cellSizeWorld: number): Text {
@@ -2387,6 +2658,23 @@ function drawLinearShapeHandles(shape: SceneShape): Graphics {
     .fill({ color: 0x7fd3ff, alpha: 0.95 });
 }
 
+function drawPathPointHandles(shape: SceneShape, cellSizeWorld: number): Graphics {
+  const graphic = new Graphics();
+
+  const firstPoint = shape.points[0];
+  if (firstPoint !== undefined) {
+    graphic
+      .circle(firstPoint.x, firstPoint.y, cellSizeWorld / 2)
+      .stroke({ color: 0xfff0a8, width: 4, alpha: 0.45 })
+      .circle(firstPoint.x, firstPoint.y, 13)
+      .fill({ color: 0x101315, alpha: 0.9 })
+      .circle(firstPoint.x, firstPoint.y, 8)
+      .fill({ color: 0xfff0a8, alpha: 0.95 });
+  }
+
+  return graphic;
+}
+
 function drawConeRotationHandle(light: SceneLight): Graphics {
   const angle = (light.direction * Math.PI) / 180;
   const handleX = light.position.x + Math.cos(angle) * CONE_ROTATION_RING_RADIUS;
@@ -2586,6 +2874,8 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
   switch (kind) {
     case "measurement":
       return 90;
+    case "path":
+      return 18;
     case "rectangle":
       return 86;
     case "cone":
@@ -2600,6 +2890,45 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
     case "magical-darkness":
       return 72;
   }
+}
+
+function hitTestPath(shape: SceneShape, point: WorldPoint, tolerance: number): boolean {
+  if (shape.type !== "path") {
+    return false;
+  }
+
+  for (const pathPoint of shape.points) {
+    if (Math.hypot(point.x - pathPoint.x, point.y - pathPoint.y) <= tolerance * 1.25) {
+      return true;
+    }
+  }
+
+  for (let index = 1; index < shape.points.length; index += 1) {
+    const from = shape.points[index - 1];
+    const to = shape.points[index];
+
+    if (from !== undefined && to !== undefined && distanceToSegment(point, from, to) <= tolerance) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function distanceToSegment(point: WorldPoint, from: WorldPoint, to: WorldPoint): number {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared === 0) {
+    return Math.hypot(point.x - from.x, point.y - from.y);
+  }
+
+  const t = Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared));
+  const projectionX = from.x + t * dx;
+  const projectionY = from.y + t * dy;
+
+  return Math.hypot(point.x - projectionX, point.y - projectionY);
 }
 
 function drawFireZoneHint(effect: SceneFireEffect): Graphics {

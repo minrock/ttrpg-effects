@@ -33,7 +33,7 @@ import {
   type LightPatch
 } from "../../domain/lighting/lights";
 import { createMapImageState, type MapImageState } from "../../domain/map/map-image";
-import { formatDistance, measureDistance } from "../../domain/measurement/measurement";
+import { formatDistance, measureDistance, measurePathDistance } from "../../domain/measurement/measurement";
 import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import type {
@@ -43,6 +43,8 @@ import type {
 } from "../../domain/sessions/scene-document";
 import {
   createTacticalShape,
+  createPathShape,
+  movePathPoint,
   moveShape,
   rotateLinearShape,
   setLinearShapeEnd,
@@ -51,6 +53,7 @@ import {
   type ShapePatch,
   type TacticalShapeKind
 } from "../../domain/shapes/shapes";
+import type { WorldPoint } from "../../domain/shared/coordinates";
 import {
   ALLOWED_SHAPE_EMOJIS,
   getSelectedShapeEmojis
@@ -76,6 +79,11 @@ type SidebarSectionId = "grid" | "figures" | "darkness" | "fog";
 
 type SidebarOpenState = Record<SidebarSectionId, boolean>;
 
+interface PathDraftState {
+  readonly points: readonly WorldPoint[];
+  readonly hoverPoint: WorldPoint | null;
+}
+
 export function App(): JSX.Element {
   const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -90,6 +98,10 @@ export function App(): JSX.Element {
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
+  const [pathDraft, setPathDraft] = useState<PathDraftState>({
+    points: [],
+    hoverPoint: null
+  });
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
@@ -102,6 +114,8 @@ export function App(): JSX.Element {
   const nextRevealId = useRef(1);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
   isSpaceDragActiveRef.current = isSpaceDragActive;
+  const pathDraftRef = useRef(pathDraft);
+  pathDraftRef.current = pathDraft;
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
 
@@ -135,6 +149,11 @@ export function App(): JSX.Element {
     }
 
     handleCreateShape(kind);
+  };
+
+  const handleStartPathDrawing = (): void => {
+    setPathDraft({ points: [], hoverPoint: null });
+    setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "path"), null));
   };
 
   const handleCreateShape = (kind: TacticalShapeKind): void => {
@@ -263,6 +282,7 @@ export function App(): JSX.Element {
     setFeedback("Escena default en memoria");
     setWarnings([]);
     setInteraction(createInitialInteractionState());
+    setPathDraft({ points: [], hoverPoint: null });
     setIsSpaceDragActive(false);
     setGridAdjustMode(false);
     setIsSelectedPropertiesOpen(true);
@@ -289,6 +309,48 @@ export function App(): JSX.Element {
     setIsNewSceneDialogOpen(false);
   }, [resetToNewScene]);
 
+  const cancelPathDrawing = useCallback((): void => {
+    setPathDraft({ points: [], hoverPoint: null });
+    setInteraction((current) => setActiveTool(current, "select"));
+  }, []);
+
+  const confirmPathDrawing = useCallback((): void => {
+    const draft = pathDraftRef.current;
+
+    if (draft.points.length < 2) {
+      return;
+    }
+
+    const id = `path-${nextShapeId.current}`;
+    nextShapeId.current += 1;
+    const path = createPathShape({ id, points: draft.points });
+
+    setScene((sceneCurrent) => ({
+      ...sceneCurrent,
+      shapes: [...sceneCurrent.shapes, path]
+    }));
+    setPathDraft({ points: [], hoverPoint: null });
+    setInteraction((interactionCurrent) => selectElement(setActiveTool(interactionCurrent, "select"), id));
+  }, []);
+
+  const removeLastPathPoint = useCallback((): void => {
+    setPathDraft((current) => {
+      if (current.points.length <= 1) {
+        setInteraction((interactionCurrent) => setActiveTool(interactionCurrent, "select"));
+        return {
+          points: [],
+          hoverPoint: null
+        };
+      }
+
+      const points = current.points.slice(0, -1);
+      return {
+        points,
+        hoverPoint: points[points.length - 1] ?? null
+      };
+    });
+  }, []);
+
   useEffect(() => {
     const shouldIgnoreSpaceDrag = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -304,6 +366,7 @@ export function App(): JSX.Element {
     };
 
     const resetToSelection = (): void => {
+      setPathDraft({ points: [], hoverPoint: null });
       setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
     };
 
@@ -339,6 +402,26 @@ export function App(): JSX.Element {
         setIsSpaceDragActive(true);
         resetToSelection();
         return;
+      }
+
+      if (interaction.activeTool === "path") {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          confirmPathDrawing();
+          return;
+        }
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cancelPathDrawing();
+          return;
+        }
+
+        if (event.key === "Backspace") {
+          event.preventDefault();
+          removeLastPathPoint();
+          return;
+        }
       }
 
       if (event.key === "Delete" || event.key === "Backspace") {
@@ -380,10 +463,14 @@ export function App(): JSX.Element {
       window.removeEventListener("blur", handleWindowBlur);
     };
   }, [
+    cancelPathDrawing,
+    confirmPathDrawing,
     handleCancelNewScene,
     handleDeleteSelectedElement,
+    interaction.activeTool,
     isGridAdjustMode,
     isNewSceneDialogOpen,
+    removeLastPathPoint,
     setGridAdjustMode
   ]);
 
@@ -654,6 +741,46 @@ export function App(): JSX.Element {
     }));
   }, []);
 
+  const handlePathPointMove = useCallback((elementId: string, pointIndex: number, x: number, y: number): void => {
+    setScene((current) => ({
+      ...current,
+      shapes: current.shapes.map((shape) =>
+        shape.id === elementId ? movePathPoint(shape, pointIndex, { x, y }, current.grid.cellSizeWorld) : shape
+      )
+    }));
+  }, []);
+
+  const handlePathMove = useCallback((elementId: string, x: number, y: number): void => {
+    setScene((current) => ({
+      ...current,
+      shapes: current.shapes.map((shape) =>
+        shape.id === elementId ? moveShape(shape, { x, y }, current.grid.cellSizeWorld) : shape
+      )
+    }));
+  }, []);
+
+  const handlePathPointerMove = useCallback((point: WorldPoint | null): void => {
+    setPathDraft((current) => ({
+      ...current,
+      hoverPoint: point
+    }));
+  }, []);
+
+  const handlePathPointAdd = useCallback((point: WorldPoint): void => {
+    setPathDraft((current) => {
+      const previous = current.points[current.points.length - 1];
+
+      if (previous !== undefined && previous.x === point.x && previous.y === point.y) {
+        return current;
+      }
+
+      return {
+        points: [...current.points, point],
+        hoverPoint: point
+      };
+    });
+  }, []);
+
   const handleShapeDirectionChange = useCallback((elementId: string, direction: number): void => {
     setScene((current) => ({
       ...current,
@@ -878,6 +1005,13 @@ export function App(): JSX.Element {
           diagonalMode: scene.settings.diagonalMode
         })
       : undefined;
+  const selectedPathDistance =
+    selectedShape?.type === "path"
+      ? measurePathDistance(selectedShape.points, {
+          grid: scene.grid,
+          diagonalMode: scene.settings.diagonalMode
+        })
+      : undefined;
   const hasSelectedObject =
     selectedLight !== undefined || selectedEffect !== undefined || selectedShape !== undefined;
 
@@ -1022,6 +1156,8 @@ export function App(): JSX.Element {
           ? "Oscuridad magica"
         : selectedShape?.type === "measurement"
           ? "Linea"
+          : selectedShape?.type === "path"
+            ? "Path/Camino"
           : selectedShape?.type === "circle"
             ? "Circulo"
             : selectedShape?.type === "cone"
@@ -1040,6 +1176,8 @@ export function App(): JSX.Element {
           ? "●"
         : selectedShape?.type === "measurement"
           ? "╱"
+          : selectedShape?.type === "path"
+            ? "⌁"
           : selectedShape?.type === "circle"
             ? "○"
             : selectedShape?.type === "cone"
@@ -1125,6 +1263,9 @@ export function App(): JSX.Element {
           isGrabMode={isSpaceDragActive}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
           isFirePaintMode={interaction.activeTool === "fire-paint"}
+          isPathDrawingMode={interaction.activeTool === "path"}
+          pathPreviewPoints={pathDraft.points}
+          pathPreviewHoverPoint={pathDraft.hoverPoint}
           onContextMenuRequest={handleContextMenuRequest}
           onElementSelect={handleElementSelect}
           onGridCellSizeChange={handleGridCellSizeChange}
@@ -1135,6 +1276,10 @@ export function App(): JSX.Element {
           onLightDirectionChange={handleLightDirectionChange}
           onLightRadiusChange={handleLightRadiusChange}
           onShapeEndMove={handleShapeEndMove}
+          onPathPointAdd={handlePathPointAdd}
+          onPathPointerMove={handlePathPointerMove}
+          onPathPointMove={handlePathPointMove}
+          onPathMove={handlePathMove}
           onShapeDirectionChange={handleShapeDirectionChange}
           onShapeRadiusChange={handleShapeRadiusChange}
           onShapeRectResize={handleShapeRectResize}
@@ -1387,21 +1532,24 @@ export function App(): JSX.Element {
               ) : null}
               {selectedShape !== undefined ? (
                 <div className="selected-properties-content" aria-label="Propiedades de forma tactica">
+                  {selectedPathDistance !== undefined ? <span>Distancia total: {selectedPathDistance.label}</span> : null}
                   {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
-                  <label>
-                    Emoji
-                    <select
-                      value={getSelectedShapeEmojis(selectedShape.emoji)[0] ?? ""}
-                      onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
-                    >
-                      <option value="">Sin emoji</option>
-                      {ALLOWED_SHAPE_EMOJIS.map(([emoji, element]) => (
-                        <option key={emoji} value={emoji}>
-                          {emoji} {element}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {selectedShape.type !== "path" ? (
+                    <label>
+                      Emoji
+                      <select
+                        value={getSelectedShapeEmojis(selectedShape.emoji)[0] ?? ""}
+                        onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
+                      >
+                        <option value="">Sin emoji</option>
+                        {ALLOWED_SHAPE_EMOJIS.map(([emoji, element]) => (
+                          <option key={emoji} value={emoji}>
+                            {emoji} {element}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                   {selectedShape.type === "circle" || selectedShape.type === "cone" ? (
                     <label>
                       Radio
@@ -1797,6 +1945,7 @@ export function App(): JSX.Element {
               <button type="button">Herramientas de área ▶</button>
               <menu className="context-submenu">
                 <button type="button" onClick={() => handleCreateElement("measurement")}>Línea</button>
+                <button type="button" onClick={handleStartPathDrawing}>Path/Camino</button>
                 <button type="button" onClick={() => handleCreateElement("circle")}>Círculo</button>
                 <button type="button" onClick={() => handleCreateElement("cone")}>Cono</button>
                 <button type="button" onClick={() => handleCreateElement("rectangle")}>Rectángulo</button>

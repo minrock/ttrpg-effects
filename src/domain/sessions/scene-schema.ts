@@ -21,6 +21,12 @@ const linearShapeSchema = z.object({
   points: z.array(worldPointSchema).min(2)
 });
 
+const pathShapeSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal("path"),
+  points: z.array(worldPointSchema).min(2)
+});
+
 const legacyLineShapeSchema = z
   .object({ type: z.literal("line") })
   .passthrough()
@@ -192,6 +198,7 @@ export const sceneDocumentV1Schema = z.object({
         legacyLineShapeSchema,
         z.discriminatedUnion("type", [
           linearShapeSchema,
+          pathShapeSchema,
           circleShapeSchema,
           coneShapeSchema,
           rectangleShapeSchema
