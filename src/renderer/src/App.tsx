@@ -105,8 +105,7 @@ export function App(): JSX.Element {
       kind,
       position: interaction.contextMenu.world,
       grid: scene.grid,
-      settings: scene.settings,
-      mapPosition: scene.map.position
+      settings: scene.settings
     });
 
     setScene((current) => ({
@@ -406,8 +405,7 @@ export function App(): JSX.Element {
           ? moveShape(
               shape,
               { x, y },
-              current.settings.snapToGrid ? current.grid.cellSizeWorld : undefined,
-              current.map.position
+              current.settings.snapToGrid ? current.grid.cellSizeWorld : undefined
             )
           : shape
       ),
@@ -739,6 +737,34 @@ export function App(): JSX.Element {
           >
             {interaction.isMapAdjustMode ? "Ajustando mapa" : "Ajustar mapa"}
           </button>
+          {interaction.isMapAdjustMode && mapState !== null ? (
+            <>
+              <label>
+                X
+                <input
+                  type="number"
+                  step="1"
+                  value={scene.map.position.x}
+                  onChange={(event) => {
+                    const v = event.currentTarget.valueAsNumber;
+                    if (Number.isFinite(v)) handleMapPositionChange(v, scene.map.position.y);
+                  }}
+                />
+              </label>
+              <label>
+                Y
+                <input
+                  type="number"
+                  step="1"
+                  value={scene.map.position.y}
+                  onChange={(event) => {
+                    const v = event.currentTarget.valueAsNumber;
+                    if (Number.isFinite(v)) handleMapPositionChange(scene.map.position.x, v);
+                  }}
+                />
+              </label>
+            </>
+          ) : null}
           <button
             type="button"
             className={interaction.activeTool === "grab" ? "is-active" : ""}

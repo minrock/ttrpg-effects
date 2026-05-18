@@ -294,12 +294,10 @@ export class PixiViewport {
     const grid = new Graphics();
     const cellSize = this.grid.cellSizeWorld;
     const bounds = this.getGridBounds();
-    const originX = this.map?.position.x ?? 0;
-    const originY = this.map?.position.y ?? 0;
-    const startX = Math.floor((bounds.left - originX) / cellSize) * cellSize + originX;
-    const endX = Math.ceil((bounds.right - originX) / cellSize) * cellSize + originX;
-    const startY = Math.floor((bounds.top - originY) / cellSize) * cellSize + originY;
-    const endY = Math.ceil((bounds.bottom - originY) / cellSize) * cellSize + originY;
+    const startX = Math.floor(bounds.left / cellSize) * cellSize;
+    const endX = Math.ceil(bounds.right / cellSize) * cellSize;
+    const startY = Math.floor(bounds.top / cellSize) * cellSize;
+    const endY = Math.ceil(bounds.bottom / cellSize) * cellSize;
 
     for (let x = startX; x <= endX; x += cellSize) {
       grid
@@ -854,18 +852,16 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const cellSize = this.grid.cellSizeWorld;
     const radius = this.getFirePaintRadius();
-    const originX = this.map?.position.x ?? 0;
-    const originY = this.map?.position.y ?? 0;
-    const startColumn = Math.floor((worldPoint.x - radius - originX) / cellSize);
-    const endColumn = Math.floor((worldPoint.x + radius - originX) / cellSize);
-    const startRow = Math.floor((worldPoint.y - radius - originY) / cellSize);
-    const endRow = Math.floor((worldPoint.y + radius - originY) / cellSize);
+    const startColumn = Math.floor((worldPoint.x - radius) / cellSize);
+    const endColumn = Math.floor((worldPoint.x + radius) / cellSize);
+    const startRow = Math.floor((worldPoint.y - radius) / cellSize);
+    const endRow = Math.floor((worldPoint.y + radius) / cellSize);
     const cells: FireCell[] = [];
 
     for (let row = startRow; row <= endRow; row += 1) {
       for (let column = startColumn; column <= endColumn; column += 1) {
-        const x = column * cellSize + originX;
-        const y = row * cellSize + originY;
+        const x = column * cellSize;
+        const y = row * cellSize;
         const centerX = x + cellSize / 2;
         const centerY = y + cellSize / 2;
 
@@ -876,11 +872,11 @@ export class PixiViewport {
     }
 
     if (cells.length === 0) {
-      const column = Math.floor((worldPoint.x - originX) / cellSize);
-      const row = Math.floor((worldPoint.y - originY) / cellSize);
+      const column = Math.floor(worldPoint.x / cellSize);
+      const row = Math.floor(worldPoint.y / cellSize);
       cells.push({
-        x: column * cellSize + originX,
-        y: row * cellSize + originY,
+        x: column * cellSize,
+        y: row * cellSize,
         size: cellSize
       });
     }

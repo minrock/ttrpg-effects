@@ -10,7 +10,6 @@ export interface CreateShapeOptions {
   readonly position: WorldPoint;
   readonly grid: Pick<SceneGrid, "cellSizeWorld">;
   readonly settings: Pick<SceneSettings, "snapToGrid">;
-  readonly mapPosition?: WorldPoint;
 }
 
 export type ShapePatch = Partial<
@@ -22,13 +21,12 @@ export function createTacticalShape({
   kind,
   position,
   grid,
-  settings,
-  mapPosition
+  settings
 }: CreateShapeOptions): SceneShape {
   assertId(id);
   const origin =
     settings.snapToGrid && kind !== "measurement"
-      ? snapWorldPoint(position, grid.cellSizeWorld, mapPosition)
+      ? snapWorldPoint(position, grid.cellSizeWorld)
       : position;
   assertFinitePoint(origin);
 
@@ -60,7 +58,7 @@ export function createTacticalShape({
       const height = grid.cellSizeWorld * 2;
       let anchor: WorldPoint;
       if (settings.snapToGrid) {
-        const topLeft = snapWorldPoint(position, grid.cellSizeWorld, mapPosition);
+        const topLeft = snapWorldPoint(position, grid.cellSizeWorld);
         anchor = { x: topLeft.x + width / 2, y: topLeft.y + height / 2 };
       } else {
         anchor = position;
@@ -70,17 +68,17 @@ export function createTacticalShape({
   }
 }
 
-export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: number, snapOrigin?: WorldPoint): SceneShape {
+export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: number): SceneShape {
   const shouldSnap = snapCellSize !== undefined && shape.type !== "measurement";
   let nextAnchor: WorldPoint;
 
   if (shouldSnap && shape.type === "rectangle" && shape.width !== undefined && shape.height !== undefined) {
     const halfW = shape.width / 2;
     const halfH = shape.height / 2;
-    const snappedCorner = snapWorldPoint({ x: position.x - halfW, y: position.y - halfH }, snapCellSize!, snapOrigin);
+    const snappedCorner = snapWorldPoint({ x: position.x - halfW, y: position.y - halfH }, snapCellSize!);
     nextAnchor = { x: snappedCorner.x + halfW, y: snappedCorner.y + halfH };
   } else {
-    nextAnchor = shouldSnap ? snapWorldPoint(position, snapCellSize, snapOrigin) : position;
+    nextAnchor = shouldSnap ? snapWorldPoint(position, snapCellSize) : position;
   }
   const currentAnchor = getShapeAnchor(shape);
   const dx = nextAnchor.x - currentAnchor.x;
