@@ -68,6 +68,7 @@ Las herramientas tacticas se crean con click derecho y se guardan en la escena.
 - Las mediciones se colocan libres, aunque `Snap` este activo.
 - Al seleccionar una medicion, arrastra el aro alrededor del origen para cambiar inclinacion y arrastra el punto final para cambiar longitud.
 - `Linea`, `Circulo`, `Cono` y `Rectangulo` permanecen visibles hasta borrarse.
+- Las formas tacticas pueden tener un emoji decorativo; las areas lo reparten como mosaico y la linea lo distribuye por su longitud.
 - El panel lateral derecho permite cambiar unidad entre `ft` y `m`, valor por casilla, snap y diagonal.
 - `Snap` encaja nuevas formas y movimientos a intersecciones de grilla.
 - `Diagonal` cambia el calculo entre D&D 5e, Manhattan y Euclidean.
@@ -81,6 +82,7 @@ La oscuridad global y la niebla se pueden activar/desactivar y ajustar desde el 
 - La luz conica ilumina un sector configurable por radio, angulo y direccion.
 - Al seleccionar una luz puntual o conica, puedes arrastrar su handle dorado para agrandar o reducir el radio/longitud desde el canvas.
 - El fuego se renderiza como areas rojas opacas y puede emitir una luz calida.
+- Las areas de fuego muestran emojis de fuego dentro del circulo o de las celdas pintadas.
 - `Pintar fuego` permite pintar cuadrados de grilla con un pincel circular.
 - Al seleccionar una luz o fuego aparece un panel compacto para ajustar visibilidad, color, opacidad, intensidad, radio o escala segun corresponda.
 - Al seleccionar fuego circular se puede alternar entre circulo cerrado y circulo abierto tipo aro.

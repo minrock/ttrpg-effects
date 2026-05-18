@@ -139,6 +139,21 @@ describe("tactical shapes", () => {
     });
   });
 
+  it("updates and clears optional shape emoji", () => {
+    const shape = createTacticalShape({
+      id: "circle-1",
+      kind: "circle",
+      position: { x: 0, y: 0 },
+      grid,
+      settings: { snapToGrid: false }
+    });
+
+    const withEmoji = updateShape(shape, { emoji: " ❄️ " });
+    expect(withEmoji.emoji).toBe("❄️");
+
+    expect(updateShape(withEmoji, { emoji: undefined }).emoji).toBeUndefined();
+  });
+
   it("setShapeRadius clamps to minimum 10 for circle", () => {
     const shape = createTacticalShape({
       id: "circle-1",

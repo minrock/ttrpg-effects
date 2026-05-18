@@ -739,7 +739,7 @@ export class PixiViewport {
 
     for (const effect of this.effects) {
       if (effect.visible) {
-        effectsLayer.addChild(drawSceneEffect(effect));
+        effectsLayer.addChild(drawSceneEffect(effect, this.grid));
       }
     }
 
@@ -1507,6 +1507,8 @@ interface SelectableRenderElement {
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
 const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
+const FIRE_EMOJI = "🔥";
+const MAX_EMOJIS_PER_ELEMENT = 120;
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
 }
@@ -1595,6 +1597,7 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
   const graphic = new Graphics();
   const anchor = getShapeAnchor(shape);
   const endPoint = getShapeEndPoint(shape);
+  const emoji = normalizeEmojiForRender(shape.emoji);
 
   switch (shape.type) {
     case "measurement":
@@ -1614,6 +1617,14 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
         const label = drawShapeLabel(distance.label);
         label.position.set((anchor.x + endPoint.x) / 2 + 10, (anchor.y + endPoint.y) / 2 - 28);
         container.addChild(label);
+        if (emoji !== null) {
+          addEmojiTexts(
+            container,
+            emoji,
+            getLineEmojiPoints(shape.id, anchor, endPoint, grid.cellSizeWorld),
+            grid.cellSizeWorld
+          );
+        }
       }
       break;
     case "circle": {
@@ -1625,6 +1636,14 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(worldLengthLabel(radius, grid));
       label.position.set(anchor.x + 10, anchor.y - radius - 28);
       container.addChild(label);
+      if (emoji !== null) {
+        addEmojiTexts(
+          container,
+          emoji,
+          getCircleEmojiPoints(shape.id, anchor, radius, grid.cellSizeWorld),
+          grid.cellSizeWorld
+        );
+      }
       break;
     }
     case "cone": {
@@ -1640,6 +1659,14 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(`${Math.round(angle)}° · ${worldLengthLabel(radius, grid)}`);
       label.position.set(tipX + 12, tipY - 10);
       container.addChild(label);
+      if (emoji !== null) {
+        addEmojiTexts(
+          container,
+          emoji,
+          getConeEmojiPoints(shape.id, anchor, radius, angle, direction, grid.cellSizeWorld),
+          grid.cellSizeWorld
+        );
+      }
       break;
     }
     case "rectangle": {
@@ -1652,6 +1679,14 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(`${worldLengthLabel(width, grid)} × ${worldLengthLabel(height, grid)}`);
       label.position.set(anchor.x + 10, anchor.y + height / 2 + 10);
       container.addChild(label);
+      if (emoji !== null) {
+        addEmojiTexts(
+          container,
+          emoji,
+          getRectangleEmojiPoints(shape.id, anchor, width, height, grid.cellSizeWorld),
+          grid.cellSizeWorld
+        );
+      }
       break;
     }
   }
@@ -1671,6 +1706,210 @@ function drawShapeLabel(text: string): Text {
       stroke: { color: 0x101315, width: 4 }
     }
   });
+}
+
+function drawEmojiText(emoji: string, x: number, y: number, cellSizeWorld: number): Text {
+  const text = new Text({
+    text: emoji,
+    style: {
+      fill: 0xffffff,
+      fontFamily: "Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif",
+      fontSize: Math.max(18, Math.min(46, cellSizeWorld * 0.46)),
+      stroke: { color: 0x101315, width: 3 }
+    }
+  });
+  text.anchor.set(0.5);
+  text.alpha = 0.88;
+  text.position.set(x, y);
+  return text;
+}
+
+function addEmojiTexts(
+  container: Container,
+  emoji: string,
+  points: readonly { readonly x: number; readonly y: number }[],
+  cellSizeWorld: number
+): void {
+  for (const point of points.slice(0, MAX_EMOJIS_PER_ELEMENT)) {
+    container.addChild(drawEmojiText(emoji, point.x, point.y, cellSizeWorld));
+  }
+}
+
+function normalizeEmojiForRender(emoji: string | undefined): string | null {
+  const normalized = emoji?.trim();
+  return normalized === undefined || normalized.length === 0 ? null : normalized.slice(0, 8);
+}
+
+function getLineEmojiPoints(
+  seed: string,
+  start: { readonly x: number; readonly y: number },
+  end: { readonly x: number; readonly y: number },
+  cellSizeWorld: number
+): Array<{ x: number; y: number }> {
+  const length = Math.hypot(end.x - start.x, end.y - start.y);
+  const count = Math.max(1, Math.ceil(length / cellSizeWorld));
+  const points: Array<{ x: number; y: number }> = [];
+  const normalX = length > 0 ? -(end.y - start.y) / length : 0;
+  const normalY = length > 0 ? (end.x - start.x) / length : 0;
+
+  for (let index = 0; index < count; index += 1) {
+    const t = (index + 1) / (count + 1);
+    const offset = stableJitter(seed, index, cellSizeWorld * 0.08);
+    points.push({
+      x: start.x + (end.x - start.x) * t + normalX * offset,
+      y: start.y + (end.y - start.y) * t + normalY * offset
+    });
+  }
+
+  return points;
+}
+
+function getCircleEmojiPoints(
+  seed: string,
+  center: { readonly x: number; readonly y: number },
+  radius: number,
+  cellSizeWorld: number,
+  innerRadius = 0
+): Array<{ x: number; y: number }> {
+  const step = getEmojiStep(cellSizeWorld);
+  const points: Array<{ x: number; y: number }> = [];
+  let index = 0;
+
+  for (let y = center.y - radius + step / 2; y <= center.y + radius; y += step) {
+    for (let x = center.x - radius + step / 2; x <= center.x + radius; x += step) {
+      const px = x + stableJitter(`${seed}:x`, index, step * 0.22);
+      const py = y + stableJitter(`${seed}:y`, index, step * 0.22);
+      const distance = Math.hypot(px - center.x, py - center.y);
+
+      if (distance <= radius * 0.92 && distance >= innerRadius * 1.08) {
+        points.push({ x: px, y: py });
+      }
+
+      index += 1;
+    }
+  }
+
+  if (points.length === 0 && radius > 8 && innerRadius <= 0) {
+    points.push({ x: center.x, y: center.y });
+  }
+
+  return points;
+}
+
+function getConeEmojiPoints(
+  seed: string,
+  origin: { readonly x: number; readonly y: number },
+  radius: number,
+  angleDegrees: number,
+  directionDegrees: number,
+  cellSizeWorld: number
+): Array<{ x: number; y: number }> {
+  const step = getEmojiStep(cellSizeWorld);
+  const points: Array<{ x: number; y: number }> = [];
+  let index = 0;
+
+  for (let y = origin.y - radius + step / 2; y <= origin.y + radius; y += step) {
+    for (let x = origin.x - radius + step / 2; x <= origin.x + radius; x += step) {
+      const px = x + stableJitter(`${seed}:x`, index, step * 0.22);
+      const py = y + stableJitter(`${seed}:y`, index, step * 0.22);
+
+      if (isPointInCone(px, py, origin, radius * 0.92, angleDegrees, directionDegrees)) {
+        points.push({ x: px, y: py });
+      }
+
+      index += 1;
+    }
+  }
+
+  if (points.length === 0 && radius > 8) {
+    const direction = (directionDegrees * Math.PI) / 180;
+    points.push({
+      x: origin.x + Math.cos(direction) * radius * 0.45,
+      y: origin.y + Math.sin(direction) * radius * 0.45
+    });
+  }
+
+  return points;
+}
+
+function getRectangleEmojiPoints(
+  seed: string,
+  center: { readonly x: number; readonly y: number },
+  width: number,
+  height: number,
+  cellSizeWorld: number
+): Array<{ x: number; y: number }> {
+  const step = getEmojiStep(cellSizeWorld);
+  const points: Array<{ x: number; y: number }> = [];
+  const left = center.x - width / 2;
+  const right = center.x + width / 2;
+  const top = center.y - height / 2;
+  const bottom = center.y + height / 2;
+  let index = 0;
+
+  for (let y = top + step / 2; y <= bottom; y += step) {
+    for (let x = left + step / 2; x <= right; x += step) {
+      const px = x + stableJitter(`${seed}:x`, index, step * 0.2);
+      const py = y + stableJitter(`${seed}:y`, index, step * 0.2);
+
+      if (px >= left + step * 0.12 && px <= right - step * 0.12 && py >= top + step * 0.12 && py <= bottom - step * 0.12) {
+        points.push({ x: px, y: py });
+      }
+
+      index += 1;
+    }
+  }
+
+  if (points.length === 0 && width > 8 && height > 8) {
+    points.push({ x: center.x, y: center.y });
+  }
+
+  return points;
+}
+
+function isPointInCone(
+  x: number,
+  y: number,
+  origin: { readonly x: number; readonly y: number },
+  radius: number,
+  angleDegrees: number,
+  directionDegrees: number
+): boolean {
+  const dx = x - origin.x;
+  const dy = y - origin.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance > radius || distance < 4) {
+    return false;
+  }
+
+  const pointAngle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  const diff = Math.abs(normalizeAngleDifference(pointAngle - directionDegrees));
+  return diff <= angleDegrees / 2;
+}
+
+function normalizeAngleDifference(value: number): number {
+  return ((value + 180) % 360 + 360) % 360 - 180;
+}
+
+function getEmojiStep(cellSizeWorld: number): number {
+  return Math.max(24, cellSizeWorld * 0.9);
+}
+
+function stableJitter(seed: string, index: number, spread: number): number {
+  const value = hashString(`${seed}:${index}`);
+  return ((value % 1000) / 999 - 0.5) * 2 * spread;
+}
+
+function hashString(value: string): number {
+  let hash = 2166136261;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
 }
 
 function drawSceneLight(light: SceneLight): Graphics {
@@ -1880,10 +2119,12 @@ function computeCellRings(
   };
 }
 
-function drawSceneEffect(effect: SceneEffect): Graphics {
+function drawSceneEffect(effect: SceneEffect, grid: SceneGrid | null): Container {
+  const container = new Container();
   const graphic = new Graphics();
   const color = parseHexColor(effect.color);
   const alpha = Math.max(0.15, 0.62 * effect.opacity);
+  const cellSizeWorld = grid?.cellSizeWorld ?? 100;
 
   if (effect.zone.kind === "circle") {
     const radius = effect.zone.radius * effect.scale;
@@ -1897,7 +2138,21 @@ function drawSceneEffect(effect: SceneEffect): Graphics {
         .cut();
     }
 
-    return graphic.stroke({ color: 0xff8a38, width: 2, alpha: 0.8 * effect.opacity });
+    graphic.stroke({ color: 0xff8a38, width: 2, alpha: 0.8 * effect.opacity });
+    container.addChild(graphic);
+    addEmojiTexts(
+      container,
+      FIRE_EMOJI,
+      getCircleEmojiPoints(
+        effect.id,
+        effect.position,
+        radius,
+        cellSizeWorld,
+        effect.zone.mode === "open" ? radius * effect.zone.innerRadiusRatio : 0
+      ),
+      cellSizeWorld
+    );
+    return container;
   }
 
   for (const cell of effect.zone.cells) {
@@ -1907,7 +2162,18 @@ function drawSceneEffect(effect: SceneEffect): Graphics {
       .stroke({ color: 0xff8a38, width: 1, alpha: 0.45 * effect.opacity });
   }
 
-  return graphic;
+  container.addChild(graphic);
+  addEmojiTexts(
+    container,
+    FIRE_EMOJI,
+    effect.zone.cells.map((cell, index) => ({
+      x: cell.x + cell.size / 2 + stableJitter(effect.id, index, cell.size * 0.12),
+      y: cell.y + cell.size / 2 + stableJitter(`${effect.id}:y`, index, cell.size * 0.12)
+    })),
+    cellSizeWorld
+  );
+
+  return container;
 }
 
 function drawSelection(element: SelectableRenderElement): Graphics {

@@ -1085,6 +1085,18 @@ export function App(): JSX.Element {
                   : "Rectangulo"}
           </strong>
           {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
+          <label>
+            Emoji
+            <input
+              type="text"
+              maxLength={8}
+              value={selectedShape.emoji ?? ""}
+              placeholder={selectedShape.type === "measurement" ? "⚡" : "✨"}
+              onChange={(event) =>
+                updateSelectedShape({ emoji: event.currentTarget.value || undefined })
+              }
+            />
+          </label>
           {selectedShape.type === "circle" || selectedShape.type === "cone" ? (
             <label>
               Radio

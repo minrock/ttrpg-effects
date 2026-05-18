@@ -13,7 +13,7 @@ export interface CreateShapeOptions {
 }
 
 export type ShapePatch = Partial<
-  Pick<SceneShape, "points" | "radius" | "width" | "height" | "angle" | "direction">
+  Pick<SceneShape, "points" | "radius" | "width" | "height" | "angle" | "direction" | "emoji">
 >;
 
 export function createTacticalShape({
@@ -136,11 +136,23 @@ export function updateShape(shape: SceneShape, patch: ShapePatch): SceneShape {
     height: patch.height === undefined ? shape.height : sanitizePositive(patch.height),
     angle: patch.angle === undefined ? shape.angle : sanitizeAngle(patch.angle),
     direction:
-      patch.direction === undefined ? shape.direction : normalizeDirection(patch.direction)
+      patch.direction === undefined ? shape.direction : normalizeDirection(patch.direction),
+    emoji: Object.prototype.hasOwnProperty.call(patch, "emoji")
+      ? normalizeEmoji(patch.emoji)
+      : shape.emoji
   };
 
   validateShape(next);
   return next;
+}
+
+function normalizeEmoji(emoji: string | undefined): string | undefined {
+  if (emoji === undefined) {
+    return undefined;
+  }
+
+  const normalized = emoji.trim();
+  return normalized.length === 0 ? undefined : normalized.slice(0, 8);
 }
 
 export function getShapeAnchor(shape: SceneShape): WorldPoint {

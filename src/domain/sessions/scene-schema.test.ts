@@ -192,6 +192,48 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("accepts optional emojis on tactical shapes", () => {
+    const scene = {
+      ...createDefaultScene(),
+      shapes: [
+        {
+          id: "measurement-1",
+          type: "measurement",
+          emoji: "⚡",
+          points: [
+            { x: 0, y: 0 },
+            { x: 300, y: 0 }
+          ]
+        },
+        {
+          id: "circle-1",
+          type: "circle",
+          emoji: "❄️",
+          points: [{ x: 10, y: 20 }],
+          radius: 100
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
+  it("keeps older tactical shapes without emojis valid", () => {
+    const scene = {
+      ...createDefaultScene(),
+      shapes: [
+        {
+          id: "circle-1",
+          type: "circle",
+          points: [{ x: 10, y: 20 }],
+          radius: 100
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene).shapes[0].emoji).toBeUndefined();
+  });
+
   it("silently drops legacy line shapes from older scenes", () => {
     const scene = {
       ...createDefaultScene(),

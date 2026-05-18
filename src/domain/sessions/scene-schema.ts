@@ -12,9 +12,12 @@ const worldPointSchema = z.object({
   y: finiteNumber
 });
 
+const emojiSchema = z.string().trim().min(1).max(8).optional();
+
 const linearShapeSchema = z.object({
   id: z.string().min(1),
   type: z.literal("measurement"),
+  emoji: emojiSchema,
   points: z.array(worldPointSchema).min(2)
 });
 
@@ -26,6 +29,7 @@ const legacyLineShapeSchema = z
 const circleShapeSchema = z.object({
   id: z.string().min(1),
   type: z.literal("circle"),
+  emoji: emojiSchema,
   points: z.array(worldPointSchema).min(1),
   radius: positiveNumber
 });
@@ -33,6 +37,7 @@ const circleShapeSchema = z.object({
 const coneShapeSchema = z.object({
   id: z.string().min(1),
   type: z.literal("cone"),
+  emoji: emojiSchema,
   points: z.array(worldPointSchema).min(1),
   radius: positiveNumber,
   angle: finiteNumber.min(1).max(360),
@@ -42,6 +47,7 @@ const coneShapeSchema = z.object({
 const rectangleShapeSchema = z.object({
   id: z.string().min(1),
   type: z.literal("rectangle"),
+  emoji: emojiSchema,
   points: z.array(worldPointSchema).min(1),
   width: positiveNumber,
   height: positiveNumber
