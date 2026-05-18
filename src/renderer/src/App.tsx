@@ -989,72 +989,11 @@ export function App(): JSX.Element {
           </button>
           <button
             type="button"
-            className={interaction.isMapAdjustMode ? "is-active" : ""}
-            onClick={handleToggleMapAdjust}
-            aria-pressed={interaction.isMapAdjustMode}
-            disabled={mapState === null}
-          >
-            {interaction.isMapAdjustMode ? "Ajustando mapa" : "Ajustar mapa"}
-          </button>
-          {interaction.isMapAdjustMode && mapState !== null ? (
-            <>
-              <label>
-                X
-                <input
-                  type="number"
-                  step="1"
-                  value={scene.map.position.x}
-                  onChange={(event) => {
-                    const v = event.currentTarget.valueAsNumber;
-                    if (Number.isFinite(v)) handleMapPositionChange(v, scene.map.position.y);
-                  }}
-                />
-              </label>
-              <label>
-                Y
-                <input
-                  type="number"
-                  step="1"
-                  value={scene.map.position.y}
-                  onChange={(event) => {
-                    const v = event.currentTarget.valueAsNumber;
-                    if (Number.isFinite(v)) handleMapPositionChange(scene.map.position.x, v);
-                  }}
-                />
-              </label>
-            </>
-          ) : null}
-          <button
-            type="button"
-            className={interaction.activeTool === "fog-reveal" ? "is-active" : ""}
-            onClick={handleToggleFogRevealMode}
-            disabled={!scene.fogOfWar.enabled}
-            aria-pressed={interaction.activeTool === "fog-reveal"}
-          >
-            Modo niebla
-          </button>
-          <button
-            type="button"
-            className={interaction.activeTool === "fire-paint" ? "is-active" : ""}
-            onClick={handleToggleFirePaintMode}
-            aria-pressed={interaction.activeTool === "fire-paint"}
-          >
-            Pintar fuego
-          </button>
-          <button
-            type="button"
             className={interaction.isZoomLocked ? "is-active" : ""}
             onClick={handleToggleZoomLock}
             aria-pressed={interaction.isZoomLocked}
           >
             {interaction.isZoomLocked ? "Zoom bloqueado" : "Bloquear zoom"}
-          </button>
-          <button
-            type="button"
-            onClick={handleDeleteSelectedElement}
-            disabled={interaction.selectedElementId === null}
-          >
-            Borrar seleccionado
           </button>
           {canCreateNewScene ? (
             <button type="button" onClick={handleRequestNewScene} disabled={isBusy}>
@@ -1427,6 +1366,43 @@ export function App(): JSX.Element {
                 <Switch.Thumb className="switch-thumb" />
               </Switch.Root>
             </div>
+            <button
+              type="button"
+              className={interaction.isMapAdjustMode ? "is-active" : ""}
+              onClick={handleToggleMapAdjust}
+              aria-pressed={interaction.isMapAdjustMode}
+              disabled={mapState === null}
+            >
+              {interaction.isMapAdjustMode ? "Ajustando mapa" : "Ajustar mapa"}
+            </button>
+            {interaction.isMapAdjustMode && mapState !== null ? (
+              <div className="map-adjust-fields" aria-label="Posicion del mapa">
+                <label>
+                  X
+                  <input
+                    type="number"
+                    step="1"
+                    value={scene.map.position.x}
+                    onChange={(event) => {
+                      const v = event.currentTarget.valueAsNumber;
+                      if (Number.isFinite(v)) handleMapPositionChange(v, scene.map.position.y);
+                    }}
+                  />
+                </label>
+                <label>
+                  Y
+                  <input
+                    type="number"
+                    step="1"
+                    value={scene.map.position.y}
+                    onChange={(event) => {
+                      const v = event.currentTarget.valueAsNumber;
+                      if (Number.isFinite(v)) handleMapPositionChange(scene.map.position.x, v);
+                    }}
+                  />
+                </label>
+              </div>
+            ) : null}
             <label>
               Opacidad
               <input
@@ -1572,6 +1548,15 @@ export function App(): JSX.Element {
               />
               Activar niebla
             </label>
+            <button
+              type="button"
+              className={interaction.activeTool === "fog-reveal" ? "is-active" : ""}
+              onClick={handleToggleFogRevealMode}
+              disabled={!scene.fogOfWar.enabled}
+              aria-pressed={interaction.activeTool === "fog-reveal"}
+            >
+              {interaction.activeTool === "fog-reveal" ? "Modo niebla activo" : "Modo niebla"}
+            </button>
             <label>
               Fog
               <input

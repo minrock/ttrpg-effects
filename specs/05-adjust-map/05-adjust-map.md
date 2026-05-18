@@ -6,7 +6,7 @@ Permitir mover la imagen del mapa sobre los ejes X e Y dentro del lienzo cuando 
 
 ## Alcance
 
-- Boton de toggle "Ajustar mapa" en la barra de controles.
+- Boton de toggle "Ajustar mapa" dentro de la seccion Grilla del sidebar derecho.
 - Cuando el modo esta activo: arrastrar sobre la imagen mueve el mapa en X/Y.
 - Cuando el modo esta inactivo: arrastrar funciona como paneo de camara normal.
 - La posicion del mapa (offset X/Y en coordenadas mundo) se guarda en el archivo `.ttrpgscene`.
@@ -27,7 +27,7 @@ Permitir mover la imagen del mapa sobre los ejes X e Y dentro del lienzo cuando 
 - El cursor cambia a indicador de movimiento sobre el lienzo.
 - Cualquier arrastre con boton izquierdo mueve la imagen (no la camara).
 - La grilla y el overlay se recalculan en tiempo real siguiendo al mapa.
-- El boton muestra estado visual diferenciado (activo / inactivo).
+- El boton en la seccion Grilla muestra estado visual diferenciado (activo / inactivo).
 
 ## Comportamiento del modo inactivo
 
@@ -43,7 +43,7 @@ Al cargar una imagen nueva, la posicion se resetea a `{ x: 0, y: 0 }`.
 
 ## Criterios de aceptacion
 
-- El boton "Ajustar mapa" aparece en los controles y tiene estado visual distinguible.
+- El boton "Ajustar mapa" aparece en la seccion Grilla del sidebar derecho y tiene estado visual distinguible.
 - Con el modo activo, arrastrar mueve la imagen del mapa.
 - Con el modo inactivo, arrastrar panea la camara (comportamiento previo intacto).
 - La grilla y el overlay se siguen visualmente mientras se arrastra.

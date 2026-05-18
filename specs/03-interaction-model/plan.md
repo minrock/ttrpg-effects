@@ -16,7 +16,6 @@
 - Crear elementos visibles de prueba desde el menu contextual: medicion, circulo, cono, rectangulo, luz puntual, luz conica y fuego animado placeholder.
 - Seleccionar elementos creados con click izquierdo.
 - Mostrar seleccion visual clara en el canvas.
-- Borrar elemento seleccionado con boton visible.
 - Borrar elemento seleccionado con `Delete` o `Backspace`.
 - Cerrar menu o cancelar herramienta con `Escape`.
 - Mantener estados de herramienta activa, seleccion y menu contextual separados.
@@ -83,7 +82,7 @@
 
 - Agregar menu contextual React posicionado sobre el canvas.
 - Agregar accion compacta de bloqueo/desbloqueo de zoom dentro del menu contextual.
-- Agregar toolbar compacta para herramienta activa, bloqueo de zoom y borrar seleccionado.
+- Agregar toolbar compacta para herramienta activa y bloqueo de zoom.
 - Escuchar `Delete`, `Backspace` y `Escape` a nivel de app con cleanup correcto.
 - Mantener estado visual de seleccion, menu y lock sin acceso directo a filesystem/Electron.
 - Mostrar contador o nombre del elemento seleccionado para que el usuario vea claramente que la interaccion funciona.
@@ -109,7 +108,7 @@
 5. Implementar hit testing simple en coordenadas de mundo.
 6. Agregar menu contextual React con acciones de creacion en posicion de mundo.
 7. Agregar toggle de bloqueo/desbloqueo de zoom dentro del menu contextual.
-8. Agregar toolbar compacta con herramienta activa, bloqueo de zoom y borrar seleccionado.
+8. Agregar toolbar compacta con herramienta activa y bloqueo de zoom.
 9. Agregar atajos `Delete`, `Backspace` y `Escape`.
 10. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
 
@@ -120,7 +119,7 @@
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Manual / smoke:** Ejecutar `pnpm dev`, click derecho sobre el canvas, crear varios elementos, seleccionar uno, borrarlo con boton, crear otro, borrarlo con `Delete`, abrir menu y cerrarlo con `Escape`, activar bloqueo de zoom y confirmar que la rueda no cambia el zoom.
+- **Manual / smoke:** Ejecutar `pnpm dev`, click derecho sobre el canvas, crear varios elementos, seleccionar uno, borrarlo con `Delete`, crear otro, borrarlo con `Backspace`, abrir menu y cerrarlo con `Escape`, activar bloqueo de zoom y confirmar que la rueda no cambia el zoom.
 - **Manual / smoke contextual:** Abrir menu con click derecho, alternar bloqueo de zoom desde el menu y confirmar que el boton de toolbar refleja el mismo estado.
 
 ## 8. Riesgos y mitigaciones
@@ -142,7 +141,6 @@
 - El menu contextual permite crear elementos visibles sin cargar imagen de mapa.
 - El usuario puede seleccionar un elemento creado.
 - El elemento seleccionado tiene indicador visual claro.
-- El usuario puede borrar el elemento seleccionado con boton visible.
 - El usuario puede borrar el elemento seleccionado con `Delete` o `Backspace`.
 - `Escape` cierra menu contextual o cancela herramienta activa.
 - El zoom no cambia cuando el bloqueo esta activo.
@@ -165,7 +163,6 @@
 - [x] Toggle de bloqueo/desbloqueo de zoom en menu contextual implementado/documentado.
 - [x] Creacion de elementos visibles desde menu implementada.
 - [x] Seleccion visual implementada.
-- [x] Borrado con boton implementado.
 - [x] Borrado con `Delete`/`Backspace` implementado.
 - [x] `Escape` cierra menu/cancela herramienta.
 - [x] Bloqueo de zoom implementado e indicado en UI.

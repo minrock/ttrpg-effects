@@ -22,6 +22,7 @@
 - Permitir revelar areas manuales desde el mapa con radio default `50`.
 - Consolidar cada arrastre de revelado en una sola area compuesta tipo stroke, con puntos simplificados por distancia, para evitar crecimiento de memoria por miles de circulos.
 - Separar `Modo niebla` del pan temporal con `Space` para que navegar el mapa no revele fog accidentalmente.
+- Exponer `Modo niebla` dentro de la seccion Niebla del sidebar derecho.
 - Agregar una accion en el menu contextual de click derecho para activar o salir de `Modo niebla`.
 - Agregar shortcut `Cmd+F` en macOS y `Ctrl+F` en Windows/Linux para activar o salir de `Modo niebla`.
 - Mostrar un cursor tipo pincel/crosshair cuando `Modo niebla` este activo.
@@ -94,7 +95,7 @@
 ### `renderer`
 
 - Agregar controles discretos para activar fog of war, ajustar opacidad, revelar area circular y resetear revelado.
-- Exponer `Modo niebla` como modo de herramienta; el pan temporal se activa con `Space`.
+- Exponer `Modo niebla` como modo de herramienta desde la seccion Niebla del sidebar; el pan temporal se activa con `Space`.
 - Agregar una accion al menu contextual para activar o salir rapidamente de `Modo niebla`.
 - Agregar listener de teclado para `Cmd+F` / `Ctrl+F`; debe prevenir el buscador del navegador y habilitar fog of war si estaba apagado.
 - La UI debe permitir crear revelados manuales sin tapar el mapa.
@@ -163,6 +164,7 @@
 - Un trazo largo de niebla se persiste como una sola area `stroke` con puntos simplificados.
 - El render de niebla no crea un objeto persistente por cada movimiento del cursor.
 - `Space` + drag permite navegar sin revelar niebla.
+- La seccion Niebla del sidebar permite activar o salir de `Modo niebla`.
 - El menu contextual permite activar o salir de `Modo niebla`.
 - `Cmd+F` / `Ctrl+F` permite activar o salir de `Modo niebla` desde teclado.
 - `Modo niebla` muestra un puntero tipo pincel/crosshair.
@@ -190,6 +192,7 @@
 - [x] Capas futuras reservadas/documentadas.
 - [x] README/docs actualizados.
 - [x] Pan temporal con `Space` y `Modo niebla` documentados como interacciones separadas.
+- [x] `Modo niebla` documentado dentro de la seccion Niebla del sidebar.
 - [x] Accion contextual para activar/salir de `Modo niebla` documentada.
 - [x] Shortcut `Cmd+F` / `Ctrl+F` para `Modo niebla` documentado.
 - [x] Cursor de `Modo niebla` documentado.

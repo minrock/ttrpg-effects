@@ -15,7 +15,7 @@
 - Mantener fuego circular como area roja opaca.
 - Mantener handles para radio visual del fuego y radio de luz (solo en modo `circle`).
 - Agregar zona `cells` para fuego pintado en cuadrados de grilla.
-- Agregar modo `Pintar fuego` en toolbar y menu contextual.
+- Agregar modo `Pintar fuego` en el menu contextual.
 - Convertir click/drag del pincel a celdas de grilla en coordenadas de mundo.
 - Radio de pincel por defecto: 25 unidades de mundo.
 - Guardar/cargar zonas `cells` en `.ttrpgscene`.
@@ -92,7 +92,7 @@
 - **Tests:** `pnpm test`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Smoke manual:** `pnpm dev`, crear fuego circular, ajustar radio naranja, activar `Pintar fuego`, pintar una celda y varias celdas, guardar/cargar escena.
+- **Smoke manual:** `pnpm dev`, crear fuego circular, ajustar radio naranja, activar `Pintar fuego` desde el menu contextual, pintar una celda y varias celdas, guardar/cargar escena.
 
 ## 8. Checklist de cierre
 

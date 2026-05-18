@@ -24,6 +24,9 @@
 - Mantener el panel visible por defecto y permitir ocultarlo/mostrarlo para ampliar el viewport del mapa.
 - Exponer `Valor por casilla` dentro de Figuras.
 - Exponer `Ajustar grilla` como switch dentro de Grilla y mostrar `Celda` solo cuando ese modo este activo.
+- Exponer `Ajustar mapa` dentro de Grilla.
+- Exponer `Modo niebla` dentro de Niebla.
+- Retirar acciones redundantes de la toolbar superior: `Pintar fuego`, `Borrar seleccionado`, `Ajustar mapa` y `Modo niebla`.
 - Ajustar el canvas para ocupar el espacio restante sin quedar cubierto.
 - Mantener intactas las reglas de dominio y render.
 - Mantener accesibilidad básica con botones, labels y `aria-expanded`.
@@ -85,8 +88,10 @@
   - Agregar estado local para visibilidad global del sidebar.
   - Crear una estructura de secciones clara para Grilla, Figuras, Oscuridad y Niebla.
   - Agregar switch `Ajustar grilla` dentro de Grilla.
+  - Mover `Ajustar mapa` a Grilla.
   - Mostrar/ocultar el input `Celda` segun `Ajustar grilla`.
   - Agregar handler para `Valor por casilla`.
+  - Mover `Modo niebla` a Niebla.
   - Mantener todos los handlers existentes conectados.
 - En `src/renderer/src/styles.css`:
   - Cambiar layout de `app-shell` para incluir área principal con canvas + sidebar.
@@ -109,16 +114,18 @@
 4. Crear helpers/render blocks para `SidebarAccordion` o una estructura equivalente dentro de `App.tsx`.
 5. Mover controles de Grilla al accordion Grilla.
 6. Agregar switch `Ajustar grilla` y dejar `Celda` visible solo cuando el switch este activo.
-7. Mover Snap, Diagonal y `Valor por casilla` al accordion Figuras.
-8. Mover controles de Oscuridad al accordion Oscuridad.
-9. Mover controles de Niebla al accordion Niebla.
-10. Implementar handler de `Valor por casilla` respetando unidad activa.
-11. Agregar botón visible para ocultar/mostrar el sidebar.
-12. Ajustar CSS para layout lateral derecho, modo colapsado y canvas con espacio restante.
-13. Ajustar estilos de headers, iconos, indicadores, controles internos y scroll.
-14. Verificar que toolbar principal, status, propiedades y canvas no se solapen.
-15. Ejecutar validaciones automáticas.
-16. Realizar smoke manual en `pnpm dev`.
+7. Mover `Ajustar mapa` al accordion Grilla.
+8. Mover Snap, Diagonal y `Valor por casilla` al accordion Figuras.
+9. Mover controles de Oscuridad al accordion Oscuridad.
+10. Mover controles de Niebla al accordion Niebla.
+11. Mover `Modo niebla` al accordion Niebla.
+12. Implementar handler de `Valor por casilla` respetando unidad activa.
+13. Agregar botón visible para ocultar/mostrar el sidebar.
+14. Ajustar CSS para layout lateral derecho, modo colapsado y canvas con espacio restante.
+15. Ajustar estilos de headers, iconos, indicadores, controles internos y scroll.
+16. Verificar que toolbar principal, status, propiedades y canvas no se solapen.
+17. Ejecutar validaciones automáticas.
+18. Realizar smoke manual en `pnpm dev`.
 
 ## 7. Testing y verificacion
 
@@ -149,10 +156,10 @@
 - Cada accordion tiene icono, título grande e indicador de estado.
 - Los headers usan tamaño de fuente aproximado entre `1.5rem` y `2rem`.
 - Los controles internos se ven más pequeños que los headers.
-- Grilla contiene toggle, opacidad, switch `Ajustar grilla`, celda condicional, unidad y preset.
+- Grilla contiene toggle, opacidad, `Ajustar mapa`, switch `Ajustar grilla`, celda condicional, unidad y preset.
 - Figuras contiene Snap, Diagonal y Valor por casilla.
 - Oscuridad contiene toggle y overlay.
-- Niebla contiene toggle, fog/opacity, color, reveal y reset.
+- Niebla contiene toggle, `Modo niebla`, fog/opacity, color, reveal y reset.
 - Los controles conservan comportamiento actual.
 - El canvas no queda cubierto por el panel.
 - El sidebar puede ocultarse para ampliar el viewport del mapa.

@@ -42,7 +42,7 @@ Simplificar el efecto de fuego para que no dependa de GIFs ni dibujo a mano alza
 
 ### Pintado por celdas
 
-- Debe existir un modo `Pintar fuego` disponible en toolbar y menu contextual.
+- Debe existir un modo `Pintar fuego` disponible desde el menu contextual.
 - En modo pintado, click o drag sobre el mapa agrega celdas de grilla al fuego.
 - El pincel usa un radio circular configurable desde el handle naranja del fuego seleccionado.
 - El radio por defecto del pincel es 25 unidades de mundo.

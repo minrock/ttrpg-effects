@@ -12,7 +12,7 @@
 
 ### Incluido
 
-- Boton toggle "Ajustar mapa" en la barra de controles del renderer.
+- Boton toggle "Ajustar mapa" dentro de la seccion Grilla del sidebar derecho.
 - Flag `isMapAdjustMode` en `InteractionState` con funcion pura para modificarlo.
 - Modo de drag `"map-move"` en `PixiViewport` que mueve el sprite del mapa en lugar de panear la camara.
 - Callback `onMapPositionChange(x, y)` que reporta la nueva posicion al renderer en cada frame de arrastre.
@@ -79,7 +79,7 @@
   - Agregar `handleToggleMapAdjust` que llama `setMapAdjustMode` sobre `interaction`.
   - Agregar `handleMapPositionChange(x, y)` memoizado con `useCallback` que actualiza `scene.map.position` via `setScene`.
   - Pasar `isMapAdjustMode={interaction.isMapAdjustMode}` y `onMapPositionChange={handleMapPositionChange}` a `<MapViewport>`.
-  - Agregar boton "Ajustar mapa" / "Ajustando mapa" en la barra de acciones con clase `is-active` cuando el modo este activo. El boton solo se habilita cuando hay un mapa cargado.
+  - Agregar boton "Ajustar mapa" / "Ajustando mapa" en la seccion Grilla del sidebar derecho con clase `is-active` cuando el modo este activo. El boton solo se habilita cuando hay un mapa cargado.
 
 - **`src/renderer/src/components/MapViewport.tsx`**
   - Agregar props `isMapAdjustMode: boolean` y `onMapPositionChange: (x: number, y: number) => void`.
@@ -118,7 +118,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:**
   1. Cargar un mapa con grilla interna.
-  2. Activar "Ajustar mapa" — verificar estado visual del boton.
+  2. Abrir Grilla en el sidebar y activar "Ajustar mapa" — verificar estado visual del boton.
   3. Arrastrar — verificar que el mapa se mueve y la grilla/oscuridad lo siguen.
   4. Desactivar — verificar que arrastrar panea la camara y el mapa no se mueve.
   5. Guardar escena y recargar — verificar que el mapa aparece en la posicion ajustada.
@@ -130,7 +130,7 @@
   **Mitigacion:** React 18 batchea las actualizaciones de estado en event handlers y callbacks async. En la practica el re-render ocurre una vez por frame de animacion. Si se detecta degradacion, se puede debouncer o mover el estado de posicion local a un ref durante el drag y flushear al soltar.
 
 - **Riesgo:** Confusion del usuario entre mover el mapa y panear la camara si el boton no es suficientemente claro.
-  **Mitigacion:** El boton usa clase `is-active` con fondo dorado (igual que "Zoom bloqueado"), texto diferenciado "Ajustando mapa" / "Ajustar mapa" y el cursor del canvas podria cambiar.
+  **Mitigacion:** El boton vive junto a los controles de Grilla, usa clase `is-active` con fondo dorado, texto diferenciado "Ajustando mapa" / "Ajustar mapa" y el cursor del canvas podria cambiar.
 
 - **Riesgo:** Al mover el mapa, `this.map.position` en `PixiViewport` queda desincronizado con `mapSprite.position` hasta que React re-renderiza y llama `setMap`.
   **Mitigacion:** El sprite es la fuente de verdad visual durante el drag. `getGridBounds()` lee de `mapSprite` (no de `this.map`), por eso la grilla y oscuridad siempre siguen al sprite. La desincronizacion es cosmética y de muy corta duracion.
@@ -140,7 +140,7 @@
 
 ## 9. Criterios de aceptacion
 
-- El boton "Ajustar mapa" aparece en la barra y se habilita solo cuando hay mapa cargado.
+- El boton "Ajustar mapa" aparece en la seccion Grilla del sidebar y se habilita solo cuando hay mapa cargado.
 - Con el modo activo, arrastrar mueve la imagen del mapa en X/Y.
 - Con el modo inactivo, arrastrar panea la camara (comportamiento existente sin regresiones).
 - La grilla y el overlay de oscuridad se mueven junto al mapa en tiempo real.
@@ -150,7 +150,7 @@
 
 ## 10. Documentacion afectada
 
-- `specs/05-adjust-map/05-adjust-map.md` — este plan complementa el spec; sin cambios al spec.
+- `specs/05-adjust-map/05-adjust-map.md`
 - No se requieren cambios en README ni en otros specs.
 
 ## 11. Checklist de cierre

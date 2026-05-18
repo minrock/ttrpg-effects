@@ -34,6 +34,7 @@ Sección para controles directamente relacionados con la grilla visual:
 
 - Activar/desactivar grilla.
 - Opacidad de grilla.
+- Ajustar mapa.
 - Switch `Ajustar grilla`.
 - Tamaño de celda, visible solo cuando `Ajustar grilla` esta activo.
 - Unidad.
@@ -68,6 +69,7 @@ Icono sugerido: luna, sombra o círculo oscuro.
 Sección para controles de fog of war:
 
 - Activar/desactivar niebla.
+- Activar/salir de `Modo niebla`.
 - Opacidad de fog.
 - Color de niebla.
 - Radio de reveal.
@@ -108,7 +110,7 @@ Icono sugerido: nube, ojo cubierto o niebla.
 ## Fuera de alcance
 
 - Cambiar reglas de grilla, medición, oscuridad, niebla o visión.
-- Cambiar el comportamiento de `Pintar fuego`, luces o formas.
+- Cambiar el comportamiento de `Pintar fuego`, luces o formas, salvo retirar acciones redundantes de la toolbar superior.
 - Persistir el estado abierto/cerrado de accordions o la visibilidad del panel en archivo de escena.
 - Crear navegación global o paneles de herramientas adicionales fuera de los grupos descritos.
 - Rediseñar la toolbar principal de carga/guardado/mapa, salvo ajustes mínimos de layout necesarios.
@@ -143,11 +145,13 @@ La spec es de presentación e interacción de UI. Los valores editados por el pa
 - Los headers usan una fuente aproximadamente entre `1.5rem` y `2rem`.
 - Los valores internos son visualmente más pequeños que los headers.
 - La sección Grilla contiene los controles de grilla actuales.
+- La sección Grilla contiene `Ajustar mapa`.
 - La sección Grilla permite activar `Ajustar grilla` con switch, no checkbox.
 - El tamaño de celda se oculta mientras `Ajustar grilla` esta inactivo.
 - La sección Figuras contiene Snap, Diagonal y Valor por casilla.
 - La sección Oscuridad contiene toggle y overlay de oscuridad.
 - La sección Niebla contiene toggle, opacidad/fog, color, reveal y reset.
+- La sección Niebla contiene `Modo niebla`.
 - Los controles siguen modificando el estado de escena igual que antes.
 - El canvas no queda cubierto por el panel; se ajusta al área disponible.
 - El usuario puede ocultar el panel lateral para ampliar el viewport del mapa.

@@ -13,6 +13,7 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - Revelar areas circulares con click o trazos compuestos al arrastrar sobre el mapa.
 - Consolidar cada trazo de revelado en una sola area compuesta por puntos simplificados con radio, evitando persistir un circulo por cada movimiento del cursor.
 - Separar `Modo niebla` del pan temporal con `Space` para evitar revelar zonas mientras se navega el mapa.
+- Exponer `Modo niebla` desde la seccion Niebla del sidebar derecho.
 - Permitir salir de `Modo niebla` desde el menu contextual de click derecho.
 - Permitir entrar/salir de `Modo niebla` con `Cmd+F` en macOS y `Ctrl+F` en Windows/Linux.
 - Mostrar un cursor tipo pincel/crosshair cuando `Modo niebla` este activo.
@@ -40,10 +41,11 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 
 ## Criterios de aceptacion
 
-- El usuario puede activar fog of war desde la barra de controles.
+- El usuario puede activar fog of war desde la seccion Niebla del sidebar derecho.
 - La niebla cubre el mapa no revelado con opacidad configurable.
 - El radio default de revelado manual es `50`.
 - `Modo niebla` permite descubrir areas circulares con click o trazos compuestos al arrastrar.
+- `Modo niebla` se activa o desactiva desde la seccion Niebla del sidebar derecho.
 - Cada trazo de arrastre se guarda como una sola zona revelada compuesta, no como cientos o miles de circulos independientes.
 - La simplificacion del trazo conserva la forma visual aproximada y reduce objetos renderizados/serializados.
 - `Modo niebla` cambia el puntero del canvas para indicar que se va a revelar niebla.
