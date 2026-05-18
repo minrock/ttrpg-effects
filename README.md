@@ -68,14 +68,14 @@ Las herramientas tacticas se crean con click derecho y se guardan en la escena.
 - Las mediciones se colocan libres, aunque `Snap` este activo.
 - Al seleccionar una medicion, arrastra el aro alrededor del origen para cambiar inclinacion y arrastra el punto final para cambiar longitud.
 - `Linea`, `Circulo`, `Cono` y `Rectangulo` permanecen visibles hasta borrarse.
-- La barra de grilla permite cambiar unidad entre `ft` y `m`.
+- El panel lateral derecho permite cambiar unidad entre `ft` y `m`, valor por casilla, snap y diagonal.
 - `Snap` encaja nuevas formas y movimientos a intersecciones de grilla.
 - `Diagonal` cambia el calculo entre D&D 5e, Manhattan y Euclidean.
 - Al seleccionar circulos, conos o rectangulos aparece un panel compacto para ajustar dimensiones.
 
 ## Iluminacion y fuego
 
-La oscuridad global se puede activar/desactivar y ajustar desde la barra de controles. Las luces y el fuego se crean con click derecho sobre el canvas.
+La oscuridad global y la niebla se pueden activar/desactivar y ajustar desde el panel lateral derecho. Las luces y el fuego se crean con click derecho sobre el canvas.
 
 - La luz puntual ilumina un area circular configurable.
 - La luz conica ilumina un sector configurable por radio, angulo y direccion.

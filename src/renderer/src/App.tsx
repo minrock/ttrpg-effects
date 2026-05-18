@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
 import {
   cancelInteraction,
   closeContextMenu,
@@ -57,6 +57,10 @@ const fallbackAppInfo = {
   version: "0.0.0"
 } as const;
 
+type SidebarSectionId = "grid" | "figures" | "darkness" | "fog";
+
+type SidebarOpenState = Record<SidebarSectionId, boolean>;
+
 export function App(): JSX.Element {
   const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -66,6 +70,13 @@ export function App(): JSX.Element {
   const [warnings, setWarnings] = useState<readonly string[]>([]);
   const [isBusy, setIsBusy] = useState(false);
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
+    grid: true,
+    figures: false,
+    darkness: false,
+    fog: false
+  });
   const nextShapeId = useRef(1);
   const nextLightId = useRef(1);
   const nextEffectId = useRef(1);
@@ -714,6 +725,33 @@ export function App(): JSX.Element {
     }));
   }
 
+  function handleCellDistanceValueChange(value: number): void {
+    if (!Number.isFinite(value) || value <= 0) {
+      return;
+    }
+
+    setScene((current) => ({
+      ...current,
+      grid:
+        current.grid.unit === "ft"
+          ? {
+              ...current.grid,
+              distancePerCell: value
+            }
+          : {
+              ...current.grid,
+              metricDistancePerCell: value
+            }
+    }));
+  }
+
+  function toggleSidebarSection(sectionId: SidebarSectionId): void {
+    setOpenSidebarSections((current) => ({
+      ...current,
+      [sectionId]: !current[sectionId]
+    }));
+  }
+
   return (
     <main className="app-shell" aria-label="TTRPG Effects">
       <header className="app-toolbar">
@@ -830,143 +868,6 @@ export function App(): JSX.Element {
           <strong key={warning}>{warning}</strong>
         ))}
       </aside>
-      <section className="grid-controls" aria-label="Controles de grilla">
-        <label>
-          <input type="checkbox" checked={scene.grid.enabled} onChange={handleGridVisibilityChange} />
-          Grilla
-        </label>
-        <label>
-          Opacidad
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={scene.grid.opacity}
-            onChange={(event) => handleGridOpacityChange(event.currentTarget.valueAsNumber)}
-          />
-        </label>
-        <label>
-          Celda
-          <input
-            type="number"
-            min="8"
-            max="1000"
-            value={scene.grid.cellSizeWorld}
-            onChange={(event) => handleGridCellSizeChange(event.currentTarget.valueAsNumber)}
-          />
-        </label>
-        <label>
-          Unidad
-          <select
-            aria-label="Unidad de medicion"
-            value={scene.grid.unit}
-            onChange={(event) => handleUnitChange(event.currentTarget.value as "ft" | "m")}
-          >
-            <option value="ft">ft</option>
-            <option value="m">m</option>
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={scene.settings.snapToGrid}
-            onChange={handleSnapToGridChange}
-          />
-          Snap
-        </label>
-        <label>
-          Diagonal
-          <select
-            aria-label="Modo de diagonal"
-            value={scene.settings.diagonalMode}
-            onChange={(event) =>
-              handleDiagonalModeChange(event.currentTarget.value as SceneDocument["settings"]["diagonalMode"])
-            }
-          >
-            <option value="dnd5e-default">D&D 5e</option>
-            <option value="manhattan">Manhattan</option>
-            <option value="euclidean">Euclidean</option>
-          </select>
-        </label>
-        <select
-          aria-label="Preset de escala"
-          defaultValue=""
-          onChange={(event) => handleGridPresetChange(event.currentTarget.value)}
-        >
-          <option value="" disabled>
-            Preset
-          </option>
-          {gridPresets.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.label}
-            </option>
-          ))}
-        </select>
-        <label>
-          <input
-            type="checkbox"
-            checked={scene.darkness.enabled}
-            onChange={handleDarknessEnabledChange}
-          />
-          Oscuridad
-        </label>
-        <label>
-          Overlay
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={scene.darkness.opacity}
-            onChange={(event) => handleDarknessOpacityChange(event.currentTarget.valueAsNumber)}
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={scene.fogOfWar.enabled}
-            onChange={handleFogEnabledChange}
-          />
-          Niebla
-        </label>
-        <label>
-          Fog
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={scene.fogOfWar.opacity}
-            onChange={(event) => handleFogOpacityChange(event.currentTarget.valueAsNumber)}
-          />
-        </label>
-        <label>
-          Color
-          <input
-            type="color"
-            value={scene.fogOfWar.color}
-            onChange={(event) => handleFogColorChange(event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          Reveal
-          <input
-            type="number"
-            min="8"
-            max="3000"
-            value={scene.fogOfWar.revealRadius}
-            onChange={(event) => handleFogRevealRadiusChange(event.currentTarget.valueAsNumber)}
-          />
-        </label>
-        <button
-          type="button"
-          onClick={handleClearFogReveals}
-          disabled={scene.fogOfWar.revealedAreas.length === 0}
-        >
-          Reset niebla
-        </button>
-      </section>
       {selectedLight !== undefined ? (
         <section className="properties-panel" aria-label="Propiedades de luz">
           <strong>{selectedLight.kind === "point" ? "Luz puntual" : "Luz conica"}</strong>
@@ -1227,39 +1128,235 @@ export function App(): JSX.Element {
           ) : null}
         </section>
       ) : null}
-      <MapViewport
-        map={mapState}
-        grid={scene.grid}
-        settings={scene.settings}
-        darkness={scene.darkness}
-        fogOfWar={scene.fogOfWar}
-        elements={interaction.elements}
-        shapes={scene.shapes}
-        lights={scene.lights}
-        effects={scene.effects}
-        selectedElementId={interaction.selectedElementId}
-        isZoomLocked={interaction.isZoomLocked}
-        isMapAdjustMode={interaction.isMapAdjustMode}
-        isGrabMode={interaction.activeTool === "grab"}
-        isFogRevealMode={interaction.activeTool === "fog-reveal"}
-        isFirePaintMode={interaction.activeTool === "fire-paint"}
-        onContextMenuRequest={handleContextMenuRequest}
-        onElementSelect={handleElementSelect}
-        onGridCellSizeChange={handleGridCellSizeChange}
-        onMapRenderError={handleMapRenderError}
-        onMapRendered={handleMapRendered}
-        onMapPositionChange={handleMapPositionChange}
-        onElementMove={handleElementMove}
-        onLightDirectionChange={handleLightDirectionChange}
-        onShapeEndMove={handleShapeEndMove}
-        onShapeDirectionChange={handleShapeDirectionChange}
-        onShapeRadiusChange={handleShapeRadiusChange}
-        onShapeRectResize={handleShapeRectResize}
-        onFogReveal={handleFogReveal}
-        onFirePaint={handleFirePaint}
-        onFireZoneRadiusChange={handleFireZoneRadiusChange}
-        onFireLightRadiusChange={handleFireLightRadiusChange}
-      />
+      <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}`}>
+        <MapViewport
+          map={mapState}
+          grid={scene.grid}
+          settings={scene.settings}
+          darkness={scene.darkness}
+          fogOfWar={scene.fogOfWar}
+          elements={interaction.elements}
+          shapes={scene.shapes}
+          lights={scene.lights}
+          effects={scene.effects}
+          selectedElementId={interaction.selectedElementId}
+          isZoomLocked={interaction.isZoomLocked}
+          isMapAdjustMode={interaction.isMapAdjustMode}
+          isGrabMode={interaction.activeTool === "grab"}
+          isFogRevealMode={interaction.activeTool === "fog-reveal"}
+          isFirePaintMode={interaction.activeTool === "fire-paint"}
+          onContextMenuRequest={handleContextMenuRequest}
+          onElementSelect={handleElementSelect}
+          onGridCellSizeChange={handleGridCellSizeChange}
+          onMapRenderError={handleMapRenderError}
+          onMapRendered={handleMapRendered}
+          onMapPositionChange={handleMapPositionChange}
+          onElementMove={handleElementMove}
+          onLightDirectionChange={handleLightDirectionChange}
+          onShapeEndMove={handleShapeEndMove}
+          onShapeDirectionChange={handleShapeDirectionChange}
+          onShapeRadiusChange={handleShapeRadiusChange}
+          onShapeRectResize={handleShapeRectResize}
+          onFogReveal={handleFogReveal}
+          onFirePaint={handleFirePaint}
+          onFireZoneRadiusChange={handleFireZoneRadiusChange}
+          onFireLightRadiusChange={handleFireLightRadiusChange}
+        />
+        <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
+          <SidebarAccordion
+            id="grid-controls-panel"
+            icon="▦"
+            title="Grilla"
+            isOpen={openSidebarSections.grid}
+            onToggle={() => toggleSidebarSection("grid")}
+          >
+            <label>
+              <input type="checkbox" checked={scene.grid.enabled} onChange={handleGridVisibilityChange} />
+              Activar grilla
+            </label>
+            <label>
+              Opacidad
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={scene.grid.opacity}
+                onChange={(event) => handleGridOpacityChange(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+            <label>
+              Celda
+              <input
+                type="number"
+                min="8"
+                max="1000"
+                value={scene.grid.cellSizeWorld}
+                onChange={(event) => handleGridCellSizeChange(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+            <label>
+              Unidad
+              <select
+                aria-label="Unidad de medicion"
+                value={scene.grid.unit}
+                onChange={(event) => handleUnitChange(event.currentTarget.value as "ft" | "m")}
+              >
+                <option value="ft">ft</option>
+                <option value="m">m</option>
+              </select>
+            </label>
+            <label>
+              Preset
+              <select
+                aria-label="Preset de escala"
+                defaultValue=""
+                onChange={(event) => handleGridPresetChange(event.currentTarget.value)}
+              >
+                <option value="" disabled>
+                  Preset
+                </option>
+                {gridPresets.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </SidebarAccordion>
+
+          <SidebarAccordion
+            id="figure-controls-panel"
+            icon="◇"
+            title="Figuras"
+            isOpen={openSidebarSections.figures}
+            onToggle={() => toggleSidebarSection("figures")}
+          >
+            <label>
+              <input
+                type="checkbox"
+                checked={scene.settings.snapToGrid}
+                onChange={handleSnapToGridChange}
+              />
+              Snap
+            </label>
+            <label>
+              Diagonal
+              <select
+                aria-label="Modo de diagonal"
+                value={scene.settings.diagonalMode}
+                onChange={(event) =>
+                  handleDiagonalModeChange(event.currentTarget.value as SceneDocument["settings"]["diagonalMode"])
+                }
+              >
+                <option value="dnd5e-default">D&D 5e</option>
+                <option value="manhattan">Manhattan</option>
+                <option value="euclidean">Euclidean</option>
+              </select>
+            </label>
+            <label>
+              Valor por casilla
+              <input
+                type="number"
+                min="0.1"
+                step={scene.grid.unit === "ft" ? "1" : "0.1"}
+                value={scene.grid.unit === "ft" ? scene.grid.distancePerCell : scene.grid.metricDistancePerCell}
+                onChange={(event) => handleCellDistanceValueChange(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+          </SidebarAccordion>
+
+          <SidebarAccordion
+            id="darkness-controls-panel"
+            icon="●"
+            title="Oscuridad"
+            isOpen={openSidebarSections.darkness}
+            onToggle={() => toggleSidebarSection("darkness")}
+          >
+            <label>
+              <input
+                type="checkbox"
+                checked={scene.darkness.enabled}
+                onChange={handleDarknessEnabledChange}
+              />
+              Activar oscuridad
+            </label>
+            <label>
+              Overlay
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={scene.darkness.opacity}
+                onChange={(event) => handleDarknessOpacityChange(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+          </SidebarAccordion>
+
+          <SidebarAccordion
+            id="fog-controls-panel"
+            icon="◌"
+            title="Niebla"
+            isOpen={openSidebarSections.fog}
+            onToggle={() => toggleSidebarSection("fog")}
+          >
+            <label>
+              <input
+                type="checkbox"
+                checked={scene.fogOfWar.enabled}
+                onChange={handleFogEnabledChange}
+              />
+              Activar niebla
+            </label>
+            <label>
+              Fog
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={scene.fogOfWar.opacity}
+                onChange={(event) => handleFogOpacityChange(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+            <label>
+              Color
+              <input
+                type="color"
+                value={scene.fogOfWar.color}
+                onChange={(event) => handleFogColorChange(event.currentTarget.value)}
+              />
+            </label>
+            <label>
+              Reveal
+              <input
+                type="number"
+                min="8"
+                max="3000"
+                value={scene.fogOfWar.revealRadius}
+                onChange={(event) => handleFogRevealRadiusChange(event.currentTarget.valueAsNumber)}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleClearFogReveals}
+              disabled={scene.fogOfWar.revealedAreas.length === 0}
+            >
+              Reset niebla
+            </button>
+          </SidebarAccordion>
+        </aside>
+        <button
+          className="sidebar-visibility-toggle"
+          type="button"
+          aria-pressed={!isSidebarVisible}
+          aria-label={isSidebarVisible ? "Ocultar menú lateral" : "Mostrar menú lateral"}
+          onClick={() => setIsSidebarVisible((current) => !current)}
+        >
+          {isSidebarVisible ? "›" : "‹"}
+        </button>
+      </div>
       {interaction.contextMenu !== null ? (
         <div
           className="context-menu-backdrop"
@@ -1320,4 +1417,48 @@ function mergeFireCells(existing: readonly FireCell[], incoming: readonly FireCe
   }
 
   return [...cells.values()];
+}
+
+interface SidebarAccordionProps {
+  readonly id: string;
+  readonly icon: string;
+  readonly title: string;
+  readonly isOpen: boolean;
+  readonly onToggle: () => void;
+  readonly children: ReactNode;
+}
+
+function SidebarAccordion({
+  id,
+  icon,
+  title,
+  isOpen,
+  onToggle,
+  children
+}: SidebarAccordionProps): JSX.Element {
+  return (
+    <section className={`sidebar-accordion${isOpen ? " is-open" : ""}`} aria-labelledby={`${id}-header`}>
+      <button
+        id={`${id}-header`}
+        className="sidebar-accordion-header"
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={id}
+        onClick={onToggle}
+      >
+        <span className="sidebar-accordion-icon" aria-hidden="true">
+          {icon}
+        </span>
+        <span className="sidebar-accordion-title">{title}</span>
+        <span className="sidebar-accordion-chevron" aria-hidden="true">
+          {isOpen ? "−" : "+"}
+        </span>
+      </button>
+      {isOpen ? (
+        <div id={id} className="sidebar-accordion-content">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
 }
