@@ -13,6 +13,8 @@ const worldPointSchema = z.object({
 });
 
 const emojiSchema = z.string().trim().min(1).max(32).optional();
+const tokenSizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
+const tokenFootprintSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
 
 const linearShapeSchema = z.object({
   id: z.string().min(1),
@@ -140,6 +142,20 @@ const magicalDarknessEffectSchema = z.object({
   visible: z.boolean()
 });
 
+const tokenSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().trim().min(1),
+  type: z.string().trim().min(1),
+  imagePath: z.string().min(1),
+  position: worldPointSchema,
+  size: tokenSizeSchema,
+  footprintCells: tokenFootprintSchema,
+  selectionColor: hexColor,
+  badgeNumber: z.number().int().positive(),
+  order: z.number().int().positive(),
+  visible: z.boolean().default(true)
+});
+
 export const sceneDocumentV1Schema = z.object({
   version: z.literal(SCENE_DOCUMENT_VERSION),
   map: z.object({
@@ -205,7 +221,8 @@ export const sceneDocumentV1Schema = z.object({
         ])
       ])
     )
-    .transform((arr) => arr.filter((s): s is NonNullable<typeof s> => s !== null))
+    .transform((arr) => arr.filter((s): s is NonNullable<typeof s> => s !== null)),
+  tokens: z.array(tokenSchema).default([])
 });
 
 export function parseSceneDocument(input: unknown): SceneDocument {

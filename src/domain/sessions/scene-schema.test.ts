@@ -237,6 +237,58 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("accepts virtual tokens in scenes", () => {
+    const scene = {
+      ...createDefaultScene(),
+      tokens: [
+        {
+          id: "token-1",
+          name: "Goblin",
+          type: "Goblin",
+          imagePath: "/tokens/goblin.png",
+          position: { x: 150, y: 150 },
+          size: "small",
+          footprintCells: 1,
+          selectionColor: "#fff0a8",
+          badgeNumber: 1,
+          order: 1,
+          visible: true
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
+  it("adds empty tokens to older v1 scenes", () => {
+    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    delete legacyScene.tokens;
+
+    expect(parseSceneDocument(legacyScene).tokens).toEqual([]);
+  });
+
+  it("adds visible true to older persisted tokens", () => {
+    const scene = {
+      ...createDefaultScene(),
+      tokens: [
+        {
+          id: "token-1",
+          name: "Goblin",
+          type: "Goblin",
+          imagePath: "/tokens/goblin.png",
+          position: { x: 150, y: 150 },
+          size: "small",
+          footprintCells: 1,
+          selectionColor: "#fff0a8",
+          badgeNumber: 1,
+          order: 1
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene).tokens[0].visible).toBe(true);
+  });
+
   it("rejects persisted paths with fewer than two points", () => {
     const scene = {
       ...createDefaultScene(),

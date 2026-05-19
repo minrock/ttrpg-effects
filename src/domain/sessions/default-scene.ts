@@ -36,6 +36,7 @@ export function createDefaultScene(): SceneDocument {
     },
     lights: [],
     effects: [],
-    shapes: []
+    shapes: [],
+    tokens: []
   };
 }

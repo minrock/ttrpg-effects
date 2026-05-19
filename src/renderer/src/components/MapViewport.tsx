@@ -1,8 +1,9 @@
-import { useEffect, useRef, type JSX } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, type JSX } from "react";
 import { NavigationLegend } from "./NavigationLegend";
 import {
   PixiViewport,
-  type PixiContextMenuRequest
+  type PixiContextMenuRequest,
+  type RenderSceneToken
 } from "../../../render/pixi/PixiViewport";
 import type { TacticalElement } from "../../../domain/tools/tactical-elements";
 import type { MapImageState } from "../../../domain/map/map-image";
@@ -17,6 +18,10 @@ import type {
 } from "../../../domain/sessions/scene-document";
 import type { FireCell } from "../../../domain/effects/fire";
 
+export interface MapViewportHandle {
+  getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
+}
+
 interface MapViewportProps {
   readonly map: MapImageState | null;
   readonly grid: SceneGrid;
@@ -27,6 +32,7 @@ interface MapViewportProps {
   readonly shapes: readonly SceneShape[];
   readonly lights: readonly SceneLight[];
   readonly effects: readonly SceneEffect[];
+  readonly tokens: readonly RenderSceneToken[];
   readonly selectedElementId: string | null;
   readonly isZoomLocked: boolean;
   readonly isMapAdjustMode: boolean;
@@ -61,7 +67,7 @@ interface MapViewportProps {
   readonly onMagicalDarknessRadiusChange: (elementId: string, radius: number) => void;
 }
 
-export function MapViewport({
+export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport({
   map,
   grid,
   settings,
@@ -71,6 +77,7 @@ export function MapViewport({
   shapes,
   lights,
   effects,
+  tokens,
   selectedElementId,
   isZoomLocked,
   isMapAdjustMode,
@@ -103,11 +110,15 @@ export function MapViewport({
   onFireZoneRadiusChange,
   onFireLightRadiusChange,
   onMagicalDarknessRadiusChange
-}: MapViewportProps): JSX.Element {
+}: MapViewportProps, ref): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
   const mapRef = useRef(map);
   mapRef.current = map;
+
+  useImperativeHandle(ref, () => ({
+    getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 }
+  }), []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -158,6 +169,7 @@ export function MapViewport({
       createdViewport.setShapes(shapes);
       createdViewport.setLights(lights);
       createdViewport.setEffects(effects);
+      createdViewport.setTokens(tokens);
       createdViewport.setSelectedElementId(selectedElementId);
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setGrabMode(isGrabMode);
@@ -212,6 +224,10 @@ export function MapViewport({
   }, [effects]);
 
   useEffect(() => {
+    viewportRef.current?.setTokens(tokens);
+  }, [tokens]);
+
+  useEffect(() => {
     viewportRef.current?.setSelectedElementId(selectedElementId);
   }, [selectedElementId]);
 
@@ -256,4 +272,4 @@ export function MapViewport({
       <NavigationLegend />
     </div>
   );
-}
+});

@@ -76,6 +76,10 @@ export class ElectronSceneFileStorage implements SceneFileStorage {
   async getMapImageUrl(filePath: string): Promise<string> {
     return pathToFileURL(filePath).toString().replace("file:", "map-asset:");
   }
+
+  async getTokenImageUrl(filePath: string): Promise<string> {
+    return pathToFileURL(filePath).toString().replace("file:", "map-asset:");
+  }
 }
 
 function ensureSceneExtension(filePath: string): string {

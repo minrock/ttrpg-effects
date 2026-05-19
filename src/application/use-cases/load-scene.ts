@@ -24,16 +24,39 @@ export async function loadSceneUseCase(storage: SceneFileStorage): Promise<Scene
       });
     }
 
+    for (const token of scene.tokens) {
+      if (!(await storage.fileExists(token.imagePath))) {
+        warnings.push({
+          code: "map-image-missing",
+          message: `La imagen local del token "${token.name}" no existe. La escena se cargo sin bloquear la app.`,
+          path: token.imagePath
+        });
+      }
+    }
+
     const mapImageUrl =
-      scene.map.imagePath !== null && warnings.length === 0 && storage.getMapImageUrl !== undefined
+      scene.map.imagePath !== null &&
+      !warnings.some((warning) => warning.path === scene.map.imagePath) &&
+      storage.getMapImageUrl !== undefined
         ? await storage.getMapImageUrl(scene.map.imagePath)
         : undefined;
+    const tokenImageUrlEntries = await Promise.all(
+      scene.tokens.map(async (token) => {
+        if (storage.getTokenImageUrl === undefined || !(await storage.fileExists(token.imagePath))) {
+          return null;
+        }
+
+        return [token.id, await storage.getTokenImageUrl(token.imagePath)] as const;
+      })
+    );
+    const tokenImageUrls = Object.fromEntries(tokenImageUrlEntries.filter((entry): entry is readonly [string, string] => entry !== null));
 
     return {
       ok: true,
       scene,
       filePath: loadedFile.filePath,
       mapImageUrl,
+      tokenImageUrls,
       warnings
     };
   } catch (error) {

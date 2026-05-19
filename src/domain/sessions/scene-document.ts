@@ -157,6 +157,23 @@ export interface SceneShape {
   readonly direction?: number;
 }
 
+export interface SceneToken {
+  readonly id: string;
+  readonly name: string;
+  readonly type: string;
+  readonly imagePath: string;
+  readonly position: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly size: "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan";
+  readonly footprintCells: 1 | 2 | 3 | 4;
+  readonly selectionColor: string;
+  readonly badgeNumber: number;
+  readonly order: number;
+  readonly visible: boolean;
+}
+
 export interface SceneDocumentV1 {
   readonly version: typeof SCENE_DOCUMENT_VERSION;
   readonly map: SceneMap;
@@ -168,6 +185,7 @@ export interface SceneDocumentV1 {
   readonly lights: readonly SceneLight[];
   readonly effects: readonly SceneEffect[];
   readonly shapes: readonly SceneShape[];
+  readonly tokens: readonly SceneToken[];
 }
 
 export type SceneDocument = SceneDocumentV1;
@@ -183,6 +201,7 @@ export interface SceneOperationSuccess {
   readonly scene: SceneDocument;
   readonly filePath: string;
   readonly mapImageUrl?: string;
+  readonly tokenImageUrls?: Readonly<Record<string, string>>;
   readonly warnings: readonly SceneWarning[];
 }
 
