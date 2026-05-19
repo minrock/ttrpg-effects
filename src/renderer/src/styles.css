@@ -149,6 +149,7 @@ body {
   grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 380px);
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .app-workspace.is-sidebar-hidden {
@@ -156,12 +157,16 @@ body {
 }
 
 .control-sidebar {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  max-height: 100%;
   overflow-y: auto;
+  overscroll-behavior: contain;
   border-left: 1px solid rgb(244 241 232 / 12%);
   background: #171b1d;
   padding: 12px;
@@ -203,6 +208,7 @@ body {
 }
 
 .sidebar-accordion {
+  flex: 0 0 auto;
   border: 1px solid rgb(244 241 232 / 13%);
   border-radius: 8px;
   background: #1d2224;
@@ -248,7 +254,7 @@ body {
 
 .sidebar-accordion-title {
   overflow-wrap: anywhere;
-  font-size: 1.55rem;
+  font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: 0;
   line-height: 1.05;
@@ -265,6 +271,7 @@ body {
 .sidebar-accordion-content {
   display: grid;
   gap: 12px;
+  min-height: 0;
   padding: 12px;
   color: #d7e2d4;
   font-size: 0.86rem;
@@ -1041,6 +1048,7 @@ body {
   }
 
   .control-sidebar {
+    height: auto;
     max-height: 38vh;
     border-top: 1px solid rgb(244 241 232 / 12%);
     border-left: 0;
@@ -1063,6 +1071,6 @@ body {
   }
 
   .sidebar-accordion-title {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
 }
