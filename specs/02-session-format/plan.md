@@ -19,6 +19,7 @@
 - Implementar IPC seguro para guardar y cargar escenas.
 - Exponer funciones especificas en preload: `saveScene` y `loadScene`.
 - Crear UI minima para probar guardar/cargar desde la app.
+- Al guardar una escena cargada desde disco, sugerir en el dialogo la misma ruta/nombre actual para que el usuario pueda sobrescribir confirmando.
 - Mostrar estado visible de escena cargada/guardada y errores recuperables.
 - Detectar ruta local de imagen rota si existe `map.imagePath`.
 
@@ -35,7 +36,7 @@
 
 - **Arquitectura:** El formato y validacion viven en `domain/sessions`; los casos de uso en `application/use-cases`; lectura/escritura de disco en `infrastructure/file-system`; IPC en `main/ipc`; React solo invoca preload y muestra resultado.
 - **Persistencia:** Usar archivos JSON `.ttrpgscene` en disco. SQLite queda fuera. Las rutas de imagen se guardan como rutas locales sin copiar assets.
-- **IPC / Electron:** Crear canales especificos `scene:save` y `scene:load` con `ipcMain.handle` + `ipcRenderer.invoke`. No exponer `ipcRenderer`, `fs`, `path` ni canales genericos.
+- **IPC / Electron:** Crear canales especificos `scene:save` y `scene:load` con `ipcMain.handle` + `ipcRenderer.invoke`. `scene:save` puede recibir una sugerencia tipada de ruta actual para configurar `defaultPath` del dialogo, pero main/infrastructure siguen controlando el dialogo y la escritura. No exponer `ipcRenderer`, `fs`, `path` ni canales genericos.
 - **Render / PixiJS:** No acoplar el formato a PixiJS. La camara del viewport debe poder convertirse desde/hacia el `SceneDocument`, pero esta spec puede guardar una escena default si todavia no existe estado editable completo.
 - **Validacion:** Usar un esquema compartido para validar datos externos cargados desde disco e inputs enviados por IPC. Devolver errores serializables y amigables.
 - **Dependencias nuevas:** Agregar `zod` para validacion de esquema, salvo que se prefiera una validacion manual equivalente antes de implementar.
@@ -66,6 +67,7 @@
 
 - Crear implementacion de filesystem para `.ttrpgscene` usando APIs Node solo en main/infrastructure.
 - Usar dialogos nativos para elegir destino/origen.
+- Si `saveScene` recibe `suggestedFilePath`, usarlo como `defaultPath` del `showSaveDialog`; si no existe, usar `untitled.ttrpgscene`.
 - Leer/escribir UTF-8.
 - Validar extension `.ttrpgscene` y agregarla si el usuario guarda sin extension.
 - Verificar existencia de `map.imagePath` cuando no este vacio y reportar warning recuperable.
@@ -79,7 +81,7 @@
 
 ### `preload`
 
-- Exponer `window.ttrpg.saveScene(scene)` y `window.ttrpg.loadScene()`.
+- Exponer `window.ttrpg.saveScene(scene, options?)` y `window.ttrpg.loadScene()`, donde `options.suggestedFilePath` permite sugerir la ruta actual sin exponer filesystem al renderer.
 - Actualizar tipos compartidos de `TtrpgApi`.
 - Mantener API pequena y por accion.
 
@@ -87,6 +89,7 @@
 
 - Agregar controles discretos para `Guardar escena` y `Cargar escena`.
 - Mostrar nombre/ruta del archivo actual si existe.
+- Enviar `currentFilePath` como sugerencia al guardar si existe una escena ya cargada/guardada.
 - Mostrar estado de guardado/carga y warnings de ruta rota.
 - Mantener una escena default en estado visual local hasta que specs futuras conecten mapa/grilla/luces reales.
 - Evitar acceso directo a filesystem o Electron internals.
@@ -111,7 +114,7 @@
 ## 7. Testing y verificacion
 
 - **Unit tests:** Schema de escena, default scene valida, rechazo de version incompatible, rangos invalidos, serializacion JSON.
-- **Integration tests:** Casos de uso con storage fake para guardar/cargar sin tocar filesystem real.
+- **Integration tests:** Casos de uso con storage fake para guardar/cargar sin tocar filesystem real, incluyendo que el guardado reenvia `suggestedFilePath` al puerto de filesystem.
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
@@ -134,6 +137,7 @@
 
 - Se puede guardar una escena en disco con extension `.ttrpgscene`.
 - Se puede cargar una escena `.ttrpgscene` desde disco.
+- Si se carga o guarda una escena existente, un guardado posterior abre el dialogo en la misma ruta/nombre para sobrescribir con confirmacion.
 - El archivo guardado es JSON versionado con `version: 1`.
 - Una escena cargada invalida muestra un error recuperable.
 - Una ruta local de imagen rota muestra warning recuperable sin bloquear la app.

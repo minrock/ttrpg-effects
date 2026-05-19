@@ -10,7 +10,10 @@ export interface TtrpgAppInfo {
 
 export interface TtrpgApi {
   getAppInfo: () => TtrpgAppInfo;
-  saveScene: (scene: SceneDocument) => Promise<SceneOperationResult>;
+  saveScene: (
+    scene: SceneDocument,
+    options?: { readonly suggestedFilePath?: string | null }
+  ) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
   openMapImage: () => Promise<MapOpenResult>;
   resolveMapUrl: (imagePath: string) => Promise<string | null>;

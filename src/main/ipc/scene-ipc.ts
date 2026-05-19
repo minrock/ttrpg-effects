@@ -7,8 +7,11 @@ import { parseSceneDocument } from "../../domain/sessions/scene-schema";
 export function registerSceneIpc(storage: SceneFileStorage): void {
   ipcMain.handle("scene:save", async (_event, payload: unknown) => {
     try {
-      const scene = parseSceneDocument(payload);
-      return await saveSceneUseCase(storage, scene);
+      const parsedPayload = parseSaveScenePayload(payload);
+      const scene = parseSceneDocument(parsedPayload.scene);
+      return await saveSceneUseCase(storage, scene, {
+        suggestedFilePath: parsedPayload.suggestedFilePath
+      });
     } catch (error) {
       return {
         ok: false,
@@ -20,4 +23,25 @@ export function registerSceneIpc(storage: SceneFileStorage): void {
   ipcMain.handle("scene:load", async () => {
     return loadSceneUseCase(storage);
   });
+}
+
+function parseSaveScenePayload(payload: unknown): {
+  readonly scene: unknown;
+  readonly suggestedFilePath: string | null;
+} {
+  if (payload !== null && typeof payload === "object" && "scene" in payload) {
+    const record = payload as { readonly scene: unknown; readonly suggestedFilePath?: unknown };
+    return {
+      scene: record.scene,
+      suggestedFilePath:
+        typeof record.suggestedFilePath === "string" && record.suggestedFilePath.length > 0
+          ? record.suggestedFilePath
+          : null
+    };
+  }
+
+  return {
+    scene: payload,
+    suggestedFilePath: null
+  };
 }

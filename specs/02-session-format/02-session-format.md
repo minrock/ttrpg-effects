@@ -73,6 +73,7 @@ El contenido sera JSON.
 
 - Se puede guardar una escena en disco.
 - Se puede cargar una escena desde disco.
+- Si una escena fue cargada desde un `.ttrpgscene` existente, `Guardar escena` abre el dialogo nativo en esa misma ruta y sugiere el mismo nombre de archivo para permitir sobrescribir con una sola confirmacion.
 - Si la imagen local no existe, la app muestra un error recuperable.
 - El formato incluye version para migraciones futuras.
 - El guardado conserva rutas locales sin copiar la imagen.
@@ -87,5 +88,5 @@ El contenido sera JSON.
 
 - Mantener validacion de esquema.
 - Considerar Zod o una validacion equivalente.
+- El renderer puede enviar la ruta actual como sugerencia tipada de guardado, pero no debe escribir directamente en filesystem; main/infrastructure siguen controlando el dialogo y la escritura.
 - No bloquear el render si falla la carga de un asset.
-

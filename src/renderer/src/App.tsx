@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type JSX,
+  type ReactNode,
+  type SetStateAction
+} from "react";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import * as Switch from "@radix-ui/react-switch";
 import {
@@ -103,7 +112,7 @@ interface NewTokenDraftState {
 
 export function App(): JSX.Element {
   const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
-  const [scene, setScene] = useState<SceneDocument>(() => {
+  const [scene, setSceneState] = useState<SceneDocument>(() => {
     try {
       const snapshot = sessionStorage.getItem("ttrpg:session-scene");
       if (snapshot !== null) {
@@ -114,6 +123,15 @@ export function App(): JSX.Element {
     }
     return createDefaultScene();
   });
+  const sceneRef = useRef(scene);
+  const setScene = useCallback((nextScene: SetStateAction<SceneDocument>): void => {
+    const resolvedScene =
+      typeof nextScene === "function"
+        ? (nextScene as (currentScene: SceneDocument) => SceneDocument)(sceneRef.current)
+        : nextScene;
+    sceneRef.current = resolvedScene;
+    setSceneState(resolvedScene);
+  }, []);
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
@@ -151,6 +169,7 @@ export function App(): JSX.Element {
   pathDraftRef.current = pathDraft;
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
+  sceneRef.current = scene;
 
   // Phase 1: Reconstruct the runtime map URL on mount if the scene has a map but no URL yet.
   // This covers renderer remounts where scene was restored from sessionStorage but mapImageUrl was lost.
@@ -589,7 +608,9 @@ export function App(): JSX.Element {
       return { ok: false, error: "La API de preload no esta disponible." };
     }
 
-    return window.ttrpg.saveScene(scene);
+    return window.ttrpg.saveScene(sceneRef.current, {
+      suggestedFilePath: currentFilePath
+    });
   }
 
   async function handleSaveScene(): Promise<void> {

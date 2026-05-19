@@ -4,11 +4,12 @@ import { serializeSceneDocument } from "../../domain/sessions/scene-schema";
 
 export async function saveSceneUseCase(
   storage: SceneFileStorage,
-  scene: SceneDocument
+  scene: SceneDocument,
+  options?: { readonly suggestedFilePath?: string | null }
 ): Promise<SceneOperationResult> {
   try {
     const json = serializeSceneDocument(scene);
-    const filePath = await storage.saveSceneJson(json);
+    const filePath = await storage.saveSceneJson(json, options);
 
     if (filePath === null) {
       return {

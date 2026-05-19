@@ -10,11 +10,14 @@ const SCENE_EXTENSION = ".ttrpgscene";
 export class ElectronSceneFileStorage implements SceneFileStorage {
   constructor(private readonly getWindow: () => BrowserWindow | null) {}
 
-  async saveSceneJson(json: string): Promise<string | null> {
+  async saveSceneJson(
+    json: string,
+    options?: { readonly suggestedFilePath?: string | null }
+  ): Promise<string | null> {
     const targetWindow = this.getWindow();
-    const options: SaveDialogOptions = {
+    const dialogOptions: SaveDialogOptions = {
       title: "Guardar escena",
-      defaultPath: `untitled${SCENE_EXTENSION}`,
+      defaultPath: options?.suggestedFilePath ?? `untitled${SCENE_EXTENSION}`,
       filters: [
         {
           name: "TTRPG Scene",
@@ -24,8 +27,8 @@ export class ElectronSceneFileStorage implements SceneFileStorage {
     };
     const result =
       targetWindow === null
-        ? await dialog.showSaveDialog(options)
-        : await dialog.showSaveDialog(targetWindow, options);
+        ? await dialog.showSaveDialog(dialogOptions)
+        : await dialog.showSaveDialog(targetWindow, dialogOptions);
 
     if (result.canceled || result.filePath === undefined) {
       return null;

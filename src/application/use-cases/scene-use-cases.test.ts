@@ -23,6 +23,76 @@ describe("scene use cases", () => {
     expect(JSON.parse(savedJson)).toMatchObject({ version: 1 });
   });
 
+  it("saves virtual tokens inside scene JSON", async () => {
+    let savedJson = "";
+    const scene = {
+      ...createDefaultScene(),
+      tokens: [
+        {
+          id: "token-1",
+          name: "Goblin",
+          type: "Goblin",
+          imagePath: "/tokens/goblin.png",
+          position: { x: 150, y: 150 },
+          size: "small" as const,
+          footprintCells: 1 as const,
+          selectionColor: "#fff0a8",
+          badgeNumber: 1,
+          order: 1,
+          visible: true
+        }
+      ]
+    };
+    const storage: SceneFileStorage = {
+      saveSceneJson: async (json) => {
+        savedJson = json;
+        return "/tmp/example.ttrpgscene";
+      },
+      loadSceneJson: async () => null,
+      fileExists: async () => true
+    };
+
+    const result = await saveSceneUseCase(storage, scene);
+
+    expect(result).toMatchObject({ ok: true, filePath: "/tmp/example.ttrpgscene" });
+    expect(JSON.parse(savedJson)).toMatchObject({
+      tokens: [
+        {
+          id: "token-1",
+          name: "Goblin",
+          type: "Goblin",
+          imagePath: "/tokens/goblin.png",
+          position: { x: 150, y: 150 },
+          size: "small",
+          footprintCells: 1,
+          selectionColor: "#fff0a8",
+          badgeNumber: 1,
+          order: 1,
+          visible: true
+        }
+      ]
+    });
+  });
+
+  it("passes the current scene file path as save dialog suggestion", async () => {
+    let suggestedFilePath: string | null | undefined;
+    const storage: SceneFileStorage = {
+      saveSceneJson: async (_json, options) => {
+        suggestedFilePath = options?.suggestedFilePath;
+        return "/tmp/current-scene.ttrpgscene";
+      },
+      loadSceneJson: async () => null,
+      fileExists: async () => true
+    };
+
+    const result = await saveSceneUseCase(storage, createDefaultScene(), {
+      suggestedFilePath: "/tmp/current-scene.ttrpgscene"
+    });
+
+    expect(result).toMatchObject({ ok: true, filePath: "/tmp/current-scene.ttrpgscene" });
+    expect(suggestedFilePath).toBe("/tmp/current-scene.ttrpgscene");
+  });
+
   it("loads a scene and reports missing map image as a warning", async () => {
     const scene = {
       ...createDefaultScene(),

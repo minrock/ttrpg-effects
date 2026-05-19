@@ -35,7 +35,7 @@
 ## 3. Decisiones tecnicas
 
 - **Arquitectura:** El reset de escena se orquesta desde `renderer` porque es una accion de UI sobre estado ya cargado. La creacion del documento inicial reutiliza `domain/sessions/default-scene.ts`.
-- **Persistencia:** No hay cambios de formato. `Guardar y crear nueva` llama la API existente `window.ttrpg.saveScene(scene)` antes de resetear.
+- **Persistencia:** No hay cambios de formato. `Guardar y crear nueva` llama la API existente `window.ttrpg.saveScene(scene, options?)` antes de resetear y reusa `currentFilePath` como sugerencia del dialogo si la escena ya tenia archivo cargado/guardado.
 - **IPC / Electron:** No se agregan canales nuevos. Se reutiliza `scene:save` via preload. El renderer no accede a filesystem ni Electron internals.
 - **Render / PixiJS:** Al cambiar `scene` a `createDefaultScene()` y limpiar estados derivados, `MapViewport`/`PixiViewport` recibe arrays vacios y mapa nulo, por lo que debe limpiar capas existentes.
 - **Validacion:** El guardado mantiene la validacion existente de `parseSceneDocument`/`serializeSceneDocument`.
@@ -148,6 +148,7 @@
 - `Cancelar` no cambia la escena.
 - `Descartar cambios` reinicia la escena sin guardar.
 - `Guardar y crear nueva` abre el dialogo de guardado `.ttrpgscene`.
+- Si existe archivo actual, `Guardar y crear nueva` sugiere esa misma ruta/nombre en el dialogo.
 - Si se cancela el dialogo de guardado, la escena queda intacta.
 - Si el guardado termina correctamente, la escena queda limpia.
 - No quedan mapa, luces, efectos, formas, fog, seleccion ni panel contextual despues del reset.

@@ -8,7 +8,8 @@ const appInfo = {
 
 contextBridge.exposeInMainWorld("ttrpg", {
   getAppInfo: () => appInfo,
-  saveScene: (scene: unknown) => ipcRenderer.invoke("scene:save", scene),
+  saveScene: (scene: unknown, options?: { readonly suggestedFilePath?: string | null }) =>
+    ipcRenderer.invoke("scene:save", { scene, suggestedFilePath: options?.suggestedFilePath ?? null }),
   loadScene: () => ipcRenderer.invoke("scene:load"),
   openMapImage: () => ipcRenderer.invoke("map:open-image"),
   resolveMapUrl: (imagePath: string) => ipcRenderer.invoke("map:resolve-url", imagePath),

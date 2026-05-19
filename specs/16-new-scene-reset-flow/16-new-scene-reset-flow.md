@@ -139,6 +139,7 @@ Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe
 
 - No cambia el schema `.ttrpgscene`.
 - Se reutiliza el flujo actual de guardado.
+- Si la escena actual fue cargada o guardada previamente, el flujo de guardado debe sugerir esa misma ruta/nombre en el dialogo para facilitar sobrescritura antes de crear la nueva escena.
 - El renderer no debe acceder directamente a filesystem.
 - El guardado debe pasar por la API de preload/IPC existente.
 - La nueva escena no debe escribir automaticamente en disco.
@@ -164,6 +165,7 @@ Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe
 - Si hay mapa cargado, se muestra modal antes de borrar.
 - Si hay luces, efectos, formas, mediciones o fog, se muestra modal antes de borrar.
 - `Guardar y crear nueva` abre el dialogo de guardado `.ttrpgscene`.
+- Si la escena ya tenia archivo actual, el dialogo se abre sugiriendo ese mismo archivo.
 - Si el guardado se completa, la escena queda limpia.
 - Si el usuario cancela el guardado, la escena actual queda intacta.
 - `Descartar cambios` limpia la escena sin guardar.
