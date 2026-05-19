@@ -52,6 +52,8 @@ Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El f
 - Si no hay fuego por celdas seleccionado, el primer click crea uno nuevo y lo selecciona.
 - Si hay un fuego por celdas seleccionado, los nuevos cuadrados se agregan a ese mismo efecto.
 - Las celdas pintadas se agrupan por conectividad cardinal. Cada grupo contiguo se renderiza con un unico GIF interno escalado a su bounding box y recortado por una mascara de celdas.
+- Al mover un fuego por celdas, la agrupacion contigua debe mantenerse aunque las coordenadas queden desplazadas respecto al origen exacto de la grilla; la conectividad se calcula por indice relativo de celda y no por igualdad exacta de coordenadas.
+- El fuego por celdas no debe dibujar marcos/contornos naranjas por celda. La zona afectada se comunica con el GIF enmascarado y la iluminacion, no con frames individuales.
 - El resultado debe persistir como coordenadas de mundo por celda, no como coordenadas de pantalla.
 - Las celdas se calculan usando el origen mundial (0, 0) como base, identico al grid visual, para garantizar alineacion cuando el mapa se mueve.
 
@@ -89,6 +91,8 @@ La escena debe conservar:
 - El radio del pincel por defecto es 25 unidades de mundo.
 - El radio del pincel define cuantas celdas quedan pintadas.
 - Las celdas se alinean al grid visual independientemente de la posicion del mapa.
+- Si una region pintada se mueve, debe seguir usando un unico GIF por region contigua en lugar de degradarse a un GIF por celda.
+- El fuego por celdas no muestra cuadrados naranjas alrededor de cada celda, incluso cuando esta seleccionado o si se usa el fallback vectorial.
 - En modo `cells`, los handles de radio (naranja y amarillo) no se muestran.
 - En modo `cells`, el contorno de 1 celda alrededor del fuego emite luz brillante.
 - En modo `cells`, el contorno de 2 celdas alrededor del fuego emite luz tenue.

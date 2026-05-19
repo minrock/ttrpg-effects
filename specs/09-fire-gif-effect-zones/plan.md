@@ -56,6 +56,8 @@
 - Cargar `area-fire.gif` desde assets publicos del renderer, no desde `map-asset:`.
 - Renderizar zona circular con un solo `GifSprite` escalado y una mascara circular.
 - Renderizar zona `cells` agrupando celdas contiguas; cada grupo usa un solo `GifSprite` escalado a su bounding box y una mascara de celdas.
+- Calcular la conectividad de celdas por indices relativos a la region, no por igualdad exacta de coordenadas, para conservar un solo GIF por region despues de mover el fuego.
+- No dibujar marcos/contornos naranjas por celda en fuego pintado, ni en seleccion ni en fallback vectorial.
 - Mantener fallback rojo vectorial si el GIF no carga.
 - Mantener handles naranja y luz para resize solo en modo `circle`; en modo `cells` no se muestran.
 - Luz del fuego en modo `cells`: calcular anillo brillante (adyacentes al fuego) y anillo tenue (adyacentes al anillo brillante) con `computeCellRings`.
@@ -84,6 +86,8 @@
 - El radio del pincel por defecto es 25; decide cuantas celdas se pintan.
 - El fuego circular se ve como un unico GIF animado enmascarado con handles de resize.
 - El fuego por celdas se ve como un unico GIF por region contigua sin handles de resize.
+- Al mover un fuego por celdas, las regiones contiguas siguen agrupadas y no aparecen patrones repetidos por celda.
+- El fuego por celdas no muestra cuadrados naranjas alrededor de cada celda.
 - El GIF usa alpha `0.65 * opacity` para dejar ver parcialmente el mapa debajo.
 - El fuego no muestra emojis.
 - En modo `cells`, el anillo 1 adyacente emite luz brillante y el anillo 2 emite luz tenue.
@@ -109,6 +113,8 @@
 - [x] Render con GIF enmascarado implementado, con fallback rojo vectorial.
 - [x] Fuego circular usa un solo GIF escalado.
 - [x] Fuego por celdas usa un GIF por region contigua.
+- [x] Agrupacion de fuego por celdas estable despues de mover el efecto.
+- [x] Marcos naranjas por celda eliminados para fuego pintado.
 - [x] Fuego sin emojis.
 - [x] Handles de fuego/luz solo en modo `circle`.
 - [x] Handles ocultos en modo `cells` (sin circulo naranja ni amarillo).

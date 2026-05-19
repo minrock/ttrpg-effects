@@ -2630,7 +2630,7 @@ function drawFireLight(effect: SceneFireEffect): Graphics {
         .fill({ color: 0xffa54f, alpha: 0.08 * effect.opacity });
     }
 
-    for (const cell of bright) {
+    for (const cell of [...effect.zone.cells, ...bright]) {
       graphic
         .rect(cell.x, cell.y, cell.size, cell.size)
         .fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
@@ -2655,37 +2655,45 @@ function computeCellRings(
   if (cells.length === 0) return { bright: [], dim: [] };
 
   const cellSize = cells[0].size;
-  const fireSet = new Set(cells.map((c) => `${c.x}:${c.y}`));
-  const brightSet = new Set<string>();
+  const origin = getFireCellGridOrigin(cells);
+  const cellsByIndex = new Map(cells.map((cell) => [getFireCellIndexKey(cell, origin), cell] as const));
+  const fireSet = new Set(cellsByIndex.keys());
+  const brightSet = new Map<string, { x: number; y: number; size: number }>();
 
   for (const cell of cells) {
-    for (const [dx, dy] of [[-cellSize, 0], [cellSize, 0], [0, -cellSize], [0, cellSize]]) {
-      const key = `${cell.x + dx}:${cell.y + dy}`;
-      if (!fireSet.has(key)) brightSet.add(key);
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const neighbor = getFireCellIndex(cell, origin);
+      const key = `${neighbor.x + dx}:${neighbor.y + dy}`;
+      if (!fireSet.has(key)) {
+        brightSet.set(key, {
+          x: cell.x + dx * cellSize,
+          y: cell.y + dy * cellSize,
+          size: cellSize
+        });
+      }
     }
   }
 
-  const dimSet = new Set<string>();
+  const dimSet = new Map<string, { x: number; y: number; size: number }>();
 
-  for (const key of brightSet) {
-    const [xs, ys] = key.split(":");
-    const x = Number(xs);
-    const y = Number(ys);
+  for (const brightCell of brightSet.values()) {
+    const brightIndex = getFireCellIndex(brightCell, origin);
 
-    for (const [dx, dy] of [[-cellSize, 0], [cellSize, 0], [0, -cellSize], [0, cellSize]]) {
-      const nKey = `${x + dx}:${y + dy}`;
-      if (!fireSet.has(nKey) && !brightSet.has(nKey)) dimSet.add(nKey);
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const key = `${brightIndex.x + dx}:${brightIndex.y + dy}`;
+      if (!fireSet.has(key) && !brightSet.has(key)) {
+        dimSet.set(key, {
+          x: brightCell.x + dx * cellSize,
+          y: brightCell.y + dy * cellSize,
+          size: cellSize
+        });
+      }
     }
   }
-
-  const keyToCell = (key: string): { x: number; y: number; size: number } => {
-    const [xs, ys] = key.split(":");
-    return { x: Number(xs), y: Number(ys), size: cellSize };
-  };
 
   return {
-    bright: [...brightSet].map(keyToCell),
-    dim: [...dimSet].map(keyToCell)
+    bright: [...brightSet.values()],
+    dim: [...dimSet.values()]
   };
 }
 
@@ -2725,8 +2733,7 @@ function drawSceneEffect(
     for (const cell of effect.zone.cells) {
       graphic
         .rect(cell.x, cell.y, cell.size, cell.size)
-        .fill({ color, alpha })
-        .stroke({ color: 0xff8a38, width: 1, alpha: 0.45 * effect.opacity });
+        .fill({ color, alpha });
     }
 
     container.addChild(graphic);
@@ -2820,7 +2827,8 @@ function addMaskedFirePatternSprite(
 }
 
 function groupContiguousFireCells(cells: readonly FireCell[]): readonly (readonly FireCell[])[] {
-  const remaining = new Map(cells.map((cell) => [getFireCellKey(cell), cell] as const));
+  const origin = getFireCellGridOrigin(cells);
+  const remaining = new Map(cells.map((cell) => [getFireCellIndexKey(cell, origin), cell] as const));
   const groups: FireCell[][] = [];
 
   while (remaining.size > 0) {
@@ -2832,7 +2840,7 @@ function groupContiguousFireCells(cells: readonly FireCell[]): readonly (readonl
 
     const group: FireCell[] = [];
     const queue = [first];
-    remaining.delete(getFireCellKey(first));
+    remaining.delete(getFireCellIndexKey(first, origin));
 
     for (let index = 0; index < queue.length; index += 1) {
       const cell = queue[index];
@@ -2843,7 +2851,7 @@ function groupContiguousFireCells(cells: readonly FireCell[]): readonly (readonl
 
       group.push(cell);
 
-      for (const key of getFireCellNeighborKeys(cell)) {
+      for (const key of getFireCellNeighborKeys(cell, origin)) {
         const neighbor = remaining.get(key);
 
         if (neighbor !== undefined) {
@@ -2859,16 +2867,44 @@ function groupContiguousFireCells(cells: readonly FireCell[]): readonly (readonl
   return groups;
 }
 
-function getFireCellKey(cell: FireCell): string {
-  return `${cell.x}:${cell.y}:${cell.size}`;
+function getFireCellGridOrigin(cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]): {
+  readonly x: number;
+  readonly y: number;
+} {
+  return {
+    x: Math.min(...cells.map((cell) => cell.x)),
+    y: Math.min(...cells.map((cell) => cell.y))
+  };
 }
 
-function getFireCellNeighborKeys(cell: FireCell): readonly string[] {
+function getFireCellIndex(
+  cell: { readonly x: number; readonly y: number; readonly size: number },
+  origin: { readonly x: number; readonly y: number }
+): { readonly x: number; readonly y: number } {
+  return {
+    x: Math.round((cell.x - origin.x) / cell.size),
+    y: Math.round((cell.y - origin.y) / cell.size)
+  };
+}
+
+function getFireCellIndexKey(
+  cell: { readonly x: number; readonly y: number; readonly size: number },
+  origin: { readonly x: number; readonly y: number }
+): string {
+  const index = getFireCellIndex(cell, origin);
+  return `${index.x}:${index.y}`;
+}
+
+function getFireCellNeighborKeys(
+  cell: FireCell,
+  origin: { readonly x: number; readonly y: number }
+): readonly string[] {
+  const index = getFireCellIndex(cell, origin);
   return [
-    `${cell.x - cell.size}:${cell.y}:${cell.size}`,
-    `${cell.x + cell.size}:${cell.y}:${cell.size}`,
-    `${cell.x}:${cell.y - cell.size}:${cell.size}`,
-    `${cell.x}:${cell.y + cell.size}:${cell.size}`
+    `${index.x - 1}:${index.y}`,
+    `${index.x + 1}:${index.y}`,
+    `${index.x}:${index.y - 1}`,
+    `${index.x}:${index.y + 1}`
   ];
 }
 
@@ -2936,12 +2972,6 @@ function drawFireZoneOutline(effect: SceneFireEffect): Graphics {
     }
 
     return outline.stroke({ color: 0xff8a38, width: 2, alpha: 0.8 * effect.opacity });
-  }
-
-  for (const cell of effect.zone.cells) {
-    outline
-      .rect(cell.x, cell.y, cell.size, cell.size)
-      .stroke({ color: 0xff8a38, width: 1, alpha: 0.45 * effect.opacity });
   }
 
   return outline;
@@ -3307,12 +3337,6 @@ function drawFireZoneHint(effect: SceneFireEffect): Graphics {
     graphic
       .circle(effect.position.x, effect.position.y, radius)
       .stroke({ color: 0xff8a38, width: 2, alpha: 0.28 });
-  } else {
-    for (const cell of effect.zone.cells) {
-      graphic
-        .rect(cell.x, cell.y, cell.size, cell.size)
-        .stroke({ color: 0xff8a38, width: 1, alpha: 0.28 });
-    }
   }
 
   return graphic;
