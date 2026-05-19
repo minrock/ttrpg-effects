@@ -3,7 +3,7 @@
 ## 1. Resumen
 
 - **Spec fuente:** `./specs/14-emoji-fill-for-effects-and-shapes/14-emoji-fill-for-effects-and-shapes.md`
-- **Objetivo:** Renderizar emojis representativos dentro de fuego, formas de área y líneas, con distribución estable y persistencia opcional para emojis de formas.
+- **Objetivo:** Renderizar emojis representativos dentro de formas de área y líneas, con distribución estable y persistencia opcional para emojis de formas. El fuego queda excluido porque usa GIF interno enmascarado definido por Spec 09.
 - **Estado:** Implementado
 - **Prioridad:** Media
 - **Dependencias:** Specs 07, 09, 10 y 11; render Pixi de formas/fuego; schema versionado de escenas; grilla actual.
@@ -12,8 +12,6 @@
 
 ### Incluido
 
-- Render de `🔥` dentro de fuego circular.
-- Render de `🔥` dentro de fuego pintado por celdas.
 - Render de emojis dentro de círculo, cono y rectángulo.
 - Render de emojis distribuidos a lo largo de línea/medición.
 - Distribución tipo mosaico con jitter determinista para áreas.
@@ -32,14 +30,14 @@
 - Emoji por celda individual dentro de una misma forma.
 - Cambios a luces, oscuridad, darkvision, fog of war o mapas.
 - Emojis para tokens/minis futuros.
-- Persistencia de emoji para fuego, porque fuego usa `🔥` fijo.
+- Persistencia de emoji para fuego, porque fuego no usa emojis.
 
 ## 3. Decisiones tecnicas
 
 - **Arquitectura:** El dato persistente de emoji vive en `domain/sessions` como propiedad opcional de `SceneShape`; la UI solo edita ese campo; Pixi renderiza el patrón sin introducir reglas de negocio en React.
 - **Persistencia:** Extender `SceneShape` con `emoji?: string`; el schema acepta ausencia del campo y la UI solo guarda uno de los emojis permitidos.
 - **IPC / Electron:** Sin canales nuevos. Guardar/cargar usa el flujo existente de `.ttrpgscene`.
-- **Render / PixiJS:** Usar `Text` de Pixi para emojis en las capas existentes de efectos y formas. Selección y handles permanecen en la capa `selection`, por encima.
+- **Render / PixiJS:** Usar `Text` de Pixi para emojis en la capa de formas. Selección y handles permanecen en la capa `selection`, por encima. Fuego no renderiza emojis.
 - **Validacion:** Limitar emoji a string corto, sugerido máximo 8 unidades UTF-16 para permitir secuencias emoji compuestas sin aceptar textos largos.
 - **Emojis permitidos:** Centralizar el set en `src/domain/shapes/shape-emojis.ts` para que UI, dominio y render compartan fuente.
 - **Dependencias nuevas:** Ninguna.
@@ -89,12 +87,11 @@
   - Agregar selector compacto para editar emoji de forma seleccionada.
   - Permitir limpiar emoji.
   - Usar `updateSelectedShape({ emoji })` o helper equivalente.
-- No agregar control para fuego, porque fuego siempre usa `🔥`.
+- No agregar control para fuego, porque fuego usa el GIF interno de Spec 09.
 
 ### `render`
 
 - En `src/render/pixi/PixiViewport.ts`:
-  - Dibujar emojis de fuego en `drawSceneEffect`.
   - Dibujar emojis de formas en `drawTacticalShape`.
   - Para línea/measurement, distribuir emojis a lo largo del segmento.
   - Asegurar que emojis queden debajo de selección/handles.
@@ -108,7 +105,7 @@
 3. [x] Agregar tests de schema para formas con y sin emoji.
 4. [x] Agregar UI mínima en panel de forma seleccionada con selector único de emoji.
 5. [x] Implementar helpers de distribución para área y línea.
-6. [x] Implementar render de emojis en fuego circular y fuego por celdas.
+6. [x] Excluir fuego del render de emojis; Spec 09 lo representa con GIF interno enmascarado.
 7. [x] Implementar render de emojis en círculo, cono y rectángulo.
 8. [x] Implementar render de emojis sobre línea/measurement.
 9. [x] Ajustar tamaño, opacidad y densidad para legibilidad.
@@ -123,7 +120,7 @@
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Manual / smoke:** Crear fuego circular y pintado; crear línea, círculo, cono y rectángulo con emoji; mover/redimensionar; guardar/cargar.
+- **Manual / smoke:** Crear fuego circular y pintado y confirmar que no muestra emojis; crear línea, círculo, cono y rectángulo con emoji; mover/redimensionar; guardar/cargar.
 
 ## 8. Riesgos y mitigaciones
 
@@ -140,8 +137,7 @@
 
 ## 9. Criterios de aceptacion
 
-- Fuego circular muestra `🔥` dentro del círculo.
-- Fuego por celdas muestra `🔥` dentro de celdas pintadas.
+- Fuego circular y fuego por celdas no muestran emojis.
 - Círculo, cono y rectángulo pueden mostrar emoji dentro del área.
 - El selector de formas permite elegir un solo emoji entre `💧`, `💨`, `🤐`, `🤢`, `💀`, `☠️`, `🔮` o limpiar la selección.
 - Línea/measurement muestra emojis distribuidos a lo largo del segmento.

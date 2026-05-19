@@ -14,14 +14,12 @@ La app ya permite:
 - Configurar grilla, unidad y tamaño de casilla.
 - Renderizar efectos y formas en PixiJS sobre el mapa.
 
-Actualmente las áreas se representan con rellenos de color y bordes. Esta spec añade una capa visual adicional basada en emojis, útil para identificar zonas como fuego, veneno, hielo, magia u otros estados futuros.
+Actualmente las áreas se representan con rellenos, bordes o efectos animados. Esta spec añade una capa visual adicional basada en emojis para formas tácticas, útil para identificar zonas como veneno, hielo, magia u otros estados futuros.
 
 ## Alcance
 
-- Renderizar emojis dentro de zonas de fuego.
 - Renderizar emojis dentro de formas de área, excepto línea.
 - Renderizar emojis distribuidos sobre líneas.
-- Usar `🔥` como emoji obligatorio para fuego.
 - Usar un emoji configurable para formas tácticas desde un selector único.
 - Mantener un conjunto permitido de emojis en un archivo TypeScript compartido.
 - Distribuir emojis en patrón tipo mosaico con ligera aleatoriedad visual dentro del área.
@@ -32,7 +30,7 @@ Actualmente las áreas se representan con rellenos de color y bordes. Esta spec 
 ## Fuera de alcance
 
 - Animar emojis.
-- Usar sprites o imágenes externas en lugar de emojis.
+- Reemplazar el GIF de fuego por emojis.
 - Crear un editor avanzado de patrones.
 - Permitir emojis por cada celda individual dentro de una misma forma.
 - Cambiar reglas de oscuridad, darkvision, niebla o luces.
@@ -43,15 +41,9 @@ Actualmente las áreas se representan con rellenos de color y bordes. Esta spec 
 
 ### Fuego
 
-- El fuego siempre usa el emoji `🔥`.
-- Si el fuego es circular:
-  - Los emojis se distribuyen dentro del círculo.
-  - El patrón debe cubrir la zona sin saturarla.
-  - La distribución usa el centro/centroide del fuego como referencia.
-- Si el fuego está pintado por cuadrados:
-  - Cada cuadrado de fuego puede mostrar uno o más emojis `🔥`.
-  - Como mínimo debe haber una presencia clara de fuego por celda pintada.
-  - Los emojis no deben aparecer fuera de las celdas pintadas.
+- El fuego no renderiza emojis.
+- La representacion visual del fuego vive en Spec 09 como GIF interno enmascarado.
+- El selector de emojis no aplica a fuego.
 
 ### Formas de área
 
@@ -89,7 +81,7 @@ Reglas:
 
 Decisión inicial propuesta:
 
-- Fuego: fijo en `🔥`.
+- Fuego: sin emoji; usa el GIF interno enmascarado definido por Spec 09.
 - Formas tácticas: agregar una propiedad opcional de emoji por forma, por ejemplo `emoji?: string`.
 - La UI debe ofrecer un único selector con opción vacía y los emojis permitidos.
 - El conjunto permitido inicial vive en TypeScript y contiene: `💧`, `💨`, `🤐`, `🤢`, `💀`, `☠️`, `🔮`.
@@ -105,7 +97,7 @@ Requisitos:
 
 ## Reglas visuales
 
-- Los emojis deben renderizarse sobre el relleno de la forma o fuego, pero debajo de selección/handles.
+- Los emojis deben renderizarse sobre el relleno de la forma, pero debajo de selección/handles.
 - El tamaño del emoji debe escalar de forma legible con la grilla.
 - Valor sugerido inicial: entre `0.35` y `0.55` del tamaño de celda.
 - La opacidad debe ser suficiente para verse en proyección, sin tapar completamente el mapa.
@@ -133,7 +125,7 @@ Requisitos:
 
 Fuego:
 
-- No requiere campo nuevo para emoji, porque usa `🔥` fijo.
+- No requiere campo nuevo para emoji, porque no renderiza emojis. Su representacion visual vive en Spec 09.
 
 Formas:
 
@@ -146,7 +138,6 @@ Formas:
 - La implementación debe vivir encapsulada en `src/render/pixi`.
 - Usar texto Pixi para renderizar emojis.
 - Mantener los emojis dentro de capas existentes:
-  - fuego dentro de capa de efectos,
   - formas dentro de capa de shapes/measurements,
   - selección y handles por encima.
 - Evitar recrear patrones costosos en cada frame si no cambió la escena.
@@ -154,9 +145,7 @@ Formas:
 
 ## Criterios de aceptación
 
-- El fuego circular muestra varios emojis `🔥` dentro de su área.
-- El fuego pintado en celdas muestra emojis `🔥` dentro de las celdas pintadas.
-- Los emojis de fuego no aparecen fuera del círculo o fuera de las celdas.
+- El fuego circular y el fuego pintado no muestran emojis.
 - Círculos, conos y rectángulos pueden renderizar un emoji dentro del área.
 - El emoji de formas se elige desde un selector único con el conjunto permitido.
 - La línea puede renderizar emojis distribuidos a lo largo del segmento.

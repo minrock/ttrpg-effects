@@ -64,15 +64,18 @@ Requerimientos:
 
 Decision posterior:
 
-- Spec 09 usa fuego vectorial rojo sin GIF.
+- Spec 09 usa un GIF interno generado para el proyecto, servido desde `/effects/area-fire.gif`.
 - El fuego puede ser circular o pintado como cuadrados de grilla con un pincel circular.
-- El area en fuego se representa como rojo opaco y la luz asociada sigue revelando oscuridad.
+- El fuego circular usa un unico GIF escalado al diametro del circulo y enmascarado por su geometria.
+- El fuego pintado agrupa celdas contiguas; cada region contigua usa un unico GIF escalado a su bounding box y enmascarado por las celdas.
+- El GIF se renderiza con alpha `0.65 * opacity` para dejar ver parcialmente el mapa debajo.
+- La luz asociada sigue revelando oscuridad.
+- El fuego no renderiza emojis.
 
 Fuente de asset:
 
-- No se requiere asset para el fuego vectorial actual.
-- Candidato inicial: OpenGameArt "Animated flame / Fire sprite Sheet", CC0.
-- Si se usa asset externo no CC0, guardar licencia y atribucion.
+- Asset interno generado para el proyecto: `src/renderer/public/effects/area-fire.gif`.
+- No se usa asset externo ni licencia de terceros para el fuego actual.
 
 ## Criterios de aceptacion
 

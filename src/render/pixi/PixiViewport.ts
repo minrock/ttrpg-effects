@@ -1,4 +1,5 @@
 import { Application, Assets, ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text } from "pixi.js";
+import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
   createCameraState,
   panCamera,
@@ -122,6 +123,7 @@ export class PixiViewport {
   private tokenLoadVersion = 0;
   private loadedMapUrl: string | null = null;
   private loadedTokenUrls = new Set<string>();
+  private firePatternSource: GifSource | null = null;
   private elements: readonly TacticalElement[] = [];
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
@@ -317,6 +319,7 @@ export class PixiViewport {
     }
     this.darkvisionMask?.destroy();
     this.darkvisionMask = null;
+    this.firePatternSource = null;
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -331,6 +334,7 @@ export class PixiViewport {
     this.app.canvas.className = "pixi-canvas";
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
+    this.firePatternSource = await loadFirePatternSource();
 
     this.createLayers();
     this.drawStaticScene();
@@ -905,7 +909,7 @@ export class PixiViewport {
 
     for (const effect of this.effects) {
       if (effect.visible && effect.kind === "fire") {
-        effectsLayer.addChild(drawSceneEffect(effect, this.grid));
+        effectsLayer.addChild(drawSceneEffect(effect, this.firePatternSource));
         if (effect.id !== this.selectedElementId) {
           selectionLayer.addChild(drawFireZoneHint(effect));
         }
@@ -1963,7 +1967,8 @@ interface SelectableRenderElement {
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
 const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
-const FIRE_EMOJI = "🔥";
+const FIRE_PATTERN_URL = "/effects/area-fire.gif";
+const FIRE_PATTERN_ALPHA_MULTIPLIER = 0.65;
 const MAX_EMOJIS_PER_ELEMENT = 120;
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
@@ -1971,6 +1976,14 @@ function parseHexColor(color: string): number {
 
 function isVisibleLightEmittingFireEffect(effect: SceneEffect): effect is SceneFireEffect {
   return effect.kind === "fire" && effect.visible && effect.emitsLight;
+}
+
+async function loadFirePatternSource(): Promise<GifSource | null> {
+  try {
+    return await Assets.load<GifSource>(FIRE_PATTERN_URL);
+  } catch {
+    return null;
+  }
 }
 
 function getLayerForElementKind(kind: TacticalElement["kind"]): "shapes" | "lights" | "effects" {
@@ -2676,61 +2689,262 @@ function computeCellRings(
   };
 }
 
-function drawSceneEffect(effect: SceneFireEffect, grid: SceneGrid | null): Container {
+function drawSceneEffect(
+  effect: SceneFireEffect,
+  firePatternSource: GifSource | null
+): Container {
   const container = new Container();
   const graphic = new Graphics();
   const color = parseHexColor(effect.color);
   const alpha = Math.max(0.15, 0.62 * effect.opacity);
-  const cellSizeWorld = grid?.cellSizeWorld ?? 100;
 
   if (effect.zone.kind === "circle") {
     const radius = effect.zone.radius * effect.scale;
-    graphic
+    addFirePattern(container, effect, firePatternSource);
+    if (firePatternSource === null) {
+      graphic
+        .circle(effect.position.x, effect.position.y, radius)
+        .fill({ color, alpha });
+
+      if (effect.zone.mode === "open") {
+        graphic
+          .circle(effect.position.x, effect.position.y, radius * effect.zone.innerRadiusRatio)
+          .cut();
+      }
+
+      container.addChild(graphic);
+    }
+
+    container.addChild(drawFireZoneOutline(effect));
+    return container;
+  }
+
+  addFirePattern(container, effect, firePatternSource);
+
+  if (firePatternSource === null) {
+    for (const cell of effect.zone.cells) {
+      graphic
+        .rect(cell.x, cell.y, cell.size, cell.size)
+        .fill({ color, alpha })
+        .stroke({ color: 0xff8a38, width: 1, alpha: 0.45 * effect.opacity });
+    }
+
+    container.addChild(graphic);
+  }
+
+  container.addChild(drawFireZoneOutline(effect));
+
+  return container;
+}
+
+function addFirePattern(
+  container: Container,
+  effect: SceneFireEffect,
+  firePatternSource: GifSource | null
+): void {
+  if (firePatternSource === null) {
+    return;
+  }
+
+  if (effect.zone.kind === "circle") {
+    addMaskedFirePatternSprite(
+      container,
+      firePatternSource,
+      getFirePatternBounds(effect),
+      drawFireZoneMask(effect),
+      effect.opacity
+    );
+    return;
+  }
+
+  for (const group of groupContiguousFireCells(effect.zone.cells)) {
+    addMaskedFirePatternSprite(
+      container,
+      firePatternSource,
+      getFireCellBounds(group),
+      drawFireCellMask(group),
+      effect.opacity
+    );
+  }
+}
+
+function getFirePatternBounds(effect: SceneFireEffect): {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+} {
+  if (effect.zone.kind === "circle") {
+    const radius = effect.zone.radius * effect.scale;
+
+    return {
+      left: effect.position.x - radius,
+      right: effect.position.x + radius,
+      top: effect.position.y - radius,
+      bottom: effect.position.y + radius
+    };
+  }
+
+  const xs = effect.zone.cells.flatMap((cell) => [cell.x, cell.x + cell.size]);
+  const ys = effect.zone.cells.flatMap((cell) => [cell.y, cell.y + cell.size]);
+
+  return {
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys)
+  };
+}
+
+function addMaskedFirePatternSprite(
+  container: Container,
+  firePatternSource: GifSource,
+  bounds: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number },
+  mask: Graphics,
+  opacity: number
+): void {
+  const sprite = new GifSprite({
+    source: firePatternSource,
+    autoPlay: true,
+    loop: true,
+    animationSpeed: 1
+  });
+  sprite.x = bounds.left;
+  sprite.y = bounds.top;
+  sprite.width = Math.max(1, bounds.right - bounds.left);
+  sprite.height = Math.max(1, bounds.bottom - bounds.top);
+  sprite.alpha = Math.max(0.18, opacity * FIRE_PATTERN_ALPHA_MULTIPLIER);
+  sprite.mask = mask;
+  container.addChild(sprite);
+  container.addChild(mask);
+}
+
+function groupContiguousFireCells(cells: readonly FireCell[]): readonly (readonly FireCell[])[] {
+  const remaining = new Map(cells.map((cell) => [getFireCellKey(cell), cell] as const));
+  const groups: FireCell[][] = [];
+
+  while (remaining.size > 0) {
+    const first = remaining.values().next().value;
+
+    if (first === undefined) {
+      break;
+    }
+
+    const group: FireCell[] = [];
+    const queue = [first];
+    remaining.delete(getFireCellKey(first));
+
+    for (let index = 0; index < queue.length; index += 1) {
+      const cell = queue[index];
+
+      if (cell === undefined) {
+        continue;
+      }
+
+      group.push(cell);
+
+      for (const key of getFireCellNeighborKeys(cell)) {
+        const neighbor = remaining.get(key);
+
+        if (neighbor !== undefined) {
+          remaining.delete(key);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    groups.push(group);
+  }
+
+  return groups;
+}
+
+function getFireCellKey(cell: FireCell): string {
+  return `${cell.x}:${cell.y}:${cell.size}`;
+}
+
+function getFireCellNeighborKeys(cell: FireCell): readonly string[] {
+  return [
+    `${cell.x - cell.size}:${cell.y}:${cell.size}`,
+    `${cell.x + cell.size}:${cell.y}:${cell.size}`,
+    `${cell.x}:${cell.y - cell.size}:${cell.size}`,
+    `${cell.x}:${cell.y + cell.size}:${cell.size}`
+  ];
+}
+
+function getFireCellBounds(cells: readonly FireCell[]): {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+} {
+  const xs = cells.flatMap((cell) => [cell.x, cell.x + cell.size]);
+  const ys = cells.flatMap((cell) => [cell.y, cell.y + cell.size]);
+
+  return {
+    left: Math.min(...xs),
+    right: Math.max(...xs),
+    top: Math.min(...ys),
+    bottom: Math.max(...ys)
+  };
+}
+
+function drawFireCellMask(cells: readonly FireCell[]): Graphics {
+  const mask = new Graphics();
+
+  for (const cell of cells) {
+    mask.rect(cell.x, cell.y, cell.size, cell.size).fill({ color: 0xffffff, alpha: 1 });
+  }
+
+  return mask;
+}
+
+function drawFireZoneMask(effect: SceneFireEffect): Graphics {
+  const mask = new Graphics();
+
+  if (effect.zone.kind === "circle") {
+    const radius = effect.zone.radius * effect.scale;
+    mask
       .circle(effect.position.x, effect.position.y, radius)
-      .fill({ color, alpha });
+      .fill({ color: 0xffffff, alpha: 1 });
 
     if (effect.zone.mode === "open") {
-      graphic
+      mask
         .circle(effect.position.x, effect.position.y, radius * effect.zone.innerRadiusRatio)
         .cut();
     }
 
-    graphic.stroke({ color: 0xff8a38, width: 2, alpha: 0.8 * effect.opacity });
-    container.addChild(graphic);
-    addEmojiTexts(
-      container,
-      [FIRE_EMOJI],
-      getCircleEmojiPoints(
-        effect.id,
-        effect.position,
-        radius,
-        cellSizeWorld,
-        effect.zone.mode === "open" ? radius * effect.zone.innerRadiusRatio : 0
-      ),
-      cellSizeWorld
-    );
-    return container;
+    return mask;
   }
 
   for (const cell of effect.zone.cells) {
-    graphic
+    mask.rect(cell.x, cell.y, cell.size, cell.size).fill({ color: 0xffffff, alpha: 1 });
+  }
+
+  return mask;
+}
+
+function drawFireZoneOutline(effect: SceneFireEffect): Graphics {
+  const outline = new Graphics();
+
+  if (effect.zone.kind === "circle") {
+    const radius = effect.zone.radius * effect.scale;
+    outline.circle(effect.position.x, effect.position.y, radius);
+
+    if (effect.zone.mode === "open") {
+      outline.circle(effect.position.x, effect.position.y, radius * effect.zone.innerRadiusRatio).cut();
+    }
+
+    return outline.stroke({ color: 0xff8a38, width: 2, alpha: 0.8 * effect.opacity });
+  }
+
+  for (const cell of effect.zone.cells) {
+    outline
       .rect(cell.x, cell.y, cell.size, cell.size)
-      .fill({ color, alpha })
       .stroke({ color: 0xff8a38, width: 1, alpha: 0.45 * effect.opacity });
   }
 
-  container.addChild(graphic);
-  addEmojiTexts(
-    container,
-    [FIRE_EMOJI],
-    effect.zone.cells.map((cell, index) => ({
-      x: cell.x + cell.size / 2 + stableJitter(effect.id, index, cell.size * 0.12),
-      y: cell.y + cell.size / 2 + stableJitter(`${effect.id}:y`, index, cell.size * 0.12)
-    })),
-    cellSizeWorld
-  );
-
-  return container;
+  return outline;
 }
 
 function drawMagicalDarknessEffect(effect: SceneMagicalDarknessEffect): Graphics {
