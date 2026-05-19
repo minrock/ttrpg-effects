@@ -4,4 +4,6 @@ import { ElectronMapImageStorage } from "../../infrastructure/file-system/electr
 export function registerMapIpc(storage: ElectronMapImageStorage): void {
   ipcMain.handle("map:open-image", async () => storage.openMapImage());
   ipcMain.handle("map:resolve-url", async (_event, imagePath: string) => storage.resolveMapUrl(imagePath));
+  ipcMain.handle("token:open-image", async () => storage.openTokenImage());
+  ipcMain.handle("token:resolve-url", async (_event, imagePath: string) => storage.resolveTokenUrl(imagePath));
 }

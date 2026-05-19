@@ -40,7 +40,8 @@ import { createDefaultScene } from "../../domain/sessions/default-scene";
 import type {
   SceneDocument,
   SceneFireEffect,
-  SceneOperationResult
+  SceneOperationResult,
+  SceneToken
 } from "../../domain/sessions/scene-document";
 import {
   createTacticalShape,
@@ -66,8 +67,15 @@ import {
   updateFogOfWar
 } from "../../domain/vision/vision";
 import type { FirePatch } from "../../domain/effects/fire";
+import {
+  createSceneToken,
+  snapTokenToGrid,
+  sortTokensByOrder,
+  tokenSizeLabels,
+  type TokenSize
+} from "../../domain/tokens/tokens";
 import type { TacticalElementKind } from "../../domain/tools/tactical-elements";
-import { MapViewport } from "./components/MapViewport";
+import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
 import type { PixiContextMenuRequest } from "../../render/pixi/PixiViewport";
 
 const logoUrl = "/logo/ttrpg-effects-logo.png";
@@ -76,13 +84,21 @@ const fallbackAppInfo = {
   version: "0.0.0"
 } as const;
 
-type SidebarSectionId = "grid" | "figures" | "darkness" | "fog";
+type SidebarSectionId = "grid" | "figures" | "effects" | "tokens" | "darkness" | "fog";
 
 type SidebarOpenState = Record<SidebarSectionId, boolean>;
 
 interface PathDraftState {
   readonly points: readonly WorldPoint[];
   readonly hoverPoint: WorldPoint | null;
+}
+
+interface NewTokenDraftState {
+  readonly imagePath: string | null;
+  readonly imageUrl: string | null;
+  readonly name: string;
+  readonly size: TokenSize;
+  readonly position: WorldPoint;
 }
 
 export function App(): JSX.Element {
@@ -99,6 +115,7 @@ export function App(): JSX.Element {
     return createDefaultScene();
   });
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
+  const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("Escena default en memoria");
   const [warnings, setWarnings] = useState<readonly string[]>([]);
@@ -109,6 +126,7 @@ export function App(): JSX.Element {
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
+  const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
     points: [],
     hoverPoint: null
@@ -116,13 +134,17 @@ export function App(): JSX.Element {
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
+    effects: false,
+    tokens: false,
     darkness: false,
     fog: false
   });
   const nextShapeId = useRef(1);
   const nextLightId = useRef(1);
   const nextEffectId = useRef(1);
+  const nextTokenId = useRef(1);
   const nextRevealId = useRef(1);
+  const viewportHandleRef = useRef<MapViewportHandle | null>(null);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
   isSpaceDragActiveRef.current = isSpaceDragActive;
   const pathDraftRef = useRef(pathDraft);
@@ -142,6 +164,43 @@ export function App(): JSX.Element {
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (window.ttrpg === undefined || scene.tokens.length === 0) {
+      return;
+    }
+
+    const missingTokens = scene.tokens.filter((token) => tokenImageUrls[token.id] === undefined);
+
+    if (missingTokens.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+    void Promise.all(
+      missingTokens.map(async (token) => [token.id, await window.ttrpg?.resolveTokenUrl(token.imagePath)] as const)
+    ).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+
+      setTokenImageUrls((current) => {
+        const next = { ...current };
+
+        for (const [tokenId, url] of entries) {
+          if (typeof url === "string") {
+            next[tokenId] = url;
+          }
+        }
+
+        return next;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [scene.tokens, tokenImageUrls]);
 
   // Phase 2: Autosave scene to sessionStorage on every change (debounced).
   // sessionStorage survives renderer reloads within the same Electron window session
@@ -274,8 +333,18 @@ export function App(): JSX.Element {
         ...current,
         lights: current.lights.filter((light) => light.id !== interaction.selectedElementId),
         effects: current.effects.filter((effect) => effect.id !== interaction.selectedElementId),
-        shapes: current.shapes.filter((shape) => shape.id !== interaction.selectedElementId)
+        shapes: current.shapes.filter((shape) => shape.id !== interaction.selectedElementId),
+        tokens: current.tokens.filter((token) => token.id !== interaction.selectedElementId)
       };
+    });
+    setTokenImageUrls((current) => {
+      if (interaction.selectedElementId === null) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[interaction.selectedElementId];
+      return next;
     });
     setInteraction((current) => deleteSelectedElement(current));
   }, [interaction.selectedElementId]);
@@ -317,6 +386,7 @@ export function App(): JSX.Element {
     sessionStorage.removeItem("ttrpg:session-scene");
     setScene(createDefaultScene());
     setMapImageUrl(null);
+    setTokenImageUrls({});
     setCurrentFilePath(null);
     setFeedback("Escena default en memoria");
     setWarnings([]);
@@ -328,6 +398,7 @@ export function App(): JSX.Element {
     nextShapeId.current = 1;
     nextLightId.current = 1;
     nextEffectId.current = 1;
+    nextTokenId.current = 1;
     nextRevealId.current = 1;
   }, [setGridAdjustMode]);
 
@@ -573,7 +644,9 @@ export function App(): JSX.Element {
       setScene(result.scene);
       if (actionLabel === "cargada") {
         setMapImageUrl(result.mapImageUrl ?? null);
+        setTokenImageUrls(result.tokenImageUrls ?? {});
         setInteraction((current) => setZoomLocked(current, result.scene.grid.locked));
+        nextTokenId.current = getNextNumericId(result.scene.tokens.map((token) => token.id), "token-");
       }
       setCurrentFilePath(result.filePath);
       setFeedback(`Escena ${actionLabel}`);
@@ -749,6 +822,14 @@ export function App(): JSX.Element {
             ? updateAnimatedFireEffect(effect, { position: { x, y } })
             : updateMagicalDarknessEffect(effect, { position: { x, y } })
           : effect
+      ),
+      tokens: current.tokens.map((token) =>
+        token.id === elementId
+          ? {
+              ...token,
+              position: snapTokenToGrid({ x, y }, current.grid, token.footprintCells)
+            }
+          : token
       )
     }));
   }, []);
@@ -987,6 +1068,106 @@ export function App(): JSX.Element {
     });
   }
 
+  function handleCreateToken(): void {
+    if (interaction.contextMenu === null) {
+      return;
+    }
+
+    setNewTokenDraft({
+      imagePath: null,
+      imageUrl: null,
+      name: "",
+      size: "medium",
+      position: interaction.contextMenu.world
+    });
+    setInteraction((current) => closeContextMenu(current));
+  }
+
+  function handleConfirmNewToken(): void {
+    if (newTokenDraft === null) {
+      return;
+    }
+
+    const { imagePath, imageUrl, name, size, position } = newTokenDraft;
+
+    if (imagePath === null || imageUrl === null) {
+      setFeedback("Selecciona una imagen para el token.");
+      return;
+    }
+
+    const id = `token-${nextTokenId.current}`;
+    nextTokenId.current += 1;
+    const tokenName = name.trim() || getFileBaseName(imagePath);
+
+    setScene((current) => {
+      const footprintCells =
+        size === "large" ? 2 : size === "huge" ? 3 : size === "gargantuan" ? 4 : 1;
+      const token = createSceneToken({
+        id,
+        name: tokenName,
+        type: tokenName,
+        imagePath,
+        position: snapTokenToGrid(position, current.grid, footprintCells),
+        size,
+        tokens: current.tokens
+      });
+
+      return { ...current, tokens: [...current.tokens, token] };
+    });
+    setTokenImageUrls((current) => ({ ...current, [id]: imageUrl }));
+    setInteraction((current) => selectElement(current, id));
+    setNewTokenDraft(null);
+    setFeedback("Token creado");
+  }
+
+  function handleCancelNewToken(): void {
+    setNewTokenDraft(null);
+  }
+
+  function handleRequestSidebarNewToken(): void {
+    setNewTokenDraft({
+      imagePath: null,
+      imageUrl: null,
+      name: "",
+      size: "medium",
+      position: viewportHandleRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 }
+    });
+    setIsSidebarVisible(true);
+    setOpenSidebarSections((current) => ({ ...current, tokens: true }));
+  }
+
+  async function handleChooseNewTokenImage(): Promise<void> {
+    if (newTokenDraft === null) {
+      return;
+    }
+
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return;
+    }
+
+    setIsBusy(true);
+    setWarnings([]);
+
+    try {
+      const result = await window.ttrpg.openTokenImage();
+
+      if (!result.ok) {
+        setFeedback(result.error);
+        return;
+      }
+
+      setNewTokenDraft((current) => current === null ? null : {
+        ...current,
+        imagePath: result.imagePath,
+        imageUrl: result.imageUrl,
+        name: current.name.trim() || getFileBaseName(result.imagePath)
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   function handleToggleContextMenuFogMode(): void {
     if (interaction.activeTool !== "fog-reveal" && !scene.fogOfWar.enabled) {
       return;
@@ -1037,6 +1218,10 @@ export function App(): JSX.Element {
     interaction.selectedElementId === null
       ? undefined
       : scene.shapes.find((shape) => shape.id === interaction.selectedElementId);
+  const selectedToken =
+    interaction.selectedElementId === null
+      ? undefined
+      : scene.tokens.find((token) => token.id === interaction.selectedElementId);
   const selectedMeasurement =
     selectedShape?.type === "measurement"
       ? measureDistance(selectedShape.points[0], selectedShape.points[1], {
@@ -1052,7 +1237,10 @@ export function App(): JSX.Element {
         })
       : undefined;
   const hasSelectedObject =
-    selectedLight !== undefined || selectedEffect !== undefined || selectedShape !== undefined;
+    selectedLight !== undefined ||
+    selectedEffect !== undefined ||
+    selectedShape !== undefined ||
+    selectedToken !== undefined;
 
   useEffect(() => {
     if (!hasSelectedObject) {
@@ -1115,6 +1303,33 @@ export function App(): JSX.Element {
       ...current,
       shapes: current.shapes.map((shape) =>
         shape.id === selectedShape.id ? updateShape(shape, patch) : shape
+      )
+    }));
+  }
+
+  function updateSelectedToken(patch: Partial<SceneToken>): void {
+    if (selectedToken === undefined) {
+      return;
+    }
+
+    setScene((current) => ({
+      ...current,
+      tokens: current.tokens.map((token) =>
+        token.id === selectedToken.id
+          ? {
+              ...token,
+              ...patch
+            }
+          : token
+      )
+    }));
+  }
+
+  function handleToggleTokenVisibility(tokenId: string): void {
+    setScene((current) => ({
+      ...current,
+      tokens: current.tokens.map((token) =>
+        token.id === tokenId ? { ...token, visible: !token.visible } : token
       )
     }));
   }
@@ -1193,17 +1408,19 @@ export function App(): JSX.Element {
         ? "Fuego"
         : selectedMagicalDarkness !== undefined
           ? "Oscuridad magica"
-        : selectedShape?.type === "measurement"
-          ? "Linea"
-          : selectedShape?.type === "path"
-            ? "Path/Camino"
-          : selectedShape?.type === "circle"
-            ? "Circulo"
-            : selectedShape?.type === "cone"
-              ? "Cono"
-              : selectedShape?.type === "rectangle"
-                ? "Rectangulo"
-                : "Propiedades";
+          : selectedToken !== undefined
+            ? "Token"
+            : selectedShape?.type === "measurement"
+              ? "Linea"
+              : selectedShape?.type === "path"
+                ? "Path/Camino"
+                : selectedShape?.type === "circle"
+                  ? "Circulo"
+                  : selectedShape?.type === "cone"
+                    ? "Cono"
+                    : selectedShape?.type === "rectangle"
+                      ? "Rectangulo"
+                      : "Propiedades";
   const selectedPropertiesIcon =
     selectedLight !== undefined
       ? selectedLight.kind === "point"
@@ -1213,15 +1430,17 @@ export function App(): JSX.Element {
         ? "火"
         : selectedMagicalDarkness !== undefined
           ? "●"
-        : selectedShape?.type === "measurement"
-          ? "╱"
-          : selectedShape?.type === "path"
-            ? "⌁"
-          : selectedShape?.type === "circle"
-            ? "○"
-            : selectedShape?.type === "cone"
-          ? "◺"
-          : "▭";
+          : selectedToken !== undefined
+            ? "◉"
+            : selectedShape?.type === "measurement"
+              ? "╱"
+              : selectedShape?.type === "path"
+                ? "⌁"
+                : selectedShape?.type === "circle"
+                  ? "○"
+                  : selectedShape?.type === "cone"
+                    ? "◺"
+                    : "▭";
   const selectedMagicalDarknessRadiusCells =
     selectedMagicalDarkness === undefined
       ? 1
@@ -1230,6 +1449,15 @@ export function App(): JSX.Element {
     selectedMagicalDarknessRadiusCells *
       (scene.grid.unit === "ft" ? scene.grid.distancePerCell : scene.grid.metricDistancePerCell),
     scene.grid.unit
+  );
+  const sortedTokens = useMemo(() => sortTokensByOrder(scene.tokens), [scene.tokens]);
+  const renderedTokens = useMemo(
+    () =>
+      sortedTokens.map((token) => ({
+        ...token,
+        imageUrl: tokenImageUrls[token.id] ?? null
+      })),
+    [sortedTokens, tokenImageUrls]
   );
 
   return (
@@ -1272,7 +1500,11 @@ export function App(): JSX.Element {
         <span>{scene.map.imagePath ?? "Sin mapa"}</span>
         <span>{currentFilePath ?? "Sin archivo seleccionado"}</span>
         <span>
-          {scene.shapes.length + scene.lights.length + scene.effects.length + interaction.elements.length} elementos
+          {scene.shapes.length +
+            scene.lights.length +
+            scene.effects.length +
+            scene.tokens.length +
+            interaction.elements.length} elementos
         </span>
         <span>
           {interaction.selectedElementId === null
@@ -1286,6 +1518,7 @@ export function App(): JSX.Element {
       </aside>
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}`}>
         <MapViewport
+          ref={viewportHandleRef}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}
@@ -1295,6 +1528,7 @@ export function App(): JSX.Element {
           shapes={scene.shapes}
           lights={scene.lights}
           effects={scene.effects}
+          tokens={renderedTokens}
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
@@ -1569,6 +1803,18 @@ export function App(): JSX.Element {
                   </label>
                 </div>
               ) : null}
+              {selectedToken !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de token">
+                  <label>
+                    Color selección
+                    <input
+                      type="color"
+                      value={selectedToken.selectionColor}
+                      onChange={(event) => updateSelectedToken({ selectionColor: event.currentTarget.value })}
+                    />
+                  </label>
+                </div>
+              ) : null}
               {selectedShape !== undefined ? (
                 <div className="selected-properties-content" aria-label="Propiedades de forma tactica">
                   {selectedPathDistance !== undefined ? <span>Distancia total: {selectedPathDistance.label}</span> : null}
@@ -1812,6 +2058,65 @@ export function App(): JSX.Element {
           </SidebarAccordion>
 
           <SidebarAccordion
+            id="token-controls-panel"
+            icon="◉"
+            title="Tokens"
+            isOpen={openSidebarSections.tokens}
+            onToggle={() => toggleSidebarSection("tokens")}
+          >
+            {renderedTokens.length > 0 ? (
+              <div className="token-list" aria-label="Tokens en escena">
+                {renderedTokens.map((token) => {
+                  const hasRepeatedName =
+                    scene.tokens.filter((candidate) => sameTokenName(candidate.name, token.name)).length > 1;
+
+                  return (
+                    <div
+                      key={token.id}
+                      className={`token-list-row${interaction.selectedElementId === token.id ? " is-selected" : ""}${token.visible ? "" : " is-hidden-token"}`}
+                    >
+                      <button
+                        type="button"
+                        className="token-list-item"
+                        onClick={() => setInteraction((current) => selectElement(current, token.id))}
+                      >
+                        <span className="token-list-image" style={{ borderColor: token.selectionColor }}>
+                          {token.imageUrl !== null ? <img src={token.imageUrl} alt="" /> : token.name.slice(0, 1)}
+                          {hasRepeatedName ? (
+                            <span className="token-list-badge" style={{ color: token.selectionColor }}>
+                              {token.badgeNumber}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="token-list-copy">
+                          <strong>{token.name}</strong>
+                          <small>
+                            {tokenSizeLabels[token.size]} · {getTokenSizeCellLabel(token.size)} · {getTokenNameCardinality(scene.tokens, token.name)}
+                          </small>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="token-visibility-button"
+                        onClick={() => handleToggleTokenVisibility(token.id)}
+                        aria-pressed={!token.visible}
+                        aria-label={token.visible ? `Ocultar ${token.name}` : `Mostrar ${token.name}`}
+                      >
+                        {token.visible ? "Ocultar" : "Mostrar"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="sidebar-hint">No hay tokens en escena.</p>
+            )}
+            <button type="button" className="new-token-button" onClick={() => void handleRequestSidebarNewToken()}>
+              Nuevo token
+            </button>
+          </SidebarAccordion>
+
+          <SidebarAccordion
             id="darkness-controls-panel"
             icon="●"
             title="Oscuridad"
@@ -1951,6 +2256,87 @@ export function App(): JSX.Element {
           </section>
         </div>
       ) : null}
+      {newTokenDraft !== null ? (
+        <div className="modal-backdrop" onClick={handleCancelNewToken}>
+          <section
+            className="confirmation-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-token-dialog-title"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
+          >
+            <div>
+              <h2 id="new-token-dialog-title">Nuevo token</h2>
+              <p>
+                {newTokenDraft.imagePath === null
+                  ? "Selecciona una imagen y ajusta los datos iniciales."
+                  : newTokenDraft.imagePath.split(/[\\/]/).pop()}
+              </p>
+            </div>
+            <div className="token-modal-preview">
+              {newTokenDraft.imageUrl !== null ? <img src={newTokenDraft.imageUrl} alt="" /> : <span>Sin imagen</span>}
+              <button type="button" onClick={() => void handleChooseNewTokenImage()} disabled={isBusy}>
+                {newTokenDraft.imageUrl === null ? "Seleccionar imagen" : "Cambiar imagen"}
+              </button>
+            </div>
+            <div className="modal-form">
+              <label>
+                Nombre
+                <input
+                  type="text"
+                  autoFocus
+                  value={newTokenDraft.name}
+                  onChange={(event) =>
+                    setNewTokenDraft((current) =>
+                      current !== null ? { ...current, name: event.target.value } : null
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleConfirmNewToken();
+                    if (event.key === "Escape") handleCancelNewToken();
+                  }}
+                />
+              </label>
+              <label>
+                Tamaño
+                <select
+                  value={newTokenDraft.size}
+                  onChange={(event) =>
+                    setNewTokenDraft((current) =>
+                      current !== null
+                        ? { ...current, size: event.target.value as TokenSize }
+                        : null
+                    )
+                  }
+                >
+                  {(["tiny", "small", "medium", "large", "huge", "gargantuan"] as TokenSize[]).map(
+                    (size) => (
+                      <option key={size} value={size}>
+                        {tokenSizeLabels[size]} ({getTokenSizeCellLabel(size)})
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" onClick={handleCancelNewToken}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="is-primary"
+                onClick={handleConfirmNewToken}
+                disabled={newTokenDraft.imagePath === null || isBusy}
+              >
+                Crear token
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
       {interaction.contextMenu !== null ? (
         <div
           className="context-menu-backdrop"
@@ -1992,6 +2378,12 @@ export function App(): JSX.Element {
               </menu>
             </li>
             <li className="has-submenu">
+              <button type="button">Tokens ▶</button>
+              <menu className="context-submenu">
+                <button type="button" onClick={handleCreateToken}>Crear token</button>
+              </menu>
+            </li>
+            <li className="has-submenu">
               <button type="button">Efectos ▶</button>
               <menu className="context-submenu">
                 <button type="button" onClick={() => handleCreateElement("fire")}>Fuego</button>
@@ -2018,6 +2410,50 @@ function mergeFireCells(existing: readonly FireCell[], incoming: readonly FireCe
   }
 
   return [...cells.values()];
+}
+
+function getFileBaseName(filePath: string): string {
+  const normalized = filePath.replaceAll("\\", "/");
+  const fileName = normalized.split("/").pop() ?? "Token";
+  return fileName.replace(/\.[^.]+$/, "") || "Token";
+}
+
+
+function getTokenSizeCellLabel(size: TokenSize): string {
+  switch (size) {
+    case "tiny":
+    case "small":
+    case "medium":
+      return "1x1";
+    case "large":
+      return "2x2";
+    case "huge":
+      return "3x3";
+    case "gargantuan":
+      return "4x4";
+  }
+}
+
+function getNextNumericId(ids: readonly string[], prefix: string): number {
+  const values = ids
+    .filter((id) => id.startsWith(prefix))
+    .map((id) => Number.parseInt(id.slice(prefix.length), 10))
+    .filter((value) => Number.isFinite(value));
+
+  if (values.length === 0) {
+    return 1;
+  }
+
+  return Math.max(...values) + 1;
+}
+
+function sameTokenName(left: string, right: string): boolean {
+  return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
+}
+
+function getTokenNameCardinality(tokens: readonly SceneToken[], tokenName: string): string {
+  const count = tokens.filter((token) => sameTokenName(token.name, tokenName)).length;
+  return `${count} ${count === 1 ? "igual" : "iguales"}`;
 }
 
 interface SidebarAccordionProps {

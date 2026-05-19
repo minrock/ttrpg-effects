@@ -76,6 +76,45 @@ describe("scene use cases", () => {
     });
   });
 
+  it("loads existing token images through storage-provided URLs", async () => {
+    const scene = {
+      ...createDefaultScene(),
+      tokens: [
+        {
+          id: "token-1",
+          name: "Goblin",
+          type: "Goblin",
+          imagePath: "/tokens/goblin.png",
+          position: { x: 150, y: 150 },
+          size: "small" as const,
+          footprintCells: 1 as const,
+          selectionColor: "#fff0a8",
+          badgeNumber: 1,
+          order: 1,
+          visible: true
+        }
+      ]
+    };
+    const storage: SceneFileStorage = {
+      saveSceneJson: async () => null,
+      loadSceneJson: async () => ({
+        filePath: "/tmp/example.ttrpgscene",
+        json: serializeSceneDocument(scene)
+      }),
+      fileExists: async () => true,
+      getTokenImageUrl: async (filePath) => `map-asset://${filePath}`
+    };
+
+    const result = await loadSceneUseCase(storage);
+
+    expect(result).toMatchObject({
+      ok: true,
+      tokenImageUrls: {
+        "token-1": "map-asset:///tokens/goblin.png"
+      }
+    });
+  });
+
   it("does not request a map URL when the referenced map is missing", async () => {
     const scene = {
       ...createDefaultScene(),

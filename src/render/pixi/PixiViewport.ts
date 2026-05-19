@@ -19,7 +19,8 @@ import type {
   SceneLight,
   SceneMagicalDarknessEffect,
   SceneSettings,
-  SceneShape
+  SceneShape,
+  SceneToken
 } from "../../domain/sessions/scene-document";
 import {
   formatDistance,
@@ -31,6 +32,10 @@ import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
 import { getVisibleAreasFromLights } from "../../domain/vision/vision";
 import type { FireCell } from "../../domain/effects/fire";
+
+export type RenderSceneToken = SceneToken & {
+  readonly imageUrl: string | null;
+};
 
 interface PointerDragState {
   readonly pointerId: number;
@@ -114,11 +119,14 @@ export class PixiViewport {
   private darkvisionMask: Graphics | null = null;
   private readonly grayscaleFilter = new ColorMatrixFilter();
   private mapLoadVersion = 0;
+  private tokenLoadVersion = 0;
   private loadedMapUrl: string | null = null;
+  private loadedTokenUrls = new Set<string>();
   private elements: readonly TacticalElement[] = [];
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
   private effects: readonly SceneEffect[] = [];
+  private tokens: readonly RenderSceneToken[] = [];
   private selectedElementId: string | null = null;
   private isZoomLocked = false;
   private isMapAdjustMode = false;
@@ -171,6 +179,7 @@ export class PixiViewport {
     this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
+    void this.drawTokenLayer();
     this.drawInteractiveElements();
   }
 
@@ -179,6 +188,12 @@ export class PixiViewport {
     this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
+    this.drawInteractiveElements();
+  }
+
+  setTokens(tokens: readonly RenderSceneToken[]): void {
+    this.tokens = tokens;
+    void this.drawTokenLayer();
     this.drawInteractiveElements();
   }
 
@@ -227,6 +242,16 @@ export class PixiViewport {
     this.drawInteractiveElements();
   }
 
+  getRandomVisibleWorldPoint(): WorldPoint {
+    const viewport = this.getViewportSize();
+    const screenPoint = {
+      x: viewport.width * (0.25 + Math.random() * 0.5),
+      y: viewport.height * (0.25 + Math.random() * 0.5)
+    };
+
+    return screenToWorld(screenPoint, this.camera, viewport);
+  }
+
   setMap(map: MapImageState | null): void {
     const prevUrl = this.map?.imageUrl ?? null;
     this.map = map;
@@ -253,6 +278,7 @@ export class PixiViewport {
     this.drawGrid();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
+    void this.drawTokenLayer();
     this.drawInteractiveElements();
   }
 
@@ -282,6 +308,10 @@ export class PixiViewport {
     this._darknessTexture = null;
     this._fogOfWarTexture?.destroy();
     this._fogOfWarTexture = null;
+    for (const url of this.loadedTokenUrls) {
+      void Assets.unload(url);
+    }
+    this.loadedTokenUrls.clear();
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
     }
@@ -982,6 +1012,74 @@ export class PixiViewport {
     }
   }
 
+  private async drawTokenLayer(): Promise<void> {
+    const layer = this.getLayer("tokens");
+    const loadVersion = ++this.tokenLoadVersion;
+    layer.removeChildren();
+
+    const currentUrls = new Set(
+      this.tokens
+        .map((token) => token.imageUrl)
+        .filter((url): url is string => typeof url === "string" && url.length > 0)
+    );
+
+    for (const url of this.loadedTokenUrls) {
+      if (!currentUrls.has(url)) {
+        void Assets.unload(url);
+        this.loadedTokenUrls.delete(url);
+      }
+    }
+
+    for (const token of this.tokens) {
+      if (!token.visible) {
+        continue;
+      }
+
+      if (this.disposed || loadVersion !== this.tokenLoadVersion) {
+        return;
+      }
+
+      const container = new Container();
+      container.label = token.id;
+      const footprintWorld = this.getTokenFootprintWorld(token);
+
+      if (token.imageUrl !== null) {
+        try {
+          const texture = await Assets.load(token.imageUrl);
+
+          if (this.disposed || loadVersion !== this.tokenLoadVersion) {
+            return;
+          }
+
+          this.loadedTokenUrls.add(token.imageUrl);
+          const sprite = new Sprite(texture);
+          sprite.anchor.set(0.5);
+          const textureMin = Math.max(Math.min(texture.width, texture.height), 1);
+          const scale = footprintWorld / textureMin;
+          sprite.width = texture.width * scale;
+          sprite.height = texture.height * scale;
+          sprite.position.set(token.position.x, token.position.y);
+          const tokenMask = new Graphics()
+            .circle(token.position.x, token.position.y, footprintWorld / 2)
+            .fill({ color: 0xffffff, alpha: 1 });
+          sprite.setMask({ mask: tokenMask });
+          container.addChild(sprite);
+          container.addChild(tokenMask);
+        } catch {
+          container.addChild(drawTokenPlaceholder(token, footprintWorld));
+        }
+      } else {
+        container.addChild(drawTokenPlaceholder(token, footprintWorld));
+      }
+
+      if (this.shouldShowTokenBadge(token)) {
+        container.addChild(drawTokenBadge(token, footprintWorld));
+      }
+
+      layer.addChild(container);
+    }
+  }
+
   private drawFogOfWarLayer(): void {
     const layer = this.getLayer("fogOfWar");
     layer.removeChildren();
@@ -1414,6 +1512,14 @@ export class PixiViewport {
     return this.lights.find((light) => light.id === this.selectedElementId) ?? null;
   }
 
+  private getTokenFootprintWorld(token: RenderSceneToken): number {
+    return token.footprintCells * (this.grid?.cellSizeWorld ?? 100);
+  }
+
+  private shouldShowTokenBadge(token: RenderSceneToken): boolean {
+    return this.tokens.filter((candidate) => normalizeTokenName(candidate.name) === normalizeTokenName(token.name)).length > 1;
+  }
+
   private getSelectedLinearShape(): SceneShape | null {
     if (this.selectedElementId === null) {
       return null;
@@ -1694,7 +1800,16 @@ export class PixiViewport {
         kind: effect.kind === "fire" ? "fire" as const : "magical-darkness" as const,
         position: effect.position,
         hitRadius: effect.kind === "magical-darkness" ? effect.radius : undefined
-      }))
+      })),
+      ...this.tokens
+        .filter((token) => token.visible)
+        .map((token) => ({
+          id: token.id,
+          kind: "token" as const,
+          position: token.position,
+          hitRadius: this.getTokenFootprintWorld(token) / 2,
+          selectionColor: token.selectionColor
+        }))
     ];
   }
 
@@ -1840,9 +1955,10 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
+  readonly selectionColor?: string;
 }
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
@@ -2349,6 +2465,10 @@ function hashString(value: string): number {
   return hash >>> 0;
 }
 
+function normalizeTokenName(name: string): string {
+  return name.trim().toLocaleLowerCase();
+}
+
 function drawSceneLight(light: SceneLight): Graphics {
   const graphic = new Graphics();
   const color = parseHexColor(light.color);
@@ -2620,12 +2740,40 @@ function drawMagicalDarknessEffect(effect: SceneMagicalDarknessEffect): Graphics
     .stroke({ color: 0x000000, width: 4, alpha: 0.95 });
 }
 
+function drawTokenPlaceholder(token: RenderSceneToken, footprintWorld: number): Graphics {
+  return new Graphics()
+    .circle(token.position.x, token.position.y, footprintWorld / 2)
+    .fill({ color: 0x273033, alpha: 0.96 })
+    .stroke({ color: parseHexColor(token.selectionColor), width: 3, alpha: 0.72 });
+}
+
+function drawTokenBadge(token: RenderSceneToken, footprintWorld: number): Container {
+  const container = new Container();
+  const x = token.position.x + footprintWorld / 2 - Math.max(8, footprintWorld * 0.08);
+  const y = token.position.y - footprintWorld / 2 + Math.max(12, footprintWorld * 0.12);
+  const label = new Text({
+    text: String(token.badgeNumber),
+    style: {
+      fill: parseHexColor(token.selectionColor),
+      fontFamily: "system-ui, sans-serif",
+      fontSize: Math.max(12, Math.min(18, footprintWorld * 0.18)),
+      fontWeight: "800",
+      stroke: { color: 0x111315, width: 3 }
+    }
+  });
+
+  label.anchor.set(1, 0);
+  label.position.set(x, y);
+  container.addChild(label);
+  return container;
+}
+
 function drawSelection(element: SelectableRenderElement): Graphics {
   const { x, y } = element.position;
-  const radius = getHitRadius(element.kind) + 8;
+  const radius = (element.hitRadius ?? getHitRadius(element.kind)) + 8;
 
   return new Graphics().circle(x, y, radius).stroke({
-    color: 0xfff0a8,
+    color: parseHexColor(element.selectionColor ?? "#fff0a8"),
     width: 4,
     alpha: 0.95
   });
@@ -2889,6 +3037,8 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
       return 42;
     case "magical-darkness":
       return 72;
+    case "token":
+      return 50;
   }
 }
 
