@@ -156,7 +156,7 @@
 ## 10. Documentacion afectada
 
 - Actualizar README con pasos para probar oscuridad, luces y fuego.
-- Documentar asset de fuego, fuente y licencia si aplica.
+- Documentar asset de fuego interno generado para el proyecto.
 - Actualizar este plan si se decide usar un sistema distinto de blend/mask.
 
 ## 11. Checklist de cierre
@@ -177,7 +177,7 @@
 - [x] Seleccion/movimiento/borrado de luces/fuego implementado.
 - [x] Panel compacto de propiedades implementado.
 - [x] Guardar/cargar escena conserva luces/fuego.
-- [x] Asset/licencia de fuego documentado si aplica: no aplica, fuego procedural sin asset externo.
+- [x] Asset/licencia de fuego documentado: GIF interno generado para el proyecto en `src/renderer/public/effects/area-fire.gif`, sin asset externo.
 - [x] `pnpm test` ejecutado.
 - [x] `pnpm typecheck` ejecutado.
 - [x] `pnpm lint` ejecutado.

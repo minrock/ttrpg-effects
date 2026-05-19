@@ -1,22 +1,25 @@
-# Plan de implementacion tecnica - 09 - Zonas de Fuego Vectorial y Pintado por Celdas
+# Plan de implementacion tecnica - 09 - Zonas de Fuego Animado y Pintado por Celdas
 
 ## 1. Resumen
 
 - **Spec fuente:** `./specs/09-fire-gif-effect-zones/09-fire-gif-effect-zones.md`
-- **Objetivo:** Reemplazar el enfoque GIF/freehand por fuego vectorial rojo y pintado por celdas de grilla con pincel circular.
+- **Objetivo:** Reemplazar el freehand por fuego animado con GIF interno enmascarado y pintado por celdas de grilla con pincel circular.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 03, 06, 07 y 08; sistema de efectos existente; escena versionada; PixiJS viewport.
 
 ## 2. Alcance
 
-- Remover carga y render de GIF para fuego.
+- Usar `src/renderer/public/effects/area-fire.gif` como asset interno del renderer.
 - Remover herramienta freehand de fuego.
-- Mantener fuego circular como area roja opaca.
+- Mantener fuego circular como un unico GIF escalado al diametro del circulo y enmascarado por la geometria circular.
 - Mantener handles para radio visual del fuego y radio de luz (solo en modo `circle`).
 - Agregar zona `cells` para fuego pintado en cuadrados de grilla.
 - Agregar modo `Pintar fuego` en el menu contextual.
 - Convertir click/drag del pincel a celdas de grilla en coordenadas de mundo.
+- Agrupar celdas contiguas por conectividad cardinal y renderizar un unico GIF por region contigua.
+- Aplicar alpha del GIF como `effect.opacity * 0.65` con minimo visual suave para dejar ver el mapa debajo.
+- No renderizar emojis sobre fuego; el GIF animado es la representacion visual del efecto.
 - Radio de pincel por defecto: 25 unidades de mundo.
 - Guardar/cargar zonas `cells` en `.ttrpgscene`.
 - Iluminacion por celdas: anillo 1 (luz brillante) y anillo 2 (luz tenue) calculados geometricamente desde el contorno de celdas pintadas.
@@ -25,7 +28,7 @@
 ## 3. Decisiones tecnicas
 
 - **Dominio:** `FireZone` queda como union `circle | cells`; `cells` guarda celdas `{ x, y, size }` y `radius` para el pincel.
-- **Render:** El fuego se dibuja con `Graphics` de Pixi: circulos o rectangulos rojos opacos, sin assets externos.
+- **Render:** El fuego usa `GifSprite` de Pixi desde un asset interno servido por Vite/Electron (`/effects/area-fire.gif`). El renderer aplica mascaras `Graphics` para circulos, circulos abiertos y grupos de celdas. Si el GIF falla, se conserva fallback vectorial rojo.
 - **Pintado:** El viewport calcula las celdas tocadas usando el origen mundial (0, 0) y `cellSizeWorld`, alineado al grid visual independientemente de la posicion del mapa.
 - **Persistencia:** El schema acepta zonas `cells` y mantiene default circular para escenas viejas sin `zone`.
 - **Seguridad:** No hay IPC ni acceso filesystem nuevo.
@@ -50,9 +53,10 @@
 
 ### `render`
 
-- Remover `GifSource`, `GifSprite`, carga de `assets/effects/fire.gif` y destructores especiales.
-- Renderizar zona circular como rojo opaco.
-- Renderizar zona `cells` como cuadrados rojos opacos.
+- Cargar `area-fire.gif` desde assets publicos del renderer, no desde `map-asset:`.
+- Renderizar zona circular con un solo `GifSprite` escalado y una mascara circular.
+- Renderizar zona `cells` agrupando celdas contiguas; cada grupo usa un solo `GifSprite` escalado a su bounding box y una mascara de celdas.
+- Mantener fallback rojo vectorial si el GIF no carga.
 - Mantener handles naranja y luz para resize solo en modo `circle`; en modo `cells` no se muestran.
 - Luz del fuego en modo `cells`: calcular anillo brillante (adyacentes al fuego) y anillo tenue (adyacentes al anillo brillante) con `computeCellRings`.
 - Mantener luz del fuego en capa `lights` y como erase mask de oscuridad/fog para ambos modos.
@@ -60,26 +64,28 @@
 
 ## 5. Plan de trabajo
 
-1. Eliminar import/carga/render de GIF.
+1. Agregar asset interno `area-fire.gif` al renderer public.
 2. Cambiar modelo `FireZone` de `freehand` a `cells`.
 3. Actualizar schema y tipos de escena.
 4. Cambiar herramienta de UI a `Pintar fuego`.
 5. Calcular celdas pintadas desde viewport usando grilla.
 6. Fusionar celdas pintadas en estado React.
-7. Renderizar circulos/celdas rojas con `Graphics`.
+7. Renderizar circulos/celdas con GIF enmascarado y fallback rojo con `Graphics`.
 8. Mantener handles de radio de fuego y luz.
 9. Actualizar README/spec/plan.
 10. Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 
 ## 6. Criterios de aceptacion
 
-- No queda carga de GIF en el render.
+- El render carga el GIF interno `area-fire.gif` desde `/effects/area-fire.gif`.
 - No queda modo freehand para fuego en UI.
 - `Pintar fuego` crea o extiende zonas por celdas.
 - Las celdas pintadas se alinean al grid visual aunque el mapa se haya movido.
 - El radio del pincel por defecto es 25; decide cuantas celdas se pintan.
-- El fuego circular se ve como area roja opaca con handles de resize.
-- El fuego por celdas se ve como cuadrados rojos opacos sin handles de resize.
+- El fuego circular se ve como un unico GIF animado enmascarado con handles de resize.
+- El fuego por celdas se ve como un unico GIF por region contigua sin handles de resize.
+- El GIF usa alpha `0.65 * opacity` para dejar ver parcialmente el mapa debajo.
+- El fuego no muestra emojis.
 - En modo `cells`, el anillo 1 adyacente emite luz brillante y el anillo 2 emite luz tenue.
 - La oscuridad y el fog of war se revelan sobre fuego + anillo 1 + anillo 2.
 - Guardar/cargar conserva zonas `cells`.
@@ -92,15 +98,18 @@
 - **Tests:** `pnpm test`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Smoke manual:** `pnpm dev`, crear fuego circular, ajustar radio naranja, activar `Pintar fuego` desde el menu contextual, pintar una celda y varias celdas, guardar/cargar escena.
+- **Smoke manual:** `pnpm dev`, crear fuego circular, ajustar radio naranja, confirmar que usa un solo GIF escalado; activar `Pintar fuego`, pintar una celda, un bloque 2x2/3x3 y regiones separadas, confirmar un GIF por region contigua, guardar/cargar escena.
 
 ## 8. Checklist de cierre
 
-- [x] GIF removido del render.
+- [x] GIF interno agregado al render.
 - [x] Freehand removido del flujo principal.
 - [x] Zona `cells` agregada.
 - [x] Pintado por celdas implementado.
-- [x] Render rojo vectorial implementado.
+- [x] Render con GIF enmascarado implementado, con fallback rojo vectorial.
+- [x] Fuego circular usa un solo GIF escalado.
+- [x] Fuego por celdas usa un GIF por region contigua.
+- [x] Fuego sin emojis.
 - [x] Handles de fuego/luz solo en modo `circle`.
 - [x] Handles ocultos en modo `cells` (sin circulo naranja ni amarillo).
 - [x] Iluminacion por anillos de celdas implementada (`computeCellRings`).
