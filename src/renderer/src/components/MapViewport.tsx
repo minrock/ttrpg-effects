@@ -41,8 +41,11 @@ interface MapViewportProps {
   readonly isFogRevealMode: boolean;
   readonly isFirePaintMode: boolean;
   readonly isPathDrawingMode: boolean;
+  readonly isWaterDrawingMode: boolean;
   readonly pathPreviewPoints: readonly { readonly x: number; readonly y: number }[];
   readonly pathPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
+  readonly waterPreviewPoints: readonly { readonly x: number; readonly y: number }[];
+  readonly waterPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
   readonly onContextMenuRequest: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect: (elementId: string | null) => void;
   readonly onGridCellSizeChange: (cellSizeWorld: number) => void;
@@ -55,6 +58,8 @@ interface MapViewportProps {
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
   readonly onPathPointAdd: (point: { readonly x: number; readonly y: number }) => void;
   readonly onPathPointerMove: (point: { readonly x: number; readonly y: number } | null) => void;
+  readonly onWaterPointAdd: (point: { readonly x: number; readonly y: number }) => void;
+  readonly onWaterPointerMove: (point: { readonly x: number; readonly y: number } | null) => void;
   readonly onPathPointMove: (elementId: string, pointIndex: number, x: number, y: number) => void;
   readonly onPathMove: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange: (elementId: string, direction: number) => void;
@@ -65,6 +70,8 @@ interface MapViewportProps {
   readonly onFireZoneRadiusChange: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange: (elementId: string, radius: number) => void;
   readonly onMagicalDarknessRadiusChange: (elementId: string, radius: number) => void;
+  readonly onWaterLineRotationChange: (elementId: string, rotation: number) => void;
+  readonly onWaterPatternRotationChange: (elementId: string, rotation: number) => void;
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport({
@@ -86,8 +93,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isFogRevealMode,
   isFirePaintMode,
   isPathDrawingMode,
+  isWaterDrawingMode,
   pathPreviewPoints,
   pathPreviewHoverPoint,
+  waterPreviewPoints,
+  waterPreviewHoverPoint,
   onContextMenuRequest,
   onElementSelect,
   onGridCellSizeChange,
@@ -100,6 +110,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onShapeEndMove,
   onPathPointAdd,
   onPathPointerMove,
+  onWaterPointAdd,
+  onWaterPointerMove,
   onPathPointMove,
   onPathMove,
   onShapeDirectionChange,
@@ -109,7 +121,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onFirePaint,
   onFireZoneRadiusChange,
   onFireLightRadiusChange,
-  onMagicalDarknessRadiusChange
+  onMagicalDarknessRadiusChange,
+  onWaterLineRotationChange,
+  onWaterPatternRotationChange
 }: MapViewportProps, ref): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
@@ -142,6 +156,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onShapeEndMove,
       onPathPointAdd,
       onPathPointerMove,
+      onWaterPointAdd,
+      onWaterPointerMove,
       onPathPointMove,
       onPathMove,
       onShapeDirectionChange,
@@ -151,7 +167,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onFirePaint,
       onFireZoneRadiusChange,
       onFireLightRadiusChange,
-      onMagicalDarknessRadiusChange
+      onMagicalDarknessRadiusChange,
+      onWaterLineRotationChange,
+      onWaterPatternRotationChange
     }).then((createdViewport) => {
       if (cancelled) {
         createdViewport.destroy();
@@ -178,6 +196,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setFirePaintMode(isFirePaintMode);
       createdViewport.setPathDrawingMode(isPathDrawingMode);
       createdViewport.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
+      createdViewport.setWaterDrawingMode(isWaterDrawingMode);
+      createdViewport.setWaterPreview(waterPreviewPoints, waterPreviewHoverPoint);
     });
 
     return () => {
@@ -185,7 +205,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -263,10 +283,18 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     viewportRef.current?.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
   }, [pathPreviewPoints, pathPreviewHoverPoint]);
 
+  useEffect(() => {
+    viewportRef.current?.setWaterDrawingMode(isWaterDrawingMode);
+  }, [isWaterDrawingMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setWaterPreview(waterPreviewPoints, waterPreviewHoverPoint);
+  }, [waterPreviewPoints, waterPreviewHoverPoint]);
+
   return (
     <div
       ref={hostRef}
-      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
+      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isWaterDrawingMode ? " is-water-drawing-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
       aria-label="Lienzo del mapa"
     >
       <NavigationLegend />

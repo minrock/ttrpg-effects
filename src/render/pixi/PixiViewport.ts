@@ -21,7 +21,8 @@ import type {
   SceneMagicalDarknessEffect,
   SceneSettings,
   SceneShape,
-  SceneToken
+  SceneToken,
+  SceneWaterEffect
 } from "../../domain/sessions/scene-document";
 import {
   formatDistance,
@@ -63,7 +64,9 @@ interface PointerDragState {
     | "fire-paint"
     | "fire-zone-resize"
     | "fire-light-resize"
-    | "magical-darkness-resize";
+    | "magical-darkness-resize"
+    | "water-line-rotate"
+    | "water-pattern-rotate";
   readonly elementId?: string;
   readonly handleIndex?: number;
   readonly grabOffset?: WorldPoint;
@@ -90,6 +93,8 @@ export interface PixiViewportOptions {
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
   readonly onPathPointAdd?: (point: WorldPoint) => void;
   readonly onPathPointerMove?: (point: WorldPoint | null) => void;
+  readonly onWaterPointAdd?: (point: WorldPoint) => void;
+  readonly onWaterPointerMove?: (point: WorldPoint | null) => void;
   readonly onPathPointMove?: (elementId: string, pointIndex: number, x: number, y: number) => void;
   readonly onPathMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
@@ -98,6 +103,8 @@ export interface PixiViewportOptions {
   readonly onFireZoneRadiusChange?: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange?: (elementId: string, radius: number) => void;
   readonly onMagicalDarknessRadiusChange?: (elementId: string, radius: number) => void;
+  readonly onWaterLineRotationChange?: (elementId: string, rotation: number) => void;
+  readonly onWaterPatternRotationChange?: (elementId: string, rotation: number) => void;
   readonly onShapeRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
 }
@@ -137,14 +144,18 @@ export class PixiViewport {
   private isFogRevealMode = false;
   private isFirePaintMode = false;
   private isPathDrawingMode = false;
+  private isWaterDrawingMode = false;
   private pathPreviewPoints: readonly WorldPoint[] = [];
   private pathPreviewHoverPoint: WorldPoint | null = null;
+  private waterPreviewPoints: readonly WorldPoint[] = [];
+  private waterPreviewHoverPoint: WorldPoint | null = null;
   private pathHoverZone: "point" | "circle" | null = null;
   private fogRevealStrokePoints: WorldPoint[] = [];
   private dragState: PointerDragState | null = null;
   private _darknessTexture: RenderTexture | null = null;
   private _fogOfWarTexture: RenderTexture | null = null;
   private disposed = false;
+  private waterPatternSource: GifSource | null = null;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
@@ -238,9 +249,20 @@ export class PixiViewport {
     this.updateCursor();
   }
 
+  setWaterDrawingMode(isWaterDrawingMode: boolean): void {
+    this.isWaterDrawingMode = isWaterDrawingMode;
+    this.updateCursor();
+  }
+
   setPathPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
     this.pathPreviewPoints = points;
     this.pathPreviewHoverPoint = hoverPoint;
+    this.drawInteractiveElements();
+  }
+
+  setWaterPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
+    this.waterPreviewPoints = points;
+    this.waterPreviewHoverPoint = hoverPoint;
     this.drawInteractiveElements();
   }
 
@@ -320,6 +342,7 @@ export class PixiViewport {
     this.darkvisionMask?.destroy();
     this.darkvisionMask = null;
     this.firePatternSource = null;
+    this.waterPatternSource = null;
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -335,6 +358,7 @@ export class PixiViewport {
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
     this.firePatternSource = await loadFirePatternSource();
+    this.waterPatternSource = await loadWaterPatternSource();
 
     this.createLayers();
     this.drawStaticScene();
@@ -380,7 +404,7 @@ export class PixiViewport {
 
   private drawGrid(): void {
     const layer = this.getLayer("grid");
-    layer.removeChildren();
+    clearContainerChildren(layer);
 
     if (this.grid === null || !this.grid.enabled) {
       return;
@@ -412,7 +436,7 @@ export class PixiViewport {
 
   private drawDarknessLayer(): void {
     const layer = this.getLayer("darkness");
-    layer.removeChildren();
+    clearContainerChildren(layer);
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
 
@@ -544,12 +568,14 @@ export class PixiViewport {
       } else if (this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
-      } else if (this.isPathDrawingMode) {
+      } else if (this.isPathDrawingMode || this.isWaterDrawingMode) {
         mode = "idle";
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
         const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
         const hitMagicalDarknessResizeElementId = this.hitTestMagicalDarknessResizeHandle(point);
+        const hitWaterLineRotationElementId = this.hitTestWaterLineRotationHandle(point);
+        const hitWaterPatternRotationElementId = this.hitTestWaterPatternRotationHandle(point);
         const hitLightResizeElementId = this.hitTestLightResizeHandle(point);
         const hitRotationElementId = this.hitTestConeRotationHandle(point);
         const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
@@ -576,6 +602,16 @@ export class PixiViewport {
           elementId = hitMagicalDarknessResizeElementId;
           this.options.onElementSelect?.(hitMagicalDarknessResizeElementId);
           this.updateMagicalDarknessRadiusFromScreenPoint(hitMagicalDarknessResizeElementId, point);
+        } else if (hitWaterLineRotationElementId !== null) {
+          mode = "water-line-rotate";
+          elementId = hitWaterLineRotationElementId;
+          this.options.onElementSelect?.(hitWaterLineRotationElementId);
+          this.updateWaterLineRotationFromScreenPoint(hitWaterLineRotationElementId, point);
+        } else if (hitWaterPatternRotationElementId !== null) {
+          mode = "water-pattern-rotate";
+          elementId = hitWaterPatternRotationElementId;
+          this.options.onElementSelect?.(hitWaterPatternRotationElementId);
+          this.updateWaterPatternRotationFromScreenPoint(hitWaterPatternRotationElementId, point);
         } else if (hitLightResizeElementId !== null) {
           mode = "light-resize";
           elementId = hitLightResizeElementId;
@@ -661,6 +697,10 @@ export class PixiViewport {
       this.options.onPathPointerMove?.(this.snapScreenPointToCellCenter(screenPoint));
     }
 
+    if (this.isWaterDrawingMode) {
+      this.options.onWaterPointerMove?.(this.snapScreenPointToCellCenter(screenPoint));
+    }
+
     if (this.dragState === null) {
       const newZone = this.hitTestPathHandles(screenPoint)?.zone ?? null;
       if (newZone !== this.pathHoverZone) {
@@ -712,6 +752,10 @@ export class PixiViewport {
       this.updateFireLightRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "magical-darkness-resize" && this.dragState.elementId !== undefined) {
       this.updateMagicalDarknessRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "water-line-rotate" && this.dragState.elementId !== undefined) {
+      this.updateWaterLineRotationFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "water-pattern-rotate" && this.dragState.elementId !== undefined) {
+      this.updateWaterPatternRotationFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-circle-resize" && this.dragState.elementId !== undefined) {
       this.updateShapeCircleRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-cone-resize" && this.dragState.elementId !== undefined) {
@@ -777,6 +821,8 @@ export class PixiViewport {
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
       if (this.isPathDrawingMode) {
         this.options.onPathPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
+      } else if (this.isWaterDrawingMode) {
+        this.options.onWaterPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
       } else {
         this.options.onElementSelect?.(this.hitTestElement(releasePoint));
       }
@@ -793,7 +839,7 @@ export class PixiViewport {
   private updateCursor(): void {
     if (this.isGrabMode) {
       this.app.canvas.style.cursor = "grab";
-    } else if (this.isPathDrawingMode) {
+    } else if (this.isPathDrawingMode || this.isWaterDrawingMode) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isFogRevealMode || this.isFirePaintMode) {
       this.app.canvas.style.cursor = "cell";
@@ -878,11 +924,11 @@ export class PixiViewport {
     const magicalDarknessLayer = this.getLayer("magicalDarkness");
     const selectionLayer = this.getLayer("selection");
 
-    shapesLayer.removeChildren();
-    lightsLayer.removeChildren();
-    effectsLayer.removeChildren();
-    magicalDarknessLayer.removeChildren();
-    selectionLayer.removeChildren();
+    clearContainerChildren(shapesLayer);
+    clearContainerChildren(lightsLayer);
+    clearContainerChildren(effectsLayer);
+    clearContainerChildren(magicalDarknessLayer);
+    clearContainerChildren(selectionLayer);
 
     for (const effect of this.effects.filter(isVisibleLightEmittingFireEffect)) {
         lightsLayer.addChild(drawFireLight(effect));
@@ -913,6 +959,8 @@ export class PixiViewport {
         if (effect.id !== this.selectedElementId) {
           selectionLayer.addChild(drawFireZoneHint(effect));
         }
+      } else if (effect.visible && effect.kind === "water") {
+        effectsLayer.addChild(drawWaterEffect(effect, this.waterPatternSource));
       } else if (effect.visible && effect.kind === "magical-darkness") {
         magicalDarknessLayer.addChild(drawMagicalDarknessEffect(effect));
       }
@@ -971,6 +1019,14 @@ export class PixiViewport {
         selectionLayer.addChild(drawMagicalDarknessResizeHandle(selectedMagicalDarkness));
       }
 
+      const selectedWater = this.effects.find(
+        (effect): effect is SceneWaterEffect => effect.id === this.selectedElementId && effect.kind === "water"
+      );
+
+      if (selectedWater !== undefined) {
+        selectionLayer.addChild(drawWaterRotationHandles(selectedWater));
+      }
+
       const selectedCircleShape = this.shapes.find(
         (s) => s.id === this.selectedElementId && s.type === "circle"
       );
@@ -1014,12 +1070,22 @@ export class PixiViewport {
         )
       );
     }
+
+    if (this.isWaterDrawingMode && this.grid !== null) {
+      selectionLayer.addChild(
+        drawWaterPreview(
+          this.waterPreviewPoints,
+          this.waterPreviewHoverPoint,
+          this.grid.cellSizeWorld
+        )
+      );
+    }
   }
 
   private async drawTokenLayer(): Promise<void> {
     const layer = this.getLayer("tokens");
     const loadVersion = ++this.tokenLoadVersion;
-    layer.removeChildren();
+    clearContainerChildren(layer);
 
     const currentUrls = new Set(
       this.tokens
@@ -1086,7 +1152,7 @@ export class PixiViewport {
 
   private drawFogOfWarLayer(): void {
     const layer = this.getLayer("fogOfWar");
-    layer.removeChildren();
+    clearContainerChildren(layer);
     this._fogOfWarTexture?.destroy();
     this._fogOfWarTexture = null;
 
@@ -1181,7 +1247,7 @@ export class PixiViewport {
 
   private drawVisionObstaclesLayer(): void {
     const layer = this.getLayer("walls");
-    layer.removeChildren();
+    clearContainerChildren(layer);
 
     if (this.fogOfWar === null || this.fogOfWar.obstacles.length === 0) {
       return;
@@ -1313,6 +1379,16 @@ export class PixiViewport {
       if (element.kind === "path") {
         const path = this.shapes.find((shape) => shape.id === element.id && shape.type === "path");
         if (path !== undefined && hitTestPath(path, worldPoint, 14 / this.camera.zoom)) {
+          return element.id;
+        }
+        continue;
+      }
+
+      if (element.kind === "water") {
+        const water = this.effects.find(
+          (effect): effect is SceneWaterEffect => effect.id === element.id && effect.kind === "water"
+        );
+        if (water !== undefined && hitTestWaterEffect(water, worldPoint, 18 / this.camera.zoom)) {
           return element.id;
         }
         continue;
@@ -1634,6 +1710,80 @@ export class PixiViewport {
     this.options.onMagicalDarknessRadiusChange?.(elementId, Math.max(1, radius));
   }
 
+  private updateWaterPatternRotationFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const effect = this.effects.find(
+      (candidate): candidate is SceneWaterEffect => candidate.id === elementId && candidate.kind === "water"
+    );
+
+    if (effect === undefined) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const rotation =
+      (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) / Math.PI;
+    this.options.onWaterPatternRotationChange?.(elementId, rotation);
+  }
+
+  private updateWaterLineRotationFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const effect = this.effects.find(
+      (candidate): candidate is SceneWaterEffect => candidate.id === elementId && candidate.kind === "water"
+    );
+
+    if (effect === undefined) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const rotation =
+      (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) / Math.PI;
+    this.options.onWaterLineRotationChange?.(elementId, rotation);
+  }
+
+  private hitTestWaterLineRotationHandle(screenPoint: ScreenPoint): string | null {
+    if (this.selectedElementId === null) {
+      return null;
+    }
+
+    const effect = this.effects.find(
+      (candidate): candidate is SceneWaterEffect =>
+        candidate.id === this.selectedElementId && candidate.kind === "water"
+    );
+
+    if (effect === undefined) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const handle = getWaterLineRotationHandlePosition(effect);
+
+    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18
+      ? effect.id
+      : null;
+  }
+
+  private hitTestWaterPatternRotationHandle(screenPoint: ScreenPoint): string | null {
+    if (this.selectedElementId === null) {
+      return null;
+    }
+
+    const effect = this.effects.find(
+      (candidate): candidate is SceneWaterEffect =>
+        candidate.id === this.selectedElementId && candidate.kind === "water"
+    );
+
+    if (effect === undefined) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const handle = getWaterPatternRotationHandlePosition(effect);
+
+    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18
+      ? effect.id
+      : null;
+  }
+
   private hitTestCircleResizeHandle(screenPoint: ScreenPoint): string | null {
     const shape = this.shapes.find(
       (s) => s.id === this.selectedElementId && s.type === "circle"
@@ -1801,7 +1951,7 @@ export class PixiViewport {
       })),
       ...this.effects.map((effect) => ({
         id: effect.id,
-        kind: effect.kind === "fire" ? "fire" as const : "magical-darkness" as const,
+        kind: effect.kind === "fire" ? "fire" as const : effect.kind === "magical-darkness" ? "magical-darkness" as const : "water" as const,
         position: effect.position,
         hitRadius: effect.kind === "magical-darkness" ? effect.radius : undefined
       })),
@@ -1838,7 +1988,7 @@ export class PixiViewport {
       this.colorMapSprite.mask = null;
     }
     this.darkvisionMask?.destroy();
-    layer.removeChildren();
+    clearContainerChildren(layer);
     this.mapSprite = null;
     this.colorMapSprite = null;
     this.darkvisionMask = null;
@@ -1959,7 +2109,7 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
   readonly selectionColor?: string;
@@ -1968,8 +2118,27 @@ const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
 const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
 const FIRE_PATTERN_URL = "/effects/area-fire.gif";
+const WATER_PATTERN_URL = "/effects/water/water-center.gif";
+const WATER_BODY_TILE_SIZE = 72;
+const WATER_BODY_MAX_TILE_SIZE = 150;
+const WATER_RIVER_MIN_TILE_SIZE = 44;
+const WATER_RIVER_MAX_TILE_SIZE = 96;
+const WATER_RIVER_PERFORMANCE_TILE_SIZE = 180;
+const MAX_WATER_PATTERN_SPRITES_PER_EFFECT = 360;
 const FIRE_PATTERN_ALPHA_MULTIPLIER = 0.65;
 const MAX_EMOJIS_PER_ELEMENT = 120;
+
+function clearContainerChildren(container: Container): void {
+  const children = container.removeChildren();
+
+  for (const child of children) {
+    if (child instanceof Container) {
+      clearContainerChildren(child);
+    }
+    child.destroy();
+  }
+}
+
 function parseHexColor(color: string): number {
   return Number.parseInt(color.replace("#", ""), 16);
 }
@@ -1981,6 +2150,14 @@ function isVisibleLightEmittingFireEffect(effect: SceneEffect): effect is SceneF
 async function loadFirePatternSource(): Promise<GifSource | null> {
   try {
     return await Assets.load<GifSource>(FIRE_PATTERN_URL);
+  } catch {
+    return null;
+  }
+}
+
+async function loadWaterPatternSource(): Promise<GifSource | null> {
+  try {
+    return await Assets.load<GifSource>(WATER_PATTERN_URL);
   } catch {
     return null;
   }
@@ -2619,6 +2796,293 @@ function buildDarkvisionColorMask(
   return graphic;
 }
 
+function drawWaterEffect(effect: SceneWaterEffect, waterPatternSource: GifSource | null): Container {
+  const container = new Container();
+  container.label = effect.id;
+
+  if (waterPatternSource !== null) {
+    const mask = drawWaterMask(effect);
+    addMaskedWaterPatternSprite(container, effect, waterPatternSource, mask);
+  } else {
+    container.addChild(drawWaterFallback(effect));
+  }
+
+  container.addChild(drawWaterCoast(effect));
+  return container;
+}
+
+function drawWaterPreview(
+  points: readonly WorldPoint[],
+  hoverPoint: WorldPoint | null,
+  cellSizeWorld: number
+): Graphics {
+  const graphic = new Graphics();
+  const previewPoints =
+    hoverPoint === null || points.some((point) => point.x === hoverPoint.x && point.y === hoverPoint.y)
+      ? points
+      : [...points, hoverPoint];
+  const first = previewPoints[0];
+
+  if (first === undefined) {
+    return graphic;
+  }
+
+  drawPolyline(graphic, previewPoints);
+
+  if (previewPoints.length > 1) {
+    graphic.stroke({ color: 0x7adcf0, width: 5, alpha: 0.85 });
+  }
+
+  graphic.circle(first.x, first.y, 7).fill({ color: 0x7adcf0, alpha: 0.95 });
+
+  for (const point of previewPoints.slice(1)) {
+    graphic.circle(point.x, point.y, 5).fill({ color: 0xc7f7ff, alpha: 0.9 });
+  }
+
+  const last = previewPoints[previewPoints.length - 1];
+  if (
+    last !== undefined &&
+    previewPoints.length >= 3 &&
+    Math.hypot(last.x - first.x, last.y - first.y) <= Math.max(12, cellSizeWorld * 0.5)
+  ) {
+    graphic.circle(first.x, first.y, Math.max(12, cellSizeWorld * 0.18)).stroke({
+      color: 0xc7f7ff,
+      width: 3,
+      alpha: 0.8
+    });
+  }
+
+  return graphic;
+}
+
+function drawWaterMask(effect: SceneWaterEffect): Graphics {
+  const mask = new Graphics();
+
+  if (effect.variant === "river") {
+    drawPolyline(mask, effect.points);
+    return mask.stroke({ color: 0xffffff, width: effect.width, alpha: 1, cap: "round", join: "round" });
+  }
+
+  drawPolygon(mask, effect.points);
+  return mask.fill({ color: 0xffffff, alpha: 1 });
+}
+
+function drawWaterFallback(effect: SceneWaterEffect): Graphics {
+  const graphic = new Graphics();
+
+  if (effect.variant === "river") {
+    drawPolyline(graphic, effect.points);
+    return graphic.stroke({ color: 0x1ba7d8, width: effect.width, alpha: effect.opacity, cap: "round", join: "round" });
+  }
+
+  drawPolygon(graphic, effect.points);
+  return graphic.fill({ color: 0x1ba7d8, alpha: effect.opacity });
+}
+
+function drawWaterCoast(effect: SceneWaterEffect): Graphics {
+  const graphic = new Graphics();
+
+  if (effect.variant === "river") {
+    drawPolyline(graphic, effect.points);
+    graphic.stroke({ color: 0x8b6b42, width: effect.width + 10, alpha: 0.58 * effect.opacity, cap: "round", join: "round" });
+    drawPolyline(graphic, effect.points);
+    graphic.stroke({ color: 0xd2edf2, width: effect.width + 4, alpha: 0.3 * effect.opacity, cap: "round", join: "round" });
+    return graphic;
+  }
+
+  drawPolygon(graphic, effect.points);
+  graphic.stroke({ color: 0x8b6b42, width: 12, alpha: 0.72 * effect.opacity, join: "round" });
+  drawPolygon(graphic, effect.points);
+  graphic.stroke({ color: 0xd2edf2, width: 4, alpha: 0.48 * effect.opacity, join: "round" });
+  return graphic;
+}
+
+function addMaskedWaterPatternSprite(
+  container: Container,
+  effect: SceneWaterEffect,
+  waterPatternSource: GifSource,
+  mask: Graphics
+): void {
+  if (effect.variant === "river") {
+    addRiverWaterPatternSprites(container, effect, waterPatternSource, mask);
+    return;
+  }
+
+  addWaterBodyPatternSprites(container, effect, waterPatternSource, mask);
+}
+
+function addWaterBodyPatternSprites(
+  container: Container,
+  effect: Extract<SceneWaterEffect, { readonly variant: "water-body" }>,
+  waterPatternSource: GifSource,
+  mask: Graphics
+): void {
+  const bounds = getWaterBounds(effect);
+  const patternContainer = new Container();
+  const estimatedColumns = Math.max(1, Math.ceil((bounds.right - bounds.left + WATER_BODY_TILE_SIZE * 2) / WATER_BODY_TILE_SIZE));
+  const estimatedRows = Math.max(1, Math.ceil((bounds.bottom - bounds.top + WATER_BODY_TILE_SIZE * 2) / WATER_BODY_TILE_SIZE));
+  const estimatedSprites = estimatedColumns * estimatedRows;
+  const tileSize =
+    estimatedSprites > MAX_WATER_PATTERN_SPRITES_PER_EFFECT
+      ? Math.min(
+          WATER_BODY_MAX_TILE_SIZE,
+          WATER_BODY_TILE_SIZE * Math.sqrt(estimatedSprites / MAX_WATER_PATTERN_SPRITES_PER_EFFECT)
+        )
+      : WATER_BODY_TILE_SIZE;
+  const step = tileSize;
+
+  for (let y = bounds.top - tileSize; y <= bounds.bottom + tileSize; y += step) {
+    for (let x = bounds.left - tileSize; x <= bounds.right + tileSize; x += step) {
+      const sprite = new GifSprite({ source: waterPatternSource, autoPlay: true });
+      sprite.anchor.set(0.5);
+      sprite.position.set(x + tileSize / 2, y + tileSize / 2);
+      sprite.width = tileSize;
+      sprite.height = tileSize;
+      sprite.rotation = (effect.patternRotation * Math.PI) / 180;
+      sprite.alpha = effect.opacity;
+      applyWaterPatternFilters(sprite, effect);
+      patternContainer.addChild(sprite);
+    }
+  }
+
+  patternContainer.setMask({ mask });
+  container.addChild(patternContainer);
+  container.addChild(mask);
+}
+
+function addRiverWaterPatternSprites(
+  container: Container,
+  effect: Extract<SceneWaterEffect, { readonly variant: "river" }>,
+  waterPatternSource: GifSource,
+  mask: Graphics
+): void {
+  const patternContainer = new Container();
+  const baseTileSize = Math.max(WATER_RIVER_MIN_TILE_SIZE, Math.min(WATER_RIVER_MAX_TILE_SIZE, effect.width * 0.72));
+  const baseExtraRows = Math.max(0, Math.ceil((effect.width - baseTileSize) / (baseTileSize * 2)));
+  const estimatedSprites =
+    Math.max(1, Math.ceil(getPolylineLength(effect.points) / baseTileSize)) * (baseExtraRows * 2 + 1);
+  const tileSize =
+    estimatedSprites > MAX_WATER_PATTERN_SPRITES_PER_EFFECT
+      ? Math.min(
+          WATER_RIVER_PERFORMANCE_TILE_SIZE,
+          baseTileSize * Math.sqrt(estimatedSprites / MAX_WATER_PATTERN_SPRITES_PER_EFFECT)
+        )
+      : baseTileSize;
+  const step = tileSize;
+  const extraRows = Math.max(0, Math.ceil((effect.width - tileSize) / (tileSize * 2)));
+
+  for (let index = 1; index < effect.points.length; index += 1) {
+    const from = effect.points[index - 1];
+    const to = effect.points[index];
+    if (from === undefined || to === undefined) continue;
+
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1) continue;
+
+    const angle = Math.atan2(dy, dx);
+    const normalAngle = angle + Math.PI / 2;
+    const count = Math.max(1, Math.ceil(length / step));
+
+    for (let tileIndex = 0; tileIndex < count; tileIndex += 1) {
+      const distance = Math.min(length, tileIndex * step + step / 2);
+      const t = length === 0 ? 0 : distance / length;
+      const center = {
+        x: from.x + dx * t,
+        y: from.y + dy * t
+      };
+
+      for (let row = -extraRows; row <= extraRows; row += 1) {
+        const offset = row * tileSize;
+        const sprite = new GifSprite({ source: waterPatternSource, autoPlay: true });
+        sprite.anchor.set(0.5);
+        sprite.position.set(
+          center.x + Math.cos(normalAngle) * offset,
+          center.y + Math.sin(normalAngle) * offset
+        );
+        sprite.width = tileSize;
+        sprite.height = tileSize;
+        sprite.rotation = angle + (effect.patternRotation * Math.PI) / 180;
+        sprite.alpha = effect.opacity;
+        applyWaterPatternFilters(sprite, effect);
+        patternContainer.addChild(sprite);
+      }
+    }
+  }
+
+  patternContainer.setMask({ mask });
+  container.addChild(patternContainer);
+  container.addChild(mask);
+}
+
+function applyWaterPatternFilters(sprite: Sprite | GifSprite, effect: SceneWaterEffect): void {
+  if (effect.hue === 0 && effect.saturation === 1) {
+    return;
+  }
+
+  const filter = new ColorMatrixFilter();
+  if (effect.hue !== 0) {
+    filter.hue(effect.hue, false);
+  }
+  if (effect.saturation !== 1) {
+    filter.saturate(effect.saturation, true);
+  }
+  sprite.filters = [filter];
+}
+
+function getPolylineLength(points: readonly WorldPoint[]): number {
+  let length = 0;
+
+  for (let index = 1; index < points.length; index += 1) {
+    const from = points[index - 1];
+    const to = points[index];
+    if (from === undefined || to === undefined) {
+      continue;
+    }
+
+    length += Math.hypot(to.x - from.x, to.y - from.y);
+  }
+
+  return length;
+}
+
+function getWaterBounds(effect: SceneWaterEffect): {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+} {
+  const padding = effect.variant === "river" ? effect.width / 2 + 12 : 12;
+  const xs = effect.points.map((point) => point.x);
+  const ys = effect.points.map((point) => point.y);
+
+  return {
+    left: Math.min(...xs) - padding,
+    right: Math.max(...xs) + padding,
+    top: Math.min(...ys) - padding,
+    bottom: Math.max(...ys) + padding
+  };
+}
+
+function drawPolyline(graphic: Graphics, points: readonly WorldPoint[]): void {
+  const first = points[0];
+  if (first === undefined) return;
+  graphic.moveTo(first.x, first.y);
+
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index];
+    if (point !== undefined) {
+      graphic.lineTo(point.x, point.y);
+    }
+  }
+}
+
+function drawPolygon(graphic: Graphics, points: readonly WorldPoint[]): void {
+  drawPolyline(graphic, points);
+  graphic.closePath();
+}
+
 function drawFireLight(effect: SceneFireEffect): Graphics {
   if (effect.zone.kind === "cells") {
     const graphic = new Graphics();
@@ -3082,6 +3546,68 @@ function drawConeRotationHandle(light: SceneLight): Graphics {
     .fill({ color: 0xfff0a8, alpha: 0.95 });
 }
 
+function drawWaterRotationHandles(effect: SceneWaterEffect): Graphics {
+  const lineRadius = getWaterLineRotationRadius(effect);
+  const patternRadius = getWaterPatternRotationRadius(effect);
+  const lineHandle = getWaterLineRotationHandlePosition(effect);
+  const patternHandle = getWaterPatternRotationHandlePosition(effect);
+
+  return new Graphics()
+    .circle(effect.position.x, effect.position.y, lineRadius)
+    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.74 })
+    .moveTo(effect.position.x, effect.position.y)
+    .lineTo(lineHandle.x, lineHandle.y)
+    .stroke({ color: 0xfff0a8, width: 3, alpha: 0.82 })
+    .circle(lineHandle.x, lineHandle.y, 11)
+    .fill({ color: 0x101315, alpha: 0.9 })
+    .circle(lineHandle.x, lineHandle.y, 7)
+    .fill({ color: 0xfff0a8, alpha: 0.95 })
+    .circle(effect.position.x, effect.position.y, patternRadius)
+    .stroke({ color: 0x7adcf0, width: 2, alpha: 0.72 })
+    .moveTo(effect.position.x, effect.position.y)
+    .lineTo(patternHandle.x, patternHandle.y)
+    .stroke({ color: 0x7adcf0, width: 3, alpha: 0.82 })
+    .circle(patternHandle.x, patternHandle.y, 11)
+    .fill({ color: 0x101315, alpha: 0.9 })
+    .circle(patternHandle.x, patternHandle.y, 7)
+    .fill({ color: 0xc7f7ff, alpha: 0.95 });
+}
+
+function getWaterLineRotationHandlePosition(effect: SceneWaterEffect): WorldPoint {
+  const radius = getWaterLineRotationRadius(effect);
+  const angle = (effect.lineRotation * Math.PI) / 180;
+
+  return {
+    x: effect.position.x + Math.cos(angle) * radius,
+    y: effect.position.y + Math.sin(angle) * radius
+  };
+}
+
+function getWaterPatternRotationHandlePosition(effect: SceneWaterEffect): WorldPoint {
+  const radius = getWaterPatternRotationRadius(effect);
+  const angle = (effect.patternRotation * Math.PI) / 180;
+
+  return {
+    x: effect.position.x + Math.cos(angle) * radius,
+    y: effect.position.y + Math.sin(angle) * radius
+  };
+}
+
+function getWaterLineRotationRadius(effect: SceneWaterEffect): number {
+  if (effect.variant === "river") {
+    return Math.max(54, effect.width * 0.7 + 24);
+  }
+
+  const bounds = getWaterBounds(effect);
+  const maxDimension = Math.max(bounds.right - bounds.left, bounds.bottom - bounds.top);
+
+  return Math.max(72, Math.min(260, maxDimension * 0.25));
+}
+
+function getWaterPatternRotationRadius(effect: SceneWaterEffect): number {
+  return getWaterLineRotationRadius(effect) + 42;
+}
+
 function drawLightResizeHandle(light: SceneLight): Graphics {
   const handle = getLightResizeHandlePosition(light);
   const graphic = new Graphics();
@@ -3283,6 +3809,8 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
       return 72;
     case "token":
       return 50;
+    case "water":
+      return 50;
   }
 }
 
@@ -3307,6 +3835,60 @@ function hitTestPath(shape: SceneShape, point: WorldPoint, tolerance: number): b
   }
 
   return false;
+}
+
+function hitTestWaterEffect(effect: SceneWaterEffect, point: WorldPoint, tolerance: number): boolean {
+  if (effect.variant === "river") {
+    for (let index = 1; index < effect.points.length; index += 1) {
+      const from = effect.points[index - 1];
+      const to = effect.points[index];
+
+      if (
+        from !== undefined &&
+        to !== undefined &&
+        distanceToSegment(point, from, to) <= effect.width / 2 + tolerance
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  if (isPointInsidePolygon(point, effect.points)) {
+    return true;
+  }
+
+  for (let index = 1; index < effect.points.length; index += 1) {
+    const from = effect.points[index - 1];
+    const to = effect.points[index];
+
+    if (from !== undefined && to !== undefined && distanceToSegment(point, from, to) <= tolerance) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isPointInsidePolygon(point: WorldPoint, polygon: readonly WorldPoint[]): boolean {
+  let inside = false;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+    const a = polygon[i];
+    const b = polygon[j];
+    if (a === undefined || b === undefined) continue;
+
+    const intersects =
+      a.y > point.y !== b.y > point.y &&
+      point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y || Number.EPSILON) + a.x;
+
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+
+  return inside;
 }
 
 function distanceToSegment(point: WorldPoint, from: WorldPoint, to: WorldPoint): number {

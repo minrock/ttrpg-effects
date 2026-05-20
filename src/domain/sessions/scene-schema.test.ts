@@ -189,6 +189,51 @@ describe("scene document schema", () => {
     expect(() => parseSceneDocument(scene)).toThrow();
   });
 
+  it("accepts water effects", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "water-river-1",
+          kind: "water",
+          variant: "river",
+          position: { x: 50, y: 0 },
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 }
+          ],
+          width: 80,
+          lineRotation: 0,
+          patternRotation: 30,
+          hue: 15,
+          saturation: 1.2,
+          opacity: 0.8,
+          visible: true
+        },
+        {
+          id: "water-body-1",
+          kind: "water",
+          variant: "water-body",
+          position: { x: 50, y: 50 },
+          points: [
+            { x: 0, y: 0 },
+            { x: 100, y: 0 },
+            { x: 100, y: 100 },
+            { x: 0, y: 0 }
+          ],
+          lineRotation: 0,
+          patternRotation: 45,
+          hue: 0,
+          saturation: 1,
+          opacity: 0.8,
+          visible: true
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
   it("accepts tactical shapes with optional dimensions", () => {
     const scene = {
       ...createDefaultScene(),

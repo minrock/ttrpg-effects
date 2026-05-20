@@ -36,6 +36,13 @@ import {
   type MagicalDarknessPatch
 } from "../../domain/effects/magical-darkness";
 import {
+  createWaterEffect,
+  mergeConsecutiveRiverEffects,
+  updateWaterEffect,
+  type RiverWaterEffect,
+  type WaterPatch
+} from "../../domain/effects/water";
+import {
   createLightSource,
   moveLightSource,
   updateLightSource,
@@ -102,6 +109,11 @@ interface PathDraftState {
   readonly hoverPoint: WorldPoint | null;
 }
 
+interface WaterDraftState {
+  readonly points: readonly WorldPoint[];
+  readonly hoverPoint: WorldPoint | null;
+}
+
 interface NewTokenDraftState {
   readonly imagePath: string | null;
   readonly imageUrl: string | null;
@@ -149,6 +161,10 @@ export function App(): JSX.Element {
     points: [],
     hoverPoint: null
   });
+  const [waterDraft, setWaterDraft] = useState<WaterDraftState>({
+    points: [],
+    hoverPoint: null
+  });
   const [openSidebarSections, setOpenSidebarSections] = useState<SidebarOpenState>({
     grid: true,
     figures: false,
@@ -167,6 +183,8 @@ export function App(): JSX.Element {
   isSpaceDragActiveRef.current = isSpaceDragActive;
   const pathDraftRef = useRef(pathDraft);
   pathDraftRef.current = pathDraft;
+  const waterDraftRef = useRef(waterDraft);
+  waterDraftRef.current = waterDraft;
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
   sceneRef.current = scene;
@@ -270,6 +288,12 @@ export function App(): JSX.Element {
   const handleStartPathDrawing = (): void => {
     setPathDraft({ points: [], hoverPoint: null });
     setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "path"), null));
+  };
+
+  const handleStartWaterDrawing = (): void => {
+    setWaterDraft({ points: [], hoverPoint: null });
+    setOpenSidebarSections((current) => ({ ...current, effects: true }));
+    setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "water"), null));
   };
 
   const handleCreateShape = (kind: TacticalShapeKind): void => {
@@ -411,6 +435,7 @@ export function App(): JSX.Element {
     setWarnings([]);
     setInteraction(createInitialInteractionState());
     setPathDraft({ points: [], hoverPoint: null });
+    setWaterDraft({ points: [], hoverPoint: null });
     setIsSpaceDragActive(false);
     setGridAdjustMode(false);
     setIsSelectedPropertiesOpen(true);
@@ -440,6 +465,11 @@ export function App(): JSX.Element {
 
   const cancelPathDrawing = useCallback((): void => {
     setPathDraft({ points: [], hoverPoint: null });
+    setInteraction((current) => setActiveTool(current, "select"));
+  }, []);
+
+  const cancelWaterDrawing = useCallback((): void => {
+    setWaterDraft({ points: [], hoverPoint: null });
     setInteraction((current) => setActiveTool(current, "select"));
   }, []);
 
@@ -480,6 +510,84 @@ export function App(): JSX.Element {
     });
   }, []);
 
+  const confirmWaterDrawing = useCallback((): void => {
+    const draft = waterDraftRef.current;
+    const points =
+      draft.hoverPoint === null ||
+      draft.points.some((point) => point.x === draft.hoverPoint?.x && point.y === draft.hoverPoint?.y)
+        ? draft.points
+        : [...draft.points, draft.hoverPoint];
+
+    if (points.length < 2) {
+      return;
+    }
+
+    const id = `water-${nextEffectId.current}`;
+    nextEffectId.current += 1;
+
+    try {
+      const effect = createWaterEffect({
+        id,
+        points,
+        gridCellSizeWorld: sceneRef.current.grid.cellSizeWorld,
+        width: sceneRef.current.grid.cellSizeWorld
+      });
+
+      const riverMerge =
+        effect.variant === "river"
+          ? mergeConsecutiveRiverEffects({
+              rivers: sceneRef.current.effects.filter(
+                (sceneEffect): sceneEffect is RiverWaterEffect =>
+                  sceneEffect.kind === "water" && sceneEffect.variant === "river"
+              ),
+              incoming: effect,
+              maxEndpointDistance: sceneRef.current.grid.cellSizeWorld
+            })
+          : null;
+      const selectedWaterId = riverMerge?.effect.id ?? id;
+
+      setScene((sceneCurrent) => {
+        if (riverMerge === null || !riverMerge.didMerge) {
+          return {
+            ...sceneCurrent,
+            effects: [...sceneCurrent.effects, effect]
+          };
+        }
+
+        const mergedIds = new Set(riverMerge.mergedIds);
+
+        return {
+          ...sceneCurrent,
+          effects: sceneCurrent.effects
+            .filter((sceneEffect) => !mergedIds.has(sceneEffect.id))
+            .concat(riverMerge.effect)
+        };
+      });
+      setWaterDraft({ points: [], hoverPoint: null });
+      setInteraction((interactionCurrent) => selectElement(setActiveTool(interactionCurrent, "select"), selectedWaterId));
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo crear el agua.");
+    }
+  }, [setScene]);
+
+  const removeLastWaterPoint = useCallback((): void => {
+    setWaterDraft((current) => {
+      if (current.points.length <= 1) {
+        setInteraction((interactionCurrent) => setActiveTool(interactionCurrent, "select"));
+        return {
+          points: [],
+          hoverPoint: null
+        };
+      }
+
+      const points = current.points.slice(0, -1);
+      return {
+        points,
+        hoverPoint: points[points.length - 1] ?? null
+      };
+    });
+  }, []);
+
   useEffect(() => {
     const shouldIgnoreSpaceDrag = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
@@ -496,6 +604,7 @@ export function App(): JSX.Element {
 
     const resetToSelection = (): void => {
       setPathDraft({ points: [], hoverPoint: null });
+      setWaterDraft({ points: [], hoverPoint: null });
       setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
     };
 
@@ -553,6 +662,26 @@ export function App(): JSX.Element {
         }
       }
 
+      if (interaction.activeTool === "water") {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          confirmWaterDrawing();
+          return;
+        }
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cancelWaterDrawing();
+          return;
+        }
+
+        if (event.key === "Backspace") {
+          event.preventDefault();
+          removeLastWaterPoint();
+          return;
+        }
+      }
+
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
         handleDeleteSelectedElement();
@@ -593,13 +722,16 @@ export function App(): JSX.Element {
     };
   }, [
     cancelPathDrawing,
+    cancelWaterDrawing,
     confirmPathDrawing,
+    confirmWaterDrawing,
     handleCancelNewScene,
     handleDeleteSelectedElement,
     interaction.activeTool,
     isGridAdjustMode,
     isNewSceneDialogOpen,
     removeLastPathPoint,
+    removeLastWaterPoint,
     setGridAdjustMode
   ]);
 
@@ -841,7 +973,9 @@ export function App(): JSX.Element {
         effect.id === elementId
           ? effect.kind === "fire"
             ? updateAnimatedFireEffect(effect, { position: { x, y } })
-            : updateMagicalDarknessEffect(effect, { position: { x, y } })
+            : effect.kind === "magical-darkness"
+              ? updateMagicalDarknessEffect(effect, { position: { x, y } })
+              : updateWaterEffect(effect, { position: { x, y } })
           : effect
       ),
       tokens: current.tokens.map((token) =>
@@ -912,6 +1046,28 @@ export function App(): JSX.Element {
       const previous = current.points[current.points.length - 1];
 
       if (previous !== undefined && previous.x === point.x && previous.y === point.y) {
+        return current;
+      }
+
+      return {
+        points: [...current.points, point],
+        hoverPoint: point
+      };
+    });
+  }, []);
+
+  const handleWaterPointerMove = useCallback((point: WorldPoint | null): void => {
+    setWaterDraft((current) => ({
+      ...current,
+      hoverPoint: point
+    }));
+  }, []);
+
+  const handleWaterPointAdd = useCallback((point: WorldPoint): void => {
+    setWaterDraft((current) => {
+      const previous = current.points[current.points.length - 1];
+
+      if (previous !== undefined && Math.hypot(previous.x - point.x, previous.y - point.y) < 2) {
         return current;
       }
 
@@ -1060,6 +1216,28 @@ export function App(): JSX.Element {
       effects: current.effects.map((effect) =>
         effect.id === elementId && effect.kind === "magical-darkness"
           ? updateMagicalDarknessEffect(effect, { radius })
+          : effect
+      )
+    }));
+  }, []);
+
+  const handleWaterPatternRotationChange = useCallback((elementId: string, rotation: number): void => {
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === elementId && effect.kind === "water"
+          ? updateWaterEffect(effect, { patternRotation: rotation })
+          : effect
+      )
+    }));
+  }, []);
+
+  const handleWaterLineRotationChange = useCallback((elementId: string, rotation: number): void => {
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === elementId && effect.kind === "water"
+          ? updateWaterEffect(effect, { lineRotation: rotation })
           : effect
       )
     }));
@@ -1235,6 +1413,8 @@ export function App(): JSX.Element {
     selectedEffect?.kind === "fire" ? selectedEffect : undefined;
   const selectedMagicalDarkness =
     selectedEffect?.kind === "magical-darkness" ? selectedEffect : undefined;
+  const selectedWaterEffect =
+    selectedEffect?.kind === "water" ? selectedEffect : undefined;
   const selectedShape =
     interaction.selectedElementId === null
       ? undefined
@@ -1310,6 +1490,21 @@ export function App(): JSX.Element {
       effects: current.effects.map((effect) =>
         effect.id === selectedMagicalDarkness.id && effect.kind === "magical-darkness"
           ? updateMagicalDarknessEffect(effect, patch)
+          : effect
+      )
+    }));
+  }
+
+  function updateSelectedWaterEffect(patch: WaterPatch): void {
+    if (selectedWaterEffect === undefined) {
+      return;
+    }
+
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === selectedWaterEffect.id && effect.kind === "water"
+          ? updateWaterEffect(effect, patch)
           : effect
       )
     }));
@@ -1429,19 +1624,21 @@ export function App(): JSX.Element {
         ? "Fuego"
         : selectedMagicalDarkness !== undefined
           ? "Oscuridad magica"
-          : selectedToken !== undefined
-            ? "Token"
-            : selectedShape?.type === "measurement"
-              ? "Linea"
-              : selectedShape?.type === "path"
-                ? "Path/Camino"
-                : selectedShape?.type === "circle"
-                  ? "Circulo"
-                  : selectedShape?.type === "cone"
-                    ? "Cono"
-                    : selectedShape?.type === "rectangle"
-                      ? "Rectangulo"
-                      : "Propiedades";
+          : selectedWaterEffect !== undefined
+            ? selectedWaterEffect.variant === "river" ? "Rio" : "Cuerpo de agua"
+            : selectedToken !== undefined
+              ? "Token"
+              : selectedShape?.type === "measurement"
+                ? "Linea"
+                : selectedShape?.type === "path"
+                  ? "Path/Camino"
+                  : selectedShape?.type === "circle"
+                    ? "Circulo"
+                    : selectedShape?.type === "cone"
+                      ? "Cono"
+                      : selectedShape?.type === "rectangle"
+                        ? "Rectangulo"
+                        : "Propiedades";
   const selectedPropertiesIcon =
     selectedLight !== undefined
       ? selectedLight.kind === "point"
@@ -1451,17 +1648,19 @@ export function App(): JSX.Element {
         ? "火"
         : selectedMagicalDarkness !== undefined
           ? "●"
-          : selectedToken !== undefined
-            ? "◉"
-            : selectedShape?.type === "measurement"
-              ? "╱"
-              : selectedShape?.type === "path"
-                ? "⌁"
-                : selectedShape?.type === "circle"
-                  ? "○"
-                  : selectedShape?.type === "cone"
-                    ? "◺"
-                    : "▭";
+          : selectedWaterEffect !== undefined
+            ? "≈"
+            : selectedToken !== undefined
+              ? "◉"
+              : selectedShape?.type === "measurement"
+                ? "╱"
+                : selectedShape?.type === "path"
+                  ? "⌁"
+                  : selectedShape?.type === "circle"
+                    ? "○"
+                    : selectedShape?.type === "cone"
+                      ? "◺"
+                      : "▭";
   const selectedMagicalDarknessRadiusCells =
     selectedMagicalDarkness === undefined
       ? 1
@@ -1558,8 +1757,11 @@ export function App(): JSX.Element {
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
           isFirePaintMode={interaction.activeTool === "fire-paint"}
           isPathDrawingMode={interaction.activeTool === "path"}
+          isWaterDrawingMode={interaction.activeTool === "water"}
           pathPreviewPoints={pathDraft.points}
           pathPreviewHoverPoint={pathDraft.hoverPoint}
+          waterPreviewPoints={waterDraft.points}
+          waterPreviewHoverPoint={waterDraft.hoverPoint}
           onContextMenuRequest={handleContextMenuRequest}
           onElementSelect={handleElementSelect}
           onGridCellSizeChange={handleGridCellSizeChange}
@@ -1572,6 +1774,8 @@ export function App(): JSX.Element {
           onShapeEndMove={handleShapeEndMove}
           onPathPointAdd={handlePathPointAdd}
           onPathPointerMove={handlePathPointerMove}
+          onWaterPointAdd={handleWaterPointAdd}
+          onWaterPointerMove={handleWaterPointerMove}
           onPathPointMove={handlePathPointMove}
           onPathMove={handlePathMove}
           onShapeDirectionChange={handleShapeDirectionChange}
@@ -1582,6 +1786,8 @@ export function App(): JSX.Element {
           onFireZoneRadiusChange={handleFireZoneRadiusChange}
           onFireLightRadiusChange={handleFireLightRadiusChange}
           onMagicalDarknessRadiusChange={handleMagicalDarknessRadiusChange}
+          onWaterLineRotationChange={handleWaterLineRotationChange}
+          onWaterPatternRotationChange={handleWaterPatternRotationChange}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
           {hasSelectedObject ? (
@@ -1820,6 +2026,72 @@ export function App(): JSX.Element {
                       onChange={(event) =>
                         updateSelectedMagicalDarkness({ opacity: event.currentTarget.valueAsNumber })
                       }
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {selectedWaterEffect !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de agua">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedWaterEffect.visible}
+                      onChange={(event) => updateSelectedWaterEffect({ visible: event.currentTarget.checked })}
+                    />
+                    Visible
+                  </label>
+                  <span>
+                    Tipo: {selectedWaterEffect.variant === "river" ? "Rio / riachuelo" : "Cuerpo de agua cerrado"}
+                  </span>
+                  {selectedWaterEffect.variant === "river" ? (
+                    <>
+                      <label>
+                        Ancho
+                        <input
+                          type="number"
+                          min="1"
+                          max="3000"
+                          value={selectedWaterEffect.width}
+                          onChange={(event) => updateSelectedWaterEffect({ width: event.currentTarget.valueAsNumber })}
+                        />
+                      </label>
+                    </>
+                  ) : null}
+                  <span>Orientacion: {Math.round(selectedWaterEffect.lineRotation)}°</span>
+                  <span>GIF: {Math.round(selectedWaterEffect.patternRotation)}°</span>
+                  <label>
+                    Hue
+                    <input
+                      type="range"
+                      min="0"
+                      max="359"
+                      step="1"
+                      value={selectedWaterEffect.hue}
+                      onChange={(event) => updateSelectedWaterEffect({ hue: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    Saturacion
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.05"
+                      value={selectedWaterEffect.saturation}
+                      onChange={(event) =>
+                        updateSelectedWaterEffect({ saturation: event.currentTarget.valueAsNumber })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Opacidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedWaterEffect.opacity}
+                      onChange={(event) => updateSelectedWaterEffect({ opacity: event.currentTarget.valueAsNumber })}
                     />
                   </label>
                 </div>
@@ -2414,6 +2686,7 @@ export function App(): JSX.Element {
                 <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
                 <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
                 <button type="button" onClick={handleCreateMagicalDarkness}>Oscuridad magica</button>
+                <button type="button" onClick={handleStartWaterDrawing}>Agua</button>
               </menu>
             </li>
           </menu>

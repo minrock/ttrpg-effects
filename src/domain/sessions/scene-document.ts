@@ -95,7 +95,7 @@ export interface SceneLight {
   readonly snapToGrid: boolean;
 }
 
-export type SceneEffect = SceneFireEffect | SceneMagicalDarknessEffect;
+export type SceneEffect = SceneFireEffect | SceneMagicalDarknessEffect | SceneWaterEffect;
 
 export interface SceneFireEffect {
   readonly id: string;
@@ -124,6 +124,47 @@ export interface SceneMagicalDarknessEffect {
   readonly opacity: number;
   readonly visible: boolean;
 }
+
+export type SceneWaterEffect =
+  | {
+      readonly id: string;
+      readonly kind: "water";
+      readonly variant: "river";
+      readonly position: {
+        readonly x: number;
+        readonly y: number;
+      };
+      readonly points: ReadonlyArray<{
+        readonly x: number;
+        readonly y: number;
+      }>;
+      readonly width: number;
+      readonly lineRotation: number;
+      readonly patternRotation: number;
+      readonly hue: number;
+      readonly saturation: number;
+      readonly opacity: number;
+      readonly visible: boolean;
+    }
+  | {
+      readonly id: string;
+      readonly kind: "water";
+      readonly variant: "water-body";
+      readonly position: {
+        readonly x: number;
+        readonly y: number;
+      };
+      readonly points: ReadonlyArray<{
+        readonly x: number;
+        readonly y: number;
+      }>;
+      readonly lineRotation: number;
+      readonly patternRotation: number;
+      readonly hue: number;
+      readonly saturation: number;
+      readonly opacity: number;
+      readonly visible: boolean;
+    };
 
 export type SceneFireZone =
   | {

@@ -142,6 +142,40 @@ const magicalDarknessEffectSchema = z.object({
   visible: z.boolean()
 });
 
+const riverWaterEffectSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("water"),
+  variant: z.literal("river"),
+  position: worldPointSchema,
+  points: z.array(worldPointSchema).min(2),
+  width: positiveNumber,
+  lineRotation: finiteNumber.default(0),
+  patternRotation: finiteNumber.default(0),
+  hue: finiteNumber.default(0),
+  saturation: finiteNumber.min(0).default(1),
+  opacity,
+  visible: z.boolean()
+});
+
+const closedWaterEffectSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("water"),
+  variant: z.literal("water-body"),
+  position: worldPointSchema,
+  points: z.array(worldPointSchema).min(3),
+  lineRotation: finiteNumber.default(0),
+  patternRotation: finiteNumber.default(0),
+  hue: finiteNumber.default(0),
+  saturation: finiteNumber.min(0).default(1),
+  opacity,
+  visible: z.boolean()
+});
+
+const waterEffectSchema = z.discriminatedUnion("variant", [
+  riverWaterEffectSchema,
+  closedWaterEffectSchema
+]);
+
 const tokenSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -207,7 +241,7 @@ export const sceneDocumentV1Schema = z.object({
       snapToGrid: z.boolean()
     })
   ),
-  effects: z.array(z.discriminatedUnion("kind", [fireEffectSchema, magicalDarknessEffectSchema])),
+  effects: z.array(z.union([fireEffectSchema, magicalDarknessEffectSchema, waterEffectSchema])),
   shapes: z
     .array(
       z.union([
