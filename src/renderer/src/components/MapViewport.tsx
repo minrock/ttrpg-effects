@@ -17,6 +17,7 @@ import type {
   SceneShape
 } from "../../../domain/sessions/scene-document";
 import type { FireCell } from "../../../domain/effects/fire";
+import type { ArcanePointerCreatureSize } from "../../../domain/pointer/arcane-pointer";
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
@@ -42,6 +43,9 @@ interface MapViewportProps {
   readonly isFirePaintMode: boolean;
   readonly isPathDrawingMode: boolean;
   readonly isWaterDrawingMode: boolean;
+  readonly isArcanePointerMode: boolean;
+  readonly arcanePointerCreatureSize: ArcanePointerCreatureSize;
+  readonly arcanePointerResetKey: number;
   readonly pathPreviewPoints: readonly { readonly x: number; readonly y: number }[];
   readonly pathPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
   readonly waterPreviewPoints: readonly { readonly x: number; readonly y: number }[];
@@ -94,6 +98,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isFirePaintMode,
   isPathDrawingMode,
   isWaterDrawingMode,
+  isArcanePointerMode,
+  arcanePointerCreatureSize,
+  arcanePointerResetKey,
   pathPreviewPoints,
   pathPreviewHoverPoint,
   waterPreviewPoints,
@@ -198,6 +205,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
       createdViewport.setWaterDrawingMode(isWaterDrawingMode);
       createdViewport.setWaterPreview(waterPreviewPoints, waterPreviewHoverPoint);
+      createdViewport.setArcanePointerMode(isArcanePointerMode);
+      createdViewport.setArcanePointerCreatureSize(arcanePointerCreatureSize);
+      if (arcanePointerResetKey > 0) {
+        createdViewport.clearArcanePointers();
+      }
     });
 
     return () => {
@@ -291,10 +303,22 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     viewportRef.current?.setWaterPreview(waterPreviewPoints, waterPreviewHoverPoint);
   }, [waterPreviewPoints, waterPreviewHoverPoint]);
 
+  useEffect(() => {
+    viewportRef.current?.setArcanePointerMode(isArcanePointerMode);
+  }, [isArcanePointerMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setArcanePointerCreatureSize(arcanePointerCreatureSize);
+  }, [arcanePointerCreatureSize]);
+
+  useEffect(() => {
+    viewportRef.current?.clearArcanePointers();
+  }, [arcanePointerResetKey]);
+
   return (
     <div
       ref={hostRef}
-      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isWaterDrawingMode ? " is-water-drawing-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
+      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isWaterDrawingMode ? " is-water-drawing-mode" : ""}${isArcanePointerMode ? " is-arcane-pointer-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
       aria-label="Lienzo del mapa"
     >
       <NavigationLegend />

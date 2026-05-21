@@ -34,10 +34,21 @@ import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
 import { getVisibleAreasFromLights } from "../../domain/vision/vision";
 import type { FireCell } from "../../domain/effects/fire";
+import {
+  getArcanePointerAlpha,
+  getArcanePointerDiameterWorld,
+  type ArcanePointerCreatureSize
+} from "../../domain/pointer/arcane-pointer";
 
 export type RenderSceneToken = SceneToken & {
   readonly imageUrl: string | null;
 };
+
+interface ArcanePointerAnimation {
+  readonly container: Container;
+  readonly startedAt: number;
+  readonly durationMs: number;
+}
 
 interface PointerDragState {
   readonly pointerId: number;
@@ -145,6 +156,8 @@ export class PixiViewport {
   private isFirePaintMode = false;
   private isPathDrawingMode = false;
   private isWaterDrawingMode = false;
+  private isArcanePointerMode = false;
+  private arcanePointerCreatureSize: ArcanePointerCreatureSize = "medium";
   private pathPreviewPoints: readonly WorldPoint[] = [];
   private pathPreviewHoverPoint: WorldPoint | null = null;
   private waterPreviewPoints: readonly WorldPoint[] = [];
@@ -156,6 +169,9 @@ export class PixiViewport {
   private _fogOfWarTexture: RenderTexture | null = null;
   private disposed = false;
   private waterPatternSource: GifSource | null = null;
+  private arcanePointerSource: GifSource | null = null;
+  private readonly arcanePointers = new Map<string, ArcanePointerAnimation>();
+  private nextArcanePointerId = 1;
   private readonly effectRenderCache = new Map<
     string,
     {
@@ -267,6 +283,22 @@ export class PixiViewport {
     this.updateCursor();
   }
 
+  setArcanePointerMode(isArcanePointerMode: boolean): void {
+    this.isArcanePointerMode = isArcanePointerMode;
+    this.updateCursor();
+  }
+
+  setArcanePointerCreatureSize(arcanePointerCreatureSize: ArcanePointerCreatureSize): void {
+    this.arcanePointerCreatureSize = arcanePointerCreatureSize;
+  }
+
+  clearArcanePointers(): void {
+    for (const pointer of this.arcanePointers.values()) {
+      destroyDisplayObject(pointer.container);
+    }
+    this.arcanePointers.clear();
+  }
+
   setPathPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
     this.pathPreviewPoints = points;
     this.pathPreviewHoverPoint = hoverPoint;
@@ -357,6 +389,9 @@ export class PixiViewport {
     this.darkvisionMask = null;
     this.firePatternSource = null;
     this.waterPatternSource = null;
+    this.arcanePointerSource = null;
+    this.app.ticker.remove(this.updateArcanePointers);
+    this.clearArcanePointers();
     for (const cached of this.effectRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
@@ -377,6 +412,8 @@ export class PixiViewport {
     this.app.stage.addChild(this.world);
     this.firePatternSource = await loadFirePatternSource();
     this.waterPatternSource = await loadWaterPatternSource();
+    this.arcanePointerSource = await loadArcanePointerSource();
+    this.app.ticker.add(this.updateArcanePointers);
 
     this.createLayers();
     this.drawStaticScene();
@@ -586,7 +623,7 @@ export class PixiViewport {
       } else if (this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
-      } else if (this.isPathDrawingMode || this.isWaterDrawingMode) {
+      } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode) {
         mode = "idle";
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
@@ -844,6 +881,8 @@ export class PixiViewport {
         this.options.onPathPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
       } else if (this.isWaterDrawingMode) {
         this.options.onWaterPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
+      } else if (this.isArcanePointerMode) {
+        this.spawnArcanePointer(this.snapScreenPointToCellCenter(releasePoint));
       } else {
         this.options.onElementSelect?.(this.hitTestElement(releasePoint));
       }
@@ -860,7 +899,7 @@ export class PixiViewport {
   private updateCursor(): void {
     if (this.isGrabMode) {
       this.app.canvas.style.cursor = "grab";
-    } else if (this.isPathDrawingMode || this.isWaterDrawingMode) {
+    } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isFogRevealMode || this.isFirePaintMode) {
       this.app.canvas.style.cursor = "cell";
@@ -2111,6 +2150,58 @@ export class PixiViewport {
     return layer;
   }
 
+  private spawnArcanePointer(position: WorldPoint): void {
+    const layer = this.getLayer("pointer");
+    const cellSize = this.grid?.cellSizeWorld ?? 100;
+    const diameter = getArcanePointerDiameterWorld(this.arcanePointerCreatureSize, cellSize);
+    const container = new Container();
+    container.position.set(position.x, position.y);
+    container.alpha = 0;
+
+    if (this.arcanePointerSource !== null) {
+      const sprite = new GifSprite({
+        source: this.arcanePointerSource,
+        autoPlay: true,
+        loop: true,
+        animationSpeed: 1
+      });
+      sprite.anchor.set(0.5);
+      sprite.width = diameter;
+      sprite.height = diameter;
+      container.addChild(sprite);
+    } else {
+      container.addChild(drawArcanePointerFallback(diameter));
+    }
+
+    layer.addChild(container);
+    this.arcanePointers.set(`arcane-pointer-${this.nextArcanePointerId}`, {
+      container,
+      startedAt: performance.now(),
+      durationMs: 4000
+    });
+    this.nextArcanePointerId += 1;
+  }
+
+  private readonly updateArcanePointers = (): void => {
+    if (this.arcanePointers.size === 0) {
+      return;
+    }
+
+    const now = performance.now();
+
+    for (const [id, pointer] of this.arcanePointers) {
+      const progress = (now - pointer.startedAt) / pointer.durationMs;
+
+      if (progress >= 1) {
+        destroyDisplayObject(pointer.container);
+        this.arcanePointers.delete(id);
+        continue;
+      }
+
+      pointer.container.alpha = getArcanePointerAlpha(progress);
+    }
+  };
+
   private async drawMapImage(): Promise<void> {
     const layer = this.getLayer("map");
     const loadVersion = ++this.mapLoadVersion;
@@ -2249,6 +2340,7 @@ const LINEAR_ROTATION_RING_RADIUS = 54;
 const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
 const FIRE_PATTERN_URL = "/effects/area-fire.gif";
 const WATER_PATTERN_URL = "/effects/water/water-center.gif";
+const ARCANE_POINTER_URL = "/effects/arcane-pointer.gif";
 const WATER_BODY_TILE_SIZE = 72;
 const WATER_BODY_MAX_TILE_SIZE = 150;
 const WATER_RIVER_MIN_TILE_SIZE = 44;
@@ -2300,6 +2392,25 @@ async function loadWaterPatternSource(): Promise<GifSource | null> {
   } catch {
     return null;
   }
+}
+
+async function loadArcanePointerSource(): Promise<GifSource | null> {
+  try {
+    return await Assets.load<GifSource>(ARCANE_POINTER_URL);
+  } catch {
+    return null;
+  }
+}
+
+function drawArcanePointerFallback(diameter: number): Graphics {
+  const radius = diameter / 2;
+  return new Graphics()
+    .circle(0, 0, radius)
+    .stroke({ color: 0x8ee7ff, width: Math.max(2, diameter * 0.035), alpha: 0.9 })
+    .circle(0, 0, radius * 0.72)
+    .stroke({ color: 0xffd28a, width: Math.max(1, diameter * 0.018), alpha: 0.85 })
+    .circle(0, 0, radius * 0.38)
+    .stroke({ color: 0xf4f1e8, width: Math.max(1, diameter * 0.012), alpha: 0.7 });
 }
 
 function getLayerForElementKind(kind: TacticalElement["kind"]): "shapes" | "lights" | "effects" {

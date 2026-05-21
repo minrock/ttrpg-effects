@@ -73,6 +73,10 @@ import {
 } from "../../domain/shapes/shapes";
 import type { WorldPoint } from "../../domain/shared/coordinates";
 import {
+  arcanePointerSizeOptions,
+  type ArcanePointerCreatureSize
+} from "../../domain/pointer/arcane-pointer";
+import {
   ALLOWED_SHAPE_EMOJIS,
   getSelectedShapeEmojis
 } from "../../domain/shapes/shape-emojis";
@@ -155,6 +159,9 @@ export function App(): JSX.Element {
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
+  const [arcanePointerCreatureSize, setArcanePointerCreatureSize] =
+    useState<ArcanePointerCreatureSize>("medium");
+  const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
   const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
@@ -438,6 +445,7 @@ export function App(): JSX.Element {
     setWaterDraft({ points: [], hoverPoint: null });
     setIsSpaceDragActive(false);
     setGridAdjustMode(false);
+    setArcanePointerResetKey((current) => current + 1);
     setIsSelectedPropertiesOpen(true);
     nextShapeId.current = 1;
     nextLightId.current = 1;
@@ -799,6 +807,7 @@ export function App(): JSX.Element {
         setMapImageUrl(result.mapImageUrl ?? null);
         setTokenImageUrls(result.tokenImageUrls ?? {});
         setInteraction((current) => setZoomLocked(current, result.scene.grid.locked));
+        setArcanePointerResetKey((current) => current + 1);
         nextTokenId.current = getNextNumericId(result.scene.tokens.map((token) => token.id), "token-");
       }
       setCurrentFilePath(result.filePath);
@@ -828,6 +837,7 @@ export function App(): JSX.Element {
 
       const nextMap = createMapImageState(result.imagePath, result.imageUrl);
       setMapImageUrl(nextMap.imageUrl);
+      setArcanePointerResetKey((current) => current + 1);
       setScene((current) => ({
         ...current,
         map: {
@@ -1267,6 +1277,20 @@ export function App(): JSX.Element {
     });
   }
 
+  function handleToggleArcanePointerMode(): void {
+    setPathDraft({ points: [], hoverPoint: null });
+    setWaterDraft({ points: [], hoverPoint: null });
+    setGridAdjustMode(false);
+    setIsSidebarVisible(true);
+    setOpenSidebarSections((current) => ({ ...current, effects: true }));
+    setInteraction((current) =>
+      selectElement(
+        setActiveTool(current, current.activeTool === "arcane-pointer" ? "select" : "arcane-pointer"),
+        null
+      )
+    );
+  }
+
   function handleCreateToken(): void {
     if (interaction.contextMenu === null) {
       return;
@@ -1702,6 +1726,14 @@ export function App(): JSX.Element {
           >
             {interaction.isZoomLocked ? "Zoom bloqueado" : "Bloquear zoom"}
           </button>
+          <button
+            type="button"
+            className={interaction.activeTool === "arcane-pointer" ? "is-active" : ""}
+            onClick={handleToggleArcanePointerMode}
+            aria-pressed={interaction.activeTool === "arcane-pointer"}
+          >
+            {interaction.activeTool === "arcane-pointer" ? "Apuntador activo" : "Apuntador"}
+          </button>
           {canCreateNewScene ? (
             <button type="button" onClick={handleRequestNewScene} disabled={isBusy}>
               Nueva escena
@@ -1758,6 +1790,9 @@ export function App(): JSX.Element {
           isFirePaintMode={interaction.activeTool === "fire-paint"}
           isPathDrawingMode={interaction.activeTool === "path"}
           isWaterDrawingMode={interaction.activeTool === "water"}
+          isArcanePointerMode={interaction.activeTool === "arcane-pointer"}
+          arcanePointerCreatureSize={arcanePointerCreatureSize}
+          arcanePointerResetKey={arcanePointerResetKey}
           pathPreviewPoints={pathDraft.points}
           pathPreviewHoverPoint={pathDraft.hoverPoint}
           waterPreviewPoints={waterDraft.points}
@@ -2348,6 +2383,47 @@ export function App(): JSX.Element {
                 onChange={(event) => handleCellDistanceValueChange(event.currentTarget.valueAsNumber)}
               />
             </label>
+          </SidebarAccordion>
+
+          <SidebarAccordion
+            id="effects-controls-panel"
+            icon="✦"
+            title="Efectos"
+            isOpen={openSidebarSections.effects}
+            onToggle={() => toggleSidebarSection("effects")}
+          >
+            <button
+              type="button"
+              className={interaction.activeTool === "arcane-pointer" ? "is-active" : ""}
+              onClick={handleToggleArcanePointerMode}
+              aria-pressed={interaction.activeTool === "arcane-pointer"}
+            >
+              {interaction.activeTool === "arcane-pointer" ? "Apuntador activo" : "Modo apuntador"}
+            </button>
+            {interaction.activeTool === "arcane-pointer" ? (
+              <label>
+                Tamano
+                <select
+                  aria-label="Tamano del apuntador"
+                  value={arcanePointerCreatureSize}
+                  onChange={(event) =>
+                    setArcanePointerCreatureSize(event.currentTarget.value as ArcanePointerCreatureSize)
+                  }
+                >
+                  {arcanePointerSizeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} ({option.footprintCells}x{option.footprintCells})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <button type="button" onClick={handleToggleFirePaintMode}>
+              {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
+            </button>
+            <button type="button" onClick={handleStartWaterDrawing}>
+              {interaction.activeTool === "water" ? "Dibujando agua" : "Dibujar agua"}
+            </button>
           </SidebarAccordion>
 
           <SidebarAccordion

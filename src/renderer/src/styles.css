@@ -711,6 +711,11 @@ body {
   cursor: crosshair;
 }
 
+.map-viewport.is-arcane-pointer-mode,
+.map-viewport.is-arcane-pointer-mode:active {
+  cursor: crosshair;
+}
+
 .map-viewport.is-space-drag-mode,
 .map-viewport.is-space-drag-mode:active {
   cursor: grab;

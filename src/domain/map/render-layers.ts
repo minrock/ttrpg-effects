@@ -10,7 +10,8 @@ export const renderLayerNames = [
   "tokens",
   "walls",
   "shapesAndMeasurements",
-  "selection"
+  "selection",
+  "pointer"
 ] as const;
 
 export type RenderLayerName = (typeof renderLayerNames)[number];
