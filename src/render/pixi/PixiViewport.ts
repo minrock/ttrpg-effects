@@ -1,4 +1,4 @@
-import { Application, Assets, ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text, type Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
   createCameraState,
@@ -156,6 +156,13 @@ export class PixiViewport {
   private _fogOfWarTexture: RenderTexture | null = null;
   private disposed = false;
   private waterPatternSource: GifSource | null = null;
+  private readonly effectRenderCache = new Map<
+    string,
+    {
+      readonly signature: string;
+      readonly container: Container;
+    }
+  >();
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
@@ -179,12 +186,14 @@ export class PixiViewport {
 
   setShapes(shapes: readonly SceneShape[]): void {
     this.shapes = shapes;
-    this.drawInteractiveElements();
+    this.drawShapesAndMeasurementsLayer();
+    this.drawSelectionLayer();
   }
 
   setSettings(settings: SceneSettings): void {
     this.settings = settings;
-    this.drawInteractiveElements();
+    this.drawShapesAndMeasurementsLayer();
+    this.drawSelectionLayer();
   }
 
   setLights(lights: readonly SceneLight[]): void {
@@ -193,7 +202,8 @@ export class PixiViewport {
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
     void this.drawTokenLayer();
-    this.drawInteractiveElements();
+    this.drawLightsLayer();
+    this.drawSelectionLayer();
   }
 
   setEffects(effects: readonly SceneEffect[]): void {
@@ -201,19 +211,22 @@ export class PixiViewport {
     this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
-    this.drawInteractiveElements();
+    this.drawLightsLayer();
+    this.drawEffectsLayer();
+    this.drawMagicalDarknessLayer();
+    this.drawSelectionLayer();
   }
 
   setTokens(tokens: readonly RenderSceneToken[]): void {
     this.tokens = tokens;
     void this.drawTokenLayer();
-    this.drawInteractiveElements();
+    this.drawSelectionLayer();
   }
 
   setSelectedElementId(selectedElementId: string | null): void {
     this.selectedElementId = selectedElementId;
     this.pathHoverZone = null;
-    this.drawInteractiveElements();
+    this.drawSelectionLayer();
   }
 
   setZoomLocked(isZoomLocked: boolean): void {
@@ -226,7 +239,7 @@ export class PixiViewport {
 
   setGridAdjustMode(isGridAdjustMode: boolean): void {
     this.isGridAdjustMode = isGridAdjustMode;
-    this.drawInteractiveElements();
+    this.drawSelectionLayer();
   }
 
   setGrabMode(isGrabMode: boolean): void {
@@ -257,13 +270,13 @@ export class PixiViewport {
   setPathPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
     this.pathPreviewPoints = points;
     this.pathPreviewHoverPoint = hoverPoint;
-    this.drawInteractiveElements();
+    this.drawSelectionLayer();
   }
 
   setWaterPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
     this.waterPreviewPoints = points;
     this.waterPreviewHoverPoint = hoverPoint;
-    this.drawInteractiveElements();
+    this.drawSelectionLayer();
   }
 
   getRandomVisibleWorldPoint(): WorldPoint {
@@ -303,7 +316,8 @@ export class PixiViewport {
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
     void this.drawTokenLayer();
-    this.drawInteractiveElements();
+    this.drawShapesAndMeasurementsLayer();
+    this.drawSelectionLayer();
   }
 
   setDarkness(darkness: SceneDarkness): void {
@@ -311,7 +325,7 @@ export class PixiViewport {
     this.updateBaseMapVisibility();
     this.drawDarkvisionLayer();
     this.drawDarknessLayer();
-    this.drawInteractiveElements();
+    this.drawSelectionLayer();
   }
 
   setFogOfWar(fogOfWar: SceneFogOfWar): void {
@@ -343,6 +357,10 @@ export class PixiViewport {
     this.darkvisionMask = null;
     this.firePatternSource = null;
     this.waterPatternSource = null;
+    for (const cached of this.effectRenderCache.values()) {
+      destroyDisplayObject(cached.container);
+    }
+    this.effectRenderCache.clear();
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -726,11 +744,6 @@ export class PixiViewport {
       this.mapSprite.position.x += dx;
       this.mapSprite.position.y += dy;
       this.colorMapSprite?.position.set(this.mapSprite.position.x, this.mapSprite.position.y);
-      this.drawGrid();
-      this.drawDarkvisionLayer();
-      this.drawDarknessLayer();
-      this.drawFogOfWarLayer();
-      this.options.onMapPositionChange?.(this.mapSprite.position.x, this.mapSprite.position.y);
     } else if (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       this.options.onElementMove?.(this.dragState.elementId, worldPoint.x, worldPoint.y);
@@ -816,6 +829,14 @@ export class PixiViewport {
 
     if (this.dragState.mode === "fog-reveal") {
       this.finishFogRevealStroke(releasePoint);
+    }
+
+    if (this.dragState.mode === "map-move" && this.mapSprite !== null) {
+      this.drawGrid();
+      this.drawDarkvisionLayer();
+      this.drawDarknessLayer();
+      this.drawFogOfWarLayer();
+      this.options.onMapPositionChange?.(this.mapSprite.position.x, this.mapSprite.position.y);
     }
 
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
@@ -918,20 +939,36 @@ export class PixiViewport {
   }
 
   private drawInteractiveElements(): void {
-    const shapesLayer = this.getLayer("shapesAndMeasurements");
-    const lightsLayer = this.getLayer("lights");
-    const effectsLayer = this.getLayer("effects");
-    const magicalDarknessLayer = this.getLayer("magicalDarkness");
-    const selectionLayer = this.getLayer("selection");
+    this.drawShapesAndMeasurementsLayer();
+    this.drawLightsLayer();
+    this.drawEffectsLayer();
+    this.drawMagicalDarknessLayer();
+    this.drawSelectionLayer();
+  }
 
+  private drawShapesAndMeasurementsLayer(): void {
+    const shapesLayer = this.getLayer("shapesAndMeasurements");
     clearContainerChildren(shapesLayer);
+
+    for (const element of this.elements) {
+      if (getLayerForElementKind(element.kind) === "shapes") {
+        shapesLayer.addChild(drawElement(element));
+      }
+    }
+
+    if (this.grid !== null && this.settings !== null) {
+      for (const shape of this.shapes) {
+        shapesLayer.addChild(drawTacticalShape(shape, this.grid, this.settings));
+      }
+    }
+  }
+
+  private drawLightsLayer(): void {
+    const lightsLayer = this.getLayer("lights");
     clearContainerChildren(lightsLayer);
-    clearContainerChildren(effectsLayer);
-    clearContainerChildren(magicalDarknessLayer);
-    clearContainerChildren(selectionLayer);
 
     for (const effect of this.effects.filter(isVisibleLightEmittingFireEffect)) {
-        lightsLayer.addChild(drawFireLight(effect));
+      lightsLayer.addChild(drawFireLight(effect));
     }
 
     for (const light of this.lights) {
@@ -941,28 +978,102 @@ export class PixiViewport {
     }
 
     for (const element of this.elements) {
-      const layer = getLayerForElementKind(element.kind);
-      const targetLayer =
-        layer === "lights" ? lightsLayer : layer === "effects" ? effectsLayer : shapesLayer;
-      targetLayer.addChild(drawElement(element));
+      if (getLayerForElementKind(element.kind) === "lights") {
+        lightsLayer.addChild(drawElement(element));
+      }
     }
+  }
 
-    if (this.grid !== null && this.settings !== null) {
-      for (const shape of this.shapes) {
-        shapesLayer.addChild(drawTacticalShape(shape, this.grid, this.settings));
+  private drawEffectsLayer(): void {
+    const effectsLayer = this.getLayer("effects");
+    const previousChildren = effectsLayer.removeChildren();
+    const reusedContainers = new Set<Container>();
+    const nextCache = new Map<
+      string,
+      {
+        readonly signature: string;
+        readonly container: Container;
+      }
+    >();
+
+    for (const element of this.elements) {
+      if (getLayerForElementKind(element.kind) === "effects") {
+        effectsLayer.addChild(drawElement(element));
       }
     }
 
     for (const effect of this.effects) {
       if (effect.visible && effect.kind === "fire") {
-        effectsLayer.addChild(drawSceneEffect(effect, this.firePatternSource));
-        if (effect.id !== this.selectedElementId) {
-          selectionLayer.addChild(drawFireZoneHint(effect));
-        }
+        const rendered = this.getCachedEffectContainer(effect, getSceneEffectRenderSignature(effect, this.firePatternSource !== null));
+        nextCache.set(effect.id, rendered);
+        reusedContainers.add(rendered.container);
+        effectsLayer.addChild(rendered.container);
       } else if (effect.visible && effect.kind === "water") {
-        effectsLayer.addChild(drawWaterEffect(effect, this.waterPatternSource));
-      } else if (effect.visible && effect.kind === "magical-darkness") {
+        const rendered = this.getCachedEffectContainer(effect, getSceneEffectRenderSignature(effect, this.waterPatternSource !== null));
+        nextCache.set(effect.id, rendered);
+        reusedContainers.add(rendered.container);
+        effectsLayer.addChild(rendered.container);
+      }
+    }
+
+    for (const child of previousChildren) {
+      if (child instanceof Container && reusedContainers.has(child)) {
+        continue;
+      }
+      destroyDisplayObject(child);
+    }
+
+    for (const [id, cached] of this.effectRenderCache) {
+      if (!nextCache.has(id) && !reusedContainers.has(cached.container)) {
+        destroyDisplayObject(cached.container);
+      }
+    }
+
+    this.effectRenderCache.clear();
+    for (const [id, cached] of nextCache) {
+      this.effectRenderCache.set(id, cached);
+    }
+  }
+
+  private getCachedEffectContainer(
+    effect: SceneFireEffect | SceneWaterEffect,
+    signature: string
+  ): {
+    readonly signature: string;
+    readonly container: Container;
+  } {
+    const cached = this.effectRenderCache.get(effect.id);
+
+    if (cached !== undefined && cached.signature === signature) {
+      return cached;
+    }
+
+    const container =
+      effect.kind === "fire"
+        ? drawSceneEffect(effect, this.firePatternSource)
+        : drawWaterEffect(effect, this.waterPatternSource);
+
+    return { signature, container };
+  }
+
+  private drawMagicalDarknessLayer(): void {
+    const magicalDarknessLayer = this.getLayer("magicalDarkness");
+    clearContainerChildren(magicalDarknessLayer);
+
+    for (const effect of this.effects) {
+      if (effect.visible && effect.kind === "magical-darkness") {
         magicalDarknessLayer.addChild(drawMagicalDarknessEffect(effect));
+      }
+    }
+  }
+
+  private drawSelectionLayer(): void {
+    const selectionLayer = this.getLayer("selection");
+    clearContainerChildren(selectionLayer);
+
+    for (const effect of this.effects) {
+      if (effect.visible && effect.kind === "fire" && effect.id !== this.selectedElementId) {
+        selectionLayer.addChild(drawFireZoneHint(effect));
       }
     }
 
@@ -1100,7 +1211,32 @@ export class PixiViewport {
       }
     }
 
-    for (const token of this.tokens) {
+    const visibleTokens = this.tokens.filter((token) => token.visible);
+    const imageUrls = [
+      ...new Set(
+        visibleTokens
+          .map((token) => token.imageUrl)
+          .filter((url): url is string => url !== null)
+      )
+    ];
+    const textures = new Map<string, Texture>();
+
+    await Promise.all(
+      imageUrls.map(async (url) => {
+        try {
+          textures.set(url, await Assets.load<Texture>(url));
+          this.loadedTokenUrls.add(url);
+        } catch {
+          textures.delete(url);
+        }
+      })
+    );
+
+    if (this.disposed || loadVersion !== this.tokenLoadVersion) {
+      return;
+    }
+
+    for (const token of visibleTokens) {
       if (!token.visible) {
         continue;
       }
@@ -1114,14 +1250,8 @@ export class PixiViewport {
       const footprintWorld = this.getTokenFootprintWorld(token);
 
       if (token.imageUrl !== null) {
-        try {
-          const texture = await Assets.load(token.imageUrl);
-
-          if (this.disposed || loadVersion !== this.tokenLoadVersion) {
-            return;
-          }
-
-          this.loadedTokenUrls.add(token.imageUrl);
+        const texture = textures.get(token.imageUrl);
+        if (texture !== undefined) {
           const sprite = new Sprite(texture);
           sprite.anchor.set(0.5);
           const textureMin = Math.max(Math.min(texture.width, texture.height), 1);
@@ -1135,7 +1265,7 @@ export class PixiViewport {
           sprite.setMask({ mask: tokenMask });
           container.addChild(sprite);
           container.addChild(tokenMask);
-        } catch {
+        } else {
           container.addChild(drawTokenPlaceholder(token, footprintWorld));
         }
       } else {
@@ -2127,16 +2257,25 @@ const WATER_RIVER_PERFORMANCE_TILE_SIZE = 180;
 const MAX_WATER_PATTERN_SPRITES_PER_EFFECT = 360;
 const FIRE_PATTERN_ALPHA_MULTIPLIER = 0.65;
 const MAX_EMOJIS_PER_ELEMENT = 120;
+const waterFilterCache = new Map<string, ColorMatrixFilter>();
 
 function clearContainerChildren(container: Container): void {
   const children = container.removeChildren();
 
   for (const child of children) {
-    if (child instanceof Container) {
-      clearContainerChildren(child);
-    }
-    child.destroy();
+    destroyDisplayObject(child);
   }
+}
+
+function destroyDisplayObject(child: Container): void {
+  if (child instanceof Container) {
+    clearContainerChildren(child);
+  }
+  child.destroy();
+}
+
+function getSceneEffectRenderSignature(effect: SceneFireEffect | SceneWaterEffect, hasPatternSource: boolean): string {
+  return `${hasPatternSource ? "pattern" : "fallback"}:${JSON.stringify(effect)}`;
 }
 
 function parseHexColor(color: string): number {
@@ -2995,25 +3134,91 @@ function addRiverWaterPatternSprites(
 
       for (let row = -extraRows; row <= extraRows; row += 1) {
         const offset = row * tileSize;
-        const sprite = new GifSprite({ source: waterPatternSource, autoPlay: true });
-        sprite.anchor.set(0.5);
-        sprite.position.set(
-          center.x + Math.cos(normalAngle) * offset,
-          center.y + Math.sin(normalAngle) * offset
-        );
-        sprite.width = tileSize;
-        sprite.height = tileSize;
-        sprite.rotation = angle + (effect.patternRotation * Math.PI) / 180;
-        sprite.alpha = effect.opacity;
-        applyWaterPatternFilters(sprite, effect);
-        patternContainer.addChild(sprite);
+        addWaterPatternTile(patternContainer, effect, waterPatternSource, {
+          x: center.x + Math.cos(normalAngle) * offset,
+          y: center.y + Math.sin(normalAngle) * offset
+        }, tileSize, angle + (effect.patternRotation * Math.PI) / 180);
       }
     }
   }
 
+  addRiverEndpointAndCornerPatternSprites(patternContainer, effect, waterPatternSource, tileSize);
   patternContainer.setMask({ mask });
   container.addChild(patternContainer);
   container.addChild(mask);
+}
+
+function addRiverEndpointAndCornerPatternSprites(
+  container: Container,
+  effect: Extract<SceneWaterEffect, { readonly variant: "river" }>,
+  waterPatternSource: GifSource,
+  tileSize: number
+): void {
+  const capTileSize = Math.max(tileSize, effect.width * 1.08);
+
+  for (let index = 0; index < effect.points.length; index += 1) {
+    const point = effect.points[index];
+    if (point === undefined) {
+      continue;
+    }
+
+    addWaterPatternTile(
+      container,
+      effect,
+      waterPatternSource,
+      point,
+      capTileSize,
+      getRiverPointPatternRotation(effect, index)
+    );
+  }
+}
+
+function addWaterPatternTile(
+  container: Container,
+  effect: SceneWaterEffect,
+  waterPatternSource: GifSource,
+  position: WorldPoint,
+  size: number,
+  rotation: number
+): void {
+  const sprite = new GifSprite({ source: waterPatternSource, autoPlay: true });
+  sprite.anchor.set(0.5);
+  sprite.position.set(position.x, position.y);
+  sprite.width = size;
+  sprite.height = size;
+  sprite.rotation = rotation;
+  sprite.alpha = effect.opacity;
+  applyWaterPatternFilters(sprite, effect);
+  container.addChild(sprite);
+}
+
+function getRiverPointPatternRotation(
+  effect: Extract<SceneWaterEffect, { readonly variant: "river" }>,
+  pointIndex: number
+): number {
+  const previous = effect.points[pointIndex - 1];
+  const point = effect.points[pointIndex];
+  const next = effect.points[pointIndex + 1];
+
+  if (point === undefined) {
+    return (effect.patternRotation * Math.PI) / 180;
+  }
+
+  if (previous !== undefined && next !== undefined) {
+    const previousAngle = Math.atan2(point.y - previous.y, point.x - previous.x);
+    const nextAngle = Math.atan2(next.y - point.y, next.x - point.x);
+    return ((previousAngle + nextAngle) / 2) + (effect.patternRotation * Math.PI) / 180;
+  }
+
+  if (next !== undefined) {
+    return Math.atan2(next.y - point.y, next.x - point.x) + (effect.patternRotation * Math.PI) / 180;
+  }
+
+  if (previous !== undefined) {
+    return Math.atan2(point.y - previous.y, point.x - previous.x) + (effect.patternRotation * Math.PI) / 180;
+  }
+
+  return (effect.patternRotation * Math.PI) / 180;
 }
 
 function applyWaterPatternFilters(sprite: Sprite | GifSprite, effect: SceneWaterEffect): void {
@@ -3021,14 +3226,26 @@ function applyWaterPatternFilters(sprite: Sprite | GifSprite, effect: SceneWater
     return;
   }
 
+  sprite.filters = [getWaterColorMatrixFilter(effect.hue, effect.saturation)];
+}
+
+function getWaterColorMatrixFilter(hue: number, saturation: number): ColorMatrixFilter {
+  const key = `${hue}:${saturation}`;
+  const cached = waterFilterCache.get(key);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
   const filter = new ColorMatrixFilter();
-  if (effect.hue !== 0) {
-    filter.hue(effect.hue, false);
+  if (hue !== 0) {
+    filter.hue(hue, false);
   }
-  if (effect.saturation !== 1) {
-    filter.saturate(effect.saturation, true);
+  if (saturation !== 1) {
+    filter.saturate(saturation, true);
   }
-  sprite.filters = [filter];
+  waterFilterCache.set(key, filter);
+  return filter;
 }
 
 function getPolylineLength(points: readonly WorldPoint[]): number {

@@ -116,6 +116,7 @@
 - Renderizar rios como un trazo ancho con agua interior y costas en ambos lados.
 - En rios, repetir el GIF de agua con multiples sprites a lo largo del cauce y recortarlos con la mascara del rio; no estirar un unico GIF sobre todo el bounding box.
 - Usar tiles GIF pequenos y con paso equivalente al tamano del tile para evitar solapamiento/apilamiento visual.
+- Agregar tiles GIF adicionales centrados en extremos y vertices del rio para cubrir caps redondeados y esquinas dentro de la mascara.
 - En rios y cuerpos de agua seleccionados, renderizar una manivela interna para `lineRotation` y una externa para `patternRotation`.
 - Aplicar filtros de `hue` y `saturation` al GIF de agua sin afectar costa/vector de seleccion.
 - Renderizar cuerpos cerrados como poligono con interior de `water-center.gif` repetido en mosaico y recortado por mascara; `patternRotation` rota los GIFs del mosaico y `lineRotation` rota la geometria del poligono.

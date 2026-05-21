@@ -51,6 +51,7 @@ La base visual inicial del agua usa el GIF provisto por el usuario (`Q52D8P.gif`
 - El render del rio usa agua animada en el centro y costa animada a ambos lados del trazo.
 - El GIF de agua del rio debe repetirse muchas veces a lo largo del trazo, cada cierta distancia, en lugar de estirarse como una unica textura sobre todo el bounding box.
 - Los tiles GIF del rio deben ser pequenos y distribuirse de forma continua sin solaparse entre si; el espaciado base debe coincidir con el tamano visual del tile para evitar apilamiento.
+- Los extremos redondeados y esquinas/puntos intermedios del rio tambien deben recibir tiles GIF centrados sobre cada punto para evitar huecos sin textura dentro de la mascara.
 - El rio debe exponer una manivela de rotacion sobre un circulo de seleccion para girar la direccion visual del GIF sin mover la geometria del cauce.
 - El rio debe exponer una segunda manivela sobre otro circulo de seleccion para rotar la geometria de la linea/cauce sin rotar el GIF por separado.
 - Los dos circulos de rotacion deben tener suficiente separacion visual para que sus manivelas se puedan manipular sin interferirse.
