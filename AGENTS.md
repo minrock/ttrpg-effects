@@ -27,6 +27,11 @@ pnpm test
 
 No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 
+## Way of Working
+- Siempre que vayas a comenzar con un spec/feature nueva inicia creando una rama feature/.*
+- Siempre que vayas a comenzar a trabajar con un bug inicia creando una rama fix/.*
+- Siempre espera a la orden de mergear para llevar los cambios a main.
+
 ## Principios de arquitectura
 
 - Separar logica de dominio, persistencia, infraestructura y vista.
