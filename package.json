@@ -8,9 +8,44 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "pnpm typecheck && electron-vite build",
+    "dist:mac": "pnpm build && electron-builder --mac dmg",
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.luismoncaris.ttrpg-effects",
+    "productName": "TTRPG Effects",
+    "copyright": "Copyright © 2026 Luis Moncaris",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**/*",
+      "!out/**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "assets/logo/ttrpg-effects-logo.png",
+        "to": "assets/logo/ttrpg-effects-logo.png"
+      }
+    ],
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "assets/logo/ttrpg-effects-logo.png",
+      "category": "public.app-category.entertainment",
+      "identity": null
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ],
+      "window": { "width": 540, "height": 380 }
+    }
   },
   "dependencies": {
     "@radix-ui/react-switch": "^1.2.6",
@@ -26,6 +61,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "electron": "^39.0.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^9.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.0.0",
@@ -34,7 +70,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "esbuild"
+      "esbuild",
+      "electron-winstaller"
     ]
   }
 }

@@ -58,3 +58,7 @@ Crashpad/
 crashes/
 
 tmp/
+
+# ── Debug artifacts ───────────────────────────────────────────────────────────
+/index.html
+/index.js

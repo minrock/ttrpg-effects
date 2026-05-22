@@ -25,6 +25,7 @@ export default defineConfig({
     }
   },
   renderer: {
-    root: "src/renderer"
+    root: "src/renderer",
+    base: "./"
   }
 });

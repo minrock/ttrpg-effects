@@ -2338,9 +2338,9 @@ interface SelectableRenderElement {
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
 const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
-const FIRE_PATTERN_URL = "/effects/area-fire.gif";
-const WATER_PATTERN_URL = "/effects/water/water-center.gif";
-const ARCANE_POINTER_URL = "/effects/arcane-pointer.gif";
+const FIRE_PATTERN_URL = "effects/area-fire.gif";
+const WATER_PATTERN_URL = "effects/water/water-center.gif";
+const ARCANE_POINTER_URL = "effects/arcane-pointer.gif";
 const WATER_BODY_TILE_SIZE = 72;
 const WATER_BODY_MAX_TILE_SIZE = 150;
 const WATER_RIVER_MIN_TILE_SIZE = 44;

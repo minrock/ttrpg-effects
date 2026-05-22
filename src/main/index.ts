@@ -14,7 +14,7 @@ app.setName("TTRPG Effects");
 const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
 const appIconPath = isDevelopment
   ? join(app.getAppPath(), "assets/logo/ttrpg-effects-logo.png")
-  : join(__dirname, "../../assets/logo/ttrpg-effects-logo.png");
+  : join(process.resourcesPath, "assets/logo/ttrpg-effects-logo.png");
 
 let mainWindow: BrowserWindow | null = null;
 

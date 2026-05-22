@@ -98,7 +98,7 @@ import type { TacticalElementKind } from "../../domain/tools/tactical-elements";
 import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
 import type { PixiContextMenuRequest } from "../../render/pixi/PixiViewport";
 
-const logoUrl = "/logo/ttrpg-effects-logo.png";
+const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
   name: "TTRPG Effects",
   version: "0.0.0"
