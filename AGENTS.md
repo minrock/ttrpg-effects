@@ -31,6 +31,7 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 - Siempre que vayas a comenzar con un spec/feature nueva inicia creando una rama feature/.*
 - Siempre que vayas a comenzar a trabajar con un bug inicia creando una rama fix/.*
 - Siempre espera a la orden de mergear para llevar los cambios a main.
+- Cada vez que se mergee un nuevo spec a main, ejecutar `./scripts/build-dmg.sh` para generar un nuevo DMG instalable. El DMG queda en `dist/`.
 
 ## Principios de arquitectura
 
@@ -334,15 +335,22 @@ Tipos de test:
 - No introducir dependencias pesadas sin justificar su rol.
 - Revisar warnings de Electron en consola durante desarrollo.
 
-## Empaquetado futuro
+## Empaquetado macOS
 
-No es parte del primer bootstrap, pero la arquitectura debe permitir:
+El proyecto incluye un pipeline de empaquetado para macOS con `electron-builder`.
 
-- Code signing para distribucion.
+Para generar un DMG instalable:
+
+```bash
+./scripts/build-dmg.sh
+```
+
+El DMG resultante queda en `dist/`. No incluye firma de codigo (uso personal/interno). Si macOS bloquea la app al abrirla, hacer clic derecho → Abrir la primera vez.
+
+Pendiente si se decide distribuir ampliamente:
+- Code signing con certificado Developer ID Application.
 - Notarizacion en macOS.
-- Builds por plataforma.
-- Actualizaciones futuras si se decide distribuir ampliamente.
-- ASAR y verificacion de integridad si aplica.
+- Builds para otras plataformas (Windows, Linux).
 
 ## Referencias
 
