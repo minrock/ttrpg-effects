@@ -77,6 +77,14 @@ import {
   type ArcanePointerCreatureSize
 } from "../../domain/pointer/arcane-pointer";
 import {
+  deriveFogPresentation,
+  deriveHiddenTokenPolicy,
+  normalizeCameraSnapshot,
+  type ArcanePointerBroadcast,
+  type PlayerWindowSnapshot,
+  type ViewportCameraSnapshot
+} from "../../domain/player/player-window";
+import {
   ALLOWED_SHAPE_EMOJIS,
   getSelectedShapeEmojis
 } from "../../domain/shapes/shape-emojis";
@@ -126,6 +134,9 @@ interface NewTokenDraftState {
   readonly position: WorldPoint;
 }
 
+const SESSION_AUTOSAVE_DELAY_MS = 1000;
+const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
+
 export function App(): JSX.Element {
   const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
   const [scene, setSceneState] = useState<SceneDocument>(() => {
@@ -162,6 +173,15 @@ export function App(): JSX.Element {
   const [arcanePointerCreatureSize, setArcanePointerCreatureSize] =
     useState<ArcanePointerCreatureSize>("medium");
   const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
+  const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
+  const [isPlayerWindowOpen, setIsPlayerWindowOpen] = useState(false);
+  const isPlayerWindowOpenRef = useRef(isPlayerWindowOpen);
+  isPlayerWindowOpenRef.current = isPlayerWindowOpen;
+  const playerCameraRef = useRef<ViewportCameraSnapshot>(
+    normalizeCameraSnapshot({ center: { x: scene.camera.x, y: scene.camera.y }, zoom: scene.camera.zoom })
+  );
+  const pendingPlayerCameraRef = useRef<ViewportCameraSnapshot | null>(null);
+  const playerCameraFrameRef = useRef<number | null>(null);
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
   const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
@@ -256,7 +276,7 @@ export function App(): JSX.Element {
       } catch {
         // Storage full or unavailable — skip silently
       }
-    }, 500);
+    }, SESSION_AUTOSAVE_DELAY_MS);
     return () => clearTimeout(handle);
   }, [scene]);
 
@@ -266,6 +286,32 @@ export function App(): JSX.Element {
 
   const handleElementSelect = useCallback((elementId: string | null) => {
     setInteraction((current) => selectElement(current, elementId));
+  }, []);
+
+  const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
+    const normalized = normalizeCameraSnapshot(camera);
+    playerCameraRef.current = normalized;
+    pendingPlayerCameraRef.current = normalized;
+
+    if (playerCameraFrameRef.current !== null) {
+      return;
+    }
+
+    playerCameraFrameRef.current = window.requestAnimationFrame(() => {
+      playerCameraFrameRef.current = null;
+      const nextCamera = pendingPlayerCameraRef.current;
+      pendingPlayerCameraRef.current = null;
+
+      if (nextCamera !== null && isPlayerWindowOpenRef.current) {
+        void window.ttrpg?.publishPlayerCamera(nextCamera);
+      }
+    });
+  }, []);
+
+  const handleArcanePointerTrigger = useCallback((pointer: ArcanePointerBroadcast): void => {
+    if (isPlayerWindowOpenRef.current) {
+      void window.ttrpg?.publishPlayerPointer(pointer);
+    }
   }, []);
 
   const setGridAdjustMode = useCallback((enabled: boolean): void => {
@@ -431,6 +477,44 @@ export function App(): JSX.Element {
     () => hasSceneContent(scene, interaction.elements.length),
     [scene, interaction.elements.length]
   );
+
+  const playerWindowSnapshot = useMemo<PlayerWindowSnapshot>(
+    () => ({
+      scene,
+      mapImageUrl,
+      tokenImageUrls,
+      camera: playerCameraRef.current,
+      showDmFogOverlay
+    }),
+    [scene, mapImageUrl, tokenImageUrls, showDmFogOverlay]
+  );
+
+  useEffect(() => {
+    if (!isPlayerWindowOpen) {
+      return undefined;
+    }
+
+    const handle = window.setTimeout(() => {
+      void window.ttrpg?.publishPlayerScene(playerWindowSnapshot);
+    }, PLAYER_SCENE_PUBLISH_DELAY_MS);
+
+    return () => window.clearTimeout(handle);
+  }, [isPlayerWindowOpen, playerWindowSnapshot]);
+
+  useEffect(() => {
+    const unsubscribe = window.ttrpg?.onPlayerWindowClosed(() => {
+      setIsPlayerWindowOpen(false);
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
+  useEffect(() => () => {
+    if (playerCameraFrameRef.current !== null) {
+      window.cancelAnimationFrame(playerCameraFrameRef.current);
+      playerCameraFrameRef.current = null;
+    }
+  }, []);
 
   const resetToNewScene = useCallback((): void => {
     sessionStorage.removeItem("ttrpg:session-scene");
@@ -1291,6 +1375,24 @@ export function App(): JSX.Element {
     );
   }
 
+  async function handleOpenPlayerWindow(): Promise<void> {
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return;
+    }
+
+    const result = await window.ttrpg.openPlayerWindow();
+
+    if (!result.ok) {
+      setFeedback(result.error ?? "No se pudo abrir la ventana de jugador.");
+      return;
+    }
+
+    setIsPlayerWindowOpen(true);
+    await window.ttrpg.publishPlayerScene(playerWindowSnapshot);
+    setFeedback("Ventana de jugador lista.");
+  }
+
   function handleCreateToken(): void {
     if (interaction.contextMenu === null) {
       return;
@@ -1734,6 +1836,9 @@ export function App(): JSX.Element {
           >
             {interaction.activeTool === "arcane-pointer" ? "Apuntador activo" : "Apuntador"}
           </button>
+          <button type="button" onClick={() => void handleOpenPlayerWindow()} disabled={isBusy}>
+            Ventana de jugador
+          </button>
           {canCreateNewScene ? (
             <button type="button" onClick={handleRequestNewScene} disabled={isBusy}>
               Nueva escena
@@ -1786,6 +1891,10 @@ export function App(): JSX.Element {
           isMapAdjustMode={interaction.isMapAdjustMode}
           isGridAdjustMode={isGridAdjustMode}
           isGrabMode={isSpaceDragActive}
+          viewRole="dm"
+          isReadOnly={false}
+          fogPresentation={deriveFogPresentation("dm", showDmFogOverlay)}
+          hiddenTokenPolicy={deriveHiddenTokenPolicy("dm")}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
           isFirePaintMode={interaction.activeTool === "fire-paint"}
           isPathDrawingMode={interaction.activeTool === "path"}
@@ -1823,6 +1932,8 @@ export function App(): JSX.Element {
           onMagicalDarknessRadiusChange={handleMagicalDarknessRadiusChange}
           onWaterLineRotationChange={handleWaterLineRotationChange}
           onWaterPatternRotationChange={handleWaterPatternRotationChange}
+          onCameraChange={handleCameraChange}
+          onArcanePointerTrigger={handleArcanePointerTrigger}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
           {hasSelectedObject ? (
@@ -2535,6 +2646,14 @@ export function App(): JSX.Element {
                 onChange={handleFogEnabledChange}
               />
               Activar niebla
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={showDmFogOverlay}
+                onChange={(event) => setShowDmFogOverlay(event.currentTarget.checked)}
+              />
+              Ver niebla en DM
             </label>
             <button
               type="button"

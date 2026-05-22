@@ -2,6 +2,8 @@ import type { WorldPoint } from "../shared/coordinates";
 
 export type LightKind = "point" | "cone";
 export const CONE_LIGHT_ANGLE = 60;
+export const DEFAULT_POINT_LIGHT_RADIUS = 90;
+export const DEFAULT_CONE_LIGHT_RADIUS = 140;
 
 export interface LightSource {
   readonly id: string;
@@ -39,7 +41,7 @@ export function createLightSource(id: string, kind: LightKind, position: WorldPo
     id,
     kind,
     position,
-    radius: kind === "point" ? 180 : 260,
+    radius: kind === "point" ? DEFAULT_POINT_LIGHT_RADIUS : DEFAULT_CONE_LIGHT_RADIUS,
     color: kind === "point" ? "#ffd28a" : "#fff1b8",
     intensity: 0.85,
     opacity: 0.7,

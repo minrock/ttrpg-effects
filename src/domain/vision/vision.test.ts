@@ -116,13 +116,24 @@ describe("vision and fog of war", () => {
     const hiddenLight = updateLightSource(createLightSource("light-2", "point", { x: 0, y: 0 }), {
       visible: false
     });
+    const coneLight = updateLightSource(createLightSource("light-3", "cone", { x: 30, y: 40 }), {
+      direction: 90
+    });
 
-    expect(getVisibleAreasFromLights([visibleLight, hiddenLight])).toEqual([
+    expect(getVisibleAreasFromLights([visibleLight, hiddenLight, coneLight])).toEqual([
       {
         id: "vision-light-1",
         kind: "circle",
         center: { x: 10, y: 20 },
         radius: visibleLight.radius
+      },
+      {
+        id: "vision-light-3",
+        kind: "cone",
+        center: { x: 30, y: 40 },
+        radius: coneLight.radius,
+        angle: 60,
+        direction: 90
       }
     ]);
   });

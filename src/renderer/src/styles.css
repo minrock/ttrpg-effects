@@ -35,6 +35,18 @@ body {
   background: #111315;
 }
 
+.player-shell {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050606;
+}
+
+.player-shell .map-viewport {
+  width: 100%;
+  height: 100%;
+}
+
 .app-toolbar {
   display: flex;
   align-items: center;
