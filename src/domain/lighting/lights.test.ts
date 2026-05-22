@@ -12,7 +12,7 @@ describe("lights", () => {
     expect(createLightSource("light-1", "point", { x: 10, y: 20 })).toMatchObject({
       id: "light-1",
       kind: "point",
-      radius: 180,
+      radius: 90,
       angle: 360,
       visible: true
     });
@@ -20,7 +20,7 @@ describe("lights", () => {
     expect(createLightSource("light-2", "cone", { x: -10, y: 40 })).toMatchObject({
       id: "light-2",
       kind: "cone",
-      radius: 260,
+      radius: 140,
       angle: 60,
       visible: true
     });

@@ -18,6 +18,13 @@ import type {
 } from "../../../domain/sessions/scene-document";
 import type { FireCell } from "../../../domain/effects/fire";
 import type { ArcanePointerCreatureSize } from "../../../domain/pointer/arcane-pointer";
+import type {
+  ArcanePointerBroadcast,
+  FogPresentation,
+  HiddenTokenPolicy,
+  ViewportCameraSnapshot,
+  ViewportViewRole
+} from "../../../domain/player/player-window";
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
@@ -39,6 +46,11 @@ interface MapViewportProps {
   readonly isMapAdjustMode: boolean;
   readonly isGridAdjustMode: boolean;
   readonly isGrabMode: boolean;
+  readonly viewRole?: ViewportViewRole;
+  readonly isReadOnly?: boolean;
+  readonly fogPresentation?: FogPresentation;
+  readonly hiddenTokenPolicy?: HiddenTokenPolicy;
+  readonly cameraSnapshot?: ViewportCameraSnapshot | null;
   readonly isFogRevealMode: boolean;
   readonly isFirePaintMode: boolean;
   readonly isPathDrawingMode: boolean;
@@ -46,6 +58,7 @@ interface MapViewportProps {
   readonly isArcanePointerMode: boolean;
   readonly arcanePointerCreatureSize: ArcanePointerCreatureSize;
   readonly arcanePointerResetKey: number;
+  readonly arcanePointerEvent?: ArcanePointerBroadcast | null;
   readonly pathPreviewPoints: readonly { readonly x: number; readonly y: number }[];
   readonly pathPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
   readonly waterPreviewPoints: readonly { readonly x: number; readonly y: number }[];
@@ -76,6 +89,8 @@ interface MapViewportProps {
   readonly onMagicalDarknessRadiusChange: (elementId: string, radius: number) => void;
   readonly onWaterLineRotationChange: (elementId: string, rotation: number) => void;
   readonly onWaterPatternRotationChange: (elementId: string, rotation: number) => void;
+  readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
+  readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport({
@@ -94,6 +109,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isMapAdjustMode,
   isGridAdjustMode,
   isGrabMode,
+  viewRole = "dm",
+  isReadOnly = false,
+  fogPresentation = "dm-preview",
+  hiddenTokenPolicy = "show-with-indicator",
+  cameraSnapshot = null,
   isFogRevealMode,
   isFirePaintMode,
   isPathDrawingMode,
@@ -101,6 +121,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isArcanePointerMode,
   arcanePointerCreatureSize,
   arcanePointerResetKey,
+  arcanePointerEvent = null,
   pathPreviewPoints,
   pathPreviewHoverPoint,
   waterPreviewPoints,
@@ -130,7 +151,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onFireLightRadiusChange,
   onMagicalDarknessRadiusChange,
   onWaterLineRotationChange,
-  onWaterPatternRotationChange
+  onWaterPatternRotationChange,
+  onCameraChange,
+  onArcanePointerTrigger
 }: MapViewportProps, ref): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
@@ -176,7 +199,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onFireLightRadiusChange,
       onMagicalDarknessRadiusChange,
       onWaterLineRotationChange,
-      onWaterPatternRotationChange
+      onWaterPatternRotationChange,
+      onCameraChange,
+      onArcanePointerTrigger
     }).then((createdViewport) => {
       if (cancelled) {
         createdViewport.destroy();
@@ -197,6 +222,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setTokens(tokens);
       createdViewport.setSelectedElementId(selectedElementId);
       createdViewport.setZoomLocked(isZoomLocked);
+      createdViewport.setViewRole(viewRole);
+      createdViewport.setReadOnly(isReadOnly);
+      createdViewport.setFogPresentation(fogPresentation);
+      createdViewport.setHiddenTokenPolicy(hiddenTokenPolicy);
+      if (cameraSnapshot !== null) {
+        createdViewport.setCameraSnapshot(cameraSnapshot);
+      }
       createdViewport.setGrabMode(isGrabMode);
       createdViewport.setGridAdjustMode(isGridAdjustMode);
       createdViewport.setFogRevealMode(isFogRevealMode);
@@ -217,7 +249,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onArcanePointerTrigger]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -268,6 +300,28 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   }, [isZoomLocked]);
 
   useEffect(() => {
+    viewportRef.current?.setViewRole(viewRole);
+  }, [viewRole]);
+
+  useEffect(() => {
+    viewportRef.current?.setReadOnly(isReadOnly);
+  }, [isReadOnly]);
+
+  useEffect(() => {
+    viewportRef.current?.setFogPresentation(fogPresentation);
+  }, [fogPresentation]);
+
+  useEffect(() => {
+    viewportRef.current?.setHiddenTokenPolicy(hiddenTokenPolicy);
+  }, [hiddenTokenPolicy]);
+
+  useEffect(() => {
+    if (cameraSnapshot !== null) {
+      viewportRef.current?.setCameraSnapshot(cameraSnapshot);
+    }
+  }, [cameraSnapshot]);
+
+  useEffect(() => {
     viewportRef.current?.setMapAdjustMode(isMapAdjustMode);
   }, [isMapAdjustMode]);
 
@@ -315,13 +369,19 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     viewportRef.current?.clearArcanePointers();
   }, [arcanePointerResetKey]);
 
+  useEffect(() => {
+    if (arcanePointerEvent !== null) {
+      viewportRef.current?.showArcanePointer(arcanePointerEvent);
+    }
+  }, [arcanePointerEvent]);
+
   return (
     <div
       ref={hostRef}
       className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isWaterDrawingMode ? " is-water-drawing-mode" : ""}${isArcanePointerMode ? " is-arcane-pointer-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
       aria-label="Lienzo del mapa"
     >
-      <NavigationLegend />
+      {isReadOnly ? null : <NavigationLegend />}
     </div>
   );
 });

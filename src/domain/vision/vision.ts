@@ -2,6 +2,16 @@ import type { SceneFogOfWar, SceneFogObstacle, SceneLight } from "../sessions/sc
 import type { WorldPoint } from "../shared/coordinates";
 
 export type RevealAreaKind = "circle";
+export type RuntimeVisionArea =
+  | SceneFogOfWar["revealedAreas"][number]
+  | {
+      readonly id: string;
+      readonly kind: "cone";
+      readonly center: WorldPoint;
+      readonly radius: number;
+      readonly angle: number;
+      readonly direction: number;
+    };
 
 export interface CreateRevealAreaOptions {
   readonly id: string;
@@ -141,15 +151,26 @@ export function createWallObstacle(
 
 export function getVisibleAreasFromLights(
   lights: readonly SceneLight[]
-): readonly SceneFogOfWar["revealedAreas"][number][] {
+): readonly RuntimeVisionArea[] {
   return lights
     .filter((light) => light.visible)
-    .map((light) => ({
-      id: `vision-${light.id}`,
-      kind: "circle" as const,
-      center: light.position,
-      radius: sanitizePositive(light.radius)
-    }));
+    .map((light) =>
+      light.kind === "cone"
+        ? {
+            id: `vision-${light.id}`,
+            kind: "cone" as const,
+            center: light.position,
+            radius: sanitizePositive(light.radius),
+            angle: light.angle,
+            direction: light.direction
+          }
+        : {
+            id: `vision-${light.id}`,
+            kind: "circle" as const,
+            center: light.position,
+            radius: sanitizePositive(light.radius)
+          }
+    );
 }
 
 function clampUnit(value: number): number {

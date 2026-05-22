@@ -32,13 +32,22 @@ import {
 } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
-import { getVisibleAreasFromLights } from "../../domain/vision/vision";
+import { getVisibleAreasFromLights, type RuntimeVisionArea } from "../../domain/vision/vision";
 import type { FireCell } from "../../domain/effects/fire";
 import {
   getArcanePointerAlpha,
   getArcanePointerDiameterWorld,
   type ArcanePointerCreatureSize
 } from "../../domain/pointer/arcane-pointer";
+import {
+  cameraStateToSnapshot,
+  normalizeCameraSnapshot,
+  type ArcanePointerBroadcast,
+  type FogPresentation,
+  type HiddenTokenPolicy,
+  type ViewportCameraSnapshot,
+  type ViewportViewRole
+} from "../../domain/player/player-window";
 
 export type RenderSceneToken = SceneToken & {
   readonly imageUrl: string | null;
@@ -81,6 +90,8 @@ interface PointerDragState {
   readonly elementId?: string;
   readonly handleIndex?: number;
   readonly grabOffset?: WorldPoint;
+  readonly moveStartPosition?: WorldPoint;
+  readonly pendingMovePosition?: WorldPoint;
 }
 
 export interface PixiContextMenuRequest {
@@ -118,6 +129,8 @@ export interface PixiViewportOptions {
   readonly onWaterPatternRotationChange?: (elementId: string, rotation: number) => void;
   readonly onShapeRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
+  readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
+  readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
 }
 
 export class PixiViewport {
@@ -158,6 +171,10 @@ export class PixiViewport {
   private isWaterDrawingMode = false;
   private isArcanePointerMode = false;
   private arcanePointerCreatureSize: ArcanePointerCreatureSize = "medium";
+  private viewRole: ViewportViewRole = "dm";
+  private isReadOnly = false;
+  private fogPresentation: FogPresentation = "dm-preview";
+  private hiddenTokenPolicy: HiddenTokenPolicy = "show-with-indicator";
   private pathPreviewPoints: readonly WorldPoint[] = [];
   private pathPreviewHoverPoint: WorldPoint | null = null;
   private waterPreviewPoints: readonly WorldPoint[] = [];
@@ -165,11 +182,23 @@ export class PixiViewport {
   private pathHoverZone: "point" | "circle" | null = null;
   private fogRevealStrokePoints: WorldPoint[] = [];
   private dragState: PointerDragState | null = null;
+  private transientMovePreview:
+    | {
+        readonly elementId: string;
+        readonly dx: number;
+        readonly dy: number;
+      }
+    | null = null;
   private _darknessTexture: RenderTexture | null = null;
   private _fogOfWarTexture: RenderTexture | null = null;
+  private _darknessTextureSize: { readonly width: number; readonly height: number } | null = null;
+  private _fogOfWarTextureSize: { readonly width: number; readonly height: number } | null = null;
+  private fogRedrawFrame: number | null = null;
   private disposed = false;
   private waterPatternSource: GifSource | null = null;
   private arcanePointerSource: GifSource | null = null;
+  private readonly tokenTextureCache = new Map<string, Texture>();
+  private tokenLayerSignature: string | null = null;
   private readonly arcanePointers = new Map<string, ArcanePointerAnimation>();
   private nextArcanePointerId = 1;
   private readonly effectRenderCache = new Map<
@@ -179,6 +208,16 @@ export class PixiViewport {
       readonly container: Container;
     }
   >();
+  private readonly shapeRenderCache = new Map<string, { readonly signature: string; readonly container: Container }>();
+  private readonly lightRenderCache = new Map<string, { readonly signature: string; readonly container: Container }>();
+  private readonly magicalDarknessRenderCache = new Map<string, { readonly signature: string; readonly container: Container }>();
+  private readonly previewShapes = new Map<string, SceneShape>();
+  private readonly previewLights = new Map<string, SceneLight>();
+  private readonly previewEffects = new Map<string, SceneEffect>();
+  private readonly pendingViewportUpdates = new Map<string, () => void>();
+  private pendingViewportUpdateFrame: number | null = null;
+  private readonly pendingFirePaintCells = new Map<string, FireCell>();
+  private pendingFirePaintCenter: WorldPoint | null = null;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
@@ -202,6 +241,7 @@ export class PixiViewport {
 
   setShapes(shapes: readonly SceneShape[]): void {
     this.shapes = shapes;
+    this.previewShapes.clear();
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
   }
@@ -214,22 +254,35 @@ export class PixiViewport {
 
   setLights(lights: readonly SceneLight[]): void {
     this.lights = lights;
+    this.previewLights.clear();
     this.drawDarkvisionLayer();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
-    void this.drawTokenLayer();
     this.drawLightsLayer();
     this.drawSelectionLayer();
   }
 
   setEffects(effects: readonly SceneEffect[]): void {
+    const previousLightingSignature = getEffectsLightingSignature(this.effects);
+    const nextLightingSignature = getEffectsLightingSignature(effects);
+    const previousMagicalDarknessSignature = getMagicalDarknessSignature(this.effects);
+    const nextMagicalDarknessSignature = getMagicalDarknessSignature(effects);
     this.effects = effects;
-    this.drawDarkvisionLayer();
-    this.drawDarknessLayer();
-    this.drawFogOfWarLayer();
-    this.drawLightsLayer();
+    this.previewEffects.clear();
+
+    if (previousLightingSignature !== nextLightingSignature) {
+      this.drawDarkvisionLayer();
+      this.drawDarknessLayer();
+      this.drawFogOfWarLayer();
+      this.drawLightsLayer();
+    }
+
     this.drawEffectsLayer();
-    this.drawMagicalDarknessLayer();
+
+    if (previousMagicalDarknessSignature !== nextMagicalDarknessSignature) {
+      this.drawMagicalDarknessLayer();
+    }
+
     this.drawSelectionLayer();
   }
 
@@ -292,6 +345,35 @@ export class PixiViewport {
     this.arcanePointerCreatureSize = arcanePointerCreatureSize;
   }
 
+  setViewRole(viewRole: ViewportViewRole): void {
+    this.viewRole = viewRole;
+  }
+
+  setReadOnly(isReadOnly: boolean): void {
+    this.isReadOnly = isReadOnly;
+    this.updateCursor();
+  }
+
+  setFogPresentation(fogPresentation: FogPresentation): void {
+    this.fogPresentation = fogPresentation;
+    this.drawFogOfWarLayer();
+  }
+
+  setHiddenTokenPolicy(hiddenTokenPolicy: HiddenTokenPolicy): void {
+    this.hiddenTokenPolicy = hiddenTokenPolicy;
+    void this.drawTokenLayer(true);
+    this.drawSelectionLayer();
+  }
+
+  setCameraSnapshot(camera: ViewportCameraSnapshot): void {
+    this.camera = normalizeCameraSnapshot(camera);
+    this.applyCamera(false);
+  }
+
+  showArcanePointer(pointer: ArcanePointerBroadcast): void {
+    this.spawnArcanePointer(pointer);
+  }
+
   clearArcanePointers(): void {
     for (const pointer of this.arcanePointers.values()) {
       destroyDisplayObject(pointer.container);
@@ -347,7 +429,7 @@ export class PixiViewport {
     this.drawGrid();
     this.drawDarknessLayer();
     this.drawFogOfWarLayer();
-    void this.drawTokenLayer();
+    void this.drawTokenLayer(true);
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
   }
@@ -374,14 +456,19 @@ export class PixiViewport {
     this.disposed = true;
     this.resizeObserver.disconnect();
     this.removeInputListeners();
+    this.cancelScheduledFogRedraw();
+    this.cancelPendingViewportUpdates();
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
+    this._darknessTextureSize = null;
     this._fogOfWarTexture?.destroy();
     this._fogOfWarTexture = null;
+    this._fogOfWarTextureSize = null;
     for (const url of this.loadedTokenUrls) {
       void Assets.unload(url);
     }
     this.loadedTokenUrls.clear();
+    this.tokenTextureCache.clear();
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
     }
@@ -390,12 +477,29 @@ export class PixiViewport {
     this.firePatternSource = null;
     this.waterPatternSource = null;
     this.arcanePointerSource = null;
+    clearWaterFilterCache();
+    fireCellRingCache.clear();
     this.app.ticker.remove(this.updateArcanePointers);
     this.clearArcanePointers();
     for (const cached of this.effectRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
     this.effectRenderCache.clear();
+    for (const cached of this.shapeRenderCache.values()) {
+      destroyDisplayObject(cached.container);
+    }
+    this.shapeRenderCache.clear();
+    for (const cached of this.lightRenderCache.values()) {
+      destroyDisplayObject(cached.container);
+    }
+    this.lightRenderCache.clear();
+    for (const cached of this.magicalDarknessRenderCache.values()) {
+      destroyDisplayObject(cached.container);
+    }
+    this.magicalDarknessRenderCache.clear();
+    this.previewShapes.clear();
+    this.previewLights.clear();
+    this.previewEffects.clear();
     this.app.destroy(true, { children: true, texture: true });
   }
 
@@ -492,8 +596,6 @@ export class PixiViewport {
   private drawDarknessLayer(): void {
     const layer = this.getLayer("darkness");
     clearContainerChildren(layer);
-    this._darknessTexture?.destroy();
-    this._darknessTexture = null;
 
     if (
       this.darkness === null ||
@@ -504,39 +606,66 @@ export class PixiViewport {
       return;
     }
 
-    const bounds = this.getGridBounds();
-    const w = Math.ceil(bounds.right - bounds.left);
-    const h = Math.ceil(bounds.bottom - bounds.top);
+    const viewport = this.getViewportSize();
+    const { width: w, height: h } = viewport;
+    if (w <= 0 || h <= 0) { return; }
+    const zoom = this.camera.zoom;
+    const viewportBounds = getViewportWorldBounds(this.camera, viewport);
 
-    const rt = RenderTexture.create({ width: w, height: h });
-    this._darknessTexture = rt;
+    const rt = this.getDarknessRenderTexture(w, h);
 
-    // Pass 1: fill darkness into the texture
+    // Pass 1: fill darkness into the texture (screen-space)
     const darkRect = new Graphics()
       .rect(0, 0, w, h)
       .fill({ color: parseHexColor(this.darkness.color), alpha: this.darkness.opacity });
     this.app.renderer.render({ container: darkRect, target: rt, clear: true });
     darkRect.destroy();
 
-    // Pass 2: erase light areas from the texture
-    const activeLights = this.lights.filter((l) => l.visible);
-    const activeFireEffects = this.effects.filter(isVisibleLightEmittingFireEffect);
+    // Pass 2: erase light areas in screen-space
+    const activeLights = this.getRenderableLights().filter((light) =>
+      light.visible && isCircleNearViewport(light.position, light.radius, viewportBounds)
+    );
+    const activeFireEffects = this.getRenderableEffects().filter(
+      (effect): effect is SceneFireEffect =>
+        isVisibleLightEmittingFireEffect(effect) &&
+        (effect.zone.kind === "cells"
+          ? effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, cell.size, viewportBounds))
+          : isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds))
+    );
     if (activeLights.length > 0 || activeFireEffects.length > 0) {
       const eraseContainer = new Container();
       for (const light of activeLights) {
-        eraseContainer.addChild(buildLightEraseGraphic(light, bounds.left, bounds.top));
+        eraseContainer.addChild(buildLightEraseGraphicScreen(light, this.camera, viewport));
       }
       for (const effect of activeFireEffects) {
-        eraseContainer.addChild(buildFireLightEraseGraphic(effect, bounds.left, bounds.top));
+        eraseContainer.addChild(buildFireLightEraseGraphicScreen(effect, this.camera, viewport));
       }
       this.app.renderer.render({ container: eraseContainer, target: rt, clear: false });
       eraseContainer.destroy({ children: true });
     }
 
-    // Display the composited darkness texture as a sprite in world space
+    // Sprite positioned at the world-space top-left corner of the viewport, scaled to 1/zoom
     const darknessSprite = new Sprite(rt);
-    darknessSprite.position.set(bounds.left, bounds.top);
+    darknessSprite.position.set(
+      this.camera.center.x - w / (2 * zoom),
+      this.camera.center.y - h / (2 * zoom)
+    );
+    darknessSprite.scale.set(1 / zoom);
     layer.addChild(darknessSprite);
+  }
+
+  private getDarknessRenderTexture(width: number, height: number): RenderTexture {
+    if (
+      this._darknessTexture === null ||
+      this._darknessTextureSize?.width !== width ||
+      this._darknessTextureSize.height !== height
+    ) {
+      this._darknessTexture?.destroy();
+      this._darknessTexture = RenderTexture.create({ width, height });
+      this._darknessTextureSize = { width, height };
+    }
+
+    return this._darknessTexture;
   }
 
   private updateBaseMapVisibility(): void {
@@ -568,7 +697,7 @@ export class PixiViewport {
       return;
     }
 
-    const mask = buildDarkvisionColorMask(this.lights, this.effects);
+    const mask = buildDarkvisionColorMask(this.getRenderableLights(), this.getRenderableEffects());
 
     if (mask === null) {
       return;
@@ -607,6 +736,9 @@ export class PixiViewport {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     event.preventDefault();
+    if (this.isReadOnly) {
+      return;
+    }
     this.app.canvas.setPointerCapture(event.pointerId);
     const point = this.eventToScreenPoint(event);
 
@@ -614,6 +746,7 @@ export class PixiViewport {
     let elementId: string | undefined;
     let handleIndex: number | undefined;
     let grabOffset: WorldPoint | undefined;
+    let moveStartPosition: WorldPoint | undefined;
     if (event.button === 0) {
       if (this.isGrabMode) {
         mode = "pan";
@@ -724,6 +857,7 @@ export class PixiViewport {
           const hitIsPath = this.shapes.some((s) => s.id === hitElementId && s.type === "path");
           mode = hitIsPath ? "idle" : "element-move";
           elementId = hitElementId;
+          moveStartPosition = this.findSelectableElement(hitElementId)?.position;
           this.options.onElementSelect?.(hitElementId);
         } else if (this.isMapAdjustMode && this.mapSprite !== null) {
           mode = "map-move";
@@ -741,19 +875,30 @@ export class PixiViewport {
       mode,
       elementId,
       handleIndex,
-      grabOffset
+      grabOffset,
+      moveStartPosition
     };
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
+    if (this.isReadOnly) {
+      return;
+    }
+
     const screenPoint = this.eventToScreenPoint(event);
 
     if (this.isPathDrawingMode) {
-      this.options.onPathPointerMove?.(this.snapScreenPointToCellCenter(screenPoint));
+      const point = this.snapScreenPointToCellCenter(screenPoint);
+      this.scheduleViewportUpdate("path-pointer-preview", () => {
+        this.options.onPathPointerMove?.(point);
+      });
     }
 
     if (this.isWaterDrawingMode) {
-      this.options.onWaterPointerMove?.(this.snapScreenPointToCellCenter(screenPoint));
+      const point = this.snapScreenPointToCellCenter(screenPoint);
+      this.scheduleViewportUpdate("water-pointer-preview", () => {
+        this.options.onWaterPointerMove?.(point);
+      });
     }
 
     if (this.dragState === null) {
@@ -774,7 +919,10 @@ export class PixiViewport {
     if (this.dragState.mode === "calibrate") {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       const origin = this.getCalibrationOrigin();
-      this.options.onGridCellSizeChange?.(Math.abs(worldPoint.x - origin.x));
+      const cellSize = Math.abs(worldPoint.x - origin.x);
+      this.scheduleViewportUpdate("grid-cell-size", () => {
+        this.options.onGridCellSizeChange?.(cellSize);
+      });
     } else if (this.dragState.mode === "map-move" && this.mapSprite !== null) {
       const dx = (nextPoint.x - this.dragState.lastPoint.x) / this.camera.zoom;
       const dy = (nextPoint.y - this.dragState.lastPoint.y) / this.camera.zoom;
@@ -783,7 +931,7 @@ export class PixiViewport {
       this.colorMapSprite?.position.set(this.mapSprite.position.x, this.mapSprite.position.y);
     } else if (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
-      this.options.onElementMove?.(this.dragState.elementId, worldPoint.x, worldPoint.y);
+      this.applyElementMovePreview(this.dragState.elementId, worldPoint, this.dragState.moveStartPosition);
     } else if (this.dragState.mode === "light-rotate" && this.dragState.elementId !== undefined) {
       this.updateLightDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "light-resize" && this.dragState.elementId !== undefined) {
@@ -819,11 +967,10 @@ export class PixiViewport {
     } else if (this.dragState.mode === "path-move" && this.dragState.elementId !== undefined && this.dragState.grabOffset !== undefined) {
       this.app.canvas.style.cursor = "grabbing";
       const currentWorld = screenToWorld(nextPoint, this.camera, this.getViewportSize());
-      this.options.onPathMove?.(
-        this.dragState.elementId,
-        currentWorld.x - this.dragState.grabOffset.x,
-        currentWorld.y - this.dragState.grabOffset.y
-      );
+      const elementId = this.dragState.elementId;
+      const x = currentWorld.x - this.dragState.grabOffset.x;
+      const y = currentWorld.y - this.dragState.grabOffset.y;
+      this.updatePathMovePreview(elementId, x, y);
     } else if (this.dragState.mode === "pan") {
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
@@ -840,11 +987,20 @@ export class PixiViewport {
       mode: this.dragState.mode,
       elementId: this.dragState.elementId,
       handleIndex: this.dragState.handleIndex,
-      grabOffset: this.dragState.grabOffset
+      grabOffset: this.dragState.grabOffset,
+      moveStartPosition: this.dragState.moveStartPosition,
+      pendingMovePosition:
+        this.dragState.mode === "element-move" && this.dragState.elementId !== undefined
+          ? screenToWorld(nextPoint, this.camera, this.getViewportSize())
+          : this.dragState.pendingMovePosition
     };
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
+    if (this.isReadOnly) {
+      return;
+    }
+
     if (this.dragState === null || this.dragState.pointerId !== event.pointerId) {
       return;
     }
@@ -855,6 +1011,7 @@ export class PixiViewport {
       releasePoint.y - this.dragState.startPoint.y
     );
     const isClick = movedDistance < 4;
+    this.flushPendingViewportUpdates();
 
     if (isClick && this.dragState.button === 2) {
       const screen = this.eventToClientPoint(event);
@@ -868,6 +1025,10 @@ export class PixiViewport {
       this.finishFogRevealStroke(releasePoint);
     }
 
+    if (this.dragState.mode === "fire-paint") {
+      this.flushPendingFirePaint();
+    }
+
     if (this.dragState.mode === "map-move" && this.mapSprite !== null) {
       this.drawGrid();
       this.drawDarkvisionLayer();
@@ -876,13 +1037,32 @@ export class PixiViewport {
       this.options.onMapPositionChange?.(this.mapSprite.position.x, this.mapSprite.position.y);
     }
 
+    if (!isClick && this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
+      const pendingPosition =
+        this.dragState.pendingMovePosition ??
+        screenToWorld(releasePoint, this.camera, this.getViewportSize());
+      this.clearElementMovePreview();
+      this.options.onElementMove?.(this.dragState.elementId, pendingPosition.x, pendingPosition.y);
+    } else if (this.dragState.mode === "element-move") {
+      this.clearElementMovePreview();
+    }
+
+    if (!isClick && isPreviewCommitDragMode(this.dragState.mode)) {
+      this.commitPreviewForDrag(this.dragState, releasePoint);
+    } else if (isPreviewCommitDragMode(this.dragState.mode)) {
+      this.clearDragPreviews();
+    }
+
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
       if (this.isPathDrawingMode) {
         this.options.onPathPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
       } else if (this.isWaterDrawingMode) {
         this.options.onWaterPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
       } else if (this.isArcanePointerMode) {
-        this.spawnArcanePointer(this.snapScreenPointToCellCenter(releasePoint));
+        const position = this.snapScreenPointToCellCenter(releasePoint);
+        const pointer = createArcanePointerBroadcast(position, this.arcanePointerCreatureSize);
+        this.spawnArcanePointer(pointer);
+        this.options.onArcanePointerTrigger?.(pointer);
       } else {
         this.options.onElementSelect?.(this.hitTestElement(releasePoint));
       }
@@ -896,9 +1076,179 @@ export class PixiViewport {
     this.dragState = null;
   };
 
+  private applyElementMovePreview(
+    elementId: string,
+    targetPosition: WorldPoint,
+    startPosition: WorldPoint | undefined
+  ): void {
+    if (startPosition === undefined) {
+      return;
+    }
+
+    const dx = targetPosition.x - startPosition.x;
+    const dy = targetPosition.y - startPosition.y;
+
+    this.transientMovePreview = { elementId, dx, dy };
+    this.applyElementMovePreviewToLayers(elementId, dx, dy);
+  }
+
+  private clearElementMovePreview(): void {
+    if (this.transientMovePreview === null) {
+      return;
+    }
+
+    this.applyElementMovePreviewToLayers(this.transientMovePreview.elementId, 0, 0);
+    this.transientMovePreview = null;
+  }
+
+  private applyElementMovePreviewToLayers(elementId: string, dx: number, dy: number): void {
+    const layerNames: RenderLayerName[] = [
+      "shapesAndMeasurements",
+      "lights",
+      "effects",
+      "magicalDarkness",
+      "tokens",
+      "selection"
+    ];
+
+    for (const layerName of layerNames) {
+      const layer = this.layers.get(layerName);
+      const target = layer?.getChildByLabel(elementId, true);
+
+      if (target != null) {
+        target.position.set(dx, dy);
+      }
+    }
+  }
+
+  private drawShapePreviewLayers(): void {
+    this.drawShapesAndMeasurementsLayer();
+    this.drawSelectionLayer();
+  }
+
+  private drawLightDependentPreviewLayers(): void {
+    this.drawDarkvisionLayer();
+    this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
+    this.drawLightsLayer();
+    this.drawSelectionLayer();
+  }
+
+  private drawEffectPreviewLayers(): void {
+    this.drawDarkvisionLayer();
+    this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
+    this.drawLightsLayer();
+    this.drawEffectsLayer();
+    this.drawMagicalDarknessLayer();
+    this.drawSelectionLayer();
+  }
+
+  private updatePathMovePreview(elementId: string, x: number, y: number): void {
+    const shape = this.shapes.find((candidate) => candidate.id === elementId && candidate.type === "path");
+    const firstPoint = shape?.points[0];
+
+    if (shape === undefined || firstPoint === undefined) {
+      return;
+    }
+
+    const dx = x - firstPoint.x;
+    const dy = y - firstPoint.y;
+    this.previewShapes.set(elementId, {
+      ...shape,
+      points: shape.points.map((point) => ({ x: point.x + dx, y: point.y + dy }))
+    });
+    this.drawShapePreviewLayers();
+  }
+
+  private commitPreviewForDrag(dragState: PointerDragState, releasePoint: ScreenPoint): void {
+    if (dragState.elementId === undefined) {
+      return;
+    }
+
+    const previewLight = this.previewLights.get(dragState.elementId);
+    if (previewLight !== undefined) {
+      if (dragState.mode === "light-rotate") {
+        this.options.onLightDirectionChange?.(previewLight.id, previewLight.direction);
+      } else if (dragState.mode === "light-resize") {
+        this.options.onLightRadiusChange?.(previewLight.id, previewLight.radius);
+      }
+      return;
+    }
+
+    const previewShape = this.previewShapes.get(dragState.elementId);
+    if (previewShape !== undefined) {
+      const anchor = getShapeAnchor(previewShape);
+
+      if (dragState.mode === "shape-end-move") {
+        const endPoint = getShapeEndPoint(previewShape);
+        if (endPoint !== null) {
+          this.options.onShapeEndMove?.(previewShape.id, endPoint.x, endPoint.y);
+        }
+      } else if (dragState.mode === "path-point-move" && dragState.handleIndex !== undefined) {
+        const point = previewShape.points[dragState.handleIndex];
+        if (point !== undefined) {
+          this.options.onPathPointMove?.(previewShape.id, dragState.handleIndex, point.x, point.y);
+        }
+      } else if (dragState.mode === "path-move") {
+        this.options.onPathMove?.(previewShape.id, anchor.x, anchor.y);
+      } else if (dragState.mode === "shape-rotate" || dragState.mode === "shape-cone-rotate") {
+        this.options.onShapeDirectionChange?.(previewShape.id, previewShape.direction ?? 0);
+      } else if (dragState.mode === "shape-circle-resize" || dragState.mode === "shape-cone-resize") {
+        this.options.onShapeRadiusChange?.(previewShape.id, previewShape.radius ?? 10);
+      } else if (dragState.mode === "shape-rect-resize") {
+        this.options.onShapeRectResize?.(
+          previewShape.id,
+          previewShape.width ?? 10,
+          previewShape.height ?? 10,
+          anchor.x,
+          anchor.y
+        );
+      }
+      return;
+    }
+
+    const previewEffect = this.previewEffects.get(dragState.elementId);
+    if (previewEffect !== undefined) {
+      if (dragState.mode === "fire-zone-resize" && previewEffect.kind === "fire") {
+        this.options.onFireZoneRadiusChange?.(previewEffect.id, previewEffect.zone.radius);
+      } else if (dragState.mode === "fire-light-resize" && previewEffect.kind === "fire") {
+        this.options.onFireLightRadiusChange?.(previewEffect.id, previewEffect.lightRadius);
+      } else if (dragState.mode === "magical-darkness-resize" && previewEffect.kind === "magical-darkness") {
+        this.options.onMagicalDarknessRadiusChange?.(previewEffect.id, previewEffect.radius);
+      } else if (dragState.mode === "water-line-rotate" && previewEffect.kind === "water") {
+        this.options.onWaterLineRotationChange?.(previewEffect.id, previewEffect.lineRotation);
+      } else if (dragState.mode === "water-pattern-rotate" && previewEffect.kind === "water") {
+        this.options.onWaterPatternRotationChange?.(previewEffect.id, previewEffect.patternRotation);
+      }
+      return;
+    }
+
+    if (dragState.mode === "path-point-move" && dragState.handleIndex !== undefined) {
+      const worldPoint = this.snapScreenPointToCellCenter(releasePoint);
+      this.options.onPathPointMove?.(dragState.elementId, dragState.handleIndex, worldPoint.x, worldPoint.y);
+    }
+  }
+
+  private clearDragPreviews(): void {
+    if (this.previewShapes.size === 0 && this.previewLights.size === 0 && this.previewEffects.size === 0) {
+      return;
+    }
+
+    this.previewShapes.clear();
+    this.previewLights.clear();
+    this.previewEffects.clear();
+    this.drawInteractiveElements();
+    this.drawDarkvisionLayer();
+    this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
+  }
+
   private updateCursor(): void {
     if (this.isGrabMode) {
       this.app.canvas.style.cursor = "grab";
+    } else if (this.isReadOnly) {
+      this.app.canvas.style.cursor = "default";
     } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isFogRevealMode || this.isFirePaintMode) {
@@ -913,7 +1263,7 @@ export class PixiViewport {
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
 
-    if (this.isZoomLocked) {
+    if (this.isReadOnly || this.isZoomLocked) {
       return;
     }
 
@@ -933,16 +1283,21 @@ export class PixiViewport {
     const nextHeight = Math.max(1, Math.floor(height));
 
     this.app.renderer.resize(nextWidth, nextHeight);
-    this.applyCamera();
+    this.applyCamera(false);
   }
 
-  private applyCamera(): void {
+  private applyCamera(emit = true): void {
     const viewport = this.getViewportSize();
     this.world.scale.set(this.camera.zoom);
     this.world.position.set(
       viewport.width / 2 - this.camera.center.x * this.camera.zoom,
       viewport.height / 2 - this.camera.center.y * this.camera.zoom
     );
+    if (emit && this.viewRole === "dm") {
+      this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
+    }
+    this.drawDarknessLayer();
+    this.scheduleFogOfWarRedraw();
   }
 
   private getViewportSize(): ViewportSize {
@@ -987,7 +1342,9 @@ export class PixiViewport {
 
   private drawShapesAndMeasurementsLayer(): void {
     const shapesLayer = this.getLayer("shapesAndMeasurements");
-    clearContainerChildren(shapesLayer);
+    const previousChildren = shapesLayer.removeChildren();
+    const reusedContainers = new Set<Container>();
+    const nextCache = new Map<string, { readonly signature: string; readonly container: Container }>();
 
     for (const element of this.elements) {
       if (getLayerForElementKind(element.kind) === "shapes") {
@@ -996,23 +1353,64 @@ export class PixiViewport {
     }
 
     if (this.grid !== null && this.settings !== null) {
-      for (const shape of this.shapes) {
-        shapesLayer.addChild(drawTacticalShape(shape, this.grid, this.settings));
+      for (const shape of this.getRenderableShapes()) {
+        const signature = getShapeRenderSignature(shape, this.grid, this.settings);
+        const cached = this.shapeRenderCache.get(shape.id);
+        const rendered =
+          cached !== undefined && cached.signature === signature
+            ? cached
+            : { signature, container: drawTacticalShape(shape, this.grid, this.settings) };
+
+        rendered.container.label = shape.id;
+        nextCache.set(shape.id, rendered);
+        reusedContainers.add(rendered.container);
+        shapesLayer.addChild(rendered.container);
       }
+    }
+
+    destroyRemovedChildren(previousChildren, reusedContainers);
+    destroyStaleCachedContainers(this.shapeRenderCache, nextCache, reusedContainers);
+    this.shapeRenderCache.clear();
+    for (const [id, cached] of nextCache) {
+      this.shapeRenderCache.set(id, cached);
     }
   }
 
   private drawLightsLayer(): void {
     const lightsLayer = this.getLayer("lights");
-    clearContainerChildren(lightsLayer);
+    const previousChildren = lightsLayer.removeChildren();
+    const reusedContainers = new Set<Container>();
+    const nextCache = new Map<string, { readonly signature: string; readonly container: Container }>();
 
-    for (const effect of this.effects.filter(isVisibleLightEmittingFireEffect)) {
-      lightsLayer.addChild(drawFireLight(effect));
+    for (const effect of this.getRenderableEffects().filter(isVisibleLightEmittingFireEffect)) {
+      const key = `fire:${effect.id}`;
+      const signature = getFireLightRenderSignature(effect);
+      const cached = this.lightRenderCache.get(key);
+      const rendered =
+        cached !== undefined && cached.signature === signature
+          ? cached
+          : { signature, container: drawFireLight(effect) };
+
+      rendered.container.label = effect.id;
+      nextCache.set(key, rendered);
+      reusedContainers.add(rendered.container);
+      lightsLayer.addChild(rendered.container);
     }
 
-    for (const light of this.lights) {
+    for (const light of this.getRenderableLights()) {
       if (light.visible) {
-        lightsLayer.addChild(drawSceneLight(light));
+        const key = `light:${light.id}`;
+        const signature = getLightRenderSignature(light);
+        const cached = this.lightRenderCache.get(key);
+        const rendered =
+          cached !== undefined && cached.signature === signature
+            ? cached
+            : { signature, container: drawSceneLight(light) };
+
+        rendered.container.label = light.id;
+        nextCache.set(key, rendered);
+        reusedContainers.add(rendered.container);
+        lightsLayer.addChild(rendered.container);
       }
     }
 
@@ -1020,6 +1418,13 @@ export class PixiViewport {
       if (getLayerForElementKind(element.kind) === "lights") {
         lightsLayer.addChild(drawElement(element));
       }
+    }
+
+    destroyRemovedChildren(previousChildren, reusedContainers);
+    destroyStaleCachedContainers(this.lightRenderCache, nextCache, reusedContainers);
+    this.lightRenderCache.clear();
+    for (const [id, cached] of nextCache) {
+      this.lightRenderCache.set(id, cached);
     }
   }
 
@@ -1041,14 +1446,23 @@ export class PixiViewport {
       }
     }
 
-    for (const effect of this.effects) {
+    const visibleWaterEffectCount = this.getRenderableEffects().filter(
+      (effect) => effect.visible && effect.kind === "water"
+    ).length;
+    const waterSpriteBudget = getWaterPatternSpriteBudget(visibleWaterEffectCount);
+
+    for (const effect of this.getRenderableEffects()) {
       if (effect.visible && effect.kind === "fire") {
         const rendered = this.getCachedEffectContainer(effect, getSceneEffectRenderSignature(effect, this.firePatternSource !== null));
         nextCache.set(effect.id, rendered);
         reusedContainers.add(rendered.container);
         effectsLayer.addChild(rendered.container);
       } else if (effect.visible && effect.kind === "water") {
-        const rendered = this.getCachedEffectContainer(effect, getSceneEffectRenderSignature(effect, this.waterPatternSource !== null));
+        const rendered = this.getCachedEffectContainer(
+          effect,
+          `${getSceneEffectRenderSignature(effect, this.waterPatternSource !== null)}:budget:${waterSpriteBudget}`,
+          waterSpriteBudget
+        );
         nextCache.set(effect.id, rendered);
         reusedContainers.add(rendered.container);
         effectsLayer.addChild(rendered.container);
@@ -1076,7 +1490,8 @@ export class PixiViewport {
 
   private getCachedEffectContainer(
     effect: SceneFireEffect | SceneWaterEffect,
-    signature: string
+    signature: string,
+    waterSpriteBudget = MAX_WATER_PATTERN_SPRITES_PER_EFFECT
   ): {
     readonly signature: string;
     readonly container: Container;
@@ -1090,19 +1505,38 @@ export class PixiViewport {
     const container =
       effect.kind === "fire"
         ? drawSceneEffect(effect, this.firePatternSource)
-        : drawWaterEffect(effect, this.waterPatternSource);
+        : drawWaterEffect(effect, this.waterPatternSource, waterSpriteBudget);
 
     return { signature, container };
   }
 
   private drawMagicalDarknessLayer(): void {
     const magicalDarknessLayer = this.getLayer("magicalDarkness");
-    clearContainerChildren(magicalDarknessLayer);
+    const previousChildren = magicalDarknessLayer.removeChildren();
+    const reusedContainers = new Set<Container>();
+    const nextCache = new Map<string, { readonly signature: string; readonly container: Container }>();
 
-    for (const effect of this.effects) {
+    for (const effect of this.getRenderableEffects()) {
       if (effect.visible && effect.kind === "magical-darkness") {
-        magicalDarknessLayer.addChild(drawMagicalDarknessEffect(effect));
+        const signature = getMagicalDarknessRenderSignature(effect);
+        const cached = this.magicalDarknessRenderCache.get(effect.id);
+        const rendered =
+          cached !== undefined && cached.signature === signature
+            ? cached
+            : { signature, container: drawMagicalDarknessEffect(effect) };
+
+        rendered.container.label = effect.id;
+        nextCache.set(effect.id, rendered);
+        reusedContainers.add(rendered.container);
+        magicalDarknessLayer.addChild(rendered.container);
       }
+    }
+
+    destroyRemovedChildren(previousChildren, reusedContainers);
+    destroyStaleCachedContainers(this.magicalDarknessRenderCache, nextCache, reusedContainers);
+    this.magicalDarknessRenderCache.clear();
+    for (const [id, cached] of nextCache) {
+      this.magicalDarknessRenderCache.set(id, cached);
     }
   }
 
@@ -1110,7 +1544,7 @@ export class PixiViewport {
     const selectionLayer = this.getLayer("selection");
     clearContainerChildren(selectionLayer);
 
-    for (const effect of this.effects) {
+    for (const effect of this.getRenderableEffects()) {
       if (effect.visible && effect.kind === "fire" && effect.id !== this.selectedElementId) {
         selectionLayer.addChild(drawFireZoneHint(effect));
       }
@@ -1124,10 +1558,12 @@ export class PixiViewport {
       const selectedElement = this.findSelectableElement(this.selectedElementId);
 
       if (selectedElement !== undefined) {
-        selectionLayer.addChild(drawSelection(selectedElement));
+        const child = drawSelection(selectedElement);
+        child.label = selectedElement.id;
+        selectionLayer.addChild(child);
       }
 
-      const selectedLinearShape = this.shapes.find(
+      const selectedLinearShape = this.getRenderableShapes().find(
         (shape) =>
           shape.id === this.selectedElementId &&
           shape.type === "measurement"
@@ -1137,7 +1573,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawLinearShapeHandles(selectedLinearShape));
       }
 
-      const selectedConeLight = this.lights.find(
+      const selectedConeLight = this.getRenderableLights().find(
         (light) => light.id === this.selectedElementId && light.kind === "cone"
       );
 
@@ -1145,13 +1581,13 @@ export class PixiViewport {
         selectionLayer.addChild(drawConeRotationHandle(selectedConeLight));
       }
 
-      const selectedLight = this.lights.find((light) => light.id === this.selectedElementId);
+      const selectedLight = this.getRenderableLights().find((light) => light.id === this.selectedElementId);
 
       if (selectedLight !== undefined && selectedLight.visible) {
         selectionLayer.addChild(drawLightResizeHandle(selectedLight));
       }
 
-      const selectedFireEffect = this.effects.find(
+      const selectedFireEffect = this.getRenderableEffects().find(
         (effect): effect is SceneFireEffect =>
           effect.id === this.selectedElementId && effect.kind === "fire"
       );
@@ -1160,7 +1596,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect));
       }
 
-      const selectedMagicalDarkness = this.effects.find(
+      const selectedMagicalDarkness = this.getRenderableEffects().find(
         (effect): effect is SceneMagicalDarknessEffect =>
           effect.id === this.selectedElementId && effect.kind === "magical-darkness"
       );
@@ -1169,7 +1605,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawMagicalDarknessResizeHandle(selectedMagicalDarkness));
       }
 
-      const selectedWater = this.effects.find(
+      const selectedWater = this.getRenderableEffects().find(
         (effect): effect is SceneWaterEffect => effect.id === this.selectedElementId && effect.kind === "water"
       );
 
@@ -1177,7 +1613,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawWaterRotationHandles(selectedWater));
       }
 
-      const selectedCircleShape = this.shapes.find(
+      const selectedCircleShape = this.getRenderableShapes().find(
         (s) => s.id === this.selectedElementId && s.type === "circle"
       );
 
@@ -1185,7 +1621,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawCircleResizeHandle(selectedCircleShape));
       }
 
-      const selectedConeShape = this.shapes.find(
+      const selectedConeShape = this.getRenderableShapes().find(
         (s) => s.id === this.selectedElementId && s.type === "cone"
       );
 
@@ -1193,7 +1629,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawConeShapeHandles(selectedConeShape));
       }
 
-      const selectedRectShape = this.shapes.find(
+      const selectedRectShape = this.getRenderableShapes().find(
         (s) => s.id === this.selectedElementId && s.type === "rectangle"
       );
 
@@ -1201,7 +1637,7 @@ export class PixiViewport {
         selectionLayer.addChild(drawRectCornerHandles(selectedRectShape));
       }
 
-      const selectedPathShape = this.shapes.find(
+      const selectedPathShape = this.getRenderableShapes().find(
         (s) => s.id === this.selectedElementId && s.type === "path"
       );
 
@@ -1232,8 +1668,23 @@ export class PixiViewport {
     }
   }
 
-  private async drawTokenLayer(): Promise<void> {
+  private async drawTokenLayer(force = false): Promise<void> {
     const layer = this.getLayer("tokens");
+    const renderableTokens =
+      this.hiddenTokenPolicy === "hide"
+        ? this.tokens.filter((token) => token.visible)
+        : this.tokens;
+    const nextSignature = getTokenLayerSignature(
+      renderableTokens,
+      this.hiddenTokenPolicy,
+      this.grid?.cellSizeWorld ?? 100
+    );
+
+    if (!force && this.tokenLayerSignature === nextSignature) {
+      return;
+    }
+
+    this.tokenLayerSignature = nextSignature;
     const loadVersion = ++this.tokenLoadVersion;
     clearContainerChildren(layer);
 
@@ -1247,13 +1698,13 @@ export class PixiViewport {
       if (!currentUrls.has(url)) {
         void Assets.unload(url);
         this.loadedTokenUrls.delete(url);
+        this.tokenTextureCache.delete(url);
       }
     }
 
-    const visibleTokens = this.tokens.filter((token) => token.visible);
     const imageUrls = [
       ...new Set(
-        visibleTokens
+        renderableTokens
           .map((token) => token.imageUrl)
           .filter((url): url is string => url !== null)
       )
@@ -1263,7 +1714,10 @@ export class PixiViewport {
     await Promise.all(
       imageUrls.map(async (url) => {
         try {
-          textures.set(url, await Assets.load<Texture>(url));
+          const cachedTexture = this.tokenTextureCache.get(url);
+          const texture = cachedTexture ?? await Assets.load<Texture>(url);
+          this.tokenTextureCache.set(url, texture);
+          textures.set(url, texture);
           this.loadedTokenUrls.add(url);
         } catch {
           textures.delete(url);
@@ -1275,17 +1729,14 @@ export class PixiViewport {
       return;
     }
 
-    for (const token of visibleTokens) {
-      if (!token.visible) {
-        continue;
-      }
-
+    for (const token of renderableTokens) {
       if (this.disposed || loadVersion !== this.tokenLoadVersion) {
         return;
       }
 
       const container = new Container();
       container.label = token.id;
+      container.alpha = token.visible ? 1 : 0.52;
       const footprintWorld = this.getTokenFootprintWorld(token);
 
       if (token.imageUrl !== null) {
@@ -1315,6 +1766,10 @@ export class PixiViewport {
         container.addChild(drawTokenBadge(token, footprintWorld));
       }
 
+      if (!token.visible && this.hiddenTokenPolicy === "show-with-indicator") {
+        container.addChild(drawHiddenTokenIndicator(token, footprintWorld));
+      }
+
       layer.addChild(container);
     }
   }
@@ -1322,22 +1777,35 @@ export class PixiViewport {
   private drawFogOfWarLayer(): void {
     const layer = this.getLayer("fogOfWar");
     clearContainerChildren(layer);
-    this._fogOfWarTexture?.destroy();
-    this._fogOfWarTexture = null;
 
-    if (this.fogOfWar === null || !this.fogOfWar.enabled || this.fogOfWar.opacity <= 0) {
+    if (this.fogPresentation === "dm-hidden") {
       return;
     }
 
-    const bounds = this.getGridBounds();
-    const width = Math.ceil(bounds.right - bounds.left);
-    const height = Math.ceil(bounds.bottom - bounds.top);
-    const fogTexture = RenderTexture.create({ width, height });
-    this._fogOfWarTexture = fogTexture;
+    if (
+      this.fogOfWar === null ||
+      !this.fogOfWar.enabled ||
+      (this.fogPresentation !== "player-blocking" && this.fogOfWar.opacity <= 0)
+    ) {
+      return;
+    }
 
+    const viewport = this.getViewportSize();
+    const { width, height } = viewport;
+    if (width <= 0 || height <= 0) { return; }
+    const zoom = this.camera.zoom;
+    const viewportBounds = getViewportWorldBounds(this.camera, viewport);
+    const fogTexture = this.getFogOfWarRenderTexture(width, height);
+
+    const fogColor = this.fogPresentation === "player-blocking"
+      ? 0x000000
+      : parseHexColor(this.fogOfWar.color);
+    const fogAlpha = this.fogPresentation === "player-blocking"
+      ? 1
+      : this.fogOfWar.opacity;
     const fogRect = new Graphics()
       .rect(0, 0, width, height)
-      .fill({ color: parseHexColor(this.fogOfWar.color), alpha: this.fogOfWar.opacity });
+      .fill({ color: fogColor, alpha: fogAlpha });
     this.app.renderer.render({ container: fogRect, target: fogTexture, clear: true });
     fogRect.destroy();
 
@@ -1355,12 +1823,16 @@ export class PixiViewport {
     const reveals = [
       ...this.fogOfWar.revealedAreas,
       ...activeStrokeReveal,
-      ...getVisibleAreasFromLights(this.lights)
-    ];
-    const circleFireReveals = this.effects
+      ...getVisibleAreasFromLights(this.getRenderableLights())
+    ].filter((area) => isVisionAreaNearViewport(area, viewportBounds));
+    const circleFireReveals = this.getRenderableEffects()
       .filter(
         (effect): effect is SceneFireEffect =>
-          effect.kind === "fire" && effect.visible && effect.emitsLight && effect.zone.kind !== "cells"
+          effect.kind === "fire" &&
+          effect.visible &&
+          effect.emitsLight &&
+          effect.zone.kind !== "cells" &&
+          isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds)
       )
       .map((effect) => ({
         id: `vision-${effect.id}`,
@@ -1369,49 +1841,161 @@ export class PixiViewport {
         radius: effect.lightRadius
       }));
 
-    const cellFireEffects = this.effects.filter(
+    const cellFireEffects = this.getRenderableEffects().filter(
       (effect): effect is SceneFireEffect =>
-        effect.kind === "fire" && effect.visible && effect.emitsLight && effect.zone.kind === "cells"
+        effect.kind === "fire" &&
+        effect.visible &&
+        effect.emitsLight &&
+        effect.zone.kind === "cells" &&
+        effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, cell.size, viewportBounds))
     );
 
     if (reveals.length > 0 || circleFireReveals.length > 0 || cellFireEffects.length > 0) {
       const eraseContainer = new Container();
+      const revealGraphic = new Graphics();
+      let hasRevealGeometry = false;
 
       for (const area of [...reveals, ...circleFireReveals]) {
-        const reveal = new Graphics();
-
         if (area.kind === "circle") {
-          reveal.circle(area.center.x - bounds.left, area.center.y - bounds.top, area.radius);
+          const sc = worldToScreen(area.center.x, area.center.y, this.camera, viewport);
+          revealGraphic.circle(sc.x, sc.y, area.radius * zoom);
+          revealGraphic.fill({ color: 0xffffff, alpha: 1 });
+          hasRevealGeometry = true;
+        } else if (area.kind === "stroke") {
+          drawStrokeRevealShapeScreen(revealGraphic, area.points, area.radius * zoom, this.camera, viewport);
+          hasRevealGeometry = true;
         } else {
-          for (const point of area.points) {
-            reveal.circle(point.x - bounds.left, point.y - bounds.top, area.radius);
-          }
+          const sc = worldToScreen(area.center.x, area.center.y, this.camera, viewport);
+          drawConeShape(revealGraphic, sc.x, sc.y, area.radius * zoom, area.angle, area.direction);
+          revealGraphic.fill({ color: 0xffffff, alpha: 1 });
+          hasRevealGeometry = true;
         }
+      }
 
-        reveal.fill({ color: 0xffffff, alpha: 1 });
-        reveal.blendMode = "erase";
-        eraseContainer.addChild(reveal);
+      if (hasRevealGeometry) {
+        revealGraphic.blendMode = "erase";
+        eraseContainer.addChild(revealGraphic);
+      } else {
+        revealGraphic.destroy();
       }
 
       for (const effect of cellFireEffects) {
         if (effect.zone.kind !== "cells") continue;
         const { bright, dim } = computeCellRings(effect.zone.cells);
+        const cellReveal = new Graphics();
         for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
-          const reveal = new Graphics()
-            .rect(cell.x - bounds.left, cell.y - bounds.top, cell.size, cell.size)
-            .fill({ color: 0xffffff, alpha: 1 });
-          reveal.blendMode = "erase";
-          eraseContainer.addChild(reveal);
+          const sc = worldToScreen(cell.x, cell.y, this.camera, viewport);
+          cellReveal.rect(sc.x, sc.y, cell.size * zoom, cell.size * zoom);
         }
+        cellReveal.fill({ color: 0xffffff, alpha: 1 });
+        cellReveal.blendMode = "erase";
+        eraseContainer.addChild(cellReveal);
       }
 
       this.app.renderer.render({ container: eraseContainer, target: fogTexture, clear: false });
       eraseContainer.destroy({ children: true });
     }
 
+    // Sprite positioned at the world-space top-left corner of the viewport, scaled to 1/zoom
     const fogSprite = new Sprite(fogTexture);
-    fogSprite.position.set(bounds.left, bounds.top);
+    fogSprite.position.set(
+      this.camera.center.x - width / (2 * zoom),
+      this.camera.center.y - height / (2 * zoom)
+    );
+    fogSprite.scale.set(1 / zoom);
     layer.addChild(fogSprite);
+  }
+
+  private getFogOfWarRenderTexture(width: number, height: number): RenderTexture {
+    if (
+      this._fogOfWarTexture === null ||
+      this._fogOfWarTextureSize?.width !== width ||
+      this._fogOfWarTextureSize.height !== height
+    ) {
+      this._fogOfWarTexture?.destroy();
+      this._fogOfWarTexture = RenderTexture.create({ width, height });
+      this._fogOfWarTextureSize = { width, height };
+    }
+
+    return this._fogOfWarTexture;
+  }
+
+  private scheduleFogOfWarRedraw(): void {
+    if (this.fogRedrawFrame !== null) {
+      return;
+    }
+
+    this.fogRedrawFrame = window.requestAnimationFrame(() => {
+      this.fogRedrawFrame = null;
+      this.drawFogOfWarLayer();
+    });
+  }
+
+  private cancelScheduledFogRedraw(): void {
+    if (this.fogRedrawFrame === null) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.fogRedrawFrame);
+    this.fogRedrawFrame = null;
+  }
+
+  private scheduleViewportUpdate(key: string, update: () => void): void {
+    this.pendingViewportUpdates.set(key, update);
+
+    if (this.pendingViewportUpdateFrame !== null) {
+      return;
+    }
+
+    this.pendingViewportUpdateFrame = window.requestAnimationFrame(() => {
+      this.pendingViewportUpdateFrame = null;
+      this.flushPendingViewportUpdates();
+    });
+  }
+
+  private flushPendingViewportUpdates(): void {
+    if (this.pendingViewportUpdates.size === 0) {
+      return;
+    }
+
+    const updates = [...this.pendingViewportUpdates.values()];
+    this.pendingViewportUpdates.clear();
+
+    for (const update of updates) {
+      update();
+    }
+  }
+
+  private cancelPendingViewportUpdates(): void {
+    if (this.pendingViewportUpdateFrame !== null) {
+      window.cancelAnimationFrame(this.pendingViewportUpdateFrame);
+      this.pendingViewportUpdateFrame = null;
+    }
+
+    this.pendingViewportUpdates.clear();
+  }
+
+  private scheduleFirePaint(cells: readonly FireCell[], center: WorldPoint): void {
+    for (const cell of cells) {
+      this.pendingFirePaintCells.set(getFireCellPaintKey(cell), cell);
+    }
+    this.pendingFirePaintCenter = center;
+
+    this.scheduleViewportUpdate("fire-paint", () => {
+      this.flushPendingFirePaint();
+    });
+  }
+
+  private flushPendingFirePaint(): void {
+    if (this.pendingFirePaintCells.size === 0 || this.pendingFirePaintCenter === null) {
+      return;
+    }
+
+    const cells = [...this.pendingFirePaintCells.values()];
+    const center = this.pendingFirePaintCenter;
+    this.pendingFirePaintCells.clear();
+    this.pendingFirePaintCenter = null;
+    this.options.onFirePaint?.(cells, center);
   }
 
   private drawVisionObstaclesLayer(): void {
@@ -1444,7 +2028,7 @@ export class PixiViewport {
 
   private startFogRevealStroke(screenPoint: ScreenPoint): void {
     this.fogRevealStrokePoints = [screenToWorld(screenPoint, this.camera, this.getViewportSize())];
-    this.drawFogOfWarLayer();
+    this.scheduleFogOfWarRedraw();
   }
 
   private appendFogRevealStrokePoint(screenPoint: ScreenPoint): void {
@@ -1453,7 +2037,7 @@ export class PixiViewport {
 
     if (previous === undefined) {
       this.fogRevealStrokePoints = [worldPoint];
-      this.drawFogOfWarLayer();
+      this.scheduleFogOfWarRedraw();
       return;
     }
 
@@ -1461,13 +2045,14 @@ export class PixiViewport {
     const minDistance = Math.max(8, radius * 0.35);
 
     if (Math.hypot(worldPoint.x - previous.x, worldPoint.y - previous.y) >= minDistance) {
-      this.fogRevealStrokePoints = [...this.fogRevealStrokePoints, worldPoint];
-      this.drawFogOfWarLayer();
+      this.fogRevealStrokePoints.push(worldPoint);
+      this.scheduleFogOfWarRedraw();
     }
   }
 
   private finishFogRevealStroke(screenPoint: ScreenPoint): void {
     this.appendFogRevealStrokePoint(screenPoint);
+    this.cancelScheduledFogRedraw();
 
     if (this.fogRevealStrokePoints.length > 0) {
       this.options.onFogRevealStroke?.(this.fogRevealStrokePoints);
@@ -1484,7 +2069,7 @@ export class PixiViewport {
       return;
     }
 
-    this.options.onFirePaint?.(cells, screenToWorld(screenPoint, this.camera, this.getViewportSize()));
+    this.scheduleFirePaint(cells, screenToWorld(screenPoint, this.camera, this.getViewportSize()));
   }
 
   private getFirePaintCells(screenPoint: ScreenPoint): readonly FireCell[] {
@@ -1765,6 +2350,30 @@ export class PixiViewport {
     return token.footprintCells * (this.grid?.cellSizeWorld ?? 100);
   }
 
+  private getRenderableShapes(): readonly SceneShape[] {
+    if (this.previewShapes.size === 0) {
+      return this.shapes;
+    }
+
+    return this.shapes.map((shape) => this.previewShapes.get(shape.id) ?? shape);
+  }
+
+  private getRenderableLights(): readonly SceneLight[] {
+    if (this.previewLights.size === 0) {
+      return this.lights;
+    }
+
+    return this.lights.map((light) => this.previewLights.get(light.id) ?? light);
+  }
+
+  private getRenderableEffects(): readonly SceneEffect[] {
+    if (this.previewEffects.size === 0) {
+      return this.effects;
+    }
+
+    return this.effects.map((effect) => this.previewEffects.get(effect.id) ?? effect);
+  }
+
   private shouldShowTokenBadge(token: RenderSceneToken): boolean {
     return this.tokens.filter((candidate) => normalizeTokenName(candidate.name) === normalizeTokenName(token.name)).length > 1;
   }
@@ -1793,7 +2402,8 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const direction =
       (Math.atan2(worldPoint.y - light.position.y, worldPoint.x - light.position.x) * 180) / Math.PI;
-    this.options.onLightDirectionChange?.(elementId, direction);
+    this.previewLights.set(elementId, { ...light, direction });
+    this.drawLightDependentPreviewLayers();
   }
 
   private updateLightRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1805,17 +2415,32 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - light.position.x, worldPoint.y - light.position.y);
-    this.options.onLightRadiusChange?.(elementId, Math.max(10, radius));
+    const nextRadius = Math.max(10, radius);
+    this.previewLights.set(elementId, { ...light, radius: nextRadius });
+    this.drawLightDependentPreviewLayers();
   }
 
   private updateLinearShapeEndFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
+    const shape = this.shapes.find((candidate) => candidate.id === elementId);
+    if (shape === undefined || shape.points[0] === undefined) {
+      return;
+    }
+
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    this.options.onShapeEndMove?.(elementId, worldPoint.x, worldPoint.y);
+    this.previewShapes.set(elementId, { ...shape, points: [shape.points[0], worldPoint] });
+    this.drawShapePreviewLayers();
   }
 
   private updatePathPointFromScreenPoint(elementId: string, pointIndex: number, screenPoint: ScreenPoint): void {
+    const shape = this.shapes.find((candidate) => candidate.id === elementId && candidate.type === "path");
+    if (shape === undefined) {
+      return;
+    }
+
     const worldPoint = this.snapScreenPointToCellCenter(screenPoint);
-    this.options.onPathPointMove?.(elementId, pointIndex, worldPoint.x, worldPoint.y);
+    const points = shape.points.map((point, index) => index === pointIndex ? worldPoint : point);
+    this.previewShapes.set(elementId, { ...shape, points });
+    this.drawShapePreviewLayers();
   }
 
   private updateLinearShapeDirectionFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1831,7 +2456,8 @@ export class PixiViewport {
     const anchor = getShapeAnchor(shape);
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const direction = (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
-    this.options.onShapeDirectionChange?.(elementId, direction);
+    this.previewShapes.set(elementId, { ...shape, direction });
+    this.drawShapePreviewLayers();
   }
 
   private updateFireZoneRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1846,7 +2472,9 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const visualRadius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
-    this.options.onFireZoneRadiusChange?.(elementId, Math.max(1, visualRadius / effect.scale));
+    const radius = Math.max(1, visualRadius / effect.scale);
+    this.previewEffects.set(elementId, { ...effect, zone: { ...effect.zone, radius } });
+    this.drawEffectPreviewLayers();
   }
 
   private updateFireLightRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1861,7 +2489,9 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
-    this.options.onFireLightRadiusChange?.(elementId, Math.max(1, radius));
+    const nextRadius = Math.max(1, radius);
+    this.previewEffects.set(elementId, { ...effect, lightRadius: nextRadius });
+    this.drawEffectPreviewLayers();
   }
 
   private updateMagicalDarknessRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1876,7 +2506,9 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
-    this.options.onMagicalDarknessRadiusChange?.(elementId, Math.max(1, radius));
+    const nextRadius = Math.max(1, radius);
+    this.previewEffects.set(elementId, { ...effect, radius: nextRadius });
+    this.drawEffectPreviewLayers();
   }
 
   private updateWaterPatternRotationFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1891,7 +2523,8 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const rotation =
       (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) / Math.PI;
-    this.options.onWaterPatternRotationChange?.(elementId, rotation);
+    this.previewEffects.set(elementId, { ...effect, patternRotation: rotation });
+    this.drawEffectPreviewLayers();
   }
 
   private updateWaterLineRotationFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -1906,7 +2539,8 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const rotation =
       (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) / Math.PI;
-    this.options.onWaterLineRotationChange?.(elementId, rotation);
+    this.previewEffects.set(elementId, { ...effect, lineRotation: rotation });
+    this.drawEffectPreviewLayers();
   }
 
   private hitTestWaterLineRotationHandle(screenPoint: ScreenPoint): string | null {
@@ -2047,7 +2681,9 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
-    this.options.onShapeRadiusChange?.(elementId, Math.max(10, radius));
+    const nextRadius = Math.max(10, radius);
+    this.previewShapes.set(elementId, { ...shape, radius: nextRadius });
+    this.drawShapePreviewLayers();
   }
 
   private updateShapeConeRadiusFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -2059,7 +2695,9 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
-    this.options.onShapeRadiusChange?.(elementId, Math.max(10, radius));
+    const nextRadius = Math.max(10, radius);
+    this.previewShapes.set(elementId, { ...shape, radius: nextRadius });
+    this.drawShapePreviewLayers();
   }
 
   private updateShapeConeDirectionFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -2072,7 +2710,8 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const direction =
       (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
-    this.options.onShapeDirectionChange?.(elementId, direction);
+    this.previewShapes.set(elementId, { ...shape, direction });
+    this.drawShapePreviewLayers();
   }
 
   private updateShapeRectCornerFromScreenPoint(
@@ -2102,30 +2741,36 @@ export class PixiViewport {
     const newHeight = Math.max(10, Math.abs(worldPoint.y - fixed.y));
     const anchorX = (worldPoint.x + fixed.x) / 2;
     const anchorY = (worldPoint.y + fixed.y) / 2;
-    this.options.onShapeRectResize?.(elementId, newWidth, newHeight, anchorX, anchorY);
+    this.previewShapes.set(elementId, {
+      ...shape,
+      points: [{ x: anchorX, y: anchorY }],
+      width: newWidth,
+      height: newHeight
+    });
+    this.drawShapePreviewLayers();
   }
 
   private getSelectableElements(): readonly SelectableRenderElement[] {
     return [
       ...this.elements,
-      ...this.shapes.map((shape) => ({
+      ...this.getRenderableShapes().map((shape) => ({
         id: shape.id,
         kind: shape.type,
         position: getShapeAnchor(shape)
       })),
-      ...this.lights.map((light) => ({
+      ...this.getRenderableLights().map((light) => ({
         id: light.id,
         kind: light.kind === "point" ? "pointLight" as const : "coneLight" as const,
         position: light.position
       })),
-      ...this.effects.map((effect) => ({
+      ...this.getRenderableEffects().map((effect) => ({
         id: effect.id,
         kind: effect.kind === "fire" ? "fire" as const : effect.kind === "magical-darkness" ? "magical-darkness" as const : "water" as const,
         position: effect.position,
         hitRadius: effect.kind === "magical-darkness" ? effect.radius : undefined
       })),
       ...this.tokens
-        .filter((token) => token.visible)
+        .filter((token) => token.visible || this.hiddenTokenPolicy === "show-with-indicator")
         .map((token) => ({
           id: token.id,
           kind: "token" as const,
@@ -2150,12 +2795,12 @@ export class PixiViewport {
     return layer;
   }
 
-  private spawnArcanePointer(position: WorldPoint): void {
+  private spawnArcanePointer(pointer: ArcanePointerBroadcast): void {
     const layer = this.getLayer("pointer");
     const cellSize = this.grid?.cellSizeWorld ?? 100;
-    const diameter = getArcanePointerDiameterWorld(this.arcanePointerCreatureSize, cellSize);
+    const diameter = getArcanePointerDiameterWorld(pointer.creatureSize, cellSize);
     const container = new Container();
-    container.position.set(position.x, position.y);
+    container.position.set(pointer.position.x, pointer.position.y);
     container.alpha = 0;
 
     if (this.arcanePointerSource !== null) {
@@ -2174,10 +2819,10 @@ export class PixiViewport {
     }
 
     layer.addChild(container);
-    this.arcanePointers.set(`arcane-pointer-${this.nextArcanePointerId}`, {
+    this.arcanePointers.set(pointer.id, {
       container,
       startedAt: performance.now(),
-      durationMs: 4000
+      durationMs: pointer.durationMs
     });
     this.nextArcanePointerId += 1;
   }
@@ -2350,12 +2995,39 @@ const MAX_WATER_PATTERN_SPRITES_PER_EFFECT = 360;
 const FIRE_PATTERN_ALPHA_MULTIPLIER = 0.65;
 const MAX_EMOJIS_PER_ELEMENT = 120;
 const waterFilterCache = new Map<string, ColorMatrixFilter>();
+const fireCellRingCache = new Map<
+  string,
+  {
+    bright: Array<{ x: number; y: number; size: number }>;
+    dim: Array<{ x: number; y: number; size: number }>;
+  }
+>();
 
 function clearContainerChildren(container: Container): void {
   const children = container.removeChildren();
 
   for (const child of children) {
     destroyDisplayObject(child);
+  }
+}
+
+function destroyRemovedChildren(children: Container[], reusedContainers: ReadonlySet<Container>): void {
+  for (const child of children) {
+    if (!reusedContainers.has(child)) {
+      destroyDisplayObject(child);
+    }
+  }
+}
+
+function destroyStaleCachedContainers(
+  previousCache: ReadonlyMap<string, { readonly container: Container }>,
+  nextCache: ReadonlyMap<string, { readonly container: Container }>,
+  reusedContainers: ReadonlySet<Container>
+): void {
+  for (const [id, cached] of previousCache) {
+    if (!nextCache.has(id) && !reusedContainers.has(cached.container) && !cached.container.destroyed) {
+      destroyDisplayObject(cached.container);
+    }
   }
 }
 
@@ -2367,7 +3039,287 @@ function destroyDisplayObject(child: Container): void {
 }
 
 function getSceneEffectRenderSignature(effect: SceneFireEffect | SceneWaterEffect, hasPatternSource: boolean): string {
-  return `${hasPatternSource ? "pattern" : "fallback"}:${JSON.stringify(effect)}`;
+  const mode = hasPatternSource ? "pattern" : "fallback";
+
+  if (effect.kind === "fire") {
+    const zoneSignature =
+      effect.zone.kind === "circle"
+        ? `circle:${effect.zone.mode}:${effect.zone.radius}:${effect.zone.innerRadiusRatio}`
+        : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
+
+    return [
+      mode,
+      effect.kind,
+      effect.id,
+      effect.position.x,
+      effect.position.y,
+      effect.scale,
+      effect.opacity,
+      effect.color,
+      effect.visible,
+      effect.emitsLight,
+      effect.lightRadius,
+      zoneSignature
+    ].join(":");
+  }
+
+  return [
+    mode,
+    effect.kind,
+    effect.variant,
+    effect.id,
+    effect.position.x,
+    effect.position.y,
+    effect.opacity,
+    effect.visible,
+    effect.lineRotation,
+    effect.patternRotation,
+    effect.hue,
+    effect.saturation,
+    effect.variant === "river" ? effect.width : "body",
+    effect.points.length,
+    hashPoints(effect.points)
+  ].join(":");
+}
+
+function getShapeRenderSignature(shape: SceneShape, grid: SceneGrid, settings: SceneSettings): string {
+  return [
+    shape.id,
+    shape.type,
+    shape.emoji,
+    shape.points.length,
+    hashPoints(shape.points),
+    shape.radius ?? "",
+    shape.width ?? "",
+    shape.height ?? "",
+    shape.direction ?? "",
+    shape.angle ?? "",
+    grid.cellSizeWorld,
+    grid.unit,
+    grid.distancePerCell,
+    grid.metricDistancePerCell,
+    settings.diagonalMode
+  ].join(":");
+}
+
+function getLightRenderSignature(light: SceneLight): string {
+  return [
+    light.id,
+    light.kind,
+    light.visible,
+    light.position.x,
+    light.position.y,
+    light.radius,
+    light.angle,
+    light.direction,
+    light.color,
+    light.intensity,
+    light.opacity
+  ].join(":");
+}
+
+function getFireLightRenderSignature(effect: SceneFireEffect): string {
+  const zoneSignature =
+    effect.zone.kind === "circle"
+      ? `circle:${effect.position.x}:${effect.position.y}:${effect.zone.radius}:${effect.scale}`
+      : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
+
+  return [
+    effect.id,
+    effect.visible,
+    effect.emitsLight,
+    effect.lightRadius,
+    effect.opacity,
+    zoneSignature
+  ].join(":");
+}
+
+function getMagicalDarknessRenderSignature(effect: SceneMagicalDarknessEffect): string {
+  return [
+    effect.id,
+    effect.visible,
+    effect.position.x,
+    effect.position.y,
+    effect.radius,
+    effect.opacity
+  ].join(":");
+}
+
+function getEffectsLightingSignature(effects: readonly SceneEffect[]): string {
+  return effects
+    .filter((effect): effect is SceneFireEffect => effect.kind === "fire")
+    .map((effect) => {
+      const zoneSignature =
+        effect.zone.kind === "circle"
+          ? `circle:${effect.position.x}:${effect.position.y}:${effect.zone.radius}:${effect.scale}`
+          : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
+      return [
+        effect.id,
+        effect.visible,
+        effect.emitsLight,
+        effect.lightRadius,
+        effect.opacity,
+        zoneSignature
+      ].join(":");
+    })
+    .join("|");
+}
+
+function getMagicalDarknessSignature(effects: readonly SceneEffect[]): string {
+  return effects
+    .filter((effect): effect is SceneMagicalDarknessEffect => effect.kind === "magical-darkness")
+    .map((effect) => [
+      effect.id,
+      effect.visible,
+      effect.position.x,
+      effect.position.y,
+      effect.radius,
+      effect.opacity
+    ].join(":"))
+    .join("|");
+}
+
+function getFireCellPaintKey(cell: FireCell): string {
+  return `${cell.x}:${cell.y}:${cell.size}`;
+}
+
+function getTokenLayerSignature(
+  tokens: readonly RenderSceneToken[],
+  hiddenTokenPolicy: HiddenTokenPolicy,
+  cellSizeWorld: number
+): string {
+  return [
+    hiddenTokenPolicy,
+    cellSizeWorld,
+    ...tokens.map((token) => [
+      token.id,
+      token.imageUrl,
+      token.position.x,
+      token.position.y,
+      token.footprintCells,
+      token.visible,
+      token.selectionColor,
+      token.badgeNumber,
+      token.name
+    ].join(":"))
+  ].join("|");
+}
+
+function getWaterPatternSpriteBudget(visibleWaterEffectCount: number): number {
+  if (visibleWaterEffectCount <= 1) {
+    return MAX_WATER_PATTERN_SPRITES_PER_EFFECT;
+  }
+
+  return Math.max(72, Math.floor(MAX_WATER_PATTERN_SPRITES_PER_EFFECT / Math.sqrt(visibleWaterEffectCount)));
+}
+
+function isPreviewCommitDragMode(mode: PointerDragState["mode"]): boolean {
+  return (
+    mode === "light-rotate" ||
+    mode === "light-resize" ||
+    mode === "shape-end-move" ||
+    mode === "shape-rotate" ||
+    mode === "shape-circle-resize" ||
+    mode === "shape-cone-rotate" ||
+    mode === "shape-cone-resize" ||
+    mode === "shape-rect-resize" ||
+    mode === "path-point-move" ||
+    mode === "path-move" ||
+    mode === "fire-zone-resize" ||
+    mode === "fire-light-resize" ||
+    mode === "magical-darkness-resize" ||
+    mode === "water-line-rotate" ||
+    mode === "water-pattern-rotate"
+  );
+}
+
+function getViewportWorldBounds(
+  camera: CameraState,
+  viewport: ViewportSize
+): { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number } {
+  const halfWidth = viewport.width / (2 * camera.zoom);
+  const halfHeight = viewport.height / (2 * camera.zoom);
+
+  return {
+    left: camera.center.x - halfWidth,
+    right: camera.center.x + halfWidth,
+    top: camera.center.y - halfHeight,
+    bottom: camera.center.y + halfHeight
+  };
+}
+
+function isVisionAreaNearViewport(
+  area: RuntimeVisionArea,
+  bounds: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }
+): boolean {
+  if (area.kind === "circle" || area.kind === "cone") {
+    return isCircleNearViewport(area.center, area.radius, bounds);
+  }
+
+  return area.points.some((point) => isCircleNearViewport(point, area.radius, bounds));
+}
+
+function isCircleNearViewport(
+  center: WorldPoint,
+  radius: number,
+  bounds: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }
+): boolean {
+  return (
+    center.x + radius >= bounds.left &&
+    center.x - radius <= bounds.right &&
+    center.y + radius >= bounds.top &&
+    center.y - radius <= bounds.bottom
+  );
+}
+
+function isRectNearViewport(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  bounds: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }
+): boolean {
+  return (
+    x + width >= bounds.left &&
+    x <= bounds.right &&
+    y + height >= bounds.top &&
+    y <= bounds.bottom
+  );
+}
+
+function hashCells(cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]): number {
+  let hash = 2166136261;
+
+  for (const cell of cells) {
+    hash = hashNumber(hash, cell.x);
+    hash = hashNumber(hash, cell.y);
+    hash = hashNumber(hash, cell.size);
+  }
+
+  return hash >>> 0;
+}
+
+function hashPoints(points: readonly WorldPoint[]): number {
+  let hash = 2166136261;
+
+  for (const point of points) {
+    hash = hashNumber(hash, point.x);
+    hash = hashNumber(hash, point.y);
+  }
+
+  return hash >>> 0;
+}
+
+function hashNumber(hash: number, value: number): number {
+  const rounded = Math.round(value * 1000);
+  hash ^= rounded & 0xff;
+  hash = Math.imul(hash, 16777619);
+  hash ^= (rounded >> 8) & 0xff;
+  hash = Math.imul(hash, 16777619);
+  hash ^= (rounded >> 16) & 0xff;
+  hash = Math.imul(hash, 16777619);
+  hash ^= (rounded >> 24) & 0xff;
+  return Math.imul(hash, 16777619);
 }
 
 function parseHexColor(color: string): number {
@@ -2937,19 +3889,31 @@ function drawSceneLight(light: SceneLight): Graphics {
     .fill({ color, alpha: light.opacity * 0.18 * light.intensity });
 }
 
-function buildLightEraseGraphic(
+function worldToScreen(
+  worldX: number,
+  worldY: number,
+  camera: CameraState,
+  viewport: ViewportSize
+): { readonly x: number; readonly y: number } {
+  return {
+    x: (worldX - camera.center.x) * camera.zoom + viewport.width / 2,
+    y: (worldY - camera.center.y) * camera.zoom + viewport.height / 2
+  };
+}
+
+function buildLightEraseGraphicScreen(
   light: SceneLight,
-  offsetX: number,
-  offsetY: number
+  camera: CameraState,
+  viewport: ViewportSize
 ): Graphics {
-  const x = light.position.x - offsetX;
-  const y = light.position.y - offsetY;
+  const { x, y } = worldToScreen(light.position.x, light.position.y, camera, viewport);
+  const radiusScreen = light.radius * camera.zoom;
   const g = new Graphics();
 
   if (light.kind === "point") {
-    g.circle(x, y, light.radius).fill({ color: 0xffffff, alpha: 1 });
+    g.circle(x, y, radiusScreen).fill({ color: 0xffffff, alpha: 1 });
   } else {
-    drawConeShape(g, x, y, light.radius, getLightRenderAngle(light), light.direction)
+    drawConeShape(g, x, y, radiusScreen, getLightRenderAngle(light), light.direction)
       .fill({ color: 0xffffff, alpha: 1 });
   }
 
@@ -2957,18 +3921,21 @@ function buildLightEraseGraphic(
   return g;
 }
 
-function buildFireLightEraseGraphic(
+function buildFireLightEraseGraphicScreen(
   effect: SceneFireEffect,
-  offsetX: number,
-  offsetY: number
+  camera: CameraState,
+  viewport: ViewportSize
 ): Graphics {
+  const zoom = camera.zoom;
+
   if (effect.zone.kind === "cells") {
     const graphic = new Graphics();
     const { bright, dim } = computeCellRings(effect.zone.cells);
 
     for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
+      const sc = worldToScreen(cell.x, cell.y, camera, viewport);
       graphic
-        .rect(cell.x - offsetX, cell.y - offsetY, cell.size, cell.size)
+        .rect(sc.x, sc.y, cell.size * zoom, cell.size * zoom)
         .fill({ color: 0xffffff, alpha: 1 });
     }
 
@@ -2976,10 +3943,9 @@ function buildFireLightEraseGraphic(
     return graphic;
   }
 
-  const x = effect.position.x - offsetX;
-  const y = effect.position.y - offsetY;
+  const { x, y } = worldToScreen(effect.position.x, effect.position.y, camera, viewport);
   const graphic = new Graphics()
-    .circle(x, y, effect.lightRadius)
+    .circle(x, y, effect.lightRadius * zoom)
     .fill({ color: 0xffffff, alpha: 1 });
 
   graphic.blendMode = "erase";
@@ -3046,13 +4012,17 @@ function buildDarkvisionColorMask(
   return graphic;
 }
 
-function drawWaterEffect(effect: SceneWaterEffect, waterPatternSource: GifSource | null): Container {
+function drawWaterEffect(
+  effect: SceneWaterEffect,
+  waterPatternSource: GifSource | null,
+  spriteBudget = MAX_WATER_PATTERN_SPRITES_PER_EFFECT
+): Container {
   const container = new Container();
   container.label = effect.id;
 
   if (waterPatternSource !== null) {
     const mask = drawWaterMask(effect);
-    addMaskedWaterPatternSprite(container, effect, waterPatternSource, mask);
+    addMaskedWaterPatternSprite(container, effect, waterPatternSource, mask, spriteBudget);
   } else {
     container.addChild(drawWaterFallback(effect));
   }
@@ -3151,21 +4121,23 @@ function addMaskedWaterPatternSprite(
   container: Container,
   effect: SceneWaterEffect,
   waterPatternSource: GifSource,
-  mask: Graphics
+  mask: Graphics,
+  spriteBudget: number
 ): void {
   if (effect.variant === "river") {
-    addRiverWaterPatternSprites(container, effect, waterPatternSource, mask);
+    addRiverWaterPatternSprites(container, effect, waterPatternSource, mask, spriteBudget);
     return;
   }
 
-  addWaterBodyPatternSprites(container, effect, waterPatternSource, mask);
+  addWaterBodyPatternSprites(container, effect, waterPatternSource, mask, spriteBudget);
 }
 
 function addWaterBodyPatternSprites(
   container: Container,
   effect: Extract<SceneWaterEffect, { readonly variant: "water-body" }>,
   waterPatternSource: GifSource,
-  mask: Graphics
+  mask: Graphics,
+  spriteBudget: number
 ): void {
   const bounds = getWaterBounds(effect);
   const patternContainer = new Container();
@@ -3173,16 +4145,19 @@ function addWaterBodyPatternSprites(
   const estimatedRows = Math.max(1, Math.ceil((bounds.bottom - bounds.top + WATER_BODY_TILE_SIZE * 2) / WATER_BODY_TILE_SIZE));
   const estimatedSprites = estimatedColumns * estimatedRows;
   const tileSize =
-    estimatedSprites > MAX_WATER_PATTERN_SPRITES_PER_EFFECT
+    estimatedSprites > spriteBudget
       ? Math.min(
           WATER_BODY_MAX_TILE_SIZE,
-          WATER_BODY_TILE_SIZE * Math.sqrt(estimatedSprites / MAX_WATER_PATTERN_SPRITES_PER_EFFECT)
+          WATER_BODY_TILE_SIZE * Math.sqrt(estimatedSprites / spriteBudget)
         )
       : WATER_BODY_TILE_SIZE;
   const step = tileSize;
 
   for (let y = bounds.top - tileSize; y <= bounds.bottom + tileSize; y += step) {
     for (let x = bounds.left - tileSize; x <= bounds.right + tileSize; x += step) {
+      if (patternContainer.children.length >= spriteBudget) {
+        break;
+      }
       const sprite = new GifSprite({ source: waterPatternSource, autoPlay: true });
       sprite.anchor.set(0.5);
       sprite.position.set(x + tileSize / 2, y + tileSize / 2);
@@ -3192,6 +4167,10 @@ function addWaterBodyPatternSprites(
       sprite.alpha = effect.opacity;
       applyWaterPatternFilters(sprite, effect);
       patternContainer.addChild(sprite);
+    }
+
+    if (patternContainer.children.length >= spriteBudget) {
+      break;
     }
   }
 
@@ -3204,7 +4183,8 @@ function addRiverWaterPatternSprites(
   container: Container,
   effect: Extract<SceneWaterEffect, { readonly variant: "river" }>,
   waterPatternSource: GifSource,
-  mask: Graphics
+  mask: Graphics,
+  spriteBudget: number
 ): void {
   const patternContainer = new Container();
   const baseTileSize = Math.max(WATER_RIVER_MIN_TILE_SIZE, Math.min(WATER_RIVER_MAX_TILE_SIZE, effect.width * 0.72));
@@ -3212,15 +4192,16 @@ function addRiverWaterPatternSprites(
   const estimatedSprites =
     Math.max(1, Math.ceil(getPolylineLength(effect.points) / baseTileSize)) * (baseExtraRows * 2 + 1);
   const tileSize =
-    estimatedSprites > MAX_WATER_PATTERN_SPRITES_PER_EFFECT
+    estimatedSprites > spriteBudget
       ? Math.min(
           WATER_RIVER_PERFORMANCE_TILE_SIZE,
-          baseTileSize * Math.sqrt(estimatedSprites / MAX_WATER_PATTERN_SPRITES_PER_EFFECT)
+          baseTileSize * Math.sqrt(estimatedSprites / spriteBudget)
         )
       : baseTileSize;
   const step = tileSize;
   const extraRows = Math.max(0, Math.ceil((effect.width - tileSize) / (tileSize * 2)));
 
+  riverSegments:
   for (let index = 1; index < effect.points.length; index += 1) {
     const from = effect.points[index - 1];
     const to = effect.points[index];
@@ -3236,6 +4217,9 @@ function addRiverWaterPatternSprites(
     const count = Math.max(1, Math.ceil(length / step));
 
     for (let tileIndex = 0; tileIndex < count; tileIndex += 1) {
+      if (patternContainer.children.length >= spriteBudget) {
+        break riverSegments;
+      }
       const distance = Math.min(length, tileIndex * step + step / 2);
       const t = length === 0 ? 0 : distance / length;
       const center = {
@@ -3244,6 +4228,9 @@ function addRiverWaterPatternSprites(
       };
 
       for (let row = -extraRows; row <= extraRows; row += 1) {
+        if (patternContainer.children.length >= spriteBudget) {
+          break riverSegments;
+        }
         const offset = row * tileSize;
         addWaterPatternTile(patternContainer, effect, waterPatternSource, {
           x: center.x + Math.cos(normalAngle) * offset,
@@ -3253,7 +4240,7 @@ function addRiverWaterPatternSprites(
     }
   }
 
-  addRiverEndpointAndCornerPatternSprites(patternContainer, effect, waterPatternSource, tileSize);
+  addRiverEndpointAndCornerPatternSprites(patternContainer, effect, waterPatternSource, tileSize, spriteBudget);
   patternContainer.setMask({ mask });
   container.addChild(patternContainer);
   container.addChild(mask);
@@ -3263,11 +4250,15 @@ function addRiverEndpointAndCornerPatternSprites(
   container: Container,
   effect: Extract<SceneWaterEffect, { readonly variant: "river" }>,
   waterPatternSource: GifSource,
-  tileSize: number
+  tileSize: number,
+  spriteBudget: number
 ): void {
   const capTileSize = Math.max(tileSize, effect.width * 1.08);
 
   for (let index = 0; index < effect.points.length; index += 1) {
+    if (container.children.length >= spriteBudget) {
+      break;
+    }
     const point = effect.points[index];
     if (point === undefined) {
       continue;
@@ -3359,6 +4350,13 @@ function getWaterColorMatrixFilter(hue: number, saturation: number): ColorMatrix
   return filter;
 }
 
+function clearWaterFilterCache(): void {
+  for (const filter of waterFilterCache.values()) {
+    filter.destroy();
+  }
+  waterFilterCache.clear();
+}
+
 function getPolylineLength(points: readonly WorldPoint[]): number {
   let length = 0;
 
@@ -3445,6 +4443,12 @@ function computeCellRings(
   dim: Array<{ x: number; y: number; size: number }>;
 } {
   if (cells.length === 0) return { bright: [], dim: [] };
+  const cacheKey = `${cells.length}:${hashCells(cells)}`;
+  const cached = fireCellRingCache.get(cacheKey);
+
+  if (cached !== undefined) {
+    return cached;
+  }
 
   const cellSize = cells[0].size;
   const origin = getFireCellGridOrigin(cells);
@@ -3483,10 +4487,16 @@ function computeCellRings(
     }
   }
 
-  return {
+  const result = {
     bright: [...brightSet.values()],
     dim: [...dimSet.values()]
   };
+
+  if (fireCellRingCache.size > 200) {
+    fireCellRingCache.clear();
+  }
+  fireCellRingCache.set(cacheKey, result);
+  return result;
 }
 
 function drawSceneEffect(
@@ -3804,6 +4814,24 @@ function drawTokenBadge(token: RenderSceneToken, footprintWorld: number): Contai
   return container;
 }
 
+function drawHiddenTokenIndicator(token: RenderSceneToken, footprintWorld: number): Container {
+  const container = new Container();
+  const radius = Math.max(8, Math.min(16, footprintWorld * 0.16));
+  const x = token.position.x - footprintWorld / 2 + radius + 4;
+  const y = token.position.y - footprintWorld / 2 + radius + 4;
+  const color = parseHexColor(token.selectionColor);
+  const icon = new Graphics()
+    .ellipse(x, y, radius, radius * 0.62)
+    .fill({ color: 0x111315, alpha: 0.9 })
+    .stroke({ color, width: Math.max(2, radius * 0.18), alpha: 0.95 })
+    .moveTo(x - radius * 0.9, y + radius * 0.9)
+    .lineTo(x + radius * 0.9, y - radius * 0.9)
+    .stroke({ color, width: Math.max(2, radius * 0.2), alpha: 1 });
+
+  container.addChild(icon);
+  return container;
+}
+
 function drawSelection(element: SelectableRenderElement): Graphics {
   const { x, y } = element.position;
   const radius = (element.hitRadius ?? getHitRadius(element.kind)) + 8;
@@ -3813,6 +4841,18 @@ function drawSelection(element: SelectableRenderElement): Graphics {
     width: 4,
     alpha: 0.95
   });
+}
+
+function createArcanePointerBroadcast(
+  position: WorldPoint,
+  creatureSize: ArcanePointerCreatureSize
+): ArcanePointerBroadcast {
+  return {
+    id: `arcane-pointer-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    position,
+    creatureSize,
+    durationMs: 4000
+  };
 }
 
 function drawLinearShapeHandles(shape: SceneShape): Graphics {
@@ -4038,6 +5078,41 @@ function drawConeShape(
   }
 
   return graphic.closePath();
+}
+
+function drawStrokeRevealShapeScreen(
+  graphic: Graphics,
+  points: readonly WorldPoint[],
+  radius: number,
+  camera: CameraState,
+  viewport: ViewportSize
+): void {
+  const firstPoint = points[0];
+
+  if (firstPoint === undefined) {
+    return;
+  }
+
+  const firstScreen = worldToScreen(firstPoint.x, firstPoint.y, camera, viewport);
+
+  if (points.length === 1) {
+    graphic.circle(firstScreen.x, firstScreen.y, radius).fill({ color: 0xffffff, alpha: 1 });
+    return;
+  }
+
+  graphic.moveTo(firstScreen.x, firstScreen.y);
+
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index];
+    if (point === undefined) {
+      continue;
+    }
+
+    const screenPoint = worldToScreen(point.x, point.y, camera, viewport);
+    graphic.lineTo(screenPoint.x, screenPoint.y);
+  }
+
+  graphic.stroke({ color: 0xffffff, width: radius * 2, alpha: 1, cap: "round", join: "round" });
 }
 
 function getLightRenderAngle(light: SceneLight): number {
