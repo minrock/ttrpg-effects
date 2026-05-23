@@ -24,6 +24,7 @@ export interface PlayerWindowSnapshot {
   readonly mapImageUrl: string | null;
   readonly tokenImageUrls: Readonly<Record<string, string>>;
   readonly camera: ViewportCameraSnapshot;
+  readonly cameraSyncKey?: number;
   readonly showDmFogOverlay: boolean;
 }
 

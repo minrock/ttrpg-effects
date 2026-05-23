@@ -165,6 +165,8 @@ export class PixiViewport {
   private isMapAdjustMode = false;
   private isGridAdjustMode = false;
   private isGrabMode = false;
+  private isNavigationEnabled = false;
+  private isSpaceNavigationActive = false;
   private isFogRevealMode = false;
   private isFirePaintMode = false;
   private isPathDrawingMode = false;
@@ -194,6 +196,8 @@ export class PixiViewport {
   private _darknessTextureSize: { readonly width: number; readonly height: number } | null = null;
   private _fogOfWarTextureSize: { readonly width: number; readonly height: number } | null = null;
   private fogRedrawFrame: number | null = null;
+  private darknessRedrawFrame: number | null = null;
+  private darkvisionSignature = "";
   private disposed = false;
   private waterPatternSource: GifSource | null = null;
   private arcanePointerSource: GifSource | null = null;
@@ -256,8 +260,8 @@ export class PixiViewport {
     this.lights = lights;
     this.previewLights.clear();
     this.drawDarkvisionLayer();
-    this.drawDarknessLayer();
-    this.drawFogOfWarLayer();
+    this.scheduleDarknessRedraw();
+    this.scheduleFogOfWarRedraw();
     this.drawLightsLayer();
     this.drawSelectionLayer();
   }
@@ -272,8 +276,8 @@ export class PixiViewport {
 
     if (previousLightingSignature !== nextLightingSignature) {
       this.drawDarkvisionLayer();
-      this.drawDarknessLayer();
-      this.drawFogOfWarLayer();
+      this.scheduleDarknessRedraw();
+      this.scheduleFogOfWarRedraw();
       this.drawLightsLayer();
     }
 
@@ -313,6 +317,17 @@ export class PixiViewport {
 
   setGrabMode(isGrabMode: boolean): void {
     this.isGrabMode = isGrabMode;
+    this.updateCursor();
+  }
+
+  setNavigationEnabled(isNavigationEnabled: boolean): void {
+    this.isNavigationEnabled = isNavigationEnabled;
+    if (!isNavigationEnabled) {
+      this.isSpaceNavigationActive = false;
+      if (this.dragState?.mode === "pan") {
+        this.dragState = null;
+      }
+    }
     this.updateCursor();
   }
 
@@ -356,7 +371,7 @@ export class PixiViewport {
 
   setFogPresentation(fogPresentation: FogPresentation): void {
     this.fogPresentation = fogPresentation;
-    this.drawFogOfWarLayer();
+    this.scheduleFogOfWarRedraw();
   }
 
   setHiddenTokenPolicy(hiddenTokenPolicy: HiddenTokenPolicy): void {
@@ -387,8 +402,18 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  setPathHoverPoint(hoverPoint: WorldPoint | null): void {
+    this.pathPreviewHoverPoint = hoverPoint;
+    this.drawSelectionLayer();
+  }
+
   setWaterPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
     this.waterPreviewPoints = points;
+    this.waterPreviewHoverPoint = hoverPoint;
+    this.drawSelectionLayer();
+  }
+
+  setWaterHoverPoint(hoverPoint: WorldPoint | null): void {
     this.waterPreviewHoverPoint = hoverPoint;
     this.drawSelectionLayer();
   }
@@ -417,8 +442,8 @@ export class PixiViewport {
         this.colorMapSprite?.scale.set(map.scale);
       }
       this.drawDarkvisionLayer();
-      this.drawDarknessLayer();
-      this.drawFogOfWarLayer();
+      this.scheduleDarknessRedraw();
+      this.scheduleFogOfWarRedraw();
     }
 
     this.drawGrid();
@@ -427,8 +452,8 @@ export class PixiViewport {
   setGrid(grid: SceneGrid): void {
     this.grid = grid;
     this.drawGrid();
-    this.drawDarknessLayer();
-    this.drawFogOfWarLayer();
+    this.scheduleDarknessRedraw();
+    this.scheduleFogOfWarRedraw();
     void this.drawTokenLayer(true);
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
@@ -438,13 +463,13 @@ export class PixiViewport {
     this.darkness = darkness;
     this.updateBaseMapVisibility();
     this.drawDarkvisionLayer();
-    this.drawDarknessLayer();
+    this.scheduleDarknessRedraw();
     this.drawSelectionLayer();
   }
 
   setFogOfWar(fogOfWar: SceneFogOfWar): void {
     this.fogOfWar = fogOfWar;
-    this.drawFogOfWarLayer();
+    this.scheduleFogOfWarRedraw();
     this.drawVisionObstaclesLayer();
   }
 
@@ -457,6 +482,7 @@ export class PixiViewport {
     this.resizeObserver.disconnect();
     this.removeInputListeners();
     this.cancelScheduledFogRedraw();
+    this.cancelScheduledDarknessRedraw();
     this.cancelPendingViewportUpdates();
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
@@ -512,6 +538,7 @@ export class PixiViewport {
     });
 
     this.app.canvas.className = "pixi-canvas";
+    this.app.canvas.tabIndex = 0;
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
     this.firePatternSource = await loadFirePatternSource();
@@ -681,23 +708,31 @@ export class PixiViewport {
   }
 
   private drawDarkvisionLayer(): void {
+    const renderableLights = this.getRenderableLights();
+    const renderableEffects = this.getRenderableEffects();
+    const spritesReady = this.mapSprite !== null && this.colorMapSprite !== null;
+    const nextSig = spritesReady
+      ? getDarkvisionSignature(this.darkness, renderableLights, renderableEffects)
+      : "";
+
+    if (nextSig === this.darkvisionSignature) {
+      return;
+    }
+
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
     }
     this.darkvisionMask?.destroy();
     this.darkvisionMask = null;
+    this.darkvisionSignature = nextSig;
 
     this.updateBaseMapVisibility();
 
-    if (
-      this.mapSprite === null ||
-      this.colorMapSprite === null ||
-      this.darkness?.darkvisionEnabled !== true
-    ) {
+    if (!spritesReady || nextSig === "") {
       return;
     }
 
-    const mask = buildDarkvisionColorMask(this.getRenderableLights(), this.getRenderableEffects());
+    const mask = buildDarkvisionColorMask(renderableLights, renderableEffects);
 
     if (mask === null) {
       return;
@@ -705,8 +740,8 @@ export class PixiViewport {
 
     this.darkvisionMask = mask;
     this.getLayer("map").addChild(mask);
-    this.colorMapSprite.visible = true;
-    this.colorMapSprite.setMask({ mask });
+    this.colorMapSprite!.visible = true;
+    this.colorMapSprite!.setMask({ mask });
   }
 
 
@@ -718,6 +753,11 @@ export class PixiViewport {
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
     canvas.addEventListener("wheel", this.handleWheel, { passive: false });
+    window.addEventListener("keydown", this.handleKeyDown, true);
+    window.addEventListener("keyup", this.handleKeyUp, true);
+    window.addEventListener("blur", this.handleWindowBlur);
+    document.addEventListener("keydown", this.handleKeyDown, true);
+    document.addEventListener("keyup", this.handleKeyUp, true);
   }
 
   private removeInputListeners(): void {
@@ -728,6 +768,11 @@ export class PixiViewport {
     canvas.removeEventListener("pointerup", this.handlePointerUp);
     canvas.removeEventListener("pointercancel", this.handlePointerUp);
     canvas.removeEventListener("wheel", this.handleWheel);
+    window.removeEventListener("keydown", this.handleKeyDown, true);
+    window.removeEventListener("keyup", this.handleKeyUp, true);
+    window.removeEventListener("blur", this.handleWindowBlur);
+    document.removeEventListener("keydown", this.handleKeyDown, true);
+    document.removeEventListener("keyup", this.handleKeyUp, true);
   }
 
   private readonly handleNativeContextMenu = (event: MouseEvent): void => {
@@ -736,7 +781,9 @@ export class PixiViewport {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     event.preventDefault();
-    if (this.isReadOnly) {
+    this.app.canvas.focus();
+    const canNavigateReadOnly = this.isNavigationEnabled && this.isSpaceNavigationActive && event.button === 0;
+    if (this.isReadOnly && !canNavigateReadOnly) {
       return;
     }
     this.app.canvas.setPointerCapture(event.pointerId);
@@ -748,8 +795,9 @@ export class PixiViewport {
     let grabOffset: WorldPoint | undefined;
     let moveStartPosition: WorldPoint | undefined;
     if (event.button === 0) {
-      if (this.isGrabMode) {
+      if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
+        this.app.canvas.style.cursor = "grabbing";
       } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
         this.startFogRevealStroke(point);
@@ -881,7 +929,7 @@ export class PixiViewport {
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (this.isReadOnly) {
+    if (this.isReadOnly && this.dragState?.mode !== "pan") {
       return;
     }
 
@@ -972,6 +1020,7 @@ export class PixiViewport {
       const y = currentWorld.y - this.dragState.grabOffset.y;
       this.updatePathMovePreview(elementId, x, y);
     } else if (this.dragState.mode === "pan") {
+      this.app.canvas.style.cursor = "grabbing";
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
         y: nextPoint.y - this.dragState.lastPoint.y
@@ -997,7 +1046,7 @@ export class PixiViewport {
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    if (this.isReadOnly) {
+    if (this.isReadOnly && this.dragState?.mode !== "pan") {
       return;
     }
 
@@ -1005,6 +1054,7 @@ export class PixiViewport {
       return;
     }
 
+    const completedMode = this.dragState.mode;
     const releasePoint = this.eventToScreenPoint(event);
     const movedDistance = Math.hypot(
       releasePoint.x - this.dragState.startPoint.x,
@@ -1074,6 +1124,9 @@ export class PixiViewport {
     }
 
     this.dragState = null;
+    if (completedMode === "pan") {
+      this.updateCursor();
+    }
   };
 
   private applyElementMovePreview(
@@ -1245,7 +1298,7 @@ export class PixiViewport {
   }
 
   private updateCursor(): void {
-    if (this.isGrabMode) {
+    if (this.isGrabMode || (this.isNavigationEnabled && this.isSpaceNavigationActive)) {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
@@ -1263,7 +1316,7 @@ export class PixiViewport {
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
 
-    if (this.isReadOnly || this.isZoomLocked) {
+    if ((this.isReadOnly && !this.isNavigationEnabled) || this.isZoomLocked) {
       return;
     }
 
@@ -1275,6 +1328,42 @@ export class PixiViewport {
       this.camera.zoom * zoomFactor
     );
     this.applyCamera();
+  };
+
+  private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (!this.isNavigationEnabled || !isSpaceKeyEvent(event) || isEditableKeyboardTarget(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (!this.isSpaceNavigationActive) {
+      this.isSpaceNavigationActive = true;
+      this.updateCursor();
+    }
+  };
+
+  private readonly handleKeyUp = (event: KeyboardEvent): void => {
+    if (!this.isNavigationEnabled || !isSpaceKeyEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (this.isSpaceNavigationActive) {
+      this.isSpaceNavigationActive = false;
+      this.updateCursor();
+    }
+  };
+
+  private readonly handleWindowBlur = (): void => {
+    if (!this.isSpaceNavigationActive && this.dragState?.mode !== "pan") {
+      return;
+    }
+
+    this.isSpaceNavigationActive = false;
+    if (this.dragState?.mode === "pan") {
+      this.dragState = null;
+    }
+    this.updateCursor();
   };
 
   private resize(): void {
@@ -1296,6 +1385,7 @@ export class PixiViewport {
     if (emit && this.viewRole === "dm") {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
+    this.cancelScheduledDarknessRedraw();
     this.drawDarknessLayer();
     this.scheduleFogOfWarRedraw();
   }
@@ -1938,6 +2028,26 @@ export class PixiViewport {
 
     window.cancelAnimationFrame(this.fogRedrawFrame);
     this.fogRedrawFrame = null;
+  }
+
+  private scheduleDarknessRedraw(): void {
+    if (this.darknessRedrawFrame !== null) {
+      return;
+    }
+
+    this.darknessRedrawFrame = window.requestAnimationFrame(() => {
+      this.darknessRedrawFrame = null;
+      this.drawDarknessLayer();
+    });
+  }
+
+  private cancelScheduledDarknessRedraw(): void {
+    if (this.darknessRedrawFrame === null) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.darknessRedrawFrame);
+    this.darknessRedrawFrame = null;
   }
 
   private scheduleViewportUpdate(key: string, update: () => void): void {
@@ -2899,6 +3009,7 @@ export class PixiViewport {
       this.updateBaseMapVisibility();
       layer.addChild(sprite);
       layer.addChild(colorSprite);
+      this.darkvisionSignature = "";
       this.drawDarkvisionLayer();
       this.drawGrid();
       this.drawDarknessLayer();
@@ -3134,6 +3245,22 @@ function getFireLightRenderSignature(effect: SceneFireEffect): string {
   ].join(":");
 }
 
+function getDarkvisionSignature(
+  darkness: SceneDarkness | null,
+  lights: readonly SceneLight[],
+  effects: readonly SceneEffect[]
+): string {
+  if (darkness?.darkvisionEnabled !== true) {
+    return "";
+  }
+
+  const lightSig = lights
+    .filter((l) => l.visible)
+    .map((l) => `${l.id}:${l.kind}:${l.position.x}:${l.position.y}:${l.radius}:${l.direction}`)
+    .join("|");
+  return `${lightSig}/${getEffectsLightingSignature(effects)}`;
+}
+
 function getMagicalDarknessRenderSignature(effect: SceneMagicalDarknessEffect): string {
   return [
     effect.id,
@@ -3231,6 +3358,19 @@ function isPreviewCommitDragMode(mode: PointerDragState["mode"]): boolean {
     mode === "water-line-rotate" ||
     mode === "water-pattern-rotate"
   );
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
+
+function isSpaceKeyEvent(event: KeyboardEvent): boolean {
+  return event.code === "Space" || event.key === " " || event.key === "Spacebar";
 }
 
 function getViewportWorldBounds(

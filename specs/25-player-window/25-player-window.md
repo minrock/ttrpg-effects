@@ -6,7 +6,7 @@ Implementada.
 
 ## Objetivo
 
-Agregar una ventana Electron secundaria para jugadores que muestre una copia sincronizada del viewport del DM, sin controles ni capacidad de edicion. La ventana de jugador debe servir para proyectar o mover a otro monitor una vista limpia del mapa, respetando la camara del DM y mostrando la escena con reglas visuales orientadas a jugadores.
+Agregar una ventana Electron secundaria para jugadores que muestre una copia sincronizada de la escena del DM, sin controles de edicion. La ventana de jugador debe servir para proyectar o mover a otro monitor una vista limpia del mapa, con pan/zoom independiente del DM y reglas visuales orientadas a jugadores.
 
 ## Contexto
 
@@ -19,13 +19,15 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Agregar un boton principal en la ventana del DM para abrir la `Ventana de jugador`.
 - Crear una segunda ventana Electron real (`BrowserWindow`) para la vista de jugadores.
 - La ventana de jugador debe ocupar el 100% del viewport del mapa disponible en esa ventana.
-- La ventana de jugador no muestra toolbar, sidebar, status bar, controles, menus contextuales ni modales de edicion.
-- La ventana de jugador es 100% read-only por ahora.
-- La camara de jugador debe seguir exactamente la camara del DM:
-  - pan;
-  - zoom;
-  - posicion visible del mapa;
-  - cambios posteriores en tiempo real.
+- La ventana de jugador no muestra toolbar, sidebar, status bar, menus contextuales ni modales de edicion.
+- La ventana de jugador es read-only para edicion de escena, pero permite navegar su propia vista.
+- La camara de jugador es independiente de la camara del DM:
+  - el DM no fuerza pan/zoom en jugador despues de abrir la ventana;
+  - el jugador puede hacer pan con barra espaciadora presionada;
+  - el jugador puede hacer zoom con rueda/trackpad si el zoom esta desbloqueado;
+  - el jugador tiene un boton local para bloquear/desbloquear zoom;
+  - la posicion visible del mapa en jugador puede diferir de la del DM.
+- Al abrir o reabrir la ventana de jugador, puede inicializarse con la camara actual del DM como punto de partida, pero desde ahi queda desacoplada.
 - Todo cambio de escena, mapa o estado visual realizado en DM se refleja en jugador.
 - Los objetos creados/editados en DM se duplican visualmente en jugador:
   - mapa;
@@ -98,7 +100,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - La ventana debe abrirse con una vista limpia del mapa y ocupar el 100% del area disponible de su contenido.
 - La ventana puede moverse a otro monitor/proyector por el sistema operativo.
 
-### Vista read-only
+### Vista read-only con navegacion local
 
 - La ventana de jugador no permite:
   - seleccionar elementos;
@@ -108,16 +110,25 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - revelar niebla;
   - ajustar mapa;
   - ajustar grilla;
-  - hacer pan/zoom independiente;
   - usar shortcuts de edicion.
-- Los eventos de mouse/teclado sobre el canvas de jugador se ignoran para edicion.
-- La camara solo cambia cuando cambia la camara del DM.
+- La ventana de jugador si permite:
+  - pan local mientras la barra espaciadora esta presionada;
+  - zoom local cuando el zoom no esta bloqueado;
+  - bloquear/desbloquear zoom con un boton visible sobre la vista.
+- Los eventos de mouse/teclado sobre el canvas de jugador se ignoran para edicion, pero se usan para navegacion local.
+- Al presionar la barra espaciadora en jugador, el cursor cambia a mano/agarre y el drag mueve la camara de jugador.
+- Al soltar la barra espaciadora, el cursor vuelve a modo normal y no se activa ninguna herramienta de edicion.
+- El boton local de bloqueo de zoom debe ser visible pero discreto, sin convertirse en toolbar de edicion.
 
 ### Sincronizacion
 
 - El DM es la fuente de verdad.
 - Toda actualizacion de escena en el DM debe publicar un snapshot o patch a la ventana de jugador.
-- La camara del DM debe sincronizarse con la ventana de jugador cada vez que cambie por pan, zoom o ajuste equivalente.
+- La camara del DM no debe sincronizarse continuamente con la ventana de jugador.
+- La ventana de jugador mantiene su propia camara en memoria local mientras exista.
+- La camara inicial de jugador puede provenir del snapshot actual del DM al abrir/reabrir la ventana.
+- Cambios posteriores de pan/zoom en DM no deben mover automaticamente la ventana de jugador.
+- Cambios locales de pan/zoom en jugador no deben emitirse al DM ni modificar escena.
 - Si el mapa se carga, cambia, se mueve o se escala en DM, la ventana de jugador lo refleja.
 - Si una escena se guarda/carga o se crea una nueva escena en DM, la ventana de jugador se actualiza con ese estado.
 - Si se cierra la ventana de jugador, el DM no pierde estado ni falla al seguir editando.
@@ -142,9 +153,11 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Agregar canales IPC especificos, tipados y validables para:
   - abrir/enfocar ventana de jugador;
   - enviar estado inicial de escena a jugador;
-  - publicar actualizaciones de escena/camara desde DM a jugador;
+  - publicar actualizaciones de escena desde DM a jugador;
   - publicar eventos temporales como apuntador arcano;
   - notificar cierre de ventana de jugador si hace falta.
+- La publicacion de camara DM -> jugador debe quedar limitada al snapshot inicial o a un evento explicito futuro, no al flujo normal de pan/zoom del DM.
+- La camara local de jugador no debe viajar por IPC hacia el DM.
 - No exponer APIs genericas de Electron al renderer.
 - Mantener `contextIsolation: true`, `nodeIntegration: false` y preload tipado.
 - La ventana de jugador no debe cargar contenido remoto.
@@ -164,6 +177,15 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 
 - Boton principal para abrir/enfocar la ventana de jugador.
 
+### Ventana de jugador
+
+- Boton flotante o control discreto `Zoom bloqueado` / `Zoom desbloqueado`.
+- El boton debe estar disponible en la vista jugador aunque no existan toolbar/sidebar.
+- La navegacion local usa:
+  - barra espaciadora sostenida + drag para pan;
+  - rueda/trackpad para zoom cuando el zoom esta desbloqueado.
+- No se agregan controles para crear, editar, seleccionar, borrar o revelar elementos.
+
 ### Sidebar DM / Niebla
 
 - Nuevo control para el DM:
@@ -173,7 +195,6 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 
 ## Fuera de alcance
 
-- Control independiente de camara para jugadores.
 - Diferentes vistas por jugador o por token.
 - Linea de vision automatica por personaje.
 - Sincronizacion por red o multiplayer remoto.
@@ -186,10 +207,14 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 
 - La ventana principal del DM muestra un boton para abrir la ventana de jugador.
 - Al usar el boton se abre una segunda ventana Electron real.
-- La ventana de jugador muestra solo el viewport del mapa, sin controles.
+- La ventana de jugador muestra solo el viewport del mapa, sin controles de edicion.
 - La ventana de jugador ocupa el 100% del area visible de la ventana.
-- La ventana de jugador es read-only.
-- Pan y zoom del DM se replican en jugador.
+- La ventana de jugador es read-only para edicion.
+- Pan y zoom del DM no se replican continuamente en jugador.
+- La ventana de jugador permite pan local con barra espaciadora sostenida.
+- La ventana de jugador permite bloquear/desbloquear zoom con un boton local.
+- La ventana de jugador permite zoom local solo cuando el zoom esta desbloqueado.
+- Pan/zoom local de jugador no cambia la escena ni la camara del DM.
 - Cargar mapa, cargar escena, crear escena nueva y cambios de escena se reflejan en jugador.
 - Formas, mediciones, paths, efectos, luces, oscuridad, grilla y tokens visibles se ven en jugador.
 - Tokens ocultos no se ven en jugador.
@@ -207,7 +232,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 
 - Mantener dos viewports Pixi sincronizados puede exponer diferencias de timing si se usan efectos animados o eventos temporales.
 - Enviar snapshots completos de escena en cada cambio puede ser costoso con mapas grandes o muchos objetos; puede requerir throttling, patches o dirty tracking.
-- La sincronizacion de camara debe evitar loops: jugador no emite cambios de camara de vuelta al DM.
+- La independencia de camara debe evitar loops: jugador no emite cambios de camara de vuelta al DM y DM no pisa la camara local del jugador durante pan/zoom normal.
 - Los assets de mapa/tokens deben resolverse en la ventana de jugador usando los mismos protocolos seguros que la ventana del DM.
 - La diferencia de niebla DM vs jugador puede complicar la capa de render si se mezcla con oscuridad y darkvision; conviene modelarla como opcion de vista, no como mutacion de escena.
 
@@ -216,5 +241,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - La implementacion usa la misma entrada renderer con query `?view=player`.
 - `MapViewport` y `PixiViewport` se reutilizan con props de rol, read-only, presentacion de niebla y politica de tokens ocultos.
 - El estado compartido fluye desde DM hacia main y luego hacia la ventana de jugador mediante IPC especifico.
-- La camara del DM se expone desde `PixiViewport` hacia React y se sincroniza como evento ligero separado del snapshot completo.
+- La camara del DM se expone desde `PixiViewport` hacia React para usos del DM y puede usarse como camara inicial al abrir jugador, pero no se sincroniza continuamente con jugador.
+- `PixiViewport` en modo jugador debe permitir input de navegacion aunque `readOnly` bloquee edicion.
+- `MapViewport`/`PlayerApp` deben separar `readOnly` de `navigationEnabled` o equivalente para que jugador pueda pan/zoom sin herramientas de edicion.
 - El apuntador arcano se emite como evento temporal DM -> jugador y no se persiste.
