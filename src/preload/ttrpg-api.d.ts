@@ -24,7 +24,7 @@ export interface TtrpgApi {
   resolveMapUrl: (imagePath: string) => Promise<string | null>;
   openTokenImage: () => Promise<TokenOpenResult>;
   resolveTokenUrl: (imagePath: string) => Promise<string | null>;
-  openPlayerWindow: () => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  openPlayerWindow: (snapshot?: PlayerWindowSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   getPlayerWindowState: () => Promise<{
     readonly snapshot: PlayerWindowSnapshot | null;
     readonly camera: ViewportCameraSnapshot | null;

@@ -48,6 +48,7 @@ interface MapViewportProps {
   readonly isGrabMode: boolean;
   readonly viewRole?: ViewportViewRole;
   readonly isReadOnly?: boolean;
+  readonly isNavigationEnabled?: boolean;
   readonly fogPresentation?: FogPresentation;
   readonly hiddenTokenPolicy?: HiddenTokenPolicy;
   readonly cameraSnapshot?: ViewportCameraSnapshot | null;
@@ -111,6 +112,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isGrabMode,
   viewRole = "dm",
   isReadOnly = false,
+  isNavigationEnabled = false,
   fogPresentation = "dm-preview",
   hiddenTokenPolicy = "show-with-indicator",
   cameraSnapshot = null,
@@ -224,6 +226,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setViewRole(viewRole);
       createdViewport.setReadOnly(isReadOnly);
+      createdViewport.setNavigationEnabled(isNavigationEnabled);
       createdViewport.setFogPresentation(fogPresentation);
       createdViewport.setHiddenTokenPolicy(hiddenTokenPolicy);
       if (cameraSnapshot !== null) {
@@ -308,6 +311,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   }, [isReadOnly]);
 
   useEffect(() => {
+    viewportRef.current?.setNavigationEnabled(isNavigationEnabled);
+  }, [isNavigationEnabled]);
+
+  useEffect(() => {
     viewportRef.current?.setFogPresentation(fogPresentation);
   }, [fogPresentation]);
 
@@ -378,7 +385,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   return (
     <div
       ref={hostRef}
-      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isWaterDrawingMode ? " is-water-drawing-mode" : ""}${isArcanePointerMode ? " is-arcane-pointer-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}`}
+      className={`map-viewport${isFogRevealMode ? " is-fog-reveal-mode" : ""}${isFirePaintMode ? " is-fire-paint-mode" : ""}${isWaterDrawingMode ? " is-water-drawing-mode" : ""}${isArcanePointerMode ? " is-arcane-pointer-mode" : ""}${isGrabMode ? " is-space-drag-mode" : ""}${isNavigationEnabled ? " is-navigation-enabled" : ""}`}
       aria-label="Lienzo del mapa"
     >
       {isReadOnly ? null : <NavigationLegend />}

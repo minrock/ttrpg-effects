@@ -14,8 +14,20 @@ let latestSnapshot: unknown = null;
 let latestCamera: unknown = null;
 
 export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
-  ipcMain.handle("player-window:open", () => {
+  ipcMain.handle("player-window:open", (event: IpcMainInvokeEvent, snapshot: unknown) => {
+    if (!isFromDmWindow(event)) {
+      return { ok: false, error: "Solo la ventana del DM puede abrir la ventana de jugador." };
+    }
+
+    if (snapshot !== null) {
+      latestSnapshot = snapshot;
+      latestCamera = getCameraFromSnapshot(snapshot) ?? latestCamera;
+    }
+
     openOrFocusPlayerWindow(options);
+    if (latestSnapshot !== null) {
+      sendToPlayerWindow("player-window:scene", latestSnapshot);
+    }
     return { ok: true };
   });
 
@@ -29,12 +41,13 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
       return { ok: false, error: "Solo la ventana del DM puede publicar escena." };
     }
 
+    latestSnapshot = snapshot;
+    latestCamera = getCameraFromSnapshot(snapshot) ?? latestCamera;
+
     if (playerWindow === null || playerWindow.isDestroyed()) {
       return { ok: true };
     }
 
-    latestSnapshot = snapshot;
-    latestCamera = getCameraFromSnapshot(snapshot) ?? latestCamera;
     sendToPlayerWindow("player-window:scene", snapshot);
     return { ok: true };
   });

@@ -165,6 +165,8 @@ export class PixiViewport {
   private isMapAdjustMode = false;
   private isGridAdjustMode = false;
   private isGrabMode = false;
+  private isNavigationEnabled = false;
+  private isSpaceNavigationActive = false;
   private isFogRevealMode = false;
   private isFirePaintMode = false;
   private isPathDrawingMode = false;
@@ -313,6 +315,17 @@ export class PixiViewport {
 
   setGrabMode(isGrabMode: boolean): void {
     this.isGrabMode = isGrabMode;
+    this.updateCursor();
+  }
+
+  setNavigationEnabled(isNavigationEnabled: boolean): void {
+    this.isNavigationEnabled = isNavigationEnabled;
+    if (!isNavigationEnabled) {
+      this.isSpaceNavigationActive = false;
+      if (this.dragState?.mode === "pan") {
+        this.dragState = null;
+      }
+    }
     this.updateCursor();
   }
 
@@ -512,6 +525,7 @@ export class PixiViewport {
     });
 
     this.app.canvas.className = "pixi-canvas";
+    this.app.canvas.tabIndex = 0;
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
     this.firePatternSource = await loadFirePatternSource();
@@ -718,6 +732,11 @@ export class PixiViewport {
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
     canvas.addEventListener("wheel", this.handleWheel, { passive: false });
+    window.addEventListener("keydown", this.handleKeyDown, true);
+    window.addEventListener("keyup", this.handleKeyUp, true);
+    window.addEventListener("blur", this.handleWindowBlur);
+    document.addEventListener("keydown", this.handleKeyDown, true);
+    document.addEventListener("keyup", this.handleKeyUp, true);
   }
 
   private removeInputListeners(): void {
@@ -728,6 +747,11 @@ export class PixiViewport {
     canvas.removeEventListener("pointerup", this.handlePointerUp);
     canvas.removeEventListener("pointercancel", this.handlePointerUp);
     canvas.removeEventListener("wheel", this.handleWheel);
+    window.removeEventListener("keydown", this.handleKeyDown, true);
+    window.removeEventListener("keyup", this.handleKeyUp, true);
+    window.removeEventListener("blur", this.handleWindowBlur);
+    document.removeEventListener("keydown", this.handleKeyDown, true);
+    document.removeEventListener("keyup", this.handleKeyUp, true);
   }
 
   private readonly handleNativeContextMenu = (event: MouseEvent): void => {
@@ -736,7 +760,9 @@ export class PixiViewport {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     event.preventDefault();
-    if (this.isReadOnly) {
+    this.app.canvas.focus();
+    const canNavigateReadOnly = this.isNavigationEnabled && this.isSpaceNavigationActive && event.button === 0;
+    if (this.isReadOnly && !canNavigateReadOnly) {
       return;
     }
     this.app.canvas.setPointerCapture(event.pointerId);
@@ -748,8 +774,9 @@ export class PixiViewport {
     let grabOffset: WorldPoint | undefined;
     let moveStartPosition: WorldPoint | undefined;
     if (event.button === 0) {
-      if (this.isGrabMode) {
+      if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
+        this.app.canvas.style.cursor = "grabbing";
       } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
         this.startFogRevealStroke(point);
@@ -881,7 +908,7 @@ export class PixiViewport {
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (this.isReadOnly) {
+    if (this.isReadOnly && this.dragState?.mode !== "pan") {
       return;
     }
 
@@ -972,6 +999,7 @@ export class PixiViewport {
       const y = currentWorld.y - this.dragState.grabOffset.y;
       this.updatePathMovePreview(elementId, x, y);
     } else if (this.dragState.mode === "pan") {
+      this.app.canvas.style.cursor = "grabbing";
       this.camera = panCamera(this.camera, {
         x: nextPoint.x - this.dragState.lastPoint.x,
         y: nextPoint.y - this.dragState.lastPoint.y
@@ -997,7 +1025,7 @@ export class PixiViewport {
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    if (this.isReadOnly) {
+    if (this.isReadOnly && this.dragState?.mode !== "pan") {
       return;
     }
 
@@ -1005,6 +1033,7 @@ export class PixiViewport {
       return;
     }
 
+    const completedMode = this.dragState.mode;
     const releasePoint = this.eventToScreenPoint(event);
     const movedDistance = Math.hypot(
       releasePoint.x - this.dragState.startPoint.x,
@@ -1074,6 +1103,9 @@ export class PixiViewport {
     }
 
     this.dragState = null;
+    if (completedMode === "pan") {
+      this.updateCursor();
+    }
   };
 
   private applyElementMovePreview(
@@ -1245,7 +1277,7 @@ export class PixiViewport {
   }
 
   private updateCursor(): void {
-    if (this.isGrabMode) {
+    if (this.isGrabMode || (this.isNavigationEnabled && this.isSpaceNavigationActive)) {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
@@ -1263,7 +1295,7 @@ export class PixiViewport {
   private readonly handleWheel = (event: WheelEvent): void => {
     event.preventDefault();
 
-    if (this.isReadOnly || this.isZoomLocked) {
+    if ((this.isReadOnly && !this.isNavigationEnabled) || this.isZoomLocked) {
       return;
     }
 
@@ -1275,6 +1307,42 @@ export class PixiViewport {
       this.camera.zoom * zoomFactor
     );
     this.applyCamera();
+  };
+
+  private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (!this.isNavigationEnabled || !isSpaceKeyEvent(event) || isEditableKeyboardTarget(event.target)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (!this.isSpaceNavigationActive) {
+      this.isSpaceNavigationActive = true;
+      this.updateCursor();
+    }
+  };
+
+  private readonly handleKeyUp = (event: KeyboardEvent): void => {
+    if (!this.isNavigationEnabled || !isSpaceKeyEvent(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (this.isSpaceNavigationActive) {
+      this.isSpaceNavigationActive = false;
+      this.updateCursor();
+    }
+  };
+
+  private readonly handleWindowBlur = (): void => {
+    if (!this.isSpaceNavigationActive && this.dragState?.mode !== "pan") {
+      return;
+    }
+
+    this.isSpaceNavigationActive = false;
+    if (this.dragState?.mode === "pan") {
+      this.dragState = null;
+    }
+    this.updateCursor();
   };
 
   private resize(): void {
@@ -1296,6 +1364,7 @@ export class PixiViewport {
     if (emit && this.viewRole === "dm") {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
+    this.drawGrid();
     this.drawDarknessLayer();
     this.scheduleFogOfWarRedraw();
   }
@@ -3231,6 +3300,19 @@ function isPreviewCommitDragMode(mode: PointerDragState["mode"]): boolean {
     mode === "water-line-rotate" ||
     mode === "water-pattern-rotate"
   );
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select" || target.isContentEditable;
+}
+
+function isSpaceKeyEvent(event: KeyboardEvent): boolean {
+  return event.code === "Space" || event.key === " " || event.key === "Spacebar";
 }
 
 function getViewportWorldBounds(

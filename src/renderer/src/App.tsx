@@ -180,8 +180,7 @@ export function App(): JSX.Element {
   const playerCameraRef = useRef<ViewportCameraSnapshot>(
     normalizeCameraSnapshot({ center: { x: scene.camera.x, y: scene.camera.y }, zoom: scene.camera.zoom })
   );
-  const pendingPlayerCameraRef = useRef<ViewportCameraSnapshot | null>(null);
-  const playerCameraFrameRef = useRef<number | null>(null);
+  const [playerCameraSyncKey, setPlayerCameraSyncKey] = useState(0);
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
   const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
@@ -289,23 +288,7 @@ export function App(): JSX.Element {
   }, []);
 
   const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
-    const normalized = normalizeCameraSnapshot(camera);
-    playerCameraRef.current = normalized;
-    pendingPlayerCameraRef.current = normalized;
-
-    if (playerCameraFrameRef.current !== null) {
-      return;
-    }
-
-    playerCameraFrameRef.current = window.requestAnimationFrame(() => {
-      playerCameraFrameRef.current = null;
-      const nextCamera = pendingPlayerCameraRef.current;
-      pendingPlayerCameraRef.current = null;
-
-      if (nextCamera !== null && isPlayerWindowOpenRef.current) {
-        void window.ttrpg?.publishPlayerCamera(nextCamera);
-      }
-    });
+    playerCameraRef.current = normalizeCameraSnapshot(camera);
   }, []);
 
   const handleArcanePointerTrigger = useCallback((pointer: ArcanePointerBroadcast): void => {
@@ -484,9 +467,10 @@ export function App(): JSX.Element {
       mapImageUrl,
       tokenImageUrls,
       camera: playerCameraRef.current,
+      cameraSyncKey: playerCameraSyncKey,
       showDmFogOverlay
     }),
-    [scene, mapImageUrl, tokenImageUrls, showDmFogOverlay]
+    [scene, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay]
   );
 
   useEffect(() => {
@@ -509,16 +493,15 @@ export function App(): JSX.Element {
     return () => unsubscribe?.();
   }, []);
 
-  useEffect(() => () => {
-    if (playerCameraFrameRef.current !== null) {
-      window.cancelAnimationFrame(playerCameraFrameRef.current);
-      playerCameraFrameRef.current = null;
-    }
-  }, []);
-
   const resetToNewScene = useCallback((): void => {
+    const defaultScene = createDefaultScene();
     sessionStorage.removeItem("ttrpg:session-scene");
-    setScene(createDefaultScene());
+    setScene(defaultScene);
+    playerCameraRef.current = normalizeCameraSnapshot({
+      center: { x: defaultScene.camera.x, y: defaultScene.camera.y },
+      zoom: defaultScene.camera.zoom
+    });
+    setPlayerCameraSyncKey((current) => current + 1);
     setMapImageUrl(null);
     setTokenImageUrls({});
     setCurrentFilePath(null);
@@ -888,6 +871,11 @@ export function App(): JSX.Element {
 
       setScene(result.scene);
       if (actionLabel === "cargada") {
+        playerCameraRef.current = normalizeCameraSnapshot({
+          center: { x: result.scene.camera.x, y: result.scene.camera.y },
+          zoom: result.scene.camera.zoom
+        });
+        setPlayerCameraSyncKey((current) => current + 1);
         setMapImageUrl(result.mapImageUrl ?? null);
         setTokenImageUrls(result.tokenImageUrls ?? {});
         setInteraction((current) => setZoomLocked(current, result.scene.grid.locked));
@@ -1381,7 +1369,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const result = await window.ttrpg.openPlayerWindow();
+    const result = await window.ttrpg.openPlayerWindow(playerWindowSnapshot);
 
     if (!result.ok) {
       setFeedback(result.error ?? "No se pudo abrir la ventana de jugador.");
@@ -1389,7 +1377,6 @@ export function App(): JSX.Element {
     }
 
     setIsPlayerWindowOpen(true);
-    await window.ttrpg.publishPlayerScene(playerWindowSnapshot);
     setFeedback("Ventana de jugador lista.");
   }
 
@@ -1893,6 +1880,7 @@ export function App(): JSX.Element {
           isGrabMode={isSpaceDragActive}
           viewRole="dm"
           isReadOnly={false}
+          isNavigationEnabled={false}
           fogPresentation={deriveFogPresentation("dm", showDmFogOverlay)}
           hiddenTokenPolicy={deriveHiddenTokenPolicy("dm")}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
