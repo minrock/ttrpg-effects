@@ -17,6 +17,7 @@ export function PlayerApp(): JSX.Element {
   );
   const hasInitializedCameraRef = useRef(false);
   const cameraSyncKeyRef = useRef<number | null>(null);
+  const mapLoadKeyRef = useRef<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [isZoomLocked, setIsZoomLocked] = useState(true);
@@ -31,7 +32,17 @@ export function PlayerApp(): JSX.Element {
     setMapImageUrl(snapshot.mapImageUrl);
     setTokenImageUrls(snapshot.tokenImageUrls);
     setIsHydrated(true);
-    setIsViewportReady(snapshot.mapImageUrl === null);
+    const nextMapLoadKey =
+      snapshot.scene.map.imagePath !== null && snapshot.mapImageUrl !== null
+        ? `${snapshot.scene.map.imagePath}:${snapshot.mapImageUrl}`
+        : null;
+    if (nextMapLoadKey === null) {
+      mapLoadKeyRef.current = null;
+      setIsViewportReady(true);
+    } else if (mapLoadKeyRef.current !== nextMapLoadKey) {
+      mapLoadKeyRef.current = nextMapLoadKey;
+      setIsViewportReady(false);
+    }
     const nextCameraSyncKey = snapshot.cameraSyncKey ?? 0;
     if (!hasInitializedCameraRef.current || cameraSyncKeyRef.current !== nextCameraSyncKey) {
       setCamera(normalizeCameraSnapshot(snapshot.camera));
