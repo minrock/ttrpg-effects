@@ -4,7 +4,7 @@ import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron
 import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
 import { registerAsideIpc } from "./ipc/aside-ipc";
 import { registerMapIpc } from "./ipc/map-ipc";
-import { getPlayerWindowRendererIndexPath, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
+import { getPlayerWindowRendererIndexPath, preloadPlayerWindow, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
 import { registerSceneIpc } from "./ipc/scene-ipc";
 
 protocol.registerSchemesAsPrivileged([
@@ -63,14 +63,16 @@ app.whenReady().then(() => {
   registerSceneIpc(new ElectronSceneFileStorage(() => mainWindow));
   registerMapIpc(mapImageStorage);
   registerAsideIpc(mapImageStorage);
-  registerPlayerWindowIpc({
+  const playerWindowOptions = {
     isDevelopment,
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
     preloadPath: join(__dirname, "../preload/index.cjs"),
     iconPath: appIconPath,
     rendererIndexPath: getPlayerWindowRendererIndexPath()
-  });
+  };
+  registerPlayerWindowIpc(playerWindowOptions);
   createMainWindow();
+  preloadPlayerWindow(playerWindowOptions);
 });
 
 app.on("window-all-closed", () => {

@@ -12,6 +12,8 @@ interface PlayerWindowIpcOptions {
 let playerWindow: BrowserWindow | null = null;
 let latestSnapshot: unknown = null;
 let latestCamera: unknown = null;
+let isPlayerWindowReady = false;
+let shouldShowPlayerWindowWhenReady = false;
 
 export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
   ipcMain.handle("player-window:open", (event: IpcMainInvokeEvent, snapshot: unknown) => {
@@ -88,15 +90,25 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
   });
 }
 
+export function preloadPlayerWindow(options: PlayerWindowIpcOptions): void {
+  ensurePlayerWindow(options);
+}
+
 function openOrFocusPlayerWindow(options: PlayerWindowIpcOptions): void {
+  shouldShowPlayerWindowWhenReady = true;
+  ensurePlayerWindow(options);
+
+  if (isPlayerWindowReady) {
+    showPlayerWindow();
+  }
+}
+
+function ensurePlayerWindow(options: PlayerWindowIpcOptions): void {
   if (playerWindow !== null && !playerWindow.isDestroyed()) {
-    if (playerWindow.isMinimized()) {
-      playerWindow.restore();
-    }
-    playerWindow.focus();
     return;
   }
 
+  isPlayerWindowReady = false;
   playerWindow = new BrowserWindow({
     width: 1280,
     height: 720,
@@ -115,7 +127,10 @@ function openOrFocusPlayerWindow(options: PlayerWindowIpcOptions): void {
   });
 
   playerWindow.once("ready-to-show", () => {
-    showPlayerWindow();
+    isPlayerWindowReady = true;
+    if (shouldShowPlayerWindowWhenReady) {
+      showPlayerWindow();
+    }
     if (latestSnapshot !== null) {
       sendToPlayerWindow("player-window:scene", latestSnapshot);
     }
@@ -126,6 +141,8 @@ function openOrFocusPlayerWindow(options: PlayerWindowIpcOptions): void {
 
   playerWindow.on("closed", () => {
     playerWindow = null;
+    isPlayerWindowReady = false;
+    shouldShowPlayerWindowWhenReady = false;
     latestSnapshot = null;
     latestCamera = null;
     notifyDmWindows("player-window:closed");
@@ -147,6 +164,9 @@ function showPlayerWindow(): void {
     return;
   }
 
+  if (playerWindow.isMinimized()) {
+    playerWindow.restore();
+  }
   if (!playerWindow.isMaximized()) {
     playerWindow.maximize();
   }
