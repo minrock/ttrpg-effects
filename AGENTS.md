@@ -31,6 +31,7 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 - Siempre que vayas a comenzar con un spec/feature nueva inicia creando una rama feature/.*
 - Siempre que vayas a comenzar a trabajar con un bug inicia creando una rama fix/.*
 - Siempre espera a la orden de mergear para llevar los cambios a main.
+- **Nunca ejecutes `git add`, `git commit`, `git push` ni ninguna operacion de escritura en el repositorio sin permiso explicito del usuario en esa sesion. Espera siempre la orden antes de escribir en el historial de git.**
 - Cada vez que se mergee un nuevo spec a main, ejecutar `./scripts/build-dmg.sh` para generar un nuevo DMG instalable. El DMG queda en `dist/`.
 
 ## Principios de arquitectura

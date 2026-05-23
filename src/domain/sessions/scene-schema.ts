@@ -256,7 +256,38 @@ export const sceneDocumentV1Schema = z.object({
       ])
     )
     .transform((arr) => arr.filter((s): s is NonNullable<typeof s> => s !== null)),
-  tokens: z.array(tokenSchema).default([])
+  tokens: z.array(tokenSchema).default([]),
+  sceneAside: z
+    .object({
+      monsters: z.array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          imagePath: z.string().nullable(),
+          visibleToPlayer: z.boolean(),
+          notes: z.string().default("")
+        })
+      ),
+      npcs: z.array(
+        z.object({
+          id: z.string().min(1),
+          name: z.string().min(1),
+          imagePath: z.string().nullable(),
+          visibleToPlayer: z.boolean(),
+          notes: z.string().default("")
+        })
+      ),
+      notes: z.array(
+        z.object({
+          id: z.string().min(1),
+          parentId: z.string().nullable(),
+          name: z.string().min(1),
+          content: z.string()
+        })
+      )
+    })
+    .optional()
+    .default(() => ({ monsters: [], npcs: [], notes: [] }))
 });
 
 export function parseSceneDocument(input: unknown): SceneDocument {

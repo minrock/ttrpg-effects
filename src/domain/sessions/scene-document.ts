@@ -1,3 +1,5 @@
+import type { SceneAside } from "./scene-aside";
+
 export const SCENE_DOCUMENT_VERSION = 1;
 
 export type DistanceUnit = "ft" | "m";
@@ -227,6 +229,7 @@ export interface SceneDocumentV1 {
   readonly effects: readonly SceneEffect[];
   readonly shapes: readonly SceneShape[];
   readonly tokens: readonly SceneToken[];
+  readonly sceneAside?: SceneAside;
 }
 
 export type SceneDocument = SceneDocumentV1;
