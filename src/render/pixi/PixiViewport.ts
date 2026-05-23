@@ -196,6 +196,8 @@ export class PixiViewport {
   private _darknessTextureSize: { readonly width: number; readonly height: number } | null = null;
   private _fogOfWarTextureSize: { readonly width: number; readonly height: number } | null = null;
   private fogRedrawFrame: number | null = null;
+  private darknessRedrawFrame: number | null = null;
+  private darkvisionSignature = "";
   private disposed = false;
   private waterPatternSource: GifSource | null = null;
   private arcanePointerSource: GifSource | null = null;
@@ -258,8 +260,8 @@ export class PixiViewport {
     this.lights = lights;
     this.previewLights.clear();
     this.drawDarkvisionLayer();
-    this.drawDarknessLayer();
-    this.drawFogOfWarLayer();
+    this.scheduleDarknessRedraw();
+    this.scheduleFogOfWarRedraw();
     this.drawLightsLayer();
     this.drawSelectionLayer();
   }
@@ -274,8 +276,8 @@ export class PixiViewport {
 
     if (previousLightingSignature !== nextLightingSignature) {
       this.drawDarkvisionLayer();
-      this.drawDarknessLayer();
-      this.drawFogOfWarLayer();
+      this.scheduleDarknessRedraw();
+      this.scheduleFogOfWarRedraw();
       this.drawLightsLayer();
     }
 
@@ -369,7 +371,7 @@ export class PixiViewport {
 
   setFogPresentation(fogPresentation: FogPresentation): void {
     this.fogPresentation = fogPresentation;
-    this.drawFogOfWarLayer();
+    this.scheduleFogOfWarRedraw();
   }
 
   setHiddenTokenPolicy(hiddenTokenPolicy: HiddenTokenPolicy): void {
@@ -400,8 +402,18 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  setPathHoverPoint(hoverPoint: WorldPoint | null): void {
+    this.pathPreviewHoverPoint = hoverPoint;
+    this.drawSelectionLayer();
+  }
+
   setWaterPreview(points: readonly WorldPoint[], hoverPoint: WorldPoint | null): void {
     this.waterPreviewPoints = points;
+    this.waterPreviewHoverPoint = hoverPoint;
+    this.drawSelectionLayer();
+  }
+
+  setWaterHoverPoint(hoverPoint: WorldPoint | null): void {
     this.waterPreviewHoverPoint = hoverPoint;
     this.drawSelectionLayer();
   }
@@ -430,8 +442,8 @@ export class PixiViewport {
         this.colorMapSprite?.scale.set(map.scale);
       }
       this.drawDarkvisionLayer();
-      this.drawDarknessLayer();
-      this.drawFogOfWarLayer();
+      this.scheduleDarknessRedraw();
+      this.scheduleFogOfWarRedraw();
     }
 
     this.drawGrid();
@@ -440,8 +452,8 @@ export class PixiViewport {
   setGrid(grid: SceneGrid): void {
     this.grid = grid;
     this.drawGrid();
-    this.drawDarknessLayer();
-    this.drawFogOfWarLayer();
+    this.scheduleDarknessRedraw();
+    this.scheduleFogOfWarRedraw();
     void this.drawTokenLayer(true);
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
@@ -451,13 +463,13 @@ export class PixiViewport {
     this.darkness = darkness;
     this.updateBaseMapVisibility();
     this.drawDarkvisionLayer();
-    this.drawDarknessLayer();
+    this.scheduleDarknessRedraw();
     this.drawSelectionLayer();
   }
 
   setFogOfWar(fogOfWar: SceneFogOfWar): void {
     this.fogOfWar = fogOfWar;
-    this.drawFogOfWarLayer();
+    this.scheduleFogOfWarRedraw();
     this.drawVisionObstaclesLayer();
   }
 
@@ -470,6 +482,7 @@ export class PixiViewport {
     this.resizeObserver.disconnect();
     this.removeInputListeners();
     this.cancelScheduledFogRedraw();
+    this.cancelScheduledDarknessRedraw();
     this.cancelPendingViewportUpdates();
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
@@ -695,23 +708,31 @@ export class PixiViewport {
   }
 
   private drawDarkvisionLayer(): void {
+    const renderableLights = this.getRenderableLights();
+    const renderableEffects = this.getRenderableEffects();
+    const spritesReady = this.mapSprite !== null && this.colorMapSprite !== null;
+    const nextSig = spritesReady
+      ? getDarkvisionSignature(this.darkness, renderableLights, renderableEffects)
+      : "";
+
+    if (nextSig === this.darkvisionSignature) {
+      return;
+    }
+
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
     }
     this.darkvisionMask?.destroy();
     this.darkvisionMask = null;
+    this.darkvisionSignature = nextSig;
 
     this.updateBaseMapVisibility();
 
-    if (
-      this.mapSprite === null ||
-      this.colorMapSprite === null ||
-      this.darkness?.darkvisionEnabled !== true
-    ) {
+    if (!spritesReady || nextSig === "") {
       return;
     }
 
-    const mask = buildDarkvisionColorMask(this.getRenderableLights(), this.getRenderableEffects());
+    const mask = buildDarkvisionColorMask(renderableLights, renderableEffects);
 
     if (mask === null) {
       return;
@@ -719,8 +740,8 @@ export class PixiViewport {
 
     this.darkvisionMask = mask;
     this.getLayer("map").addChild(mask);
-    this.colorMapSprite.visible = true;
-    this.colorMapSprite.setMask({ mask });
+    this.colorMapSprite!.visible = true;
+    this.colorMapSprite!.setMask({ mask });
   }
 
 
@@ -1364,7 +1385,7 @@ export class PixiViewport {
     if (emit && this.viewRole === "dm") {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
-    this.drawGrid();
+    this.cancelScheduledDarknessRedraw();
     this.drawDarknessLayer();
     this.scheduleFogOfWarRedraw();
   }
@@ -2007,6 +2028,26 @@ export class PixiViewport {
 
     window.cancelAnimationFrame(this.fogRedrawFrame);
     this.fogRedrawFrame = null;
+  }
+
+  private scheduleDarknessRedraw(): void {
+    if (this.darknessRedrawFrame !== null) {
+      return;
+    }
+
+    this.darknessRedrawFrame = window.requestAnimationFrame(() => {
+      this.darknessRedrawFrame = null;
+      this.drawDarknessLayer();
+    });
+  }
+
+  private cancelScheduledDarknessRedraw(): void {
+    if (this.darknessRedrawFrame === null) {
+      return;
+    }
+
+    window.cancelAnimationFrame(this.darknessRedrawFrame);
+    this.darknessRedrawFrame = null;
   }
 
   private scheduleViewportUpdate(key: string, update: () => void): void {
@@ -2968,6 +3009,7 @@ export class PixiViewport {
       this.updateBaseMapVisibility();
       layer.addChild(sprite);
       layer.addChild(colorSprite);
+      this.darkvisionSignature = "";
       this.drawDarkvisionLayer();
       this.drawGrid();
       this.drawDarknessLayer();
@@ -3201,6 +3243,22 @@ function getFireLightRenderSignature(effect: SceneFireEffect): string {
     effect.opacity,
     zoneSignature
   ].join(":");
+}
+
+function getDarkvisionSignature(
+  darkness: SceneDarkness | null,
+  lights: readonly SceneLight[],
+  effects: readonly SceneEffect[]
+): string {
+  if (darkness?.darkvisionEnabled !== true) {
+    return "";
+  }
+
+  const lightSig = lights
+    .filter((l) => l.visible)
+    .map((l) => `${l.id}:${l.kind}:${l.position.x}:${l.position.y}:${l.radius}:${l.direction}`)
+    .join("|");
+  return `${lightSig}/${getEffectsLightingSignature(effects)}`;
 }
 
 function getMagicalDarknessRenderSignature(effect: SceneMagicalDarknessEffect): string {

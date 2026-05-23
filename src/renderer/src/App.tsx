@@ -1117,10 +1117,7 @@ export function App(): JSX.Element {
   }, []);
 
   const handlePathPointerMove = useCallback((point: WorldPoint | null): void => {
-    setPathDraft((current) => ({
-      ...current,
-      hoverPoint: point
-    }));
+    viewportHandleRef.current?.setPathHoverPoint(point);
   }, []);
 
   const handlePathPointAdd = useCallback((point: WorldPoint): void => {
@@ -1139,10 +1136,7 @@ export function App(): JSX.Element {
   }, []);
 
   const handleWaterPointerMove = useCallback((point: WorldPoint | null): void => {
-    setWaterDraft((current) => ({
-      ...current,
-      hoverPoint: point
-    }));
+    viewportHandleRef.current?.setWaterHoverPoint(point);
   }, []);
 
   const handleWaterPointAdd = useCallback((point: WorldPoint): void => {
