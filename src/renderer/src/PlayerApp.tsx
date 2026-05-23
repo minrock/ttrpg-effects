@@ -5,6 +5,8 @@ import { sortTokensByOrder } from "../../domain/tokens/tokens";
 import type { SceneDocument } from "../../domain/sessions/scene-document";
 import type { MapImageState } from "../../domain/map/map-image";
 import { MapViewport } from "./components/MapViewport";
+import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
+import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 
 export function PlayerApp(): JSX.Element {
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -155,6 +157,9 @@ export function PlayerApp(): JSX.Element {
           onWaterPatternRotationChange={noop}
         />
       ) : null}
+      {isHydrated && (
+        <PlayerAsideOverlay aside={scene.sceneAside ?? createDefaultSceneAside()} />
+      )}
       <button
         className={`player-zoom-lock${isZoomLocked ? " is-locked" : ""}`}
         type="button"

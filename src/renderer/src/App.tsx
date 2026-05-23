@@ -105,6 +105,9 @@ import {
 import type { TacticalElementKind } from "../../domain/tools/tactical-elements";
 import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
 import type { PixiContextMenuRequest } from "../../render/pixi/PixiViewport";
+import { DmAsidePanel } from "./components/aside/DmAsidePanel";
+import type { SceneAside } from "../../domain/sessions/scene-aside";
+import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 
 const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
@@ -159,6 +162,9 @@ export function App(): JSX.Element {
     sceneRef.current = resolvedScene;
     setSceneState(resolvedScene);
   }, []);
+  const [sceneAside, setSceneAside] = useState<SceneAside>(() =>
+    (scene.sceneAside) ?? createDefaultSceneAside()
+  );
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
@@ -167,6 +173,7 @@ export function App(): JSX.Element {
   const [isBusy, setIsBusy] = useState(false);
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isAsidePanelVisible, setIsAsidePanelVisible] = useState(true);
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
@@ -461,16 +468,18 @@ export function App(): JSX.Element {
     [scene, interaction.elements.length]
   );
 
+  const sceneWithAside = useMemo(() => ({ ...scene, sceneAside }), [scene, sceneAside]);
+
   const playerWindowSnapshot = useMemo<PlayerWindowSnapshot>(
     () => ({
-      scene,
+      scene: sceneWithAside,
       mapImageUrl,
       tokenImageUrls,
       camera: playerCameraRef.current,
       cameraSyncKey: playerCameraSyncKey,
       showDmFogOverlay
     }),
-    [scene, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay]
+    [sceneWithAside, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay]
   );
 
   useEffect(() => {
@@ -497,6 +506,7 @@ export function App(): JSX.Element {
     const defaultScene = createDefaultScene();
     sessionStorage.removeItem("ttrpg:session-scene");
     setScene(defaultScene);
+    setSceneAside(createDefaultSceneAside());
     playerCameraRef.current = normalizeCameraSnapshot({
       center: { x: defaultScene.camera.x, y: defaultScene.camera.y },
       zoom: defaultScene.camera.zoom
@@ -684,6 +694,23 @@ export function App(): JSX.Element {
     };
 
     const handleKeyDown = (event: KeyboardEvent): void => {
+      // No interceptar atajos cuando el foco está en un campo de texto o editor rich text
+      const target = event.target as HTMLElement | null;
+      const isEditableTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target !== null && (target.isContentEditable || target.closest("[contenteditable]") !== null));
+
+      if (isEditableTarget) {
+        // Solo permitir Escape para cerrar modales; el resto lo maneja el editor/input
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setInteraction((current) => cancelInteraction(current));
+        }
+        return;
+      }
+
       if (isNewSceneDialogOpen) {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -815,7 +842,7 @@ export function App(): JSX.Element {
       return { ok: false, error: "La API de preload no esta disponible." };
     }
 
-    return window.ttrpg.saveScene(sceneRef.current, {
+    return window.ttrpg.saveScene({ ...sceneRef.current, sceneAside }, {
       suggestedFilePath: currentFilePath
     });
   }
@@ -870,6 +897,7 @@ export function App(): JSX.Element {
       }
 
       setScene(result.scene);
+      setSceneAside(result.scene.sceneAside ?? createDefaultSceneAside());
       if (actionLabel === "cargada") {
         playerCameraRef.current = normalizeCameraSnapshot({
           center: { x: result.scene.camera.x, y: result.scene.camera.y },
@@ -1854,7 +1882,17 @@ export function App(): JSX.Element {
           <strong key={warning}>{warning}</strong>
         ))}
       </aside>
-      <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}`}>
+      <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}${isAsidePanelVisible ? "" : " is-aside-hidden"}`}>
+        <DmAsidePanel aside={sceneAside} onChange={setSceneAside} hidden={!isAsidePanelVisible} />
+        <button
+          className="aside-visibility-toggle"
+          type="button"
+          aria-pressed={!isAsidePanelVisible}
+          aria-label={isAsidePanelVisible ? "Ocultar panel de escena" : "Mostrar panel de escena"}
+          onClick={() => setIsAsidePanelVisible((v) => !v)}
+        >
+          {isAsidePanelVisible ? "‹" : "›"}
+        </button>
         <MapViewport
           ref={viewportHandleRef}
           map={mapState}

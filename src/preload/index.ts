@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld("ttrpg", {
   resolveMapUrl: (imagePath: string) => ipcRenderer.invoke("map:resolve-url", imagePath),
   openTokenImage: () => ipcRenderer.invoke("token:open-image"),
   resolveTokenUrl: (imagePath: string) => ipcRenderer.invoke("token:resolve-url", imagePath),
+  openAsideImage: () => ipcRenderer.invoke("aside:open-image"),
+  resolveAsideUrl: (imagePath: string) => ipcRenderer.invoke("aside:resolve-url", imagePath),
   openPlayerWindow: (snapshot?: unknown) => ipcRenderer.invoke("player-window:open", snapshot ?? null),
   getPlayerWindowState: () => ipcRenderer.invoke("player-window:get-state"),
   publishPlayerScene: (snapshot: unknown) => ipcRenderer.invoke("player-window:publish-scene", snapshot),

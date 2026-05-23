@@ -188,15 +188,147 @@ body {
   grid-row: 3;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 380px);
+  grid-template-columns: 220px minmax(0, 1fr) clamp(300px, 22vw, 380px);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
+/* Solo sidebar derecho oculto */
 .app-workspace.is-sidebar-hidden {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* Solo aside izquierdo oculto — elimina la columna del aside */
+.app-workspace.is-aside-hidden {
+  grid-template-columns: minmax(0, 1fr) clamp(300px, 22vw, 380px);
+}
+
+/* Ambos ocultos */
+.app-workspace.is-aside-hidden.is-sidebar-hidden {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* ── Panel aside izquierdo del DM ─────────────────────────────── */
+
+.dm-aside-panel {
+  width: 220px;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-right: 1px solid rgb(244 241 232 / 12%);
+  background: #171b1d;
+  user-select: none;
+}
+
+.dm-aside-panel[hidden] {
+  display: none;
+}
+
+.dm-aside-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgb(244 241 232 / 10%);
+  flex-shrink: 0;
+}
+
+.dm-aside-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #666;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dm-aside-content {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dm-aside-accordion {
+  border-bottom: 1px solid rgb(244 241 232 / 8%);
+}
+
+.dm-aside-accordion-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.dm-aside-accordion-header:hover {
+  background: rgb(255 255 255 / 3%);
+}
+
+.dm-aside-accordion-title {
+  flex: 1;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.dm-aside-accordion-badge {
+  margin-left: 5px;
+  font-size: 0.68rem;
+  color: #555;
+  font-weight: 400;
+}
+
+.dm-aside-accordion-arrow {
+  color: #555;
+  font-size: 0.65rem;
+}
+
+.dm-aside-accordion-body {
+  padding: 4px 10px 10px;
+}
+
+/* Botón toggle del aside izquierdo — espejo de .sidebar-visibility-toggle */
+.aside-visibility-toggle {
+  position: absolute;
+  top: 12px;
+  left: calc(220px - 1px);
+  z-index: 4;
+  width: 34px;
+  height: 46px;
+  border: 1px solid rgb(244 241 232 / 16%);
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  color: #ffd28a;
+  background: #22282a;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 32%);
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.aside-visibility-toggle:hover {
+  border-color: rgb(255 197 107 / 60%);
+  background: #2e3638;
+}
+
+.app-workspace.is-aside-hidden .aside-visibility-toggle {
+  left: 0;
+  border-left: 1px solid rgb(244 241 232 / 16%);
+  border-radius: 0 8px 8px 0;
+}
+
+/* ─────────────────────────────────────────────────────────────── */
 
 .control-sidebar {
   align-self: stretch;
@@ -1092,7 +1224,7 @@ body {
 
   .app-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .app-workspace.is-sidebar-hidden {

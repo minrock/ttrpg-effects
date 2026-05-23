@@ -2,6 +2,7 @@ import { app, BrowserWindow, net, protocol, screen } from "electron";
 import { join } from "node:path";
 import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron-scene-file-storage";
 import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
+import { registerAsideIpc } from "./ipc/aside-ipc";
 import { registerMapIpc } from "./ipc/map-ipc";
 import { getPlayerWindowRendererIndexPath, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
 import { registerSceneIpc } from "./ipc/scene-ipc";
@@ -58,8 +59,10 @@ app.whenReady().then(() => {
     return net.fetch(fileUrl);
   });
 
+  const mapImageStorage = new ElectronMapImageStorage(() => mainWindow);
   registerSceneIpc(new ElectronSceneFileStorage(() => mainWindow));
-  registerMapIpc(new ElectronMapImageStorage(() => mainWindow));
+  registerMapIpc(mapImageStorage);
+  registerAsideIpc(mapImageStorage);
   registerPlayerWindowIpc({
     isDevelopment,
     rendererUrl: process.env.ELECTRON_RENDERER_URL,

@@ -1,5 +1,6 @@
 import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
+import { createDefaultSceneAside } from "./scene-aside";
 
 export function createDefaultScene(): SceneDocument {
   return {
@@ -37,6 +38,7 @@ export function createDefaultScene(): SceneDocument {
     lights: [],
     effects: [],
     shapes: [],
-    tokens: []
+    tokens: [],
+    sceneAside: createDefaultSceneAside()
   };
 }
