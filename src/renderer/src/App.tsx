@@ -170,6 +170,7 @@ export function App(): JSX.Element {
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("Escena default en memoria");
   const [warnings, setWarnings] = useState<readonly string[]>([]);
+  const [needsResave, setNeedsResave] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
@@ -887,6 +888,8 @@ export function App(): JSX.Element {
   ): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
+    // Saving always resolves any outdated-format situation
+    if (actionLabel === "guardada") setNeedsResave(false);
 
     try {
       const result = await operation();
@@ -912,7 +915,17 @@ export function App(): JSX.Element {
       }
       setCurrentFilePath(result.filePath);
       setFeedback(`Escena ${actionLabel}`);
-      setWarnings(result.warnings.map((warning) => warning.message));
+
+      // Separate "scene-format-outdated" from generic warnings so it can get
+      // its own prominent UI banner rather than disappearing into the status bar.
+      const genericWarnings = result.warnings.filter(
+        (w) => w.code !== "scene-format-outdated"
+      );
+      const isOutdated = result.warnings.some(
+        (w) => w.code === "scene-format-outdated"
+      );
+      setWarnings(genericWarnings.map((w) => w.message));
+      setNeedsResave(isOutdated);
     } finally {
       setIsBusy(false);
     }
@@ -1861,6 +1874,29 @@ export function App(): JSX.Element {
           </button>
         </div>
       </header>
+      {needsResave && (
+        <div className="resave-banner" role="alert">
+          <span>
+            ⚠️ Esta escena está en un formato anterior. Guárdala para incluir las nuevas funciones.
+          </span>
+          <button
+            type="button"
+            className="resave-banner-action"
+            onClick={handleSaveScene}
+            disabled={isBusy}
+          >
+            Guardar ahora
+          </button>
+          <button
+            type="button"
+            className="resave-banner-dismiss"
+            onClick={() => setNeedsResave(false)}
+            aria-label="Cerrar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <aside className="scene-status" aria-label="Estado de escena">
         <span>{feedback}</span>
         <span>{scene.map.imagePath ?? "Sin mapa"}</span>

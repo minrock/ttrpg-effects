@@ -18,6 +18,7 @@ export function PlayerApp(): JSX.Element {
   const hasInitializedCameraRef = useRef(false);
   const cameraSyncKeyRef = useRef<number | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isViewportReady, setIsViewportReady] = useState(false);
   const [isZoomLocked, setIsZoomLocked] = useState(true);
   const [arcanePointerEvent, setArcanePointerEvent] = useState<ArcanePointerBroadcast | null>(null);
 
@@ -30,6 +31,7 @@ export function PlayerApp(): JSX.Element {
     setMapImageUrl(snapshot.mapImageUrl);
     setTokenImageUrls(snapshot.tokenImageUrls);
     setIsHydrated(true);
+    setIsViewportReady(snapshot.mapImageUrl === null);
     const nextCameraSyncKey = snapshot.cameraSyncKey ?? 0;
     if (!hasInitializedCameraRef.current || cameraSyncKeyRef.current !== nextCameraSyncKey) {
       setCamera(normalizeCameraSnapshot(snapshot.camera));
@@ -91,6 +93,15 @@ export function PlayerApp(): JSX.Element {
     [scene.tokens, tokenImageUrls]
   );
   const noop = useCallback((): void => undefined, []);
+  const handlePlayerMapReady = useCallback((): void => {
+    setIsViewportReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (isHydrated && isViewportReady) {
+      void window.ttrpg?.notifyPlayerContentReady();
+    }
+  }, [isHydrated, isViewportReady]);
 
   return (
     <main className="player-shell" aria-label="TTRPG Effects jugador">
@@ -132,8 +143,8 @@ export function PlayerApp(): JSX.Element {
           onContextMenuRequest={noop}
           onElementSelect={noop}
           onGridCellSizeChange={noop}
-          onMapRenderError={noop}
-          onMapRendered={noop}
+          onMapRenderError={handlePlayerMapReady}
+          onMapRendered={handlePlayerMapReady}
           onMapPositionChange={noop}
           onElementMove={noop}
           onLightDirectionChange={noop}
@@ -159,6 +170,13 @@ export function PlayerApp(): JSX.Element {
       ) : null}
       {isHydrated && (
         <PlayerAsideOverlay aside={scene.sceneAside ?? createDefaultSceneAside()} />
+      )}
+      {!isViewportReady && (
+        <div className="player-loading" role="status" aria-live="polite">
+          <div className="player-loading__mark" aria-hidden="true" />
+          <strong>Cargando vista de jugador</strong>
+          <span>{isHydrated ? "Preparando mapa y efectos..." : "Sincronizando escena..."}</span>
+        </div>
       )}
       <button
         className={`player-zoom-lock${isZoomLocked ? " is-locked" : ""}`}

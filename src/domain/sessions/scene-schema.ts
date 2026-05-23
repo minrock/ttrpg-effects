@@ -294,6 +294,25 @@ export function parseSceneDocument(input: unknown): SceneDocument {
   return sceneDocumentV1Schema.parse(input);
 }
 
+/**
+ * Returns the names of top-level fields that are absent in `rawJson` but would
+ * be supplied as defaults by the *current* schema.
+ *
+ * A non-empty result means the file was saved with an older version of the app
+ * and should be re-saved so it includes all current fields.
+ *
+ * Add a new entry here whenever a new optional-with-default field is added to
+ * the schema, keeping this function in sync with the active save format.
+ */
+export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
+  if (typeof rawJson !== "object" || rawJson === null) return [];
+  const obj = rawJson as Record<string, unknown>;
+  const missing: string[] = [];
+  // Added in spec 26 (DM aside panel)
+  if (!("sceneAside" in obj)) missing.push("sceneAside");
+  return missing;
+}
+
 export function parseSceneJson(json: string): SceneDocument {
   let parsed: unknown;
 

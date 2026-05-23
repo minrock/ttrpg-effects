@@ -78,6 +78,14 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
     sendToPlayerWindow("player-window:pointer", pointer);
     return { ok: true };
   });
+
+  ipcMain.handle("player-window:content-ready", (event: IpcMainInvokeEvent) => {
+    if (!isFromPlayerWindow(event)) {
+      return { ok: false, error: "Solo la ventana de jugador puede marcar contenido listo." };
+    }
+
+    return { ok: true };
+  });
 }
 
 function openOrFocusPlayerWindow(options: PlayerWindowIpcOptions): void {
@@ -107,7 +115,7 @@ function openOrFocusPlayerWindow(options: PlayerWindowIpcOptions): void {
   });
 
   playerWindow.once("ready-to-show", () => {
-    playerWindow?.show();
+    showPlayerWindow();
     if (latestSnapshot !== null) {
       sendToPlayerWindow("player-window:scene", latestSnapshot);
     }
@@ -134,6 +142,20 @@ function openOrFocusPlayerWindow(options: PlayerWindowIpcOptions): void {
   }
 }
 
+function showPlayerWindow(): void {
+  if (playerWindow === null || playerWindow.isDestroyed()) {
+    return;
+  }
+
+  if (!playerWindow.isMaximized()) {
+    playerWindow.maximize();
+  }
+  if (!playerWindow.isVisible()) {
+    playerWindow.show();
+  }
+  playerWindow.focus();
+}
+
 function notifyDmWindows(channel: string): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (window !== playerWindow && !window.isDestroyed()) {
@@ -153,6 +175,11 @@ function sendToPlayerWindow(channel: string, payload: unknown): void {
 function isFromDmWindow(event: IpcMainInvokeEvent): boolean {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
   return senderWindow !== null && senderWindow !== playerWindow;
+}
+
+function isFromPlayerWindow(event: IpcMainInvokeEvent): boolean {
+  const senderWindow = BrowserWindow.fromWebContents(event.sender);
+  return senderWindow !== null && senderWindow === playerWindow;
 }
 
 function getCameraFromSnapshot(snapshot: unknown): unknown {

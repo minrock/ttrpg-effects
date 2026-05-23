@@ -34,6 +34,7 @@ export interface TtrpgApi {
   publishPlayerScene: (snapshot: PlayerWindowSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerCamera: (camera: ViewportCameraSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerPointer: (pointer: ArcanePointerBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  notifyPlayerContentReady: () => Promise<{ readonly ok: boolean; readonly error?: string }>;
   onPlayerScene: (handler: (snapshot: PlayerWindowSnapshot) => void) => () => void;
   onPlayerCamera: (handler: (camera: ViewportCameraSnapshot) => void) => () => void;
   onPlayerPointer: (handler: (pointer: ArcanePointerBroadcast) => void) => () => void;

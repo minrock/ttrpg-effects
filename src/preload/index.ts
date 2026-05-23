@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld("ttrpg", {
   publishPlayerScene: (snapshot: unknown) => ipcRenderer.invoke("player-window:publish-scene", snapshot),
   publishPlayerCamera: (camera: unknown) => ipcRenderer.invoke("player-window:publish-camera", camera),
   publishPlayerPointer: (pointer: unknown) => ipcRenderer.invoke("player-window:publish-pointer", pointer),
+  notifyPlayerContentReady: () => ipcRenderer.invoke("player-window:content-ready"),
   onPlayerScene: (handler: (snapshot: unknown) => void) => {
     const listener = (_event: IpcRendererEvent, snapshot: unknown): void => handler(snapshot);
     ipcRenderer.on("player-window:scene", listener);

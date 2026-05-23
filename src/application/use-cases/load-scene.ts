@@ -1,6 +1,6 @@
 import type { SceneFileStorage } from "../services/scene-file-storage";
 import type { SceneOperationResult, SceneWarning } from "../../domain/sessions/scene-document";
-import { parseSceneJson } from "../../domain/sessions/scene-schema";
+import { detectOutdatedSceneFields, parseSceneJson } from "../../domain/sessions/scene-schema";
 
 export async function loadSceneUseCase(storage: SceneFileStorage): Promise<SceneOperationResult> {
   try {
@@ -11,6 +11,16 @@ export async function loadSceneUseCase(storage: SceneFileStorage): Promise<Scene
         ok: false,
         error: "Carga cancelada."
       };
+    }
+
+    // Parse the raw JSON first so we can run the outdated-format check on it.
+    // parseSceneJson also calls JSON.parse internally, but this second parse is
+    // cheap compared to file I/O and keeps the detection logic clean.
+    let rawJson: unknown;
+    try {
+      rawJson = JSON.parse(loadedFile.json);
+    } catch {
+      rawJson = null;
     }
 
     const scene = parseSceneJson(loadedFile.json);
@@ -32,6 +42,16 @@ export async function loadSceneUseCase(storage: SceneFileStorage): Promise<Scene
           path: token.imagePath
         });
       }
+    }
+
+    // Detect whether the file was saved with an older version of the schema.
+    const outdatedFields = detectOutdatedSceneFields(rawJson);
+    if (outdatedFields.length > 0) {
+      warnings.push({
+        code: "scene-format-outdated",
+        message: `La escena usa un formato anterior (faltan: ${outdatedFields.join(", ")}). Guárdala de nuevo para actualizarla.`,
+        path: ""
+      });
     }
 
     const mapImageUrl =

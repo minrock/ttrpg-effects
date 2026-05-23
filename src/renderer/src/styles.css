@@ -29,7 +29,8 @@ body {
 .app-shell {
   position: relative;
   display: grid;
-  grid-template-rows: 64px auto minmax(0, 1fr);
+  /* row 1: toolbar | row 2: resave-banner (0-height when absent) | row 3: status | row 4: workspace */
+  grid-template-rows: 64px auto auto minmax(0, 1fr);
   width: 100%;
   height: 100%;
   background: #111315;
@@ -48,11 +49,49 @@ body {
   height: 100%;
 }
 
+.player-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  color: #f4f1e8;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 44%, rgb(255 210 138 / 10%), transparent 22rem),
+    rgb(5 6 6 / 92%);
+}
+
+.player-loading__mark {
+  justify-self: center;
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgb(255 210 138 / 24%);
+  border-top-color: #ffd28a;
+  border-radius: 50%;
+  animation: player-loading-spin 0.9s linear infinite;
+}
+
+.player-loading strong {
+  font-size: 1.1rem;
+}
+
+.player-loading span {
+  color: #b8bdb8;
+}
+
+@keyframes player-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .player-zoom-lock {
   position: absolute;
   right: 18px;
   top: 18px;
-  z-index: 5;
+  z-index: 7;
   min-width: 148px;
   border: 1px solid rgb(244 241 232 / 22%);
   border-radius: 8px;
@@ -155,6 +194,57 @@ body {
   opacity: 0.58;
 }
 
+.resave-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #3a2e00;
+  border-bottom: 1px solid rgb(255 210 138 / 30%);
+  color: #ffd28a;
+  font-size: 0.82rem;
+}
+
+.resave-banner span {
+  flex: 1;
+}
+
+.resave-banner-action {
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid rgb(255 210 138 / 55%);
+  background: rgb(255 210 138 / 12%);
+  color: #ffd28a;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.resave-banner-action:hover:not(:disabled),
+.resave-banner-action:focus-visible {
+  background: rgb(255 210 138 / 22%);
+  outline: none;
+}
+
+.resave-banner-dismiss {
+  padding: 2px 6px;
+  border: none;
+  background: none;
+  color: rgb(255 210 138 / 55%);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.resave-banner-dismiss:hover {
+  color: #ffd28a;
+}
+
 .scene-status {
   display: flex;
   align-items: center;
@@ -185,7 +275,7 @@ body {
 }
 
 .app-workspace {
-  grid-row: 3;
+  grid-row: 4;
   position: relative;
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr) clamp(300px, 22vw, 380px);
@@ -1213,7 +1303,7 @@ body {
   }
 
   .app-shell {
-    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr);
   }
 
   .scene-actions,

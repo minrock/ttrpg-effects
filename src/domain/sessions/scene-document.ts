@@ -235,7 +235,7 @@ export interface SceneDocumentV1 {
 export type SceneDocument = SceneDocumentV1;
 
 export interface SceneWarning {
-  readonly code: "map-image-missing";
+  readonly code: "map-image-missing" | "scene-format-outdated";
   readonly message: string;
   readonly path: string;
 }

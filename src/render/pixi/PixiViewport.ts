@@ -153,6 +153,8 @@ export class PixiViewport {
   private mapLoadVersion = 0;
   private tokenLoadVersion = 0;
   private loadedMapUrl: string | null = null;
+  private isMapImageLoading = false;
+  private shouldDrawEffectsAfterMapLoad = false;
   private loadedTokenUrls = new Set<string>();
   private firePatternSource: GifSource | null = null;
   private elements: readonly TacticalElement[] = [];
@@ -433,6 +435,8 @@ export class PixiViewport {
     this.map = map;
 
     if (map?.imageUrl !== prevUrl) {
+      this.isMapImageLoading = map !== null;
+      this.shouldDrawEffectsAfterMapLoad = false;
       void this.drawMapImage();
     } else {
       if (this.mapSprite !== null && map !== null) {
@@ -541,9 +545,6 @@ export class PixiViewport {
     this.app.canvas.tabIndex = 0;
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
-    this.firePatternSource = await loadFirePatternSource();
-    this.waterPatternSource = await loadWaterPatternSource();
-    this.arcanePointerSource = await loadArcanePointerSource();
     this.app.ticker.add(this.updateArcanePointers);
 
     this.createLayers();
@@ -551,6 +552,29 @@ export class PixiViewport {
     this.addInputListeners();
     this.resizeObserver.observe(this.host);
     this.resize();
+    void this.loadPatternSources();
+  }
+
+  private async loadPatternSources(): Promise<void> {
+    const [firePatternSource, waterPatternSource, arcanePointerSource] = await Promise.all([
+      loadFirePatternSource(),
+      loadWaterPatternSource(),
+      loadArcanePointerSource()
+    ]);
+
+    if (this.disposed) {
+      return;
+    }
+
+    const shouldRedrawEffects =
+      firePatternSource !== this.firePatternSource || waterPatternSource !== this.waterPatternSource;
+    this.firePatternSource = firePatternSource;
+    this.waterPatternSource = waterPatternSource;
+    this.arcanePointerSource = arcanePointerSource;
+
+    if (shouldRedrawEffects) {
+      this.drawEffectsLayer();
+    }
   }
 
   private createLayers(): void {
@@ -1519,6 +1543,12 @@ export class PixiViewport {
   }
 
   private drawEffectsLayer(): void {
+    if (this.shouldDeferEffectsUntilMapReady()) {
+      this.shouldDrawEffectsAfterMapLoad = true;
+      clearContainerChildren(this.getLayer("effects"));
+      return;
+    }
+
     const effectsLayer = this.getLayer("effects");
     const previousChildren = effectsLayer.removeChildren();
     const reusedContainers = new Set<Container>();
@@ -1539,7 +1569,7 @@ export class PixiViewport {
     const visibleWaterEffectCount = this.getRenderableEffects().filter(
       (effect) => effect.visible && effect.kind === "water"
     ).length;
-    const waterSpriteBudget = getWaterPatternSpriteBudget(visibleWaterEffectCount);
+    const waterSpriteBudget = getWaterPatternSpriteBudget(visibleWaterEffectCount, this.viewRole);
 
     for (const effect of this.getRenderableEffects()) {
       if (effect.visible && effect.kind === "fire") {
@@ -1550,7 +1580,14 @@ export class PixiViewport {
       } else if (effect.visible && effect.kind === "water") {
         const rendered = this.getCachedEffectContainer(
           effect,
-          `${getSceneEffectRenderSignature(effect, this.waterPatternSource !== null)}:budget:${waterSpriteBudget}`,
+          // Budget is intentionally excluded from the cache key: including it
+          // caused O(n²) container rebuilds whenever a new river was added (all
+          // existing containers got invalidated because the per-effect budget
+          // decreases as the total water count grows).  The budget is still
+          // forwarded to getCachedEffectContainer so *new* containers are built
+          // with the correct sprite count; existing containers keep their old
+          // sprite count, which is acceptable and avoids the frame-drop.
+          getSceneEffectRenderSignature(effect, this.waterPatternSource !== null),
           waterSpriteBudget
         );
         nextCache.set(effect.id, rendered);
@@ -2975,14 +3012,18 @@ export class PixiViewport {
     }
 
     if (this.map === null) {
+      this.isMapImageLoading = false;
       this.drawMapPlaceholder();
       this.drawFogOfWarLayer();
+      this.drawEffectsLayerAfterMapLoad();
       return;
     }
 
     if (typeof this.map.imageUrl !== "string" || this.map.imageUrl.length === 0) {
+      this.isMapImageLoading = false;
       this.drawMapPlaceholder();
       this.drawFogOfWarLayer();
+      this.drawEffectsLayerAfterMapLoad();
       this.options.onMapRenderError?.("La imagen del mapa no tiene una URL valida para renderizar.");
       return;
     }
@@ -2994,6 +3035,7 @@ export class PixiViewport {
         return;
       }
 
+      this.isMapImageLoading = false;
       this.loadedMapUrl = this.map.imageUrl;
       const sprite = new Sprite(texture);
       const colorSprite = new Sprite(texture);
@@ -3014,14 +3056,34 @@ export class PixiViewport {
       this.drawGrid();
       this.drawDarknessLayer();
       this.drawFogOfWarLayer();
+      this.drawEffectsLayerAfterMapLoad();
       this.options.onMapRendered?.(`Mapa renderizado (${texture.width} x ${texture.height})`);
     } catch {
+      this.isMapImageLoading = false;
       this.drawMapPlaceholder();
       this.drawFogOfWarLayer();
+      this.drawEffectsLayerAfterMapLoad();
       this.options.onMapRenderError?.(
         "No se pudo decodificar la imagen del mapa. Si es HEIC, puede depender del soporte del sistema."
       );
     }
+  }
+
+  private shouldDeferEffectsUntilMapReady(): boolean {
+    return this.viewRole === "player" && this.map !== null && (this.mapSprite === null || this.isMapImageLoading);
+  }
+
+  private drawEffectsLayerAfterMapLoad(): void {
+    if (!this.shouldDrawEffectsAfterMapLoad || this.shouldDeferEffectsUntilMapReady()) {
+      return;
+    }
+
+    this.shouldDrawEffectsAfterMapLoad = false;
+    window.requestAnimationFrame(() => {
+      if (!this.disposed) {
+        this.drawEffectsLayer();
+      }
+    });
   }
 
   private getGridBounds(): { left: number; right: number; top: number; bottom: number } {
@@ -3332,7 +3394,13 @@ function getTokenLayerSignature(
   ].join("|");
 }
 
-function getWaterPatternSpriteBudget(visibleWaterEffectCount: number): number {
+function getWaterPatternSpriteBudget(visibleWaterEffectCount: number, viewRole: ViewportViewRole): number {
+  if (viewRole === "player") {
+    return visibleWaterEffectCount <= 1
+      ? 180
+      : Math.max(48, Math.floor(180 / Math.sqrt(visibleWaterEffectCount)));
+  }
+
   if (visibleWaterEffectCount <= 1) {
     return MAX_WATER_PATTERN_SPRITES_PER_EFFECT;
   }
