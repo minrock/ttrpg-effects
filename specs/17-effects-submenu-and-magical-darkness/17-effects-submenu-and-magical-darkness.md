@@ -126,12 +126,14 @@ La oscuridad magica se sobrepone a:
 
 - mapa base;
 - mapas en gris/color por vision en la oscuridad;
+- tokens/minis;
 - luces puntuales y conicas;
 - luz emitida por fuego;
 - oscuridad ambiental.
 
 La oscuridad magica queda por debajo de:
 
+- fog of war / niebla de guerra;
 - grilla si se decide mantenerla visible para referencia;
 - formas tacticas;
 - mediciones;
@@ -140,7 +142,7 @@ La oscuridad magica queda por debajo de:
 - seleccion;
 - UI React.
 
-Requisito clave: las figuras y mediciones deben verse arriba de la oscuridad magica para que el usuario pueda identificar areas afectadas por otros efectos.
+Requisito clave: el orden de gameplay debe mantenerse como mapa -> tokens -> oscuridad ambiental -> luces -> oscuridad magica -> fog -> herramientas de area. Las figuras y mediciones deben verse arriba de la oscuridad magica para que el usuario pueda identificar areas afectadas por otros efectos.
 
 ## Modelo de datos
 

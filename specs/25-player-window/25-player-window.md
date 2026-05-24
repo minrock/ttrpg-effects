@@ -70,6 +70,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - niebla de guerra.
 - En la ventana del DM, estas capas siguen funcionando como hasta ahora, salvo el nuevo control de si el DM quiere ver o no la niebla.
 - La oscuridad magica conserva prioridad visual sobre mapa, luces y darkvision en ambas ventanas, segun su spec.
+- La ventana del jugador debe respetar el orden de capas de gameplay: mapa -> tokens -> oscuridad ambiental -> luces/efectos -> oscuridad magica -> fog of war -> herramientas de area/seleccion. En particular, los tokens quedan debajo de oscuridad/fog y la niebla queda por encima de oscuridad magica.
 
 ### Tokens ocultos
 

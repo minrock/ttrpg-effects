@@ -16,7 +16,7 @@
 - Crear el canvas principal de la aplicacion.
 - Definir tipos y funciones puras para coordenadas de pantalla, mundo y camara.
 - Implementar pan temporal con `Space` + arrastre y zoom basico sobre la camara.
-- Crear una jerarquia de capas con el orden recomendado por el spec.
+- Crear una jerarquia de capas con el orden recomendado por el spec: mapa, grilla base, tokens, oscuridad, luces, efectos, oscuridad magica, fog, obstaculos, herramientas de area, seleccion y apuntador.
 - Dibujar elementos de prueba en capas distintas para validar orden, zoom y pan.
 - Limpiar correctamente PixiJS, listeners y recursos al desmontar la vista.
 
@@ -84,7 +84,9 @@
 ### `render`
 
 - Crear `src/render/pixi/PixiViewport.ts` o adaptador equivalente.
-- Crear contenedores de capas en orden: fondo, mapa, grilla, oscuridad, luces, efectos, formas/mediciones, seleccion.
+- Crear contenedores de capas en orden: fondo tecnico, mapa, grilla base, tokens, oscuridad, luces, efectos animados, oscuridad magica, fog of war, obstaculos, formas/mediciones/paths, seleccion y apuntador.
+- Mantener `effects` por debajo de `fogOfWar` para que fuego/agua/ríos queden cubiertos por niebla cuando aplique.
+- Mantener `tokens` por debajo de oscuridad/fog para que la vista de jugador respete ocultamiento visual.
 - Implementar resize del renderer al contenedor.
 - Implementar eventos de puntero para pan temporal y rueda para zoom.
 - El pan temporal debe:
@@ -138,6 +140,7 @@
 - Al soltar `Space`, la herramienta activa queda en seleccion, incluso si antes estaba en otro modo.
 - La conversion pantalla <-> mundo esta centralizada y cubierta por tests.
 - El orden de capas esta representado explicitamente en codigo.
+- El orden de capas coincide con la secuencia acordada: mapa -> tokens -> oscuridad -> luces -> oscuridad magica -> fog -> herramientas de area, con grilla como referencia base bajo oscuridad/fog, efectos bajo fog y seleccion/apuntador encima.
 - Hay elementos de prueba visibles en capas distintas.
 - El renderer React no contiene reglas complejas de coordenadas o render.
 - `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.

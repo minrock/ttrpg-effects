@@ -34,15 +34,21 @@ Alternativas:
 
 Orden recomendado de abajo hacia arriba:
 
-1. Fondo del mundo.
-2. Imagen del mapa.
-3. Grilla.
+1. Imagen del mapa como primera capa visual y base mas baja.
+2. Grilla/base de referencia, debajo de ocultamiento visual.
+3. Tokens/minis.
 4. Capa global de oscuridad.
 5. Luces y mascaras de iluminacion.
-6. Efectos animados como fuego.
-7. Formas tacticas y mediciones.
-8. Indicadores de seleccion.
-9. UI contextual no renderizada en el mapa, si aplica.
+6. Efectos animados como fuego/agua, debajo de niebla.
+7. Oscuridad magica.
+8. Fog of war / niebla de guerra.
+9. Obstaculos/guia tactica si aplican.
+10. Herramientas de area: formas tacticas, mediciones, paths y handles.
+11. Indicadores de seleccion y apuntador.
+12. UI contextual no renderizada en el mapa, si aplica.
+
+El fondo tecnico del canvas puede existir como fallback visual, pero no debe considerarse una capa de gameplay por encima del mapa.
+La secuencia de gameplay que no debe romperse es: mapa -> tokens -> oscuridad -> luces -> oscuridad magica -> fog -> herramientas de area; la grilla queda como referencia base bajo oscuridad/fog.
 
 ## Sistema de coordenadas
 
