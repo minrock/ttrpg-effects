@@ -731,7 +731,12 @@ export class PixiViewport {
   private updateBaseMapVisibility(): void {
     if (this.mapSprite !== null) {
       this.mapSprite.alpha = 1;
-      this.mapSprite.filters = this.darkness?.darkvisionEnabled ? [this.grayscaleFilter] : null;
+      // Grayscale filter is part of darkvision, which is player-only.
+      // In the DM viewport the map is always rendered in full colour.
+      this.mapSprite.filters =
+        (this.viewRole !== "dm" && this.darkness?.darkvisionEnabled)
+          ? [this.grayscaleFilter]
+          : null;
     }
 
     if (this.colorMapSprite !== null) {

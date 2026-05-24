@@ -186,3 +186,12 @@
 - [x] Documentacion actualizada.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## 12. Cambio posterior: oscuridad solo en ventana de jugador
+
+La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador** (ver spec 25 y rama `feature/dm-darkness-passthrough`).
+
+- `drawDarknessLayer()` retorna inmediatamente cuando `viewRole === "dm"`, dejando la capa siempre vacía en la ventana del DM.
+- `setViewRole()` programa un redibujado de la capa de oscuridad al cambiar de rol.
+- Los controles de oscuridad del DM siguen afectando la ventana del jugador a través del snapshot de escena; el DM simplemente no ve el efecto en su propio canvas.
+- Se agrega un badge flotante en la esquina superior izquierda del viewport del DM que informa cuando oscuridad y/o darkvision están activos para el jugador.
