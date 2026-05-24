@@ -10,6 +10,7 @@ import {
 } from "react";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import * as Switch from "@radix-ui/react-switch";
+import type { MonsterTemplate } from "../../domain/monster-templates/monster-template";
 import {
   cancelInteraction,
   closeContextMenu,
@@ -115,6 +116,7 @@ import { DmAsidePanel } from "./components/aside/DmAsidePanel";
 import { DmDarknessStatusBadge } from "./components/DmDarknessStatusBadge";
 import type { SceneAside } from "../../domain/sessions/scene-aside";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
+import { MonsterTemplateManagerModal } from "./components/aside/MonsterTemplateManagerModal";
 
 const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
@@ -172,6 +174,8 @@ export function App(): JSX.Element {
   const [sceneAside, setSceneAside] = useState<SceneAside>(() =>
     (scene.sceneAside) ?? createDefaultSceneAside()
   );
+  const [monsterTemplates, setMonsterTemplates] = useState<readonly MonsterTemplate[]>([]);
+  const [isMonsterTemplateManagerOpen, setIsMonsterTemplateManagerOpen] = useState(false);
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
@@ -529,6 +533,53 @@ export function App(): JSX.Element {
 
     return () => unsubscribe?.();
   }, []);
+
+  useEffect(() => {
+    void refreshMonsterTemplates();
+
+    const unsubscribe = window.ttrpg?.onOpenMonsterTemplateManager(() => {
+      setIsMonsterTemplateManagerOpen(true);
+      void refreshMonsterTemplates();
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
+  async function refreshMonsterTemplates(): Promise<void> {
+    if (window.ttrpg === undefined) return;
+    const result = await window.ttrpg.listMonsterTemplates();
+    if (result.ok) {
+      setMonsterTemplates(result.templates);
+    } else {
+      setFeedback(result.error);
+    }
+  }
+
+  async function handleSaveMonsterTemplate(template: MonsterTemplate): Promise<void> {
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return;
+    }
+    const result = await window.ttrpg.saveMonsterTemplate(template);
+    if (result.ok) {
+      setMonsterTemplates(result.templates);
+    } else {
+      setFeedback(result.error);
+    }
+  }
+
+  async function handleDeleteMonsterTemplate(id: string): Promise<void> {
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return;
+    }
+    const result = await window.ttrpg.deleteMonsterTemplate(id);
+    if (result.ok) {
+      setMonsterTemplates(result.templates);
+    } else {
+      setFeedback(result.error);
+    }
+  }
 
   const resetToNewScene = useCallback((): void => {
     const defaultScene = createDefaultScene();
@@ -1984,7 +2035,12 @@ export function App(): JSX.Element {
         ))}
       </aside>
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}${isAsidePanelVisible ? "" : " is-aside-hidden"}`}>
-        <DmAsidePanel aside={sceneAside} onChange={setSceneAside} hidden={!isAsidePanelVisible} />
+        <DmAsidePanel
+          aside={sceneAside}
+          monsterTemplates={monsterTemplates}
+          onChange={setSceneAside}
+          hidden={!isAsidePanelVisible}
+        />
         <button
           className="aside-visibility-toggle"
           type="button"
@@ -3087,6 +3143,14 @@ export function App(): JSX.Element {
             </li>
           </menu>
         </div>
+      ) : null}
+      {isMonsterTemplateManagerOpen ? (
+        <MonsterTemplateManagerModal
+          templates={monsterTemplates}
+          onSave={handleSaveMonsterTemplate}
+          onDelete={handleDeleteMonsterTemplate}
+          onClose={() => setIsMonsterTemplateManagerOpen(false)}
+        />
       ) : null}
     </main>
   );

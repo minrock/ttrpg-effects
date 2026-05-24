@@ -1,8 +1,8 @@
 import { useMemo, type JSX } from "react";
-import { marked } from "marked";
 import type { SceneNote } from "../../../../domain/sessions/scene-aside";
 import { getNotePath } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
+import { renderMarkdown } from "./markdown";
 
 interface NoteViewModalProps {
   readonly note: SceneNote;
@@ -15,8 +15,7 @@ export function NoteViewModal({ note, allNotes, onClose, onEdit }: NoteViewModal
   const breadcrumb = useMemo(() => getNotePath(allNotes, note.id), [allNotes, note.id]);
 
   const html = useMemo(() => {
-    const raw = marked.parse(note.content, { async: false }) as string;
-    return raw;
+    return renderMarkdown(note.content);
   }, [note.content]);
 
   return (
@@ -31,6 +30,7 @@ export function NoteViewModal({ note, allNotes, onClose, onEdit }: NoteViewModal
       </div>
 
       <div
+        className="markdown-content"
         style={{
           color: "#ccc",
           fontSize: 14,

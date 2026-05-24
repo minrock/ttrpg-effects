@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type JSX } from "react";
+import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
 import { MonsterDetailModal } from "./MonsterDetailModal";
 import { MonsterModal } from "./MonsterModal";
 
 interface MonsterSectionProps {
   readonly monsters: readonly SceneMonster[];
+  readonly templates: readonly MonsterTemplate[];
   readonly onAdd: (m: SceneMonster) => void;
   readonly onUpdate: (m: SceneMonster) => void;
   readonly onRemove: (id: string) => void;
@@ -13,6 +15,7 @@ interface MonsterSectionProps {
 
 export function MonsterSection({
   monsters,
+  templates,
   onAdd,
   onUpdate,
   onRemove,
@@ -71,6 +74,7 @@ export function MonsterSection({
       {syncedDetail !== null && (
         <MonsterDetailModal
           monster={syncedDetail}
+          templates={templates}
           onClose={closeDetail}
           onToggleVisibility={() => onToggleVisibility(syncedDetail.id)}
           onEdit={() => handleEditFromDetail(syncedDetail)}
@@ -82,6 +86,7 @@ export function MonsterSection({
         <MonsterModal
           initial={editingMonster === "new" ? null : editingMonster}
           existingIds={existingIds}
+          templates={templates}
           onSave={handleSave}
           onClose={() => setEditingMonster(null)}
         />

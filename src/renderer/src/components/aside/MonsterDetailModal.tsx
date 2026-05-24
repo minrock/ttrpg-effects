@@ -1,10 +1,16 @@
 import { useMemo, useEffect, useState, type JSX } from "react";
-import { marked } from "marked";
+import {
+  getMonsterTemplateRenderClass,
+  scopeMonsterTemplateCss,
+  type MonsterTemplate
+} from "../../../../domain/monster-templates/monster-template";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
+import { renderMarkdown } from "./markdown";
 
 interface MonsterDetailModalProps {
   readonly monster: SceneMonster;
+  readonly templates: readonly MonsterTemplate[];
   readonly onClose: () => void;
   readonly onToggleVisibility: () => void;
   readonly onEdit: () => void;
@@ -12,6 +18,7 @@ interface MonsterDetailModalProps {
 
 export function MonsterDetailModal({
   monster,
+  templates,
   onClose,
   onToggleVisibility,
   onEdit
@@ -25,8 +32,18 @@ export function MonsterDetailModal({
 
   const notesHtml = useMemo(() => {
     if (monster.notes.trim() === "") return "";
-    return marked.parse(monster.notes, { async: false }) as string;
+    return renderMarkdown(monster.notes);
   }, [monster.notes]);
+  const template = useMemo(
+    () => templates.find((candidate) => candidate.id === monster.templateId),
+    [monster.templateId, templates]
+  );
+  const templateScopeClass = template !== undefined ? `monster-template-${toCssSafeId(template.id)}` : "";
+  const templateCss = useMemo(
+    () => template !== undefined ? scopeMonsterTemplateCss(template.css, templateScopeClass) : "",
+    [template, templateScopeClass]
+  );
+  const templateRenderClass = template !== undefined ? getMonsterTemplateRenderClass(template) : undefined;
 
   return (
     <ModalBackdrop onClose={onClose} large>
@@ -52,10 +69,16 @@ export function MonsterDetailModal({
       {notesHtml !== "" && (
         <div style={notesSectionStyle}>
           <div style={labelStyle}>Notas</div>
+          {templateCss !== "" ? <style>{templateCss}</style> : null}
           <div
+            className={`markdown-content${templateScopeClass !== "" ? ` ${templateScopeClass}` : ""}`}
             style={{ color: "#ccc", fontSize: 13, lineHeight: 1.65 }}
-            dangerouslySetInnerHTML={{ __html: notesHtml }}
-          />
+          >
+            <div
+              className={templateRenderClass}
+              dangerouslySetInnerHTML={{ __html: notesHtml }}
+            />
+          </div>
         </div>
       )}
 
@@ -73,6 +96,10 @@ export function MonsterDetailModal({
       </div>
     </ModalBackdrop>
   );
+}
+
+function toCssSafeId(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 }
 
 function VisibilityBadge({ visible }: { visible: boolean }): JSX.Element {

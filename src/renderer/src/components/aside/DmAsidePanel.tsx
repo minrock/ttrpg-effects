@@ -1,4 +1,5 @@
 import { useCallback, useState, type JSX } from "react";
+import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneAside, SceneMonster, SceneNpc, SceneNote } from "../../../../domain/sessions/scene-aside";
 import {
   addMonster,
@@ -17,13 +18,14 @@ import { NotesSection } from "./NotesSection";
 
 interface DmAsidePanelProps {
   readonly aside: SceneAside;
+  readonly monsterTemplates: readonly MonsterTemplate[];
   readonly onChange: (aside: SceneAside) => void;
   readonly hidden?: boolean;
 }
 
 type SectionKey = "monsters" | "npcs" | "notes";
 
-export function DmAsidePanel({ aside, onChange, hidden }: DmAsidePanelProps): JSX.Element {
+export function DmAsidePanel({ aside, monsterTemplates, onChange, hidden }: DmAsidePanelProps): JSX.Element {
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
     new Set<SectionKey>(["monsters", "npcs", "notes"])
   );
@@ -84,6 +86,7 @@ export function DmAsidePanel({ aside, onChange, hidden }: DmAsidePanelProps): JS
         >
           <MonsterSection
             monsters={aside.monsters}
+            templates={monsterTemplates}
             onAdd={handleAddMonster}
             onUpdate={handleUpdateMonster}
             onRemove={handleRemoveMonster}

@@ -42,6 +42,15 @@ export async function rebuildAppMenu(options: AppMenuOptions): Promise<void> {
                   }
                 }))
         },
+        {
+          label: "Administrar templates de monstruos",
+          click: () => {
+            const mainWindow = options.getMainWindow();
+            if (mainWindow !== null && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send("monster-template:open-manager");
+            }
+          }
+        },
         { type: "separator" },
         process.platform === "darwin" ? { role: "close" } : { role: "quit" }
       ]

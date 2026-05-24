@@ -12,7 +12,7 @@ export function NoteEditor({ initialContent, onChange }: NoteEditorProps): JSX.E
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Markdown.configure({ transformPastedText: true, transformCopiedText: true })
+      Markdown.configure({ transformPastedText: false, transformCopiedText: true })
     ],
     content: initialContent,
     onUpdate({ editor: e }) {

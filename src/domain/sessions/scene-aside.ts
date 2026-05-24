@@ -8,6 +8,7 @@ export interface SceneMonster {
   readonly imagePath: string | null;
   readonly visibleToPlayer: boolean;
   readonly notes: string;
+  readonly templateId?: string | null;
 }
 
 export interface SceneNpc {
