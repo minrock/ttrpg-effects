@@ -932,6 +932,16 @@ export function App(): JSX.Element {
     }
   }
 
+  useEffect(() => {
+    const unsubscribe = window.ttrpg?.onRecentSceneOpen((result) => {
+      void runSceneOperation("cargada", async () => result);
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [runSceneOperation]);
+
   async function handleOpenMapImage(): Promise<void> {
     setIsBusy(true);
     setWarnings([]);

@@ -2,9 +2,17 @@ import type { SceneFileStorage } from "../services/scene-file-storage";
 import type { SceneOperationResult, SceneWarning } from "../../domain/sessions/scene-document";
 import { detectOutdatedSceneFields, parseSceneJson } from "../../domain/sessions/scene-schema";
 
-export async function loadSceneUseCase(storage: SceneFileStorage): Promise<SceneOperationResult> {
+export async function loadSceneUseCase(
+  storage: SceneFileStorage,
+  options?: { readonly filePath?: string }
+): Promise<SceneOperationResult> {
   try {
-    const loadedFile = await storage.loadSceneJson();
+    const loadedFile =
+      options?.filePath === undefined
+        ? await storage.loadSceneJson()
+        : storage.loadSceneJsonFromPath === undefined
+          ? null
+          : await storage.loadSceneJsonFromPath(options.filePath);
 
     if (loadedFile === null) {
       return {
