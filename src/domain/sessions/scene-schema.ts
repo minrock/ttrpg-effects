@@ -285,7 +285,8 @@ export const sceneDocumentV1Schema = z.object({
           name: z.string().min(1),
           imagePath: z.string().nullable(),
           visibleToPlayer: z.boolean(),
-          notes: z.string().default("")
+          notes: z.string().default(""),
+          templateId: z.string().min(1).nullable().optional().default(null)
         })
       ),
       npcs: z.array(

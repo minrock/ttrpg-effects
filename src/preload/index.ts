@@ -17,6 +17,14 @@ contextBridge.exposeInMainWorld("ttrpg", {
     ipcRenderer.on("scene:recent-opened", listener);
     return () => ipcRenderer.removeListener("scene:recent-opened", listener);
   },
+  listMonsterTemplates: () => ipcRenderer.invoke("monster-template:list"),
+  saveMonsterTemplate: (template: unknown) => ipcRenderer.invoke("monster-template:save", template),
+  deleteMonsterTemplate: (id: string) => ipcRenderer.invoke("monster-template:delete", id),
+  onOpenMonsterTemplateManager: (handler: () => void) => {
+    const listener = (): void => handler();
+    ipcRenderer.on("monster-template:open-manager", listener);
+    return () => ipcRenderer.removeListener("monster-template:open-manager", listener);
+  },
   openMapImage: () => ipcRenderer.invoke("map:open-image"),
   resolveMapUrl: (imagePath: string) => ipcRenderer.invoke("map:resolve-url", imagePath),
   openTokenImage: () => ipcRenderer.invoke("token:open-image"),

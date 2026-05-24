@@ -6,6 +6,7 @@ import type {
   PlayerWindowSnapshot,
   ViewportCameraSnapshot
 } from "../domain/player/player-window";
+import type { MonsterTemplate } from "../domain/monster-templates/monster-template";
 
 export interface TtrpgAppInfo {
   name: "TTRPG Effects";
@@ -21,6 +22,10 @@ export interface TtrpgApi {
   ) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
   onRecentSceneOpen: (handler: (result: SceneOperationResult) => void) => () => void;
+  listMonsterTemplates: () => Promise<MonsterTemplateOperationResult>;
+  saveMonsterTemplate: (template: MonsterTemplate) => Promise<MonsterTemplateOperationResult>;
+  deleteMonsterTemplate: (id: string) => Promise<MonsterTemplateOperationResult>;
+  onOpenMonsterTemplateManager: (handler: () => void) => () => void;
   openMapImage: () => Promise<MapOpenResult>;
   resolveMapUrl: (imagePath: string) => Promise<string | null>;
   openTokenImage: () => Promise<TokenOpenResult>;
@@ -41,6 +46,16 @@ export interface TtrpgApi {
   onPlayerPointer: (handler: (pointer: ArcanePointerBroadcast) => void) => () => void;
   onPlayerWindowClosed: (handler: () => void) => () => void;
 }
+
+export type MonsterTemplateOperationResult =
+  | {
+      readonly ok: true;
+      readonly templates: readonly MonsterTemplate[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
 
 declare global {
   interface Window {

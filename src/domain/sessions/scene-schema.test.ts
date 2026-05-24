@@ -501,6 +501,49 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("preserves monster template ids in the DM aside", () => {
+    const scene = {
+      ...createDefaultScene(),
+      sceneAside: {
+        monsters: [
+          {
+            id: "dragon-rojo",
+            name: "Dragon rojo adulto",
+            imagePath: null,
+            visibleToPlayer: false,
+            notes: "# Dragon rojo adulto",
+            templateId: "dnd-55e-statblock"
+          }
+        ],
+        npcs: [],
+        notes: []
+      }
+    };
+
+    expect(parseSceneDocument(scene).sceneAside?.monsters[0]?.templateId).toBe("dnd-55e-statblock");
+  });
+
+  it("loads older monsters without template ids", () => {
+    const scene = {
+      ...createDefaultScene(),
+      sceneAside: {
+        monsters: [
+          {
+            id: "goblin",
+            name: "Goblin",
+            imagePath: null,
+            visibleToPlayer: false,
+            notes: ""
+          }
+        ],
+        npcs: [],
+        notes: []
+      }
+    };
+
+    expect(parseSceneDocument(scene).sceneAside?.monsters[0]?.templateId).toBeNull();
+  });
+
   it("returns a friendly error for invalid JSON", () => {
     expect(() => parseSceneJson("{ nope")).toThrow("JSON valido");
   });
