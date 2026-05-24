@@ -12,6 +12,11 @@ contextBridge.exposeInMainWorld("ttrpg", {
   saveScene: (scene: unknown, options?: { readonly suggestedFilePath?: string | null }) =>
     ipcRenderer.invoke("scene:save", { scene, suggestedFilePath: options?.suggestedFilePath ?? null }),
   loadScene: () => ipcRenderer.invoke("scene:load"),
+  onRecentSceneOpen: (handler: (result: unknown) => void) => {
+    const listener = (_event: IpcRendererEvent, result: unknown): void => handler(result);
+    ipcRenderer.on("scene:recent-opened", listener);
+    return () => ipcRenderer.removeListener("scene:recent-opened", listener);
+  },
   openMapImage: () => ipcRenderer.invoke("map:open-image"),
   resolveMapUrl: (imagePath: string) => ipcRenderer.invoke("map:resolve-url", imagePath),
   openTokenImage: () => ipcRenderer.invoke("token:open-image"),

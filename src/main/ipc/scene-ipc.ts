@@ -4,14 +4,24 @@ import { loadSceneUseCase } from "../../application/use-cases/load-scene";
 import { saveSceneUseCase } from "../../application/use-cases/save-scene";
 import { parseSceneDocument } from "../../domain/sessions/scene-schema";
 
-export function registerSceneIpc(storage: SceneFileStorage): void {
+interface SceneIpcOptions {
+  readonly onRecentScenePath?: (filePath: string) => Promise<void>;
+}
+
+export function registerSceneIpc(storage: SceneFileStorage, options: SceneIpcOptions = {}): void {
   ipcMain.handle("scene:save", async (_event, payload: unknown) => {
     try {
       const parsedPayload = parseSaveScenePayload(payload);
       const scene = parseSceneDocument(parsedPayload.scene);
-      return await saveSceneUseCase(storage, scene, {
+      const result = await saveSceneUseCase(storage, scene, {
         suggestedFilePath: parsedPayload.suggestedFilePath
       });
+
+      if (result.ok) {
+        await safeRegisterRecentScene(options, result.filePath);
+      }
+
+      return result;
     } catch (error) {
       return {
         ok: false,
@@ -21,8 +31,22 @@ export function registerSceneIpc(storage: SceneFileStorage): void {
   });
 
   ipcMain.handle("scene:load", async () => {
-    return loadSceneUseCase(storage);
+    const result = await loadSceneUseCase(storage);
+
+    if (result.ok) {
+      await safeRegisterRecentScene(options, result.filePath);
+    }
+
+    return result;
   });
+}
+
+async function safeRegisterRecentScene(options: SceneIpcOptions, filePath: string): Promise<void> {
+  try {
+    await options.onRecentScenePath?.(filePath);
+  } catch {
+    // Recent-scene bookkeeping should never make save/load fail.
+  }
 }
 
 function parseSaveScenePayload(payload: unknown): {

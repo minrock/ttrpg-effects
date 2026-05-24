@@ -67,6 +67,13 @@ export class ElectronSceneFileStorage implements SceneFileStorage {
     };
   }
 
+  async loadSceneJsonFromPath(filePath: string): Promise<{ filePath: string; json: string }> {
+    return {
+      filePath,
+      json: await readFile(filePath, "utf8")
+    };
+  }
+
   async fileExists(filePath: string): Promise<boolean> {
     try {
       await access(filePath);

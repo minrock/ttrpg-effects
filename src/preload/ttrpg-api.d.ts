@@ -20,6 +20,7 @@ export interface TtrpgApi {
     options?: { readonly suggestedFilePath?: string | null }
   ) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
+  onRecentSceneOpen: (handler: (result: SceneOperationResult) => void) => () => void;
   openMapImage: () => Promise<MapOpenResult>;
   resolveMapUrl: (imagePath: string) => Promise<string | null>;
   openTokenImage: () => Promise<TokenOpenResult>;

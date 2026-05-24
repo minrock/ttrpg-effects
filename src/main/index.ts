@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron-scene-file-storage";
 import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
 import { registerAsideIpc } from "./ipc/aside-ipc";
+import { getRecentScenesStoragePath, installAppMenu, rebuildAppMenu, registerRecentScene } from "./app-menu";
 import { registerMapIpc } from "./ipc/map-ipc";
 import { getPlayerWindowRendererIndexPath, preloadPlayerWindow, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
 import { registerSceneIpc } from "./ipc/scene-ipc";
+import { RecentScenesStore } from "./recent-scenes-store";
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "map-asset", privileges: { bypassCSP: true, corsEnabled: true, secure: true, stream: true, supportFetchAPI: true } }
@@ -51,7 +53,7 @@ function createMainWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   app.dock?.setIcon(appIconPath);
 
   protocol.handle("map-asset", (request) => {
@@ -60,7 +62,20 @@ app.whenReady().then(() => {
   });
 
   const mapImageStorage = new ElectronMapImageStorage(() => mainWindow);
-  registerSceneIpc(new ElectronSceneFileStorage(() => mainWindow));
+  const sceneFileStorage = new ElectronSceneFileStorage(() => mainWindow);
+  const recentScenes = new RecentScenesStore(getRecentScenesStoragePath());
+  const menuOptions = {
+    storage: sceneFileStorage,
+    recentScenes,
+    getMainWindow: () => mainWindow
+  };
+  await installAppMenu(menuOptions);
+  registerSceneIpc(sceneFileStorage, {
+    onRecentScenePath: async (filePath) => {
+      await registerRecentScene(recentScenes, filePath);
+      await rebuildAppMenu(menuOptions);
+    }
+  });
   registerMapIpc(mapImageStorage);
   registerAsideIpc(mapImageStorage);
   const playerWindowOptions = {
