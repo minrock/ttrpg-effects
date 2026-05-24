@@ -334,6 +334,37 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene).tokens[0].visible).toBe(true);
   });
 
+  it("accepts DM-only labels in scenes", () => {
+    const scene = {
+      ...createDefaultScene(),
+      labels: [
+        {
+          id: "label-1",
+          type: "label",
+          text: "Entrada secreta",
+          position: { x: 120, y: -40 },
+          fontFamily: "Georgia, serif",
+          color: "#fff0a8",
+          opacity: 0.85,
+          shadow: {
+            enabled: true,
+            color: "#101315",
+            blur: 6
+          }
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene)).toEqual(scene);
+  });
+
+  it("adds empty labels to older v1 scenes", () => {
+    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    delete legacyScene.labels;
+
+    expect(parseSceneDocument(legacyScene).labels).toEqual([]);
+  });
+
   it("rejects persisted paths with fewer than two points", () => {
     const scene = {
       ...createDefaultScene(),

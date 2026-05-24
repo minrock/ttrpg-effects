@@ -56,6 +56,28 @@ describe("scene content detection", () => {
         ]
       })
     ).toBe(true);
+
+    expect(
+      hasSceneContent({
+        ...createDefaultScene(),
+        labels: [
+          {
+            id: "label-1",
+            type: "label",
+            text: "Altar",
+            position: { x: 0, y: 0 },
+            fontFamily: "system-ui, sans-serif",
+            color: "#fff0a8",
+            opacity: 1,
+            shadow: {
+              enabled: true,
+              color: "#101315",
+              blur: 4
+            }
+          }
+        ]
+      })
+    ).toBe(true);
   });
 
   it("detects legacy tactical elements outside the scene document", () => {

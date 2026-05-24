@@ -217,6 +217,24 @@ export interface SceneToken {
   readonly visible: boolean;
 }
 
+export interface SceneLabel {
+  readonly id: string;
+  readonly type: "label";
+  readonly text: string;
+  readonly position: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly fontFamily: string;
+  readonly color: string;
+  readonly opacity: number;
+  readonly shadow: {
+    readonly enabled: boolean;
+    readonly color: string;
+    readonly blur: number;
+  };
+}
+
 export interface SceneDocumentV1 {
   readonly version: typeof SCENE_DOCUMENT_VERSION;
   readonly map: SceneMap;
@@ -229,6 +247,7 @@ export interface SceneDocumentV1 {
   readonly effects: readonly SceneEffect[];
   readonly shapes: readonly SceneShape[];
   readonly tokens: readonly SceneToken[];
+  readonly labels: readonly SceneLabel[];
   readonly sceneAside?: SceneAside;
 }
 

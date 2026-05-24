@@ -12,6 +12,7 @@ import type {
   SceneEffect,
   SceneFogOfWar,
   SceneGrid,
+  SceneLabel,
   SceneLight,
   SceneSettings,
   SceneShape
@@ -43,6 +44,7 @@ interface MapViewportProps {
   readonly lights: readonly SceneLight[];
   readonly effects: readonly SceneEffect[];
   readonly tokens: readonly RenderSceneToken[];
+  readonly labels: readonly SceneLabel[];
   readonly selectedElementId: string | null;
   readonly isZoomLocked: boolean;
   readonly isMapAdjustMode: boolean;
@@ -109,6 +111,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   lights,
   effects,
   tokens,
+  labels,
   selectedElementId,
   isZoomLocked,
   isMapAdjustMode,
@@ -229,6 +232,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setLights(lights);
       createdViewport.setEffects(effects);
       createdViewport.setTokens(tokens);
+      createdViewport.setLabels(labels);
       createdViewport.setSelectedElementId(selectedElementId);
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setViewRole(viewRole);
@@ -300,6 +304,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setTokens(tokens);
   }, [tokens]);
+
+  useEffect(() => {
+    viewportRef.current?.setLabels(labels);
+  }, [labels]);
 
   useEffect(() => {
     viewportRef.current?.setSelectedElementId(selectedElementId);

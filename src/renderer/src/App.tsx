@@ -43,6 +43,12 @@ import {
   type WaterPatch
 } from "../../domain/effects/water";
 import {
+  createSceneLabel,
+  systemLabelFonts,
+  updateSceneLabel,
+  type SceneLabelPatch
+} from "../../domain/labels/labels";
+import {
   createLightSource,
   moveLightSource,
   updateLightSource,
@@ -212,6 +218,7 @@ export function App(): JSX.Element {
   const nextLightId = useRef(1);
   const nextEffectId = useRef(1);
   const nextTokenId = useRef(1);
+  const nextLabelId = useRef(1);
   const nextRevealId = useRef(1);
   const viewportHandleRef = useRef<MapViewportHandle | null>(null);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
@@ -411,6 +418,23 @@ export function App(): JSX.Element {
     setInteraction((current) => selectElement(closeContextMenu(current), id));
   };
 
+  const handleCreateLabel = (): void => {
+    if (interaction.contextMenu === null) {
+      return;
+    }
+
+    const id = `label-${nextLabelId.current}`;
+    nextLabelId.current += 1;
+    const label = createSceneLabel(id, interaction.contextMenu.world);
+
+    setScene((current) => ({
+      ...current,
+      labels: [...current.labels, label]
+    }));
+    setIsSidebarVisible(true);
+    setInteraction((current) => selectElement(closeContextMenu(current), id));
+  };
+
   const handleDeleteSelectedElement = useCallback(() => {
     setScene((current) => {
       if (interaction.selectedElementId === null) {
@@ -422,7 +446,8 @@ export function App(): JSX.Element {
         lights: current.lights.filter((light) => light.id !== interaction.selectedElementId),
         effects: current.effects.filter((effect) => effect.id !== interaction.selectedElementId),
         shapes: current.shapes.filter((shape) => shape.id !== interaction.selectedElementId),
-        tokens: current.tokens.filter((token) => token.id !== interaction.selectedElementId)
+        tokens: current.tokens.filter((token) => token.id !== interaction.selectedElementId),
+        labels: current.labels.filter((label) => label.id !== interaction.selectedElementId)
       };
     });
     setTokenImageUrls((current) => {
@@ -471,17 +496,18 @@ export function App(): JSX.Element {
   );
 
   const sceneWithAside = useMemo(() => ({ ...scene, sceneAside }), [scene, sceneAside]);
+  const playerSceneSnapshot = useMemo(() => ({ ...sceneWithAside, labels: [] }), [sceneWithAside]);
 
   const playerWindowSnapshot = useMemo<PlayerWindowSnapshot>(
     () => ({
-      scene: sceneWithAside,
+      scene: playerSceneSnapshot,
       mapImageUrl,
       tokenImageUrls,
       camera: playerCameraRef.current,
       cameraSyncKey: playerCameraSyncKey,
       showDmFogOverlay
     }),
-    [sceneWithAside, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay]
+    [playerSceneSnapshot, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay]
   );
 
   useEffect(() => {
@@ -530,6 +556,7 @@ export function App(): JSX.Element {
     nextLightId.current = 1;
     nextEffectId.current = 1;
     nextTokenId.current = 1;
+    nextLabelId.current = 1;
     nextRevealId.current = 1;
   }, [setGridAdjustMode]);
 
@@ -913,6 +940,7 @@ export function App(): JSX.Element {
         setInteraction((current) => setZoomLocked(current, result.scene.grid.locked));
         setArcanePointerResetKey((current) => current + 1);
         nextTokenId.current = getNextNumericId(result.scene.tokens.map((token) => token.id), "token-");
+        nextLabelId.current = getNextNumericId(result.scene.labels.map((label) => label.id), "label-");
       }
       setCurrentFilePath(result.filePath);
       setFeedback(`Escena ${actionLabel}`);
@@ -1119,6 +1147,9 @@ export function App(): JSX.Element {
               position: snapTokenToGrid({ x, y }, current.grid, token.footprintCells)
             }
           : token
+      ),
+      labels: current.labels.map((label) =>
+        label.id === elementId ? updateSceneLabel(label, { position: { x, y } }) : label
       )
     }));
   }, []);
@@ -1582,6 +1613,10 @@ export function App(): JSX.Element {
     interaction.selectedElementId === null
       ? undefined
       : scene.tokens.find((token) => token.id === interaction.selectedElementId);
+  const selectedLabel =
+    interaction.selectedElementId === null
+      ? undefined
+      : scene.labels.find((label) => label.id === interaction.selectedElementId);
   const selectedMeasurement =
     selectedShape?.type === "measurement"
       ? measureDistance(selectedShape.points[0], selectedShape.points[1], {
@@ -1600,7 +1635,8 @@ export function App(): JSX.Element {
     selectedLight !== undefined ||
     selectedEffect !== undefined ||
     selectedShape !== undefined ||
-    selectedToken !== undefined;
+    selectedToken !== undefined ||
+    selectedLabel !== undefined;
 
   useEffect(() => {
     if (!hasSelectedObject) {
@@ -1700,6 +1736,19 @@ export function App(): JSX.Element {
     }));
   }
 
+  function updateSelectedLabel(patch: SceneLabelPatch): void {
+    if (selectedLabel === undefined) {
+      return;
+    }
+
+    setScene((current) => ({
+      ...current,
+      labels: current.labels.map((label) =>
+        label.id === selectedLabel.id ? updateSceneLabel(label, patch) : label
+      )
+    }));
+  }
+
   function handleToggleTokenVisibility(tokenId: string): void {
     setScene((current) => ({
       ...current,
@@ -1787,17 +1836,19 @@ export function App(): JSX.Element {
             ? selectedWaterEffect.variant === "river" ? "Rio" : "Cuerpo de agua"
             : selectedToken !== undefined
               ? "Token"
-              : selectedShape?.type === "measurement"
-                ? "Linea"
-                : selectedShape?.type === "path"
-                  ? "Path/Camino"
-                  : selectedShape?.type === "circle"
-                    ? "Circulo"
-                    : selectedShape?.type === "cone"
-                      ? "Cono"
-                      : selectedShape?.type === "rectangle"
-                        ? "Rectangulo"
-                        : "Propiedades";
+              : selectedLabel !== undefined
+                ? "Texto"
+                : selectedShape?.type === "measurement"
+                  ? "Linea"
+                  : selectedShape?.type === "path"
+                    ? "Path/Camino"
+                    : selectedShape?.type === "circle"
+                      ? "Circulo"
+                      : selectedShape?.type === "cone"
+                        ? "Cono"
+                        : selectedShape?.type === "rectangle"
+                          ? "Rectangulo"
+                          : "Propiedades";
   const selectedPropertiesIcon =
     selectedLight !== undefined
       ? selectedLight.kind === "point"
@@ -1811,15 +1862,17 @@ export function App(): JSX.Element {
             ? "≈"
             : selectedToken !== undefined
               ? "◉"
-              : selectedShape?.type === "measurement"
-                ? "╱"
-                : selectedShape?.type === "path"
-                  ? "⌁"
-                  : selectedShape?.type === "circle"
-                    ? "○"
-                    : selectedShape?.type === "cone"
-                      ? "◺"
-                      : "▭";
+              : selectedLabel !== undefined
+                ? "T"
+                : selectedShape?.type === "measurement"
+                  ? "╱"
+                  : selectedShape?.type === "path"
+                    ? "⌁"
+                    : selectedShape?.type === "circle"
+                      ? "○"
+                      : selectedShape?.type === "cone"
+                        ? "◺"
+                        : "▭";
   const selectedMagicalDarknessRadiusCells =
     selectedMagicalDarkness === undefined
       ? 1
@@ -1917,6 +1970,7 @@ export function App(): JSX.Element {
             scene.lights.length +
             scene.effects.length +
             scene.tokens.length +
+            scene.labels.length +
             interaction.elements.length} elementos
         </span>
         <span>
@@ -1952,6 +2006,7 @@ export function App(): JSX.Element {
           lights={scene.lights}
           effects={scene.effects}
           tokens={renderedTokens}
+          labels={scene.labels}
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
@@ -2318,6 +2373,81 @@ export function App(): JSX.Element {
                       type="color"
                       value={selectedToken.selectionColor}
                       onChange={(event) => updateSelectedToken({ selectionColor: event.currentTarget.value })}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {selectedLabel !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de texto">
+                  <label>
+                    Texto
+                    <input
+                      type="text"
+                      value={selectedLabel.text}
+                      onChange={(event) => updateSelectedLabel({ text: event.currentTarget.value })}
+                    />
+                  </label>
+                  <label>
+                    Fuente
+                    <select
+                      value={selectedLabel.fontFamily}
+                      onChange={(event) => updateSelectedLabel({ fontFamily: event.currentTarget.value })}
+                    >
+                      {systemLabelFonts.map((font) => (
+                        <option key={font} value={font}>
+                          {getFontLabel(font)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Color
+                    <input
+                      type="color"
+                      value={selectedLabel.color}
+                      onChange={(event) => updateSelectedLabel({ color: event.currentTarget.value })}
+                    />
+                  </label>
+                  <label>
+                    Opacidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedLabel.opacity}
+                      onChange={(event) => updateSelectedLabel({ opacity: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedLabel.shadow.enabled}
+                      onChange={(event) =>
+                        updateSelectedLabel({ shadow: { enabled: event.currentTarget.checked } })
+                      }
+                    />
+                    Sombra
+                  </label>
+                  <label>
+                    Color sombra
+                    <input
+                      type="color"
+                      value={selectedLabel.shadow.color}
+                      onChange={(event) => updateSelectedLabel({ shadow: { color: event.currentTarget.value } })}
+                      disabled={!selectedLabel.shadow.enabled}
+                    />
+                  </label>
+                  <label>
+                    Blur sombra
+                    <input
+                      type="range"
+                      min="0"
+                      max="24"
+                      step="1"
+                      value={selectedLabel.shadow.blur}
+                      onChange={(event) => updateSelectedLabel({ shadow: { blur: event.currentTarget.valueAsNumber } })}
+                      disabled={!selectedLabel.shadow.enabled}
                     />
                   </label>
                 </div>
@@ -2923,6 +3053,9 @@ export function App(): JSX.Element {
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
             </button>
             <hr aria-hidden="true" />
+            <button type="button" onClick={handleCreateLabel}>
+              Crear label DM
+            </button>
             <li className="has-submenu">
               <button type="button">Herramientas de área ▶</button>
               <menu className="context-submenu">
@@ -2975,6 +3108,9 @@ function getFileBaseName(filePath: string): string {
   return fileName.replace(/\.[^.]+$/, "") || "Token";
 }
 
+function getFontLabel(fontFamily: string): string {
+  return fontFamily.split(",")[0]?.replaceAll("\"", "").trim() || fontFamily;
+}
 
 function getTokenSizeCellLabel(size: TokenSize): string {
   switch (size) {
