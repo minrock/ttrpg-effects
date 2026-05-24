@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useState, type JSX } from "react";
-import { marked } from "marked";
 import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
+import { renderMarkdown } from "./markdown";
 
 interface NpcDetailModalProps {
   readonly npc: SceneNpc;
@@ -25,7 +25,7 @@ export function NpcDetailModal({
 
   const notesHtml = useMemo(() => {
     if (npc.notes.trim() === "") return "";
-    return marked.parse(npc.notes, { async: false }) as string;
+    return renderMarkdown(npc.notes);
   }, [npc.notes]);
 
   return (
@@ -53,6 +53,7 @@ export function NpcDetailModal({
         <div style={notesSectionStyle}>
           <div style={labelStyle}>Notas</div>
           <div
+            className="markdown-content"
             style={{ color: "#ccc", fontSize: 13, lineHeight: 1.65 }}
             dangerouslySetInnerHTML={{ __html: notesHtml }}
           />

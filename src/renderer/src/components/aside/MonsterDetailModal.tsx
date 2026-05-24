@@ -1,7 +1,7 @@
 import { useMemo, useEffect, useState, type JSX } from "react";
-import { marked } from "marked";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
+import { renderMarkdown } from "./markdown";
 
 interface MonsterDetailModalProps {
   readonly monster: SceneMonster;
@@ -25,7 +25,7 @@ export function MonsterDetailModal({
 
   const notesHtml = useMemo(() => {
     if (monster.notes.trim() === "") return "";
-    return marked.parse(monster.notes, { async: false }) as string;
+    return renderMarkdown(monster.notes);
   }, [monster.notes]);
 
   return (
@@ -53,6 +53,7 @@ export function MonsterDetailModal({
         <div style={notesSectionStyle}>
           <div style={labelStyle}>Notas</div>
           <div
+            className="markdown-content"
             style={{ color: "#ccc", fontSize: 13, lineHeight: 1.65 }}
             dangerouslySetInnerHTML={{ __html: notesHtml }}
           />
