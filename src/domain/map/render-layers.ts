@@ -10,6 +10,7 @@ export const renderLayerNames = [
   "fogOfWar",
   "walls",
   "shapesAndMeasurements",
+  "labels",
   "selection",
   "pointer"
 ] as const;

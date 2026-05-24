@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
+import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
 
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
@@ -15,6 +16,7 @@ const worldPointSchema = z.object({
 const emojiSchema = z.string().trim().min(1).max(32).optional();
 const tokenSizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
 const tokenFootprintSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
+const labelFontSchema = z.enum(systemLabelFonts);
 
 const linearShapeSchema = z.object({
   id: z.string().min(1),
@@ -190,6 +192,23 @@ const tokenSchema = z.object({
   visible: z.boolean().default(true)
 });
 
+const labelSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal("label").default("label"),
+  text: z.string().trim().min(1).max(120).default(defaultSceneLabelStyle.text),
+  position: worldPointSchema,
+  fontFamily: labelFontSchema.default(defaultSceneLabelStyle.fontFamily),
+  color: hexColor.default(defaultSceneLabelStyle.color),
+  opacity: opacity.default(defaultSceneLabelStyle.opacity),
+  shadow: z
+    .object({
+      enabled: z.boolean().default(defaultSceneLabelStyle.shadow.enabled),
+      color: hexColor.default(defaultSceneLabelStyle.shadow.color),
+      blur: finiteNumber.min(0).max(64).default(defaultSceneLabelStyle.shadow.blur)
+    })
+    .default(() => ({ ...defaultSceneLabelStyle.shadow }))
+});
+
 export const sceneDocumentV1Schema = z.object({
   version: z.literal(SCENE_DOCUMENT_VERSION),
   map: z.object({
@@ -257,6 +276,7 @@ export const sceneDocumentV1Schema = z.object({
     )
     .transform((arr) => arr.filter((s): s is NonNullable<typeof s> => s !== null)),
   tokens: z.array(tokenSchema).default([]),
+  labels: z.array(labelSchema).default([]),
   sceneAside: z
     .object({
       monsters: z.array(
@@ -310,6 +330,8 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
   const missing: string[] = [];
   // Added in spec 26 (DM aside panel)
   if (!("sceneAside" in obj)) missing.push("sceneAside");
+  // Added in spec 28 (DM-only map labels)
+  if (!("labels" in obj)) missing.push("labels");
   return missing;
 }
 

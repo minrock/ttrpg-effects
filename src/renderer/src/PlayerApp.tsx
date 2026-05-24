@@ -128,6 +128,7 @@ export function PlayerApp(): JSX.Element {
           lights={scene.lights}
           effects={scene.effects}
           tokens={renderedTokens}
+          labels={[]}
           selectedElementId={null}
           isZoomLocked={isZoomLocked}
           isMapAdjustMode={false}

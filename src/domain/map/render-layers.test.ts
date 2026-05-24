@@ -15,6 +15,7 @@ describe("render layer order", () => {
       "fogOfWar",
       "walls",
       "shapesAndMeasurements",
+      "labels",
       "selection",
       "pointer"
     ]);

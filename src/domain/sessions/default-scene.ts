@@ -39,6 +39,7 @@ export function createDefaultScene(): SceneDocument {
     effects: [],
     shapes: [],
     tokens: [],
+    labels: [],
     sceneAside: createDefaultSceneAside()
   };
 }

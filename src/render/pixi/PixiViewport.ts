@@ -18,6 +18,7 @@ import type {
   SceneFogRevealArea,
   SceneFogOfWar,
   SceneGrid,
+  SceneLabel,
   SceneLight,
   SceneMagicalDarknessEffect,
   SceneSettings,
@@ -162,6 +163,7 @@ export class PixiViewport {
   private lights: readonly SceneLight[] = [];
   private effects: readonly SceneEffect[] = [];
   private tokens: readonly RenderSceneToken[] = [];
+  private labels: readonly SceneLabel[] = [];
   private selectedElementId: string | null = null;
   private isZoomLocked = false;
   private isMapAdjustMode = false;
@@ -298,6 +300,12 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  setLabels(labels: readonly SceneLabel[]): void {
+    this.labels = labels;
+    this.drawLabelsLayer();
+    this.drawSelectionLayer();
+  }
+
   setSelectedElementId(selectedElementId: string | null): void {
     this.selectedElementId = selectedElementId;
     this.pathHoverZone = null;
@@ -369,6 +377,7 @@ export class PixiViewport {
     // canvas clears them the moment the role is applied.
     this.scheduleDarknessRedraw();
     this.drawDarkvisionLayer();
+    this.drawLabelsLayer();
   }
 
   setReadOnly(isReadOnly: boolean): void {
@@ -944,9 +953,17 @@ export class PixiViewport {
           this.updateShapeRectCornerFromScreenPoint(this.selectedElementId, hitRectCornerIndex, point);
         } else if (hitElementId !== null) {
           const hitIsPath = this.shapes.some((s) => s.id === hitElementId && s.type === "path");
+          const selectedElementPosition = this.findSelectableElement(hitElementId)?.position;
           mode = hitIsPath ? "idle" : "element-move";
           elementId = hitElementId;
-          moveStartPosition = this.findSelectableElement(hitElementId)?.position;
+          moveStartPosition = selectedElementPosition;
+          if (selectedElementPosition !== undefined) {
+            const grabWorld = screenToWorld(point, this.camera, this.getViewportSize());
+            grabOffset = {
+              x: grabWorld.x - selectedElementPosition.x,
+              y: grabWorld.y - selectedElementPosition.y
+            };
+          }
           this.options.onElementSelect?.(hitElementId);
         } else if (this.isMapAdjustMode && this.mapSprite !== null) {
           mode = "map-move";
@@ -1020,7 +1037,8 @@ export class PixiViewport {
       this.colorMapSprite?.position.set(this.mapSprite.position.x, this.mapSprite.position.y);
     } else if (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
-      this.applyElementMovePreview(this.dragState.elementId, worldPoint, this.dragState.moveStartPosition);
+      const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
+      this.applyElementMovePreview(this.dragState.elementId, targetPoint, this.dragState.moveStartPosition);
     } else if (this.dragState.mode === "light-rotate" && this.dragState.elementId !== undefined) {
       this.updateLightDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "light-resize" && this.dragState.elementId !== undefined) {
@@ -1081,7 +1099,7 @@ export class PixiViewport {
       moveStartPosition: this.dragState.moveStartPosition,
       pendingMovePosition:
         this.dragState.mode === "element-move" && this.dragState.elementId !== undefined
-          ? screenToWorld(nextPoint, this.camera, this.getViewportSize())
+          ? subtractGrabOffset(screenToWorld(nextPoint, this.camera, this.getViewportSize()), this.dragState.grabOffset)
           : this.dragState.pendingMovePosition
     };
   };
@@ -1202,6 +1220,7 @@ export class PixiViewport {
       "effects",
       "magicalDarkness",
       "tokens",
+      "labels",
       "selection"
     ];
 
@@ -1468,6 +1487,7 @@ export class PixiViewport {
     this.drawLightsLayer();
     this.drawEffectsLayer();
     this.drawMagicalDarknessLayer();
+    this.drawLabelsLayer();
     this.drawSelectionLayer();
   }
 
@@ -1809,6 +1829,19 @@ export class PixiViewport {
           this.grid.cellSizeWorld
         )
       );
+    }
+  }
+
+  private drawLabelsLayer(): void {
+    const labelsLayer = this.getLayer("labels");
+    clearContainerChildren(labelsLayer);
+
+    if (this.viewRole !== "dm") {
+      return;
+    }
+
+    for (const label of this.labels) {
+      labelsLayer.addChild(drawSceneLabel(label));
     }
   }
 
@@ -2898,7 +2931,16 @@ export class PixiViewport {
           position: token.position,
           hitRadius: this.getTokenFootprintWorld(token) / 2,
           selectionColor: token.selectionColor
-        }))
+        })),
+      ...(this.viewRole === "dm"
+        ? this.labels.map((label) => ({
+            id: label.id,
+            kind: "label" as const,
+            position: label.position,
+            hitRadius: getLabelHitRadius(label),
+            selectionColor: label.color
+          }))
+        : [])
     ];
   }
 
@@ -3122,7 +3164,7 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water" | "label";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
   readonly selectionColor?: string;
@@ -3413,6 +3455,17 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
 
 function isSpaceKeyEvent(event: KeyboardEvent): boolean {
   return event.code === "Space" || event.key === " " || event.key === "Spacebar";
+}
+
+function subtractGrabOffset(point: WorldPoint, grabOffset: WorldPoint | undefined): WorldPoint {
+  if (grabOffset === undefined) {
+    return point;
+  }
+
+  return {
+    x: point.x - grabOffset.x,
+    y: point.y - grabOffset.y
+  };
 }
 
 function getViewportWorldBounds(
@@ -5014,6 +5067,32 @@ function drawHiddenTokenIndicator(token: RenderSceneToken, footprintWorld: numbe
   return container;
 }
 
+function drawSceneLabel(label: SceneLabel): Container {
+  const container = new Container();
+  container.label = label.id;
+  // Container stays at (0,0) so applyElementMovePreviewToLayers can apply dx/dy
+  // as a delta offset — consistent with how tokens and other elements work.
+
+  const text = new Text({
+    text: label.text,
+    style: {
+      fill: parseHexColor(label.color),
+      fontFamily: label.fontFamily,
+      fontSize: 26,
+      fontWeight: "800",
+      stroke: label.shadow.enabled
+        ? { color: parseHexColor(label.shadow.color), width: Math.max(1, label.shadow.blur) }
+        : undefined
+    }
+  });
+
+  text.anchor.set(0.5);
+  text.position.set(label.position.x, label.position.y);
+  text.alpha = label.opacity;
+  container.addChild(text);
+  return container;
+}
+
 function drawSelection(element: SelectableRenderElement): Graphics {
   const { x, y } = element.position;
   const radius = (element.hitRadius ?? getHitRadius(element.kind)) + 8;
@@ -5396,7 +5475,13 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
       return 50;
     case "water":
       return 50;
+    case "label":
+      return 72;
   }
+}
+
+function getLabelHitRadius(label: SceneLabel): number {
+  return Math.max(42, Math.min(180, label.text.length * 8 + 28));
 }
 
 function hitTestPath(shape: SceneShape, point: WorldPoint, tolerance: number): boolean {
