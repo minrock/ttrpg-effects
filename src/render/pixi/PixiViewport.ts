@@ -363,7 +363,12 @@ export class PixiViewport {
   }
 
   setViewRole(viewRole: ViewportViewRole): void {
+    if (this.viewRole === viewRole) return;
     this.viewRole = viewRole;
+    // Darkness and darkvision are player-only: redraw immediately so the DM
+    // canvas clears them the moment the role is applied.
+    this.scheduleDarknessRedraw();
+    this.drawDarkvisionLayer();
   }
 
   setReadOnly(isReadOnly: boolean): void {
@@ -648,7 +653,11 @@ export class PixiViewport {
     const layer = this.getLayer("darkness");
     clearContainerChildren(layer);
 
+    // The darkness layer is player-only.  In the DM viewport the layer is
+    // always kept empty so the DM can see the full map regardless of the
+    // darkness settings stored in the scene.
     if (
+      this.viewRole === "dm" ||
       this.darkness === null ||
       this.darkness.darkvisionEnabled ||
       !this.darkness.enabled ||
@@ -735,7 +744,10 @@ export class PixiViewport {
     const renderableLights = this.getRenderableLights();
     const renderableEffects = this.getRenderableEffects();
     const spritesReady = this.mapSprite !== null && this.colorMapSprite !== null;
-    const nextSig = spritesReady
+    // Darkvision (grayscale map + color reveals) is player-only.  In the DM
+    // viewport we force the signature to "" so the existing cleanup path
+    // removes the grayscale filter and the colour-overlay mask.
+    const nextSig = (spritesReady && this.viewRole !== "dm")
       ? getDarkvisionSignature(this.darkness, renderableLights, renderableEffects)
       : "";
 
