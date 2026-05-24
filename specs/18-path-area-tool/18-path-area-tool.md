@@ -163,7 +163,7 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 
 ## Render / PixiJS
 
-- Renderizar path en la capa de formas/mediciones, por encima de mapa, grilla, niebla, oscuridad y luces segun el orden actual de herramientas tacticas.
+- Renderizar path en la capa de formas/mediciones, como parte de las herramientas de area finales, por encima de mapa, tokens, oscuridad, luces, oscuridad magica y fog of war.
 - Renderizar el path temporal solo mientras se esta dibujando.
 - Renderizar puntos confirmados como nodos visibles.
 - Renderizar el tramo temporal con estilo diferenciado o ligeramente translucido.

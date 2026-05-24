@@ -26,7 +26,7 @@
 - Editar opacidad desde panel de propiedades.
 - Mantener color negro fijo.
 - Dibujar borde negro visible con opacidad alta aunque el relleno sea transparente.
-- Renderizar oscuridad magica sobre mapa, luces, oscuridad ambiental y darkvision.
+- Renderizar oscuridad magica sobre mapa, tokens, luces, oscuridad ambiental y darkvision.
 - Mantener grilla, formas, mediciones, handles, emojis y seleccion por encima.
 - Guardar/cargar oscuridad magica en `.ttrpgscene`.
 - Agregar tests de dominio/schema necesarios.
@@ -46,8 +46,8 @@
 - **Arquitectura:** La oscuridad magica vive en dominio como un efecto de escena, no como estado visual de Pixi. Renderer/React orquesta creacion y propiedades; Pixi solo renderiza y reporta interacciones.
 - **Persistencia:** Convertir `SceneEffect` en union discriminada: `SceneFireEffect | SceneMagicalDarknessEffect`. Guardar ambos dentro de `effects`.
 - **IPC / Electron:** Sin cambios. Guardado/carga siguen usando `scene:save` y `scene:load`.
-- **Render / PixiJS:** Crear o usar una capa de render que quede despues de luces/darkvision/fog/effects y antes de `shapesAndMeasurements`/`selection`. Para claridad, agregar una capa `magicalDarkness` en `renderLayerNames` entre `effects` y `walls` o entre `fogOfWar` y `effects`, validando que no tape formas.
-- **Orden visual:** La oscuridad magica debe tapar mapa, luces, fire light, darkvision y oscuridad ambiental. Las formas/mediciones/seleccion deben permanecer encima.
+- **Render / PixiJS:** Crear o usar una capa de render que quede despues de luces/darkvision/effects y antes de `fogOfWar`, `shapesAndMeasurements` y `selection`. Para claridad, mantener `magicalDarkness` en `renderLayerNames` despues de `effects` y antes de `fogOfWar`.
+- **Orden visual:** La oscuridad magica debe tapar mapa, tokens, luces, fire light, darkvision y oscuridad ambiental. Fog of war queda por encima de oscuridad magica; las formas/mediciones/seleccion deben permanecer encima.
 - **Validacion:** Schema Zod con discriminated union por `kind`. Escenas antiguas con solo `fire` siguen cargando.
 - **Dependencias nuevas:** Ninguna.
 
@@ -137,7 +137,8 @@ export interface SceneMagicalDarknessEffect {
 ### `render`
 
 - **`src/domain/map/render-layers.ts`**
-  - Agregar capa `magicalDarkness` antes de `shapesAndMeasurements`.
+  - Agregar capa `magicalDarkness` despues de `effects` y antes de `fogOfWar`.
+  - Mantener el orden de gameplay: mapa -> tokens -> oscuridad -> luces -> efectos -> oscuridad magica -> fog -> herramientas de area.
 
 - **`src/render/pixi/PixiViewport.ts`**
   - Separar render de fuego y oscuridad magica:
@@ -172,7 +173,7 @@ export interface SceneMagicalDarknessEffect {
 9. Agregar capa `magicalDarkness` al orden de render.
 10. Implementar render del circulo negro con borde fijo.
 11. Implementar seleccion, hit testing, movimiento y resize de radio en Pixi.
-12. Verificar darkvision/luces: oscuridad magica debe dibujarse despues y no ser perforada por luces.
+12. Verificar darkvision/luces: oscuridad magica debe dibujarse despues de luces/efectos y no ser perforada por luces, pero antes de fog of war.
 13. Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 14. Smoke manual en `pnpm dev`.
 
@@ -225,7 +226,7 @@ export interface SceneMagicalDarknessEffect {
 - Se puede cambiar radio desde sidebar contextual en cuadros de grilla y ver equivalencia en `ft`/`m`.
 - Se puede cambiar opacidad desde sidebar contextual.
 - Color negro no se expone como control.
-- Con mapa iluminado, tapa mapa y luces debajo.
+- Con mapa iluminado, tapa mapa, tokens y luces debajo.
 - Con oscuridad ambiental y luces, sigue negra.
 - Con darkvision, sigue negra.
 - Con opacidad baja, el relleno baja pero el borde negro sigue visible.

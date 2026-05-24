@@ -3,7 +3,7 @@
 ## 1. Resumen
 
 - **Spec fuente:** `./specs/08-fog-of-war-and-vision-future/08-fog-of-war-and-vision-future.md`
-- **Objetivo:** Implementar una experiencia completa inicial de niebla de guerra y vision: ocultar mapa no revelado, revelar areas manualmente, conectar vision a luces existentes y preparar obstaculos/paredes para una linea de vision futura.
+- **Objetivo:** Implementar una experiencia completa inicial de niebla de guerra: ocultar mapa no revelado, revelar areas manualmente y preparar obstaculos/paredes para una linea de vision futura.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 00-07, escena versionada, luces persistentes, oscuridad global, PixiJS viewport, capas de render, bug abierto `./bugs/bug-mask-lights-to-see-through-darkness-overlay/`.
@@ -45,10 +45,10 @@
 
 ## 3. Decisiones tecnicas
 
-- **Arquitectura:** Crear modelos puros en `domain/vision` para niebla, zonas reveladas, vision por luces y obstaculos. El dominio no depende de React/Electron/PixiJS.
+- **Arquitectura:** Crear modelos puros en `domain/vision` para niebla, zonas reveladas y obstaculos. El dominio no depende de React/Electron/PixiJS.
 - **Persistencia:** Ampliar `SceneDocumentV1` de forma compatible agregando propiedades nuevas con defaults vacios en `createDefaultScene`. Si se considera ruptura para escenas existentes, mantener parse tolerante mediante defaults en schema.
 - **IPC / Electron:** No agregar IPC nuevo. Todo se guarda dentro del JSON `.ttrpgscene`.
-- **Render / PixiJS:** Usar capas claras para niebla/vision/paredes. Implementar fog of war visual con shapes de revelado manual y vision derivada de luces; mantener LoS por paredes fuera de alcance. Cambiar el cursor del viewport cuando la herramienta activa sea `Modo niebla`. El pan de mapa usa `Space` + drag y no `Grab` persistente. Los trazos de niebla se renderizan como una sola geometria compuesta por area revelada.
+- **Render / PixiJS:** Usar capas claras para niebla/manual reveal/paredes. Implementar fog of war visual con shapes de revelado manual; las luces y fuego no deben perforar la niebla. Mantener LoS por paredes fuera de alcance. Cambiar el cursor del viewport cuando la herramienta activa sea `Modo niebla`. El pan de mapa usa `Space` + drag y no `Grab` persistente. Los trazos de niebla se renderizan como una sola geometria compuesta por area revelada.
 - **Validacion:** Validar ids, coordenadas finitas, poligonos/segmentos con cantidad minima de puntos, estados enumerados y opacidades `0..1`.
 - **Dependencias nuevas:** Ninguna prevista.
 
@@ -106,9 +106,9 @@
 - Actualizar `renderLayerNames` para reservar capas futuras, por ejemplo:
   - `fogOfWar`
   - `walls`
-- Documentar orden esperado respecto a `darkness`, `lights`, `effects` y `shapesAndMeasurements`.
-- Renderizar fog of war encima del mapa y debajo de herramientas tacticas/seleccion.
-- Renderizar areas reveladas manuales y vision por luces como huecos/zonas claras.
+- Documentar orden esperado respecto a `tokens`, `darkness`, `lights`, `effects`, `magicalDarkness` y `shapesAndMeasurements`.
+- Renderizar fog of war encima de mapa, tokens, oscuridad, luces, efectos y oscuridad magica, y debajo de herramientas tacticas/seleccion.
+- Renderizar solo areas reveladas manuales como huecos/zonas claras; fuentes de luz y fuego no revelan fog of war.
 - Aplicar cursor tipo pincel/crosshair al viewport cuando `Modo niebla` este activo.
 - Evitar shaders complejos si Pixi Graphics alcanza.
 
@@ -116,7 +116,7 @@
 
 1. Corregir encabezado del spec fuente de `Spec 07` a `Spec 08` si se decide incluir limpieza documental.
 2. Revisar estado actual de `SceneDocumentV1`, `scene-schema.ts`, `createDefaultScene` y `renderLayerNames`.
-3. Diseñar tipos de dominio en `domain/vision` para niebla, zonas reveladas, vision por luces y obstaculos.
+3. Diseñar tipos de dominio en `domain/vision` para niebla, zonas reveladas y obstaculos.
 4. Agregar propiedades de fog/vision al documento de escena con defaults funcionales.
 5. Actualizar schema para aceptar escenas antiguas sin datos de vision o definir migracion/defaults si corresponde.
 6. Agregar tests de dominio y schema para escenas con vision vacia y con datos validos.
@@ -127,7 +127,7 @@
 11. Agregar shortcut `Cmd+F` / `Ctrl+F` para activar o salir de `Modo niebla`.
 12. Agregar cursor tipo pincel/crosshair en `Modo niebla`.
 13. Implementar render Pixi de fog y areas visibles, agrupando cada stroke en una geometria en vez de un objeto por circulo.
-14. Actualizar README/docs con la decision: hay fog/vision manual y por luces, pero no LoS automatica por paredes.
+14. Actualizar README/docs con la decision: la fog se revela manualmente; luces/fuego no la perforan y no hay LoS automatica por paredes.
 15. Referenciar el bug de mascaras de luces como riesgo tecnico conocido para futuras capas de vision.
 16. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 
@@ -138,7 +138,7 @@
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
 - **Build:** `pnpm build`
-- **Manual / smoke:** Ejecutar `pnpm dev`, cargar mapa, activar fog of war, revelar areas manuales con trazos largos, crear luces, verificar que luz/revelados muestran el area esperada, resetear revelado, guardar/cargar escena.
+- **Manual / smoke:** Ejecutar `pnpm dev`, cargar mapa, activar fog of war, revelar areas manuales con trazos largos, crear luces, verificar que la luz no perfora la fog y que solo los revelados manuales muestran el area esperada, resetear revelado, guardar/cargar escena.
 
 ## 8. Riesgos y mitigaciones
 
@@ -149,7 +149,7 @@
 - **Riesgo:** Reservar capas en orden incorrecto complique el bug futuro de mascaras.
   **Mitigacion:** Documentar orden de capas y mantener el bug de masking como trabajo separado.
 - **Riesgo:** Scope creep hacia linea de vision real.
-  **Mitigacion:** Implementar fog/vision manual y por luces; LoS automatica por paredes queda fuera de alcance.
+  **Mitigacion:** Implementar fog/reveal manual; luces y fuego no perforan fog, LoS automatica por paredes queda fuera de alcance.
 
 ## 9. Criterios de aceptacion
 
@@ -168,7 +168,7 @@
 - El menu contextual permite activar o salir de `Modo niebla`.
 - `Cmd+F` / `Ctrl+F` permite activar o salir de `Modo niebla` desde teclado.
 - `Modo niebla` muestra un puntero tipo pincel/crosshair.
-- Las luces visibles aportan vision actual en fog of war.
+- Las luces visibles no revelan ni perforan fog of war; solo afectan oscuridad/darkvision segun sus specs.
 - No hay LoS automatica por paredes.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 

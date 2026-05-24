@@ -15,6 +15,7 @@ import type {
   SceneDarkness,
   SceneEffect,
   SceneFireEffect,
+  SceneFogRevealArea,
   SceneFogOfWar,
   SceneGrid,
   SceneLight,
@@ -32,7 +33,6 @@ import {
 } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
-import { getVisibleAreasFromLights, type RuntimeVisionArea } from "../../domain/vision/vision";
 import type { FireCell } from "../../domain/effects/fire";
 import {
   getArcanePointerAlpha,
@@ -1949,40 +1949,15 @@ export class PixiViewport {
         : [];
     const reveals = [
       ...this.fogOfWar.revealedAreas,
-      ...activeStrokeReveal,
-      ...getVisibleAreasFromLights(this.getRenderableLights())
+      ...activeStrokeReveal
     ].filter((area) => isVisionAreaNearViewport(area, viewportBounds));
-    const circleFireReveals = this.getRenderableEffects()
-      .filter(
-        (effect): effect is SceneFireEffect =>
-          effect.kind === "fire" &&
-          effect.visible &&
-          effect.emitsLight &&
-          effect.zone.kind !== "cells" &&
-          isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds)
-      )
-      .map((effect) => ({
-        id: `vision-${effect.id}`,
-        kind: "circle" as const,
-        center: effect.position,
-        radius: effect.lightRadius
-      }));
 
-    const cellFireEffects = this.getRenderableEffects().filter(
-      (effect): effect is SceneFireEffect =>
-        effect.kind === "fire" &&
-        effect.visible &&
-        effect.emitsLight &&
-        effect.zone.kind === "cells" &&
-        effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, cell.size, viewportBounds))
-    );
-
-    if (reveals.length > 0 || circleFireReveals.length > 0 || cellFireEffects.length > 0) {
+    if (reveals.length > 0) {
       const eraseContainer = new Container();
       const revealGraphic = new Graphics();
       let hasRevealGeometry = false;
 
-      for (const area of [...reveals, ...circleFireReveals]) {
+      for (const area of reveals) {
         if (area.kind === "circle") {
           const sc = worldToScreen(area.center.x, area.center.y, this.camera, viewport);
           revealGraphic.circle(sc.x, sc.y, area.radius * zoom);
@@ -1990,11 +1965,6 @@ export class PixiViewport {
           hasRevealGeometry = true;
         } else if (area.kind === "stroke") {
           drawStrokeRevealShapeScreen(revealGraphic, area.points, area.radius * zoom, this.camera, viewport);
-          hasRevealGeometry = true;
-        } else {
-          const sc = worldToScreen(area.center.x, area.center.y, this.camera, viewport);
-          drawConeShape(revealGraphic, sc.x, sc.y, area.radius * zoom, area.angle, area.direction);
-          revealGraphic.fill({ color: 0xffffff, alpha: 1 });
           hasRevealGeometry = true;
         }
       }
@@ -2004,19 +1974,6 @@ export class PixiViewport {
         eraseContainer.addChild(revealGraphic);
       } else {
         revealGraphic.destroy();
-      }
-
-      for (const effect of cellFireEffects) {
-        if (effect.zone.kind !== "cells") continue;
-        const { bright, dim } = computeCellRings(effect.zone.cells);
-        const cellReveal = new Graphics();
-        for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
-          const sc = worldToScreen(cell.x, cell.y, this.camera, viewport);
-          cellReveal.rect(sc.x, sc.y, cell.size * zoom, cell.size * zoom);
-        }
-        cellReveal.fill({ color: 0xffffff, alpha: 1 });
-        cellReveal.blendMode = "erase";
-        eraseContainer.addChild(cellReveal);
       }
 
       this.app.renderer.render({ container: eraseContainer, target: fogTexture, clear: false });
@@ -3457,10 +3414,10 @@ function getViewportWorldBounds(
 }
 
 function isVisionAreaNearViewport(
-  area: RuntimeVisionArea,
+  area: SceneFogRevealArea,
   bounds: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number }
 ): boolean {
-  if (area.kind === "circle" || area.kind === "cone") {
+  if (area.kind === "circle") {
     return isCircleNearViewport(area.center, area.radius, bounds);
   }
 

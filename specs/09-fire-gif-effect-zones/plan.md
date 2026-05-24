@@ -61,7 +61,7 @@
 - Mantener fallback rojo vectorial si el GIF no carga.
 - Mantener handles naranja y luz para resize solo en modo `circle`; en modo `cells` no se muestran.
 - Luz del fuego en modo `cells`: calcular anillo brillante (adyacentes al fuego) y anillo tenue (adyacentes al anillo brillante) con `computeCellRings`.
-- Mantener luz del fuego en capa `lights` y como erase mask de oscuridad/fog para ambos modos.
+- Mantener luz del fuego como fuente que revela/aclara la capa de oscuridad, pero no como erase mask de fog of war. La niebla solo se revela por herramientas de niebla/manual reveal.
 - Celdas pintadas usan origen (0,0) mundial para garantizar alineacion con el grid al mover el mapa.
 
 ## 5. Plan de trabajo

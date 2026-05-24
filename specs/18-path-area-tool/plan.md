@@ -49,7 +49,7 @@
 - **Arquitectura:** El path se modela como una forma tactica de dominio (`SceneShape`) con `type: "path"`. React maneja el estado temporal de dibujo; PixiJS renderiza preview/handles y reporta interacciones. La distancia se calcula con helpers de dominio, no dentro de Pixi o JSX.
 - **Persistencia:** Extender `SceneShape` y el schema Zod para aceptar `type: "path"` con `points`. No persistir la distancia calculada; se deriva de `points`, `grid` y `settings`.
 - **IPC / Electron:** Sin cambios. Guardar/cargar escena sigue usando los flujos existentes.
-- **Render / PixiJS:** Renderizar path confirmado en la capa de formas/mediciones actual. Renderizar path temporal y handles de puntos en capa de seleccion/preview para quedar por encima de overlays.
+- **Render / PixiJS:** Renderizar path confirmado en la capa de formas/mediciones actual, como herramienta de area final por encima de mapa, tokens, oscuridad, luces, oscuridad magica y fog of war. Renderizar path temporal y handles de puntos en capa de seleccion/preview para quedar por encima de overlays.
 - **Coordenadas:** Guardar puntos en coordenadas de mundo, ya ajustados al centro de celda. Para clicks y drag de puntos, usar helper de snap al centro de celda.
 - **Validacion:** Schema debe requerir al menos dos puntos para paths persistidos. El estado temporal puede tener cero o un punto, pero nunca debe guardarse.
 - **Dependencias nuevas:** Ninguna.
