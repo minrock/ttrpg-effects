@@ -31,6 +31,7 @@ La visión en la oscuridad es una experiencia visual distinta al overlay de oscu
   - zonas de luz derivadas del fuego por celdas si ya existen en el render actual.
 - El modo debe vivir como una configuración de oscuridad/visión en escena, no como estado efímero del canvas.
 - Guardar y cargar el estado de `Visión en la oscuridad` dentro de `.ttrpgscene`.
+- **El modo darkvision solo se aplica en la ventana del jugador.**  En la ventana del DM el mapa siempre se ve a color (sin filtro de grises) independientemente de si `darkvisionEnabled` está activo en la escena.  Esta regla es coherente con que la oscuridad ambiental tampoco afecta la vista del DM.
 
 ## Fuera de alcance
 

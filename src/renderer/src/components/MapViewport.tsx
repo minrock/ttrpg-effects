@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, type JSX } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, type JSX, type ReactNode } from "react";
 import { NavigationLegend } from "./NavigationLegend";
 import {
   PixiViewport,
@@ -94,6 +94,8 @@ interface MapViewportProps {
   readonly onWaterPatternRotationChange: (elementId: string, rotation: number) => void;
   readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
   readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
+  /** Optional node rendered as a floating overlay inside the viewport (DM-only status badges, etc.). */
+  readonly overlay?: ReactNode;
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport({
@@ -157,7 +159,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onWaterLineRotationChange,
   onWaterPatternRotationChange,
   onCameraChange,
-  onArcanePointerTrigger
+  onArcanePointerTrigger,
+  overlay
 }: MapViewportProps, ref): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
@@ -393,6 +396,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       aria-label="Lienzo del mapa"
     >
       {isReadOnly ? null : <NavigationLegend />}
+      {overlay}
     </div>
   );
 });

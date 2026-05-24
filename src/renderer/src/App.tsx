@@ -106,6 +106,7 @@ import type { TacticalElementKind } from "../../domain/tools/tactical-elements";
 import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
 import type { PixiContextMenuRequest } from "../../render/pixi/PixiViewport";
 import { DmAsidePanel } from "./components/aside/DmAsidePanel";
+import { DmDarknessStatusBadge } from "./components/DmDarknessStatusBadge";
 import type { SceneAside } from "../../domain/sessions/scene-aside";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 
@@ -1990,6 +1991,7 @@ export function App(): JSX.Element {
           onWaterPatternRotationChange={handleWaterPatternRotationChange}
           onCameraChange={handleCameraChange}
           onArcanePointerTrigger={handleArcanePointerTrigger}
+          overlay={<DmDarknessStatusBadge darkness={scene.darkness} />}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
           {hasSelectedObject ? (

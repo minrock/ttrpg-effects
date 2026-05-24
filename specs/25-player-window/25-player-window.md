@@ -68,7 +68,12 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - fuego que emite luz;
   - oscuridad magica;
   - niebla de guerra.
-- En la ventana del DM, estas capas siguen funcionando como hasta ahora, salvo el nuevo control de si el DM quiere ver o no la niebla.
+- **La oscuridad ambiental y darkvision son exclusivas de la ventana del jugador.**
+  - La capa de oscuridad en la ventana del DM siempre tiene opacidad cero; el DM ve el mapa completo sin overlay de oscuridad independientemente de lo configurado en escena.
+  - El modo darkvision (mapa en blanco y negro con color en areas iluminadas) tampoco se aplica en la ventana del DM; el mapa del DM siempre se ve a color.
+  - Los controles de oscuridad del DM afectan unicamente la ventana del jugador.
+  - Esta regla es analoga al control de niebla del DM: el DM configura el efecto para jugadores sin sufrir ese efecto en su propia vista.
+- En la ventana del DM, las luces y fuego siguen siendo visibles como indicadores de posicion y estado, pero no interactuan con una capa de oscuridad activa.
 - La oscuridad magica conserva prioridad visual sobre mapa, luces y darkvision en ambas ventanas, segun su spec.
 - La ventana del jugador debe respetar el orden de capas de gameplay: mapa -> tokens -> oscuridad ambiental -> luces/efectos -> oscuridad magica -> fog of war -> herramientas de area/seleccion. En particular, los tokens quedan debajo de oscuridad/fog y la niebla queda por encima de oscuridad magica.
 
@@ -224,6 +229,9 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - La niebla de guerra se ve negra/opaca en jugador cuando esta activa.
 - La niebla de guerra puede verse con opacidad reducida o esconderse en DM segun el control nuevo.
 - Oscuridad, darkvision, luces y oscuridad magica se respetan en jugador.
+- La capa de oscuridad ambiental no se renderiza en la ventana del DM (siempre transparente); el DM ve el mapa completo.
+- El modo darkvision (mapa en escala de grises) no se aplica en la ventana del DM.
+- Los controles de oscuridad del DM modifican lo que ve el jugador pero no afectan la propia vista del DM.
 - El apuntador creado en DM aparece tambien en jugador con mismo lugar, tamano y duracion.
 - Cerrar la ventana de jugador no rompe la ventana del DM.
 - Reabrir la ventana de jugador carga el estado actual completo.

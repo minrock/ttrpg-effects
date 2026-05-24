@@ -21,6 +21,7 @@ Implementar una capa de oscuridad global, fuentes de luz que aclaren o revelen e
 - Debe poder activarse/desactivarse.
 - Las luces deben revelar visualmente el mapa debajo de esta capa, no solo dibujar una mancha clara encima.
 - El revelado debe mantenerse claro aunque la opacidad de oscuridad global este alta.
+- **La capa de oscuridad solo se renderiza en la ventana del jugador.**  En la ventana del DM la capa siempre tiene opacidad cero para que el DM vea el mapa completo.  Los controles de oscuridad del DM configuran el efecto para jugadores sin afectar la vista del DM.
 
 ## Luces
 

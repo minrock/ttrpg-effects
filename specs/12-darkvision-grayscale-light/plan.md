@@ -176,3 +176,12 @@
 - Grilla, formas, mediciones, fuego, selección, UI y overlays no-map conservan color normal.
 - Activar darkvision no modifica `darkness.enabled`; solo ignora visualmente el overlay de oscuridad.
 - Las zonas a color usan la geometría actual de luces y fuegos emisores, sin distinguir luz brillante/tenue todavía.
+
+## 13. Cambio posterior: darkvision solo en ventana de jugador
+
+El modo darkvision (mapa en escala de grises + revelado a color por luces) pasó a ser **exclusivo de la ventana del jugador** (ver spec 25 y rama `feature/dm-darkness-passthrough`).
+
+- `drawDarkvisionLayer()` fuerza `nextSig = ""` cuando `viewRole === "dm"`, lo que activa el camino de limpieza existente y elimina el filtro grayscale y la máscara de color del sprite del mapa.
+- `updateBaseMapVisibility()` guarda con condición `viewRole !== "dm"` antes de asignar el filtro grayscale, evitando que el filtro persista aunque `darkvisionEnabled` esté activo en escena.
+- El DM configura darkvision para los jugadores sin ver el efecto en su propio canvas.
+- El badge flotante del viewport DM incluye el indicador `👁 Visión en oscuridad` cuando `darkvisionEnabled` está activo.
