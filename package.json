@@ -6,8 +6,8 @@
   "type": "module",
   "main": "out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "pnpm typecheck && electron-vite build",
+    "dev": "NODE_OPTIONS=--experimental-sqlite electron-vite dev",
+    "build": "pnpm typecheck && NODE_OPTIONS=--experimental-sqlite electron-vite build",
     "dist:mac": "pnpm build && electron-builder --mac dmg",
     "lint": "eslint .",
     "test": "vitest run",
@@ -42,7 +42,12 @@
       ],
       "icon": "assets/logo/ttrpg-effects-logo.png",
       "category": "public.app-category.entertainment",
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "LSEnvironment": {
+          "NODE_OPTIONS": "--experimental-sqlite"
+        }
+      }
     },
     "dmg": {
       "title": "${productName} ${version}",

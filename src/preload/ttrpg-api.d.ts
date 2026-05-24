@@ -7,6 +7,11 @@ import type {
   ViewportCameraSnapshot
 } from "../domain/player/player-window";
 import type { MonsterTemplate } from "../domain/monster-templates/monster-template";
+import type {
+  MonsterLibraryEntry,
+  MonsterLibrarySaveInput,
+  MonsterLibrarySearchQuery
+} from "../domain/monster-library/monster-library";
 
 export interface TtrpgAppInfo {
   name: "TTRPG Effects";
@@ -26,6 +31,9 @@ export interface TtrpgApi {
   saveMonsterTemplate: (template: MonsterTemplate) => Promise<MonsterTemplateOperationResult>;
   deleteMonsterTemplate: (id: string) => Promise<MonsterTemplateOperationResult>;
   onOpenMonsterTemplateManager: (handler: () => void) => () => void;
+  searchMonsterLibrary: (query: MonsterLibrarySearchQuery) => Promise<MonsterLibrarySearchResult>;
+  getMonsterLibraryEntry: (id: string) => Promise<MonsterLibraryGetResult>;
+  saveMonsterLibraryEntry: (entry: MonsterLibrarySaveInput) => Promise<MonsterLibrarySaveResult>;
   openMapImage: () => Promise<MapOpenResult>;
   resolveMapUrl: (imagePath: string) => Promise<string | null>;
   openTokenImage: () => Promise<TokenOpenResult>;
@@ -51,6 +59,36 @@ export type MonsterTemplateOperationResult =
   | {
       readonly ok: true;
       readonly templates: readonly MonsterTemplate[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type MonsterLibrarySearchResult =
+  | {
+      readonly ok: true;
+      readonly entries: readonly MonsterLibraryEntry[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type MonsterLibraryGetResult =
+  | {
+      readonly ok: true;
+      readonly entry: MonsterLibraryEntry | null;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type MonsterLibrarySaveResult =
+  | {
+      readonly ok: true;
+      readonly entry: MonsterLibraryEntry;
     }
   | {
       readonly ok: false;

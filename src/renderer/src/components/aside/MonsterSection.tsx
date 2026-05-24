@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
 import { MonsterDetailModal } from "./MonsterDetailModal";
+import { MonsterLibraryModal } from "./MonsterLibraryModal";
 import { MonsterModal } from "./MonsterModal";
 
 interface MonsterSectionProps {
@@ -23,6 +24,7 @@ export function MonsterSection({
 }: MonsterSectionProps): JSX.Element {
   const [detailMonster, setDetailMonster] = useState<SceneMonster | null>(null);
   const [editingMonster, setEditingMonster] = useState<SceneMonster | null | "new">(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleSave = useCallback(
@@ -66,7 +68,7 @@ export function MonsterSection({
         />
       ))}
 
-      <button onClick={() => setEditingMonster("new")} style={addBtnStyle}>
+      <button onClick={() => setIsLibraryOpen(true)} style={addBtnStyle}>
         + Agregar monstruo
       </button>
 
@@ -91,6 +93,18 @@ export function MonsterSection({
           onClose={() => setEditingMonster(null)}
         />
       )}
+
+      {isLibraryOpen ? (
+        <MonsterLibraryModal
+          templates={templates}
+          existingIds={existingIds}
+          onAddMonster={(monster) => {
+            onAdd(monster);
+            setIsLibraryOpen(false);
+          }}
+          onClose={() => setIsLibraryOpen(false)}
+        />
+      ) : null}
 
       {/* Delete confirm */}
       {confirmDeleteId !== null && (

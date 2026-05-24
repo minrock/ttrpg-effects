@@ -25,6 +25,9 @@ contextBridge.exposeInMainWorld("ttrpg", {
     ipcRenderer.on("monster-template:open-manager", listener);
     return () => ipcRenderer.removeListener("monster-template:open-manager", listener);
   },
+  searchMonsterLibrary: (query: unknown) => ipcRenderer.invoke("monster-library:search", query),
+  getMonsterLibraryEntry: (id: string) => ipcRenderer.invoke("monster-library:get", id),
+  saveMonsterLibraryEntry: (entry: unknown) => ipcRenderer.invoke("monster-library:save", entry),
   openMapImage: () => ipcRenderer.invoke("map:open-image"),
   resolveMapUrl: (imagePath: string) => ipcRenderer.invoke("map:resolve-url", imagePath),
   openTokenImage: () => ipcRenderer.invoke("token:open-image"),
