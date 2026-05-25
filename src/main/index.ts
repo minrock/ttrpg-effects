@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron-scene-file-storage";
 import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
 import { ElectronMonsterTemplateRepository } from "../infrastructure/file-system/electron-monster-template-repository";
+import { SqliteMonsterLibraryRepository } from "../infrastructure/database/sqlite-monster-library-repository";
 import { registerAsideIpc } from "./ipc/aside-ipc";
 import { getRecentScenesStoragePath, installAppMenu, rebuildAppMenu, registerRecentScene } from "./app-menu";
 import { registerMapIpc } from "./ipc/map-ipc";
+import { registerMonsterLibraryIpc } from "./ipc/monster-library-ipc";
 import { registerMonsterTemplateIpc } from "./ipc/monster-template-ipc";
 import { getPlayerWindowRendererIndexPath, preloadPlayerWindow, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
 import { registerSceneIpc } from "./ipc/scene-ipc";
@@ -66,6 +68,7 @@ app.whenReady().then(async () => {
   const mapImageStorage = new ElectronMapImageStorage(() => mainWindow);
   const sceneFileStorage = new ElectronSceneFileStorage(() => mainWindow);
   const monsterTemplateRepository = new ElectronMonsterTemplateRepository(getMonsterTemplatesStoragePath());
+  const monsterLibraryRepository = new SqliteMonsterLibraryRepository(getLocalDatabasePath());
   const recentScenes = new RecentScenesStore(getRecentScenesStoragePath());
   const menuOptions = {
     storage: sceneFileStorage,
@@ -82,6 +85,7 @@ app.whenReady().then(async () => {
   registerMapIpc(mapImageStorage);
   registerAsideIpc(mapImageStorage);
   registerMonsterTemplateIpc(monsterTemplateRepository);
+  registerMonsterLibraryIpc(monsterLibraryRepository);
   const playerWindowOptions = {
     isDevelopment,
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
@@ -100,4 +104,8 @@ app.on("window-all-closed", () => {
 
 function getMonsterTemplatesStoragePath(): string {
   return `${app.getPath("userData")}/monster-templates.json`;
+}
+
+function getLocalDatabasePath(): string {
+  return `${app.getPath("userData")}/ttrpg-effects.sqlite`;
 }
