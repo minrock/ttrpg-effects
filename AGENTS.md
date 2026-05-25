@@ -34,6 +34,24 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 - **Nunca ejecutes `git add`, `git commit`, `git push` ni ninguna operacion de escritura en el repositorio sin permiso explicito del usuario en esa sesion. Espera siempre la orden antes de escribir en el historial de git.**
 - Cada vez que se mergee un nuevo spec a main, ejecutar `./scripts/build-dmg.sh` para generar un nuevo DMG instalable. El DMG queda en `dist/`.
 
+## Versionado y changelog
+
+La version de la aplicacion vive en `package.json` y debe ser la unica fuente de verdad para builds, empaquetado y nombre/version del DMG.
+
+Usar versionado semantico:
+
+- **Patch (`x.y.z+1`)**: cada bugfix o correccion que no agregue funcionalidad nueva ni rompa compatibilidad.
+- **Minor (`x.y+1.0`)**: cada feature/spec completada o cambio funcional compatible hacia atras.
+- **Major (`x+1.0.0`)**: solo cuando se rompa compatibilidad con archivos `.ttrpgscene` existentes o se requiera migracion incompatible del formato de escena.
+
+Reglas operativas:
+
+- Al finalizar una feature/spec, actualizar `package.json` con bump minor y registrar la entrada en `CHANGELOG.md`.
+- Al finalizar un bugfix, actualizar `package.json` con bump patch y registrar la entrada en `CHANGELOG.md`.
+- Al introducir un cambio incompatible del formato `.ttrpgscene`, actualizar `package.json` con bump major, documentar la incompatibilidad/migracion en `CHANGELOG.md` y actualizar los specs/planes afectados.
+- Cada entrada de `CHANGELOG.md` debe indicar fecha, tipo de cambio y resumen de cambios principales.
+- El script `./scripts/build-dmg.sh` debe leer la version desde `package.json`; no hardcodear versiones en scripts de build.
+
 ## Principios de arquitectura
 
 - Separar logica de dominio, persistencia, infraestructura y vista.
@@ -363,4 +381,3 @@ Pendiente si se decide distribuir ampliamente:
 - Electron ipcMain: https://www.electronjs.org/docs/latest/api/ipc-main
 - Electron ipcRenderer: https://www.electronjs.org/docs/latest/api/ipc-renderer
 - Electron Code Signing: https://www.electronjs.org/docs/latest/tutorial/code-signing
-
