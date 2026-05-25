@@ -1,17 +1,19 @@
-# Plan de implementacion tecnica - 08 - Niebla de Guerra y Vision Futuras
+# Plan - Niebla de Guerra
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener niebla de guerra, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/09-fog-of-war/spec.md`
+## Niebla de Guerra y Vision Futuras
+
+### 1. Resumen
+
 - **Objetivo:** Implementar una experiencia completa inicial de niebla de guerra: ocultar mapa no revelado, revelar areas manualmente y preparar obstaculos/paredes para una linea de vision futura.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 00-07, escena versionada, luces persistentes, oscuridad global, PixiJS viewport, capas de render, bug abierto `./bugs/bug-mask-lights-to-see-through-darkness-overlay/`.
-- **Nota documental:** El spec fuente fue corregido a `Spec 08` durante esta implementacion.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Implementar separacion entre oscuridad ambiental, vision actual y zonas reveladas.
 - Agregar tipos de dominio future-ready para niebla de guerra, zonas reveladas y obstaculos/paredes.
@@ -31,9 +33,8 @@
 - Renderizar zonas no reveladas oscuras y zonas reveladas/visibles claras.
 - Agregar tests de serializacion/validacion para escenas con y sin datos de vision.
 - Actualizar documentacion con decisiones y limites del MVP.
-- Corregir encabezado del spec fuente a `Spec 08` si se acepta la limpieza documental.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Linea de vision automatica con recorte por paredes.
 - Calculo real de visibilidad con paredes.
@@ -43,7 +44,7 @@
 - Reglas avanzadas de vision D&D 5e.
 - Resolver el bug de mascaras de luz; debe quedar referenciado como dependencia/riesgo separado.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** Crear modelos puros en `domain/vision` para niebla, zonas reveladas y obstaculos. El dominio no depende de React/Electron/PixiJS.
 - **Persistencia:** Ampliar `SceneDocumentV1` de forma compatible agregando propiedades nuevas con defaults vacios en `createDefaultScene`. Si se considera ruptura para escenas existentes, mantener parse tolerante mediante defaults en schema.
@@ -52,16 +53,16 @@
 - **Validacion:** Validar ids, coordenadas finitas, poligonos/segmentos con cantidad minima de puntos, estados enumerados y opacidades `0..1`.
 - **Dependencias nuevas:** Ninguna prevista.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** `SceneFogOfWar`, `SceneFogRevealArea`, `SceneFogObstacle` y helpers de `domain/vision`.
 - **Reglas puras:** Crear areas reveladas circulares y de trazo, simplificar puntos de stroke, validar segmentos de pared, activar/desactivar niebla, calcular areas visibles desde luces, unir vision persistente/manual y vision temporal.
 - **Coordenadas / unidades:** Todas las zonas y obstaculos se guardan en coordenadas de mundo. No guardar datos en pantalla.
 - **Errores de dominio:** Coordenadas invalidas, ids vacios, poligonos insuficientes, segmentos de pared sin dos puntos, opacidades fuera de rango.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/vision/vision.ts` con tipos y helpers puros.
 - Definir `revealRadius: 50` como default de `SceneFogOfWar`.
@@ -72,27 +73,27 @@
   - zonas reveladas persistentes,
   - obstaculos/paredes.
 
-### `application`
+#### `application`
 
 - No agregar casos de uso nuevos si guardar/cargar escena sigue bastando.
 - Si hace falta, agregar helpers puros para migrar/defaultar escenas sin vision.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 - La lectura/escritura sigue usando `.ttrpgscene`.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 - No agregar IPC ni dialogs.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 - No exponer APIs nuevas.
 
-### `renderer`
+#### `renderer`
 
 - Agregar controles discretos para activar fog of war, ajustar opacidad, revelar area circular y resetear revelado.
 - Exponer `Modo niebla` como modo de herramienta desde la seccion Niebla del sidebar; el pan temporal se activa con `Space`.
@@ -101,7 +102,7 @@
 - La UI debe permitir crear revelados manuales sin tapar el mapa.
 - Evitar paneles que cubran el mapa.
 
-### `render`
+#### `render`
 
 - Actualizar `renderLayerNames` para reservar capas futuras, por ejemplo:
   - `fogOfWar`
@@ -112,9 +113,9 @@
 - Aplicar cursor tipo pincel/crosshair al viewport cuando `Modo niebla` este activo.
 - Evitar shaders complejos si Pixi Graphics alcanza.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
-1. Corregir encabezado del spec fuente de `Spec 07` a `Spec 08` si se decide incluir limpieza documental.
+1. Corregir encabezado del documento consolidado de `medicion y herramientas tacticas` a `niebla de guerra` si se decide incluir limpieza documental.
 2. Revisar estado actual de `SceneDocumentV1`, `scene-schema.ts`, `createDefaultScene` y `renderLayerNames`.
 3. Diseñar tipos de dominio en `domain/vision` para niebla, zonas reveladas y obstaculos.
 4. Agregar propiedades de fog/vision al documento de escena con defaults funcionales.
@@ -131,7 +132,7 @@
 15. Referenciar el bug de mascaras de luces como riesgo tecnico conocido para futuras capas de vision.
 16. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Validacion de `domain/vision`, defaults, ids, coordenadas, segmentos, areas reveladas y simplificacion de strokes.
 - **Integration tests:** Parse/serialize de escenas sin vision y con vision futura.
@@ -140,7 +141,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, cargar mapa, activar fog of war, revelar areas manuales con trazos largos, crear luces, verificar que la luz no perfora la fog y que solo los revelados manuales muestran el area esperada, resetear revelado, guardar/cargar escena.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Agregar campos al schema rompa escenas existentes.
   **Mitigacion:** Usar defaults compatibles o parse tolerante, y cubrirlo con tests.
@@ -151,9 +152,8 @@
 - **Riesgo:** Scope creep hacia linea de vision real.
   **Mitigacion:** Implementar fog/reveal manual; luces y fuego no perforan fog, LoS automatica por paredes queda fuera de alcance.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
-- El spec fuente queda identificado como 08 o el plan documenta explicitamente la discrepancia.
 - Existen tipos de dominio para niebla/revelado/obstaculos.
 - Las escenas default incluyen estructura funcional de fog/vision.
 - Escenas existentes sin datos de vision siguen parseando/cargando.
@@ -172,16 +172,15 @@
 - No hay LoS automatica por paredes.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/09-fog-of-war/spec.md`
 - `README.md` si se agrega una seccion de arquitectura futura.
 - Posible nota en el bug `bug-mask-lights-to-see-through-darkness-overlay` si las nuevas capas influyen en la estrategia futura.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
-- [x] Encabezado del spec fuente revisado/corregido si aplica.
 - [x] Tipos de dominio de vision creados.
 - [x] Defaults de escena actualizados o schema tolerante implementado.
 - [x] Radio default de revelado definido en `50`.

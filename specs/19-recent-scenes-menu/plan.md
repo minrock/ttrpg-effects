@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 27 - Menu de Escenas Recientes
+# Plan - Escenas Recientes
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener escenas recientes, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/19-recent-scenes-menu/spec.md`
+## Menu de Escenas Recientes
+
+### 1. Resumen
+
 - **Objetivo:** Agregar un submenu nativo `File > Abrir recientes` con las ultimas 5 escenas `.ttrpgscene`, persistido entre ejecuciones y conectado al renderer por IPC seguro.
 - **Estado:** Implementado
 - **Prioridad:** Media
-- **Dependencias:** Spec 02 para formato `.ttrpgscene`, flujo actual `scene:load`, preload tipado.
+- **Dependencias:** persistencia de escena para formato `.ttrpgscene`, flujo actual `scene:load`, preload tipado.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Servicio en main para persistir recientes en `userData`.
 - Menu nativo Electron con `File > Abrir recientes`.
@@ -20,14 +23,14 @@
 - Renderer reutiliza el mismo flujo de aplicacion de resultado que `Cargar escena`.
 - Tests unitarios para la logica de lista de recientes.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Recientes de mapas.
 - UI React adicional.
 - Miniaturas.
 - Sincronizacion remota.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** La lista de recientes es infraestructura de app desktop y vive en `main`. El renderer solo escucha eventos `SceneOperationResult` y actualiza su estado visual.
 - **Persistencia:** Archivo JSON en `app.getPath("userData")`, por ejemplo `recent-scenes.json`, con lista de rutas absolutas.
@@ -36,16 +39,16 @@
 - **Validacion:** Main valida acceso a archivo y usa `loadSceneUseCase` para parsear/validar.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno
+### 4. Diseno
 
-### Dominio/infra liviana
+#### Dominio/infra liviana
 
 - Crear un helper puro para recientes:
   - `addRecentPath(paths, path, max = 5)`;
   - `removeRecentPath(paths, path)`;
   - deduplicacion estable.
 
-### Main
+#### Main
 
 - Crear `src/main/recent-scenes.ts`:
   - lee/escribe JSON;
@@ -61,20 +64,20 @@
   - registrar recientes al guardar/cargar;
   - cargar una escena por ruta explicita.
 
-### Preload
+#### Preload
 
 - Agregar `onRecentSceneOpen(handler)` a `window.ttrpg`.
 - Mantener tipos en `ttrpg-api.d.ts`.
 
-### Renderer
+#### Renderer
 
 - Reutilizar `runSceneOperation("cargada", ...)`.
 - Suscribirse a `onRecentSceneOpen` y aplicar el resultado como carga de escena.
 
-## 5. Plan de trabajo
+### 5. Plan de trabajo
 
-1. Crear/corregir spec 27.
-2. Crear/corregir este plan.
+1. Mantener el menu de aplicacion como punto de entrada de escenas recientes.
+2. Mantener este plan alineado con el comportamiento final.
 3. Agregar helper/test de lista de recientes.
 4. Implementar persistencia de recientes en main.
 5. Implementar menu nativo con submenu `Abrir recientes`.
@@ -84,7 +87,7 @@
 9. Reutilizar flujo de carga de escena en `App.tsx`.
 10. Ejecutar typecheck, tests, lint y build.
 
-## 6. Testing y verificacion
+### 6. Testing y verificacion
 
 - **Unit tests:** deduplicacion, limite de 5, reordenamiento, eliminacion.
 - **Typecheck:** `pnpm typecheck`
@@ -93,7 +96,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** `pnpm dev`, cargar/guardar escena, verificar menu `File > Abrir recientes`, abrir reciente, probar ruta rota si es viable.
 
-## 7. Riesgos y mitigaciones
+### 7. Riesgos y mitigaciones
 
 - **Riesgo:** Main intenta mutar escena visual.
   **Mitigacion:** Main solo emite `SceneOperationResult`; renderer decide como aplicarlo.
@@ -104,7 +107,7 @@
 - **Riesgo:** Exponer IPC generico.
   **Mitigacion:** Agregar solo funciones/eventos especificos.
 
-## 8. Criterios de aceptacion
+### 8. Criterios de aceptacion
 
 - [x] `File > Abrir recientes` existe.
 - [x] Lista ultimas 5 escenas.

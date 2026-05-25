@@ -1,10 +1,14 @@
-# Spec 08 - Niebla de Guerra y Vision
+# Spec - Niebla de Guerra
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de niebla de guerra, consolidando el alcance funcional vigente en el proyecto.
+
+## Niebla de Guerra y Vision
+
+### Objetivo
 
 Implementar una primera experiencia completa de niebla de guerra para sesiones presenciales: ocultar zonas no reveladas del mapa, revelar areas manualmente durante la partida y permitir que las luces existentes aporten vision actual.
 
-## Alcance
+### Alcance
 
 - Ocultar el mapa con una capa de fog of war configurable.
 - Activar/desactivar la niebla sin afectar la oscuridad ambiental existente.
@@ -22,7 +26,7 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - Usar luces visibles y fuego con emision de luz como areas de vision actual.
 - Reservar datos y capa visual para paredes/obstaculos de vision futuros.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Linea de vision automatica recortada por paredes.
 - Editor completo de paredes, puertas u obstaculos.
@@ -31,7 +35,7 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - Reglas avanzadas de vision D&D 5e.
 - Resolver el bug independiente de mascaras de luces contra la oscuridad ambiental.
 
-## Consideraciones de arquitectura
+### Consideraciones de arquitectura
 
 - Separar oscuridad ambiental, zonas reveladas persistentes, vision actual y obstaculos.
 - Guardar coordenadas de revelado y obstaculos en espacio de mundo.
@@ -39,7 +43,7 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - La niebla se renderiza en su propia capa, por encima del mapa y debajo de herramientas tacticas/seleccion.
 - El renderer no debe acceder directamente al filesystem ni a APIs privilegiadas.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El usuario puede activar fog of war desde la seccion Niebla del sidebar derecho.
 - La niebla cubre el mapa no revelado con opacidad configurable.
@@ -58,12 +62,12 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 - Las escenas guardadas conservan `fogOfWar`, zonas reveladas y obstaculos.
 - Existen tests de dominio y schema para la nueva estructura.
 
-## Riesgos
+### Riesgos
 
 - Las mascaras de render en Pixi pueden comportarse distinto entre render textures, blend modes y overlays.
 - Si se mezclan oscuridad y niebla en un solo concepto, futuras reglas de vision seran dificiles de implementar.
 - El calculo real de linea de vision puede requerir geometria adicional o shaders en una spec posterior.
 
-## Referencia
+### Referencia
 
 El bug `./bugs/bug-mask-lights-to-see-through-darkness-overlay/` sigue documentando el problema independiente donde las luces no revelan claramente el mapa a traves de la oscuridad ambiental.

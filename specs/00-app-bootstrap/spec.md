@@ -1,12 +1,16 @@
-# Spec 00 - Electron Bootstrap
+# Spec - Bootstrap de la Aplicacion
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de bootstrap de la aplicacion, consolidando el alcance funcional vigente en el proyecto.
+
+## Electron Bootstrap
+
+### Objetivo
 
 Crear el codigo inicial de la aplicacion Electron con lo minimo necesario para ejecutar el proyecto y ver una ventana abierta en macOS, manteniendo compatibilidad futura con Windows y Linux.
 
 Este entregable existe para validar el entorno tecnico antes de implementar mapa, grilla, luces o herramientas tacticas.
 
-## Alcance
+### Alcance
 
 - Inicializar una app Electron.
 - Mostrar una ventana principal.
@@ -15,7 +19,7 @@ Este entregable existe para validar el entorno tecnico antes de implementar mapa
 - Agregar scripts basicos de desarrollo.
 - Documentar como ejecutar la app localmente.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Carga de mapas.
 - Render del canvas principal.
@@ -24,14 +28,14 @@ Este entregable existe para validar el entorno tecnico antes de implementar mapa
 - Iluminacion.
 - Empaquetado final para distribucion.
 
-## Tecnologia propuesta
+### Tecnologia propuesta
 
 - Electron.
 - Vite para desarrollo frontend rapido.
 - TypeScript.
 - React como UI base, salvo que se decida una alternativa antes de implementar.
 
-## Estructura esperada
+### Estructura esperada
 
 La estructura final puede ajustarse al scaffolding elegido, pero deberia separar claramente:
 
@@ -58,7 +62,7 @@ assets/
 package.json
 ```
 
-## Logo inicial
+### Logo inicial
 
 Debe existir un logo inicial para validar carga de assets y primera identidad visual del proyecto.
 
@@ -72,7 +76,7 @@ Requerimientos del logo:
 
 El logo no es definitivo. Solo valida que el pipeline de assets funciona.
 
-## Pantalla inicial
+### Pantalla inicial
 
 La ventana inicial debe mostrar:
 
@@ -83,7 +87,7 @@ La ventana inicial debe mostrar:
 
 No debe convertirse en landing page. Es solo una pantalla tecnica de verificacion.
 
-## Scripts requeridos
+### Scripts requeridos
 
 - `npm install`
 - `npm run dev`
@@ -94,7 +98,7 @@ Opcionales para esta fase:
 - `npm run lint`
 - `npm run typecheck`
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Al ejecutar `npm run dev`, Electron abre una ventana.
 - La ventana carga sin errores visibles.
@@ -103,15 +107,14 @@ Opcionales para esta fase:
 - El repo contiene instrucciones basicas para correr el proyecto.
 - El codigo inicial queda listo para implementar las specs siguientes.
 
-## Riesgos
+### Riesgos
 
 - Elegir un scaffolding que complique el empaquetado posterior.
 - Mezclar demasiado pronto logica de producto con bootstrap tecnico.
 - No configurar bien preload/IPC y tener que refactorizar al cargar archivos locales.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - Mantener el bootstrap pequeno.
-- Evitar introducir librerias visuales pesadas antes de la Spec 01.
+- Evitar introducir librerias visuales pesadas antes de la motor visual.
 - Preparar el proyecto para que PixiJS o el motor visual elegido pueda incorporarse sin reestructurar todo.
-

@@ -1,21 +1,14 @@
-# Spec consolidado - Navigation And Interaction
+# Spec - Navegacion e Interaccion
 
-<!-- Archivo consolidado mecanicamente desde:
-- 03-interaction-model.md
-- 19-navigation-legend.md
--->
+Este documento describe de forma unificada la funcionalidad de navegacion e interaccion, consolidando el alcance funcional vigente en el proyecto.
 
----
+## Modelo de Interaccion
 
-## Fuente: 03-interaction-model.md
-
-# Spec 03 - Modelo de Interaccion
-
-## Objetivo
+### Objetivo
 
 Definir los controles base para navegar, calibrar, seleccionar, borrar y agregar elementos durante una sesion de juego.
 
-## Alcance
+### Alcance
 
 - Click derecho para menu contextual.
 - Pan del mapa.
@@ -24,7 +17,7 @@ Definir los controles base para navegar, calibrar, seleccionar, borrar y agregar
 - Borrado por boton y teclado.
 - Estados de herramienta activa.
 
-## Controles propuestos
+### Controles propuestos
 
 - Click derecho: abrir menu contextual en la posicion del mapa.
 - Click izquierdo: seleccionar o interactuar con la herramienta activa.
@@ -40,7 +33,7 @@ Controles alternativos a evaluar:
 - Boton medio para pan.
 - Atajos numericos para herramientas frecuentes.
 
-## Bloqueo de zoom/escala
+### Bloqueo de zoom/escala
 
 El bloqueo del mapa protege la calibracion fisica de la grilla.
 
@@ -51,7 +44,7 @@ Cuando esta bloqueado:
 - Las herramientas tacticas deben seguir funcionando.
 - La UI debe indicar claramente que la escala esta bloqueada.
 
-## Menu contextual
+### Menu contextual
 
 El menu contextual debe permitir crear:
 
@@ -64,7 +57,7 @@ El menu contextual debe permitir crear:
 - Luz conica.
 - Fuego animado.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El click derecho abre un menu en la posicion correcta.
 - El usuario puede seleccionar un elemento creado.
@@ -74,33 +67,29 @@ El menu contextual debe permitir crear:
 - El usuario puede bloquear o desbloquear zoom desde el menu contextual.
 - La app no confunde navegacion con calibracion de grilla.
 
-## Riesgos
+### Riesgos
 
 - Hacer que el zoom de camara y la escala calibrada sean la misma cosa sin control claro.
 - Crear demasiados atajos antes de validar uso real.
 - Menus que tapen demasiado la proyeccion.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - Separar estado de herramienta activa de estado de seleccion.
 - Mantener una maquina de estados simple para interacciones.
 - Evitar acciones destructivas sin seleccion clara.
 
----
+## Leyenda de Navegacion
 
-## Fuente: 19-navigation-legend.md
-
-# Spec 19 - Leyenda de Navegacion
-
-## Objetivo
+### Objetivo
 
 Mostrar una leyenda pill fija en la parte inferior central del viewport del mapa con los atajos de navegacion esenciales: panning con boton central del mouse o Space + click izquierdo, y zoom con la rueda del mouse.
 
-## Contexto
+### Contexto
 
 La app no tiene ningun indicador visual de los controles de navegacion. Los usuarios nuevos no saben como moverse por el mapa ni hacer zoom. Una leyenda discreta y permanente en el viewport resuelve esto sin interferir con las herramientas ni el canvas.
 
-## Alcance
+### Alcance
 
 - Renderizar un pill fijo en la parte inferior central del viewport del mapa.
 - El pill muestra tres grupos de atajo separados por divisores visuales:
@@ -111,7 +100,7 @@ La app no tiene ningun indicador visual de los controles de navegacion. Los usua
 - El pill se renderiza sobre el canvas del mapa, por encima de cualquier contenido.
 - El pill no se mueve ni desaparece al hacer pan, zoom o al cambiar de herramienta.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Ocultar o mostrar la leyenda con un boton de toggle.
 - Animaciones de entrada o salida.
@@ -119,7 +108,7 @@ La app no tiene ningun indicador visual de los controles de navegacion. Los usua
 - Legenda en otras posiciones que no sea el centro inferior.
 - Version movil o adaptaciones de tamano responsivo.
 
-## Visual
+### Visual
 
 - Forma: pill (rectangulo con bordes completamente redondeados).
 - Posicion: centrado horizontalmente, anclado al borde inferior del viewport con un margen interno.
@@ -130,7 +119,7 @@ La app no tiene ningun indicador visual de los controles de navegacion. Los usua
 - Divisor: separador vertical sutil entre el grupo Panning y el grupo Zoom.
 - Sin emojis.
 
-## Estructura de contenido
+### Estructura de contenido
 
 ```
 [ Menu  [mouse-right]  |  [Space] + [mouse-left]  |  Zoom  [mouse-scroll] ]
@@ -141,14 +130,14 @@ Cada icono de mouse muestra:
 - `mouse-left`: boton izquierdo iluminado.
 - `mouse-scroll`: rueda de scroll iluminada.
 
-## Implementacion
+### Implementacion
 
 - El pill se implementa como un componente React posicionado con `position: absolute` sobre el contenedor del `MapViewport`.
 - No requiere cambios en PixiJS ni en el canvas.
 - No requiere cambios en el estado de la app, IPC, preload, main ni filesystem.
 - Los iconos de mouse se implementan con SVG inline o con un componente SVG reutilizable.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El pill aparece centrado en la parte inferior del viewport del mapa en todo momento.
 - El pill muestra el atajo de menu contextual con click derecho.

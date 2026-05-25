@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 22 Minis virtuales y marcadores futuros
+# Plan - Tokens y Minis Virtuales
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener tokens y minis virtuales, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/14-tokens/spec.md`
+## Minis virtuales y marcadores futuros
+
+### 1. Resumen
+
 - **Objetivo:** Implementar tokens/minis virtuales opcionales que se puedan crear sobre la grilla, mover, seleccionar, configurar desde el aside derecho y guardar/cargar dentro de la escena.
 - **Estado:** Implementado
 - **Prioridad:** Media
 - **Dependencias:** Specs 04 (protocolo seguro para imagenes de mapa), 11 (aside derecho), 15 (propiedades del objeto seleccionado en sidebar), 16 (guardar/cargar escena), 21 (reglas de medicion/grilla).
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Crear tokens virtuales como una capa opcional del mapa.
 - Cargar imagenes de token usando un protocolo seguro de assets, sin `file://`, `data:` ni acceso directo del renderer al filesystem.
@@ -35,7 +38,7 @@
 - Mostrar un badge numerico cuando exista mas de un token del mismo tipo.
 - Persistir tokens en `.ttrpgscene`, incluyendo posicion, tamano, imagen, color de seleccion, badge y orden.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Combate automatizado.
 - Hojas de personaje.
@@ -45,7 +48,7 @@
 - Reglas automaticas de ocultamiento, vision, ataque o movimiento.
 - Asociacion funcional de tokens a luces o vision; queda como extension futura aunque el modelo debe permitirlo.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El dominio define tokens y reglas puras de tamano/orden. El renderer solo orquesta UI y seleccion. PixiJS queda encapsulado en adapters de render. Main/preload concentran dialogos y protocolo de imagen.
 - **Persistencia:** La escena versionada agrega `tokens: SceneToken[]`. La carga debe tolerar escenas antiguas sin tokens inicializando `tokens` en `[]`.
@@ -57,7 +60,7 @@
 - **Validacion:** Validar payloads de token con schema compartido: ids, rutas no vacias, tamanos permitidos, colores hex, posiciones finitas y orden numerico.
 - **Dependencias nuevas:** Ninguna prevista.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:**
   - `TokenSize = "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"`.
@@ -71,41 +74,41 @@
 - **Coordenadas / unidades:** La posicion se guarda en coordenadas de mundo. El tamano visual se calcula desde `grid.cellSizeWorld * footprintCells`, no desde pixeles de pantalla.
 - **Errores de dominio:** Rechazar tamanos desconocidos, posiciones no finitas, colores invalidos y tokens sin id o sin imagen cuando el flujo exige imagen.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/tokens/token.ts` o modulo equivalente con tipos, tabla de tamanos, badge y orden.
 - Actualizar `src/domain/sessions/scene-document.ts` para incluir `tokens`.
 - Actualizar `src/domain/sessions/scene-schema.ts` para validar tokens y tolerar escenas antiguas.
 - Agregar tests unitarios para footprint, badge, orden y serializacion.
 
-### `application`
+#### `application`
 
 - Crear casos de uso o helpers para crear token, duplicar token, mover token y actualizar propiedades.
 - Mantener la logica de badge/orden fuera de React.
 - Preparar puertos para carga de imagen de token si la arquitectura actual ya usa servicios de assets.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Extender el servicio de assets locales para registrar imagenes de token.
 - Mantener rutas locales en escena y resolverlas a URLs de protocolo al cargar/renderizar.
 - Manejar rutas rotas con error recuperable y placeholder visual no persistente.
 
-### `main`
+#### `main`
 
 - Agregar handler `token:open-image` con dialogo de imagenes (`png`, `jpg`, `jpeg`, `webp`, `gif` si Pixi lo soporta en el flujo actual).
 - Registrar o extender el protocolo seguro para servir imagenes de token.
 - Validar rutas seleccionadas antes de devolverlas al renderer.
 
-### `preload`
+#### `preload`
 
 - Exponer una API pequena y tipada:
   - `openTokenImage(): Promise<TokenImageSelection | null>`.
   - Si aplica, `resolveTokenAsset(path): Promise<TokenAssetReference>`.
 - No exponer APIs genericas ni objetos Electron completos.
 
-### `renderer`
+#### `renderer`
 
 - Agregar UI para crear token desde el menu contextual o desde el sidebar, manteniendo el modulo opcional.
 - Al crear token, pedir imagen, nombre y tamano; `type` se deriva internamente y no se muestra.
@@ -119,7 +122,7 @@
 - Cada fila de la lista tiene una accion para mostrar u ocultar el token.
 - Persistir cambios de propiedades en el estado de escena.
 
-### `render`
+#### `render`
 
 - Crear adapter Pixi para tokens:
   - Sprite de imagen ajustado al footprint de grilla.
@@ -130,7 +133,7 @@
 - Liberar texturas, sprites y listeners al borrar token, cargar nueva escena o destruir viewport.
 - Rehidratar imagenes desde protocolo al cargar escena.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Modelar `SceneToken`, `TokenSize`, footprint por casillas, badge y orden en dominio.
 2. Extender schema y documento de escena para persistir `tokens`.
@@ -146,7 +149,7 @@
 11. Implementar movimiento con snap a grilla y persistencia de posicion/orden/visibilidad.
 12. Verificar guardado/carga de escena con tokens y rehidratacion de imagenes.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Footprint por tamano, badge para tokens repetidos, orden, validacion schema y carga de escenas antiguas sin tokens.
 - **Integration tests:** Guardar/cargar `.ttrpgscene` con tokens y orden persistido.
@@ -155,7 +158,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** En `pnpm dev`, crear tokens de varios tamanos, moverlos, cambiar color de seleccion, duplicar token del mismo tipo para ver badge, guardar escena, cerrar/cargar escena y confirmar que imagenes y orden reaparecen.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Repetir bugs de carga de imagen por usar `file://` o `data:`.
   **Mitigacion:** Centralizar la carga de tokens en el protocolo seguro usado para assets locales y cubrir el flujo con smoke test de guardado/carga.
@@ -166,7 +169,7 @@
 - **Riesgo:** El badge se asigne a tokens que comparten tipo pero no son el mismo token.
   **Mitigacion:** Calcular y mostrar consecutivos solo por `name` normalizado.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - El usuario puede crear un token con imagen cargada por protocolo seguro.
 - El token se muestra sobre la grilla con el tamano correcto segun su categoria.
@@ -186,13 +189,13 @@
 - Guardar y cargar una escena conserva tokens, imagenes, posiciones, tamanos, color de seleccion, badge y orden.
 - Escenas antiguas sin tokens siguen cargando correctamente.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/14-tokens/spec.md` si durante implementacion se ajusta el alcance.
 - Documentacion de formato `.ttrpgscene` si existe archivo dedicado.
 - Docs o comentarios del protocolo local de assets si se agrega `token-asset:`.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.

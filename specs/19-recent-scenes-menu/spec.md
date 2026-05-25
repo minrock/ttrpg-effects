@@ -1,14 +1,18 @@
-# Spec 27 - Menu de Escenas Recientes
+# Spec - Escenas Recientes
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de escenas recientes, consolidando el alcance funcional vigente en el proyecto.
+
+## Menu de Escenas Recientes
+
+### Objetivo
 
 Agregar un acceso nativo de aplicacion para abrir rapidamente las ultimas escenas `.ttrpgscene` usadas, sin pasar por el dialogo de seleccion de archivo.
 
-## Contexto
+### Contexto
 
 El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alternar entre pocas escenas locales, por lo que tener una lista de recientes reduce friccion. La funcionalidad debe vivir en el menu nativo de Electron para integrarse con macOS y con el menu de aplicacion de Windows/Linux.
 
-## Alcance
+### Alcance
 
 - Agregar en el menu nativo `File` una entrada `Abrir recientes`.
 - Mostrar las ultimas 5 escenas abiertas o guardadas correctamente.
@@ -21,16 +25,16 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
 - Persistir la lista de recientes entre ejecuciones de la app.
 - Mantener seguridad Electron: renderer no accede a filesystem ni Electron internals.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Recientes de mapas sueltos.
 - Miniaturas de escenas en el menu.
 - Sincronizar recientes por nube.
 - Fusionar escenas o preguntar por guardado antes de abrir reciente.
 
-## Comportamiento
+### Comportamiento
 
-### Registro de recientes
+#### Registro de recientes
 
 - La lista conserva maximo 5 rutas absolutas.
 - Al abrir/guardar una escena ya existente en la lista, sube al primer lugar.
@@ -38,7 +42,7 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
 - Solo se registran escenas cargadas o guardadas exitosamente.
 - Cancelar un dialogo no modifica la lista.
 
-### Menu nativo
+#### Menu nativo
 
 - En macOS, la entrada vive bajo `File`.
 - En Windows/Linux, la entrada vive bajo el menu nativo de aplicacion equivalente.
@@ -46,7 +50,7 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
 - Si no hay recientes, muestra una entrada deshabilitada `Sin escenas recientes`.
 - Cada item muestra el nombre del archivo o una ruta abreviada legible.
 
-### Abrir reciente
+#### Abrir reciente
 
 - Al seleccionar una escena reciente:
   - main valida que la ruta exista;
@@ -55,7 +59,7 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
   - renderer actualiza escena, mapa, tokens, warnings, camara y path actual igual que `Cargar escena`.
 - Si la ruta falla, main la elimina de recientes y notifica al renderer con error.
 
-## Arquitectura
+### Arquitectura
 
 - La persistencia de recientes vive en `main`, bajo `app.getPath("userData")`.
 - El renderer recibe eventos tipados via preload:
@@ -63,7 +67,7 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
 - El renderer conserva la responsabilidad de aplicar el `SceneOperationResult`.
 - Main no conoce React ni muta estado visual.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El menu `File > Abrir recientes` aparece.
 - Al cargar o guardar una escena, aparece en recientes.

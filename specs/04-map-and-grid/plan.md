@@ -1,28 +1,19 @@
-# Plan consolidado - Map And Grid
+# Plan - Mapa y Grilla
 
-<!-- Archivo consolidado mecanicamente desde:
-- 04-map-loading-grid-calibration.plan.md
-- 05-adjust-map.plan.md
-- 21-dnd5e-diagonals.plan.md
--->
+Este documento describe de forma unificada el plan tecnico para implementar y mantener mapa y grilla, consolidando los pasos y criterios vigentes en el proyecto.
 
----
+## Carga de Mapa y Calibracion de Grilla
 
-## Fuente: 04-map-loading-grid-calibration.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 04 - Carga de Mapa y Calibracion de Grilla
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/04-map-and-grid/spec.md`
 - **Objetivo:** Permitir cargar una imagen de mapa, renderizarla en PixiJS, superponer una grilla cuadrada configurable y calibrar el tamano fisico de casilla por arrastre o valor numerico.
 - **Estado:** Implementado
 - **Prioridad:** Alta
-- **Dependencias:** Spec 00, Spec 01, Spec 02, Spec 03, PixiJS viewport, IPC/preload seguro, formato `.ttrpgscene`, dialogos nativos.
+- **Dependencias:** bootstrap de la app, motor visual, persistencia de escena, interaccion y navegacion, PixiJS viewport, IPC/preload seguro, formato `.ttrpgscene`, dialogos nativos.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Cargar imagen local desde dialogo nativo.
 - Aceptar PNG, JPG/JPEG, WEBP y HEIC cuando el runtime lo soporte.
@@ -42,7 +33,7 @@
 - Guardar/cargar mapa y grilla en `.ttrpgscene`.
 - Mostrar errores recuperables para imagen no soportada o ruta rota.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Grillas hexagonales.
 - Calibracion avanzada multi-punto.
@@ -52,7 +43,7 @@
 - Biblioteca local de assets o SQLite.
 - Medicion tactica exacta sobre la grilla; queda para specs siguientes.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El dominio define tipos/reglas de mapa y grilla. La aplicacion orquesta seleccion de imagen y actualizacion de escena. Infraestructura/main accede al filesystem y dialogos. PixiJS solo renderiza mapa/grilla a partir de estado serializable.
 - **Persistencia:** Se reutiliza `SceneDocumentV1`. El mapa guarda ruta local sin copiar archivo. La grilla guarda valores ya existentes del schema: `enabled`, `locked`, `cellSizeWorld`, `opacity`, `unit`, `distancePerCell`, `metricDistancePerCell`.
@@ -61,7 +52,7 @@
 - **Validacion:** Validar extension, existencia de archivo y soporte de carga. HEIC debe intentar cargarse si Chromium/sistema lo permite; si falla, mostrar mensaje claro y recuperable.
 - **Dependencias nuevas:** `@radix-ui/react-switch` para el switch accesible de `Ajustar grilla`. El protocolo `map-asset://` usa modulos nativos de Electron (`protocol`, `net`).
 
-### Decisiones tecnicas resueltas durante implementacion
+#### Decisiones tecnicas resueltas durante implementacion
 
 **Problema: `file://` URL bloqueada por politica de origen cruzado.**
 El renderer en desarrollo se sirve desde `http://localhost` (electron-vite). Chromium bloquea carga de recursos `file://` desde origenes HTTP. Se evaluaron dos alternativas:
@@ -77,29 +68,29 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 **Problema: overlay de oscuridad no cubria el mapa completo.**
 `drawDarknessLayer()` se llamaba antes de que `drawMapImage()` completara su carga asincrona, por lo que `mapSprite` era `null` y se usaban los bounds de fallback (mas chicos que la imagen). Solucion: llamar `drawDarknessLayer()` dentro de `drawMapImage()` despues de asignar `this.mapSprite`, igual que `drawGrid()`.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Crear/reforzar `MapImageState`, `GridState`, `GridCalibrationState`, `GridPreset`, `MapLoadResult`.
 - **Reglas puras:** Calcular lineas de grilla visibles, aplicar presets, cambiar opacidad con clamp `0..1`, actualizar `cellSizeWorld`, bloquear/desbloquear escala, validar tamanos positivos.
 - **Coordenadas / unidades:** Separar `map.scale`, `camera.zoom` y `grid.cellSizeWorld`. La calibracion modifica tamano de celda/grilla, no posicion de camara. El mapa y la grilla viven en coordenadas de mundo.
 - **Errores de dominio:** Extension no soportada, imagen inexistente, imagen no decodificable, `cellSizeWorld <= 0`, opacidad fuera de rango.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/map/map-image.ts` para estado/tipos de imagen de mapa.
 - Crear o ampliar `src/domain/grid/grid.ts` para estado, presets, opacidad, calibracion y validaciones.
 - Agregar tests unitarios para presets, clamp de opacidad, cambio numerico de celda y bloqueo de escala.
 - Mantener compatibilidad con `SceneDocumentV1`.
 
-### `application`
+#### `application`
 
 - Crear caso de uso `openMapImageUseCase` o servicio equivalente que reciba resultado de infraestructura y produzca actualizacion de escena.
 - Crear funciones para convertir estado de mapa/grilla a `SceneDocument`.
 - Mantener errores serializables para UI.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Implementar seleccion de imagen local con dialogo nativo.
 - Filtrar extensiones `png`, `jpg`, `jpeg`, `webp`, `heic`.
@@ -107,7 +98,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Construir `imageUrl` como `map-asset://` usando `pathToFileURL(imagePath).toString().replace('file:', 'map-asset:')`.
 - No copiar ni modificar el archivo original.
 
-### `main`
+#### `main`
 
 - Registrar IPC `map:open-image`.
 - Usar `dialog.showOpenDialog`.
@@ -116,13 +107,13 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Registrar esquema `map-asset` con `protocol.registerSchemesAsPrivileged` antes del evento `ready`, con privilegios `{ bypassCSP: true, corsEnabled: true, secure: true, stream: true, supportFetchAPI: true }`.
 - Manejar el protocolo en `whenReady` con `protocol.handle('map-asset', req => net.fetch(req.url.replace('map-asset:', 'file:')))`.
 
-### `preload`
+#### `preload`
 
 - Exponer `window.ttrpg.openMapImage()`.
 - Actualizar tipos de `TtrpgApi`.
 - Mantener API pequena y por accion.
 
-### `renderer`
+#### `renderer`
 
 - Agregar boton `Cargar mapa`.
 - Agregar controles compactos de grilla: visible, opacidad, switch `Ajustar grilla`, tamano de celda visible solo en ese modo, presets, bloqueo de escala.
@@ -131,7 +122,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Guardar/cargar `.ttrpgscene` con mapa/grilla actualizados.
 - Evitar paneles grandes que tapen el mapa.
 
-### `render`
+#### `render`
 
 - Extender `PixiViewport` para recibir `map` y `grid` como props/estado.
 - Cargar textura con `Assets.load(imageUrl)` y crear sprite con `new Sprite(texture)` (API canonica PixiJS v8).
@@ -142,15 +133,15 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Dibujar el handle de calibracion en la capa de seleccion para quedar por encima de niebla/oscuridad.
 - Respetar bloqueo de zoom/escala en rueda.
 - Llamar `drawDarknessLayer()` dentro de `drawMapImage()` tras asignar el sprite, para que los bounds del overlay sean correctos.
-- Mantener interacciones existentes de Spec 03.
+- Mantener interacciones existentes de interaccion y navegacion.
 
-### `renderer/index.html`
+#### `renderer/index.html`
 
 - Actualizar CSP meta tag: agregar `'unsafe-eval'` a `script-src` (requerido por PixiJS v8 para compilacion de shaders).
 - Agregar `map-asset: blob:` a `img-src`; agregar `data: map-asset: blob:` a `connect-src`; agregar `blob:` a `worker-src`.
 - Eliminar `file:` de `img-src` (reemplazado por `map-asset:`).
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Crear tipos/reglas de dominio para mapa, grilla, presets y calibracion.
 2. Agregar tests unitarios de grilla, presets, opacidad y valores invalidos.
@@ -167,7 +158,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 13. (Resuelto en debug) Corregir bounds del overlay de oscuridad llamando `drawDarknessLayer()` tras la carga asincrona del mapa.
 14. (Resuelto en iteracion posterior) Mover activacion de calibracion a un switch del sidebar y shortcut `Cmd/Ctrl+G`; ocultar input/handle fuera del modo y renderizar handle por encima de fog.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Presets de grilla, validacion de opacidad, validacion de `cellSizeWorld`, conversion de estado a escena, bloqueo de escala.
 - **Integration tests:** Casos de uso de carga de mapa con infraestructura fake.
@@ -176,7 +167,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, cargar PNG/JPG/WEBP, verificar mapa centrado, cambiar opacidad, activar `Ajustar grilla` con switch y `Cmd/Ctrl+G`, cambiar tamano de celda, aplicar presets, calibrar por arrastre con niebla activa, bloquear escala, intentar zoom con rueda y guardar/cargar escena.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** HEIC no carga de forma consistente entre plataformas.
   **Mitigacion:** Aceptar extension, intentar carga y mostrar error claro si Chromium/sistema no decodifica. Documentar limitacion antes de agregar conversion pesada.
@@ -197,7 +188,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - **Riesgo:** Overlay de oscuridad con bounds incorrectos por timing asincrono. _(Materializado y resuelto)_
   **Mitigacion:** Llamar `drawDarknessLayer()` dentro de `drawMapImage()` despues de asignar `this.mapSprite`, garantizando que `getGridBounds()` lea las dimensiones reales del sprite.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - El usuario puede cargar una imagen valida PNG/JPG/JPEG/WEBP.
 - HEIC muestra soporte real si carga, o error recuperable claro si no es viable.
@@ -214,13 +205,13 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Mapa y grilla se guardan y cargan en `.ttrpgscene`.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - Actualizar README con instrucciones para cargar mapa y probar grilla/calibracion.
 - Documentar limitacion o soporte real de HEIC.
 - Actualizar este plan si se decide agregar dependencia de conversion HEIC.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tipos/reglas de mapa creados.
@@ -258,23 +249,18 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
----
+## Ajuste de Posicion del Mapa
 
-## Fuente: 05-adjust-map.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 05-adjust-map - Ajuste de Posicion del Mapa
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/04-map-and-grid/spec.md`
 - **Objetivo:** Agregar un modo de ajuste que permite mover la imagen del mapa en X/Y dentro del lienzo para alinearla con la grilla, persistir la posicion en el archivo de sesion y restaurarla al recargar.
 - **Estado:** Draft
 - **Prioridad:** Alta
-- **Dependencias:** Spec 04 implementado (mapa cargado, grilla, `scene.map.position` existente en schema, `PixiViewport` con drag modes).
+- **Dependencias:** mapa y grilla implementado (mapa cargado, grilla, `scene.map.position` existente en schema, `PixiViewport` con drag modes).
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Boton toggle "Ajustar mapa" dentro de la seccion Grilla del sidebar derecho.
 - Flag `isMapAdjustMode` en `InteractionState` con funcion pura para modificarlo.
@@ -285,7 +271,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Al cargar imagen nueva, la posicion se resetea a `{ x: 0, y: 0 }` (comportamiento actual de `createMapImageState`).
 - Estado visual diferenciado del boton segun si el modo esta activo o no.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Mover el mapa con teclado (flechas de direccion).
 - Snap de posicion a grilla.
@@ -293,7 +279,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Rotacion o flip de la imagen.
 - Acceso concurrente al handle de calibracion mientras el modo de ajuste esta activo (se excluyen mutuamente).
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El flag de modo vive en `InteractionState` del dominio. `PixiViewport` recibe el modo via `setMapAdjustMode` y maneja el drag internamente. El renderer conecta ambos extremos. No se necesitan cambios en IPC, preload ni infraestructura.
 - **Persistencia:** `scene.map.position` ya existe en `SceneDocumentV1` y se guarda/carga via el pipeline existente de `.ttrpgscene`. Sin cambios de schema ni migraciones.
@@ -304,16 +290,16 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - **Validacion:** No se requiere validacion adicional. La posicion es un par `(x, y)` sin restricciones de rango por ahora.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Agregar `isMapAdjustMode: boolean` a `InteractionState`. Agregar funcion pura `setMapAdjustMode(state, isActive): InteractionState`.
 - **Reglas puras:** `setMapAdjustMode` — toggle de flag, cierra context menu si estaba abierto (consistente con otros toggles).
 - **Coordenadas / unidades:** El delta mundo se calcula como `screenDelta / camera.zoom`. La posicion acumulada `(x, y)` queda en unidades mundo, igual que `grid.cellSizeWorld` y las posiciones de otros elementos.
 - **Errores de dominio:** No aplica. No hay invariantes que puedan romperse con la posicion.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - **`src/domain/interaction/interaction-state.ts`**
   - Agregar `isMapAdjustMode: boolean` a la interfaz `InteractionState`.
@@ -321,23 +307,23 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
   - Agregar `setMapAdjustMode(state, isActive): InteractionState`.
   - Test unitario: `setMapAdjustMode` activa y desactiva el flag; verificar que no muta otros campos.
 
-### `application`
+#### `application`
 
 - Sin cambios. No se requiere nuevo caso de uso; la logica de actualizacion de posicion es un callback directo del renderer al estado de escena.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios.
 
-### `main`
+#### `main`
 
 - Sin cambios.
 
-### `preload`
+#### `preload`
 
 - Sin cambios.
 
-### `renderer`
+#### `renderer`
 
 - **`src/renderer/src/App.tsx`**
   - Agregar `handleToggleMapAdjust` que llama `setMapAdjustMode` sobre `interaction`.
@@ -350,7 +336,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
   - Pasar `onMapPositionChange` a `PixiViewport.create` en las opciones.
   - Agregar `useEffect` para `isMapAdjustMode` que llama `viewportRef.current?.setMapAdjustMode(isMapAdjustMode)`.
 
-### `render`
+#### `render`
 
 - **`src/render/pixi/PixiViewport.ts`**
   - Agregar `"map-move"` al union type de `PointerDragState.mode`.
@@ -364,7 +350,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
     - Llamar `drawGrid()` y `drawDarknessLayer()`.
     - Llamar `options.onMapPositionChange?.(mapSprite.position.x, mapSprite.position.y)`.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Agregar `isMapAdjustMode` y `setMapAdjustMode` a `interaction-state.ts` con test unitario.
 2. Agregar `"map-move"` al drag mode y `setMapAdjustMode` / `onMapPositionChange` a `PixiViewport`.
@@ -373,7 +359,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 5. Conectar boton, callback y estado en `App.tsx`.
 6. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint` y smoke manual.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** `setMapAdjustMode` en `interaction-state.test.ts` — activa, desactiva, no muta campos ajenos.
 - **Integration tests:** No aplica; el flujo es UI → PixiViewport → callback → estado React.
@@ -388,7 +374,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
   5. Guardar escena y recargar — verificar que el mapa aparece en la posicion ajustada.
   6. Cargar imagen nueva — verificar que la posicion vuelve a `(0, 0)`.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** El callback `onMapPositionChange` dispara un `setScene` en cada frame de arrastre, causando muchos re-renders de React.
   **Mitigacion:** React 18 batchea las actualizaciones de estado en event handlers y callbacks async. En la practica el re-render ocurre una vez por frame de animacion. Si se detecta degradacion, se puede debouncer o mover el estado de posicion local a un ref durante el drag y flushear al soltar.
@@ -402,7 +388,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - **Riesgo:** El handle de calibracion queda oculto o inaccesible si se activa ajuste sobre el mapa.
   **Mitigacion:** Los modos son mutuamente excluyentes por diseno. El usuario debe desactivar ajuste antes de calibrar, lo que es intuitivo.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - El boton "Ajustar mapa" aparece en la seccion Grilla del sidebar y se habilita solo cuando hay mapa cargado.
 - Con el modo activo, arrastrar mueve la imagen del mapa en X/Y.
@@ -412,12 +398,12 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Cargar imagen nueva resetea la posicion a `(0, 0)`.
 - `pnpm test`, `pnpm typecheck` y `pnpm lint` pasan sin errores.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/04-map-and-grid/spec.md`
 - No se requieren cambios en README ni en otros specs.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [ ] `isMapAdjustMode` y `setMapAdjustMode` agregados a `interaction-state.ts`.
 - [ ] Test unitario de `setMapAdjustMode` escrito y pasando.
@@ -437,19 +423,14 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - [ ] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [ ] Sin dependencias nuevas no justificadas.
 
----
+## D&D 5e Alternating Diagonals
 
-## Fuente: 21-dnd5e-diagonals.plan.md
+### 1. Resumen
 
-# Plan de implementación técnica - 21 D&D 5e Alternating Diagonals
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/04-map-and-grid/spec.md`
 - **Objetivo:** Añadir el modo `"dnd5e-alternating"` donde la 1ª diagonal cuesta 5 ft, la 2ª 10 ft, alternando a lo largo del recorrido completo.
 - **Estado:** Pendiente
 
-## 2. Archivos a modificar
+### 2. Archivos a modificar
 
 | Archivo | Cambio |
 |---|---|
@@ -459,9 +440,9 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 | `src/domain/measurement/measurement.test.ts` | Tests para `measureCells`, `measureDistance` y `measurePathDistance` con el nuevo modo |
 | `src/renderer/src/App.tsx` | Añadir `<option>` en el `<select>` de diagonal |
 
-## 3. Cambios detallados
+### 3. Cambios detallados
 
-### 3a. `scene-document.ts` — tipo DiagonalMode
+#### 3a. `scene-document.ts` — tipo DiagonalMode
 
 **Línea 4**, añadir valor al union:
 
@@ -469,9 +450,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 export type DiagonalMode = "dnd5e-default" | "dnd5e-alternating" | "manhattan" | "euclidean";
 ```
 
----
-
-### 3b. `scene-schema.ts` — validación Zod
+#### 3b. `scene-schema.ts` — validación Zod
 
 **Línea 176**, ampliar el enum:
 
@@ -479,9 +458,7 @@ export type DiagonalMode = "dnd5e-default" | "dnd5e-alternating" | "manhattan" |
 diagonalMode: z.enum(["dnd5e-default", "dnd5e-alternating", "manhattan", "euclidean"]),
 ```
 
----
-
-### 3c. `measurement.ts` — lógica de medición
+#### 3c. `measurement.ts` — lógica de medición
 
 **Paso 1 — nueva función pura `measureCellsAlternating`**
 
@@ -543,9 +520,7 @@ if (settings.diagonalMode === "dnd5e-alternating") {
 }
 ```
 
----
-
-### 3d. `measurement.test.ts` — tests nuevos
+#### 3d. `measurement.test.ts` — tests nuevos
 
 Añadir en el bloque `describe("measurement")`:
 
@@ -610,9 +585,7 @@ describe("dnd5e-alternating diagonal mode", () => {
 });
 ```
 
----
-
-### 3e. `App.tsx` — selector UI
+#### 3e. `App.tsx` — selector UI
 
 Línea ~1757, después de `<option value="dnd5e-default">D&D 5e</option>`:
 
@@ -620,9 +593,7 @@ Línea ~1757, después de `<option value="dnd5e-default">D&D 5e</option>`:
 <option value="dnd5e-alternating">D&D 5e Alt.</option>
 ```
 
----
-
-## 4. Orden de trabajo
+### 4. Orden de trabajo
 
 1. `scene-document.ts` — ampliar `DiagonalMode`.
 2. `scene-schema.ts` — ampliar `z.enum`.
@@ -631,13 +602,13 @@ Línea ~1757, después de `<option value="dnd5e-default">D&D 5e</option>`:
 5. `App.tsx` — añadir `<option>`.
 6. `pnpm typecheck && pnpm test`.
 
-## 5. Verificación
+### 5. Verificación
 
 - `pnpm typecheck` — sin errores.
 - `pnpm test` — todos los tests pasan incluyendo los nuevos.
 - Manual: crear un cone/circle/path; cambiar a "D&D 5e Alt."; verificar que el label de distancia cambia al trazar diagonales.
 
-## 6. Checklist
+### 6. Checklist
 
 - [x] `DiagonalMode` actualizado en `scene-document.ts`.
 - [x] `z.enum` actualizado en `scene-schema.ts`.

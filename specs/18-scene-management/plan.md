@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 16 Nueva Escena y Reinicio de Estado
+# Plan - Gestion de Escena
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener gestion de escena, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/18-scene-management/spec.md`
+## Nueva Escena y Reinicio de Estado
+
+### 1. Resumen
+
 - **Objetivo:** Agregar una accion `Nueva escena` que aparezca solo cuando haya contenido o cambios, pregunte si se desea guardar antes de descartar y luego reinicie la app al estado inicial sin cerrar Electron.
 - **Estado:** Implementado
 - **Prioridad:** Alta
-- **Dependencias:** Spec 02 (`.ttrpgscene`, `saveScene`, `loadScene`), estado inicial `createDefaultScene`, flujo actual de acciones de escena en `App.tsx`.
+- **Dependencias:** persistencia de escena (`.ttrpgscene`, `saveScene`, `loadScene`), estado inicial `createDefaultScene`, flujo actual de acciones de escena en `App.tsx`.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Mostrar `Nueva escena` junto a las acciones principales solo cuando la escena no este vacia o tenga cambios.
 - Detectar contenido descartable desde el estado actual de escena e interaccion.
@@ -23,7 +26,7 @@
 - Mantener la escena intacta si el usuario cancela el modal o cancela/falla el guardado.
 - Estilos del modal consistentes con la UI actual.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Autosave.
 - Historial de escenas recientes.
@@ -32,7 +35,7 @@
 - Confirmacion al cerrar ventana.
 - Nuevo canal IPC para crear escena.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El reset de escena se orquesta desde `renderer` porque es una accion de UI sobre estado ya cargado. La creacion del documento inicial reutiliza `domain/sessions/default-scene.ts`.
 - **Persistencia:** No hay cambios de formato. `Guardar y crear nueva` llama la API existente `window.ttrpg.saveScene(scene, options?)` antes de resetear y reusa `currentFilePath` como sugerencia del dialogo si la escena ya tenia archivo cargado/guardado.
@@ -41,16 +44,16 @@
 - **Validacion:** El guardado mantiene la validacion existente de `parseSceneDocument`/`serializeSceneDocument`.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** No se agregan tipos persistentes.
 - **Reglas puras:** Agregar una funcion testeable para determinar si la escena tiene contenido descartable, por ejemplo `hasSceneContent(scene, interactionElements?)`.
 - **Coordenadas / unidades:** Sin cambios.
 - **Errores de dominio:** Sin errores nuevos. Errores de guardado siguen viniendo del flujo existente.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear o extender modulo de sesiones con helper puro:
   - `hasSceneContent(scene: SceneDocument, tacticalElementsCount?: number): boolean`.
@@ -59,23 +62,23 @@
   - mapa cargado devuelve `true`;
   - luces/efectos/formas/fog revelado/devices de oscuridad o grilla modificada devuelven `true`.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - En `App.tsx`:
   - derivar `canCreateNewScene` usando helper de dominio y elementos tacticos en `interaction`.
@@ -94,11 +97,11 @@
 - En `styles.css`:
   - estilos de backdrop/modal, botones primario/secundario/destructivo y layout accesible.
 
-### `render`
+#### `render`
 
 - No se esperan cambios directos. Verificar que el reset por props limpia capas visuales.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Revisar estado inicial y defaults actuales (`createDefaultScene`, estados locales de `App.tsx`).
 2. Implementar helper puro `hasSceneContent`.
@@ -113,7 +116,7 @@
 11. Ejecutar validaciones automaticas.
 12. Realizar smoke manual en Electron.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Helper `hasSceneContent` con default, mapa, luces, efectos, formas, fog, oscuridad/darkvision y grilla modificada.
 - **Integration tests:** No se esperan nuevos; el guardado existente ya esta cubierto por casos de uso.
@@ -129,7 +132,7 @@
   - cancelar dialogo de guardado conserva todo;
   - guardar exitoso limpia la escena.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Reset parcial que deja seleccion, modos o capas visuales antiguas.
   **Mitigacion:** Centralizar `resetToNewScene` y verificar manualmente canvas, status y sidebar.
@@ -140,7 +143,7 @@
 - **Riesgo:** Modal destructivo demasiado facil de confirmar accidentalmente.
   **Mitigacion:** Separar visualmente `Cancelar`, `Guardar y crear nueva` y `Descartar cambios`.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - `Nueva escena` no aparece cuando la escena esta vacia.
 - `Nueva escena` aparece cuando hay mapa, luces, efectos, formas, mediciones, fog o configuracion relevante.
@@ -155,12 +158,12 @@
 - No cambia el schema `.ttrpgscene`.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/18-scene-management/spec.md`
 - `specs/18-scene-management/plan.md`
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.

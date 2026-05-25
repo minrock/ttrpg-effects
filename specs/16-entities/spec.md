@@ -1,40 +1,20 @@
-# Spec - Entities
+# Spec - Sistema de Entidades
 
-<!-- Archivo consolidado mecanicamente desde:
-- 16-entity-system/spec.md
-- 17-entity-library/spec.md
-- 18-entity-scene-panel/spec.md
-- 19-entity-templates-and-rendering/spec.md
--->
+Este documento describe de forma unificada la funcionalidad de sistema de entidades, consolidando el alcance funcional vigente en el proyecto.
 
----
+## Biblioteca Persistente de Monstruos
 
-## Fuente: 16-entity-system/spec.md
-
-# Spec - Entity System
-
-<!--
-No habia una spec antigua consolidada para este modulo en `main`.
-Carpeta reservada para la futura unificacion de entidades.
--->
-
----
-
-## Fuente: 17-entity-library/spec.md
-
-# Spec 30 - Biblioteca Persistente de Monstruos
-
-## Objetivo
+### Objetivo
 
 Agregar una biblioteca local persistente de monstruos para que el DM pueda reutilizar statblocks entre escenas. Al agregar un monstruo a la campaña/escena, el usuario puede elegir uno existente desde un listado con buscador o crear uno nuevo. Si crea uno nuevo, este se guarda en la base de datos local y se inserta inmediatamente en la escena actual.
 
-## Contexto
+### Contexto
 
-El aside del DM ya permite crear monstruos dentro de una escena y el spec 29 agrego templates Markdown/CSS para facilitar statblocks por sistema. Sin embargo, los monstruos creados viven solamente dentro de la escena. Para preparar campañas de forma mas eficiente, se necesita una biblioteca persistente que sobreviva entre escenas y pueda alimentar el flujo de agregar monstruos.
+El aside del DM ya permite crear monstruos dentro de una escena y el sistema de templates de monstruos agrega plantillas Markdown/CSS para facilitar statblocks por sistema. Sin embargo, los monstruos creados viven solamente dentro de la escena. Para preparar campañas de forma mas eficiente, se necesita una biblioteca persistente que sobreviva entre escenas y pueda alimentar el flujo de agregar monstruos.
 
 La app debe seguir funcionando sin servicios externos. La persistencia recomendada es SQLite local en el proceso `main`, guardada bajo `app.getPath("userData")`, expuesta al renderer mediante preload + IPC tipado.
 
-## Alcance
+### Alcance
 
 - Crear una biblioteca local persistente de monstruos respaldada por SQLite.
 - Agregar flujo de seleccion al hacer `+ Agregar monstruo`:
@@ -59,7 +39,7 @@ La app debe seguir funcionando sin servicios externos. La persistencia recomenda
   - metadata minima de auditoria local.
 - Mantener el `.ttrpgscene` como formato portable de escena: la escena guarda la instancia de monstruo, no depende de que la biblioteca exista.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Sincronizacion cloud o multiusuario.
 - Marketplace/descarga remota de monstruos.
@@ -70,9 +50,9 @@ La app debe seguir funcionando sin servicios externos. La persistencia recomenda
 - Busqueda full-text avanzada en esta primera iteracion.
 - Imagen obligatoria del monstruo.
 
-## Comportamiento
+### Comportamiento
 
-### Abrir biblioteca desde agregar monstruo
+#### Abrir biblioteca desde agregar monstruo
 
 - En el aside DM, la accion `+ Agregar monstruo` deja de abrir directamente el formulario vacio.
 - En su lugar abre un modal de biblioteca de monstruos.
@@ -83,7 +63,7 @@ La app debe seguir funcionando sin servicios externos. La persistencia recomenda
   - sistema y template usado si existe.
 - El listado debe permitir seleccionar un monstruo y agregarlo a la escena.
 
-### Buscar y seleccionar
+#### Buscar y seleccionar
 
 - El usuario puede escribir en el buscador.
 - El listado filtra por nombre y, si es razonable en la implementacion, tambien por sistema.
@@ -96,7 +76,7 @@ La app debe seguir funcionando sin servicios externos. La persistencia recomenda
   - `name` se copia desde la biblioteca;
   - `id` se slugifica y se hace unico dentro de la escena.
 
-### Crear monstruo nuevo
+#### Crear monstruo nuevo
 
 - Desde el modal de biblioteca, el usuario puede elegir `Nuevo monstruo`.
 - Se abre el formulario de monstruo actual, pero conectado a la biblioteca.
@@ -112,15 +92,15 @@ La app debe seguir funcionando sin servicios externos. La persistencia recomenda
   - se agrega inmediatamente una instancia a la escena actual;
   - el modal se cierra o vuelve al listado con feedback claro.
 
-### Editar monstruo de escena vs biblioteca
+#### Editar monstruo de escena vs biblioteca
 
 - Editar un monstruo ya agregado a la escena modifica la instancia de escena, como hoy.
 - En esta primera iteracion, editar una instancia de escena no actualiza automaticamente la biblioteca.
 - Si se requiere guardar cambios de una instancia hacia biblioteca, quedara para un spec futuro como `Actualizar entrada de biblioteca`.
 
-## Modelo de datos
+### Modelo de datos
 
-### Entidad de biblioteca
+#### Entidad de biblioteca
 
 ```ts
 type MonsterLibraryEntry = {
@@ -135,7 +115,7 @@ type MonsterLibraryEntry = {
 };
 ```
 
-### Instancia en escena
+#### Instancia en escena
 
 `SceneMonster` mantiene su rol actual como copia/instancia dentro de una escena:
 
@@ -152,7 +132,7 @@ type SceneMonster = {
 
 La escena no debe guardar solo una referencia a la biblioteca. Debe guardar los datos necesarios para abrirse de forma portable aunque la DB local no exista.
 
-## Persistencia SQLite
+### Persistencia SQLite
 
 La DB vive en `app.getPath("userData")`, por ejemplo:
 
@@ -187,7 +167,7 @@ Migraciones:
 - Deben ejecutarse desde `main` al iniciar la app o al inicializar el repositorio.
 - La version de migracion puede vivir en `PRAGMA user_version` o tabla `schema_migrations`.
 
-## Arquitectura
+### Arquitectura
 
 - `domain` define `MonsterLibraryEntry`, validaciones y conversion de entrada de biblioteca a `SceneMonster`.
 - `application` define casos de uso:
@@ -204,7 +184,7 @@ Migraciones:
 - `renderer` consume la API desde el modal de biblioteca.
 - El renderer no accede directamente a SQLite, filesystem ni Electron internals.
 
-## IPC
+### IPC
 
 Canales sugeridos:
 
@@ -214,7 +194,7 @@ Canales sugeridos:
 
 Los payloads deben validarse en `main` antes de tocar la DB.
 
-## UI / UX
+### UI / UX
 
 - Modal amplio, tipo grilla/listado, reutilizando el look del aside DM.
 - Buscador arriba, siempre visible.
@@ -225,10 +205,10 @@ Los payloads deben validarse en `main` antes de tocar la DB.
 - Si no hay resultados:
   - mostrar estado vacio;
   - ofrecer `Crear monstruo nuevo`.
-- El formulario de nuevo monstruo debe mantener el selector de template del spec 29.
+- El formulario de nuevo monstruo debe mantener el selector de template del templates de monstruos.
 - El sistema puede autocompletarse desde el template seleccionado si el template tiene `system`.
 
-## Validacion
+### Validacion
 
 - `name` requerido, trim, longitud razonable.
 - `system` requerido, trim, con default si viene vacio desde UI.
@@ -238,7 +218,7 @@ Los payloads deben validarse en `main` antes de tocar la DB.
 - Fechas en ISO string.
 - Queries parametrizadas, nunca concatenar SQL con input de usuario.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Al hacer `+ Agregar monstruo`, se abre el modal de biblioteca.
 - El modal muestra una grilla/listado con buscador.
@@ -254,38 +234,23 @@ Los payloads deben validarse en `main` antes de tocar la DB.
 - Hay migracion inicial versionada.
 - Tests relevantes cubren conversion de biblioteca a `SceneMonster` y validaciones basicas.
 
----
+## Panel lateral izquierdo del DM: Monstruos, NPCs y Notas
 
-## Fuente: 18-entity-scene-panel/spec.md
-
-# Spec consolidado - Entity Scene Panel
-
-<!-- Archivo consolidado mecanicamente desde:
-- 26-dm-scene-aside.md
-- 28-dm-map-labels.md
--->
-
----
-
-## Fuente: 26-dm-scene-aside.md
-
-# Spec 26 - Panel lateral izquierdo del DM: Monstruos, NPCs y Notas
-
-## Estado
+### Estado
 
 Implementada.
 
-## Objetivo
+### Objetivo
 
 Agregar un panel lateral izquierdo a la ventana del DM que permita gestionar Monstruos, NPCs y Notas asociadas a la escena activa. El panel es exclusivo de la ventana del DM: no aparece en la ventana de jugador. Algunos elementos (imágenes de monstruos, nombre e imagen de NPCs) pueden mostrarse opcionalmente en la ventana de jugador cuando ya existan en la escena.
 
-## Contexto
+### Contexto
 
 Durante una sesión de mesa, el DM necesita llevar registro de los enemigos presentes, los personajes no jugadores y anotaciones sobre la situación de la escena: estado de combate, motivaciones, secretos, condiciones o cualquier información que no conviene dejar solo en papel. Actualmente la app no ofrece un lugar dentro de la escena para estas anotaciones.
 
 El panel no reemplaza una hoja de personaje ni un sistema de iniciativa; es un bloc de campaña ligero embebido en la escena para que el DM tenga todo visible sin salir de la app.
 
-## Alcance
+### Alcance
 
 - Agregar un panel lateral izquierdo a la ventana del DM.
 - El panel es colapsable para ampliar el viewport del mapa cuando no se necesite.
@@ -298,9 +263,9 @@ El panel no reemplaza una hoja de personaje ni un sistema de iniciativa; es un b
 - En la ventana de jugador, los monstruos visibles muestran solo su imagen. Los NPCs visibles muestran nombre e imagen. Las notas nunca se muestran en jugador.
 - La visibilidad de cada monstruo o NPC en la ventana de jugador se controla con un toggle en el panel del DM.
 
-## Secciones del panel
+### Secciones del panel
 
-### Monstruos
+#### Monstruos
 
 - Lista de monstruos asociados a la escena.
 - Cada ítem muestra: thumbnail de imagen (si existe) y nombre.
@@ -308,7 +273,7 @@ El panel no reemplaza una hoja de personaje ni un sistema de iniciativa; es un b
 - Hacer clic sobre el área de thumbnail + nombre abre el **modal de detalle** del monstruo.
 - Botón `+` o equivalente para agregar un monstruo nuevo.
 
-### NPCs
+#### NPCs
 
 - Lista de NPCs asociados a la escena.
 - Cada ítem muestra: thumbnail de imagen (si existe) y nombre.
@@ -316,7 +281,7 @@ El panel no reemplaza una hoja de personaje ni un sistema de iniciativa; es un b
 - Hacer clic sobre el área de thumbnail + nombre abre el **modal de detalle** del NPC.
 - Botón `+` o equivalente para agregar un NPC nuevo.
 
-### Notas
+#### Notas
 
 - Lista de notas de la escena.
 - Las notas pueden ser de raíz (sin padre) o de primer nivel (hijo de una nota raíz). Máximo dos niveles.
@@ -326,11 +291,11 @@ El panel no reemplaza una hoja de personaje ni un sistema de iniciativa; es un b
 - Eliminar una nota raíz elimina también sus notas hijas.
 - Botón `+` o equivalente para agregar una nota raíz nueva.
 
-## Modales
+### Modales
 
 Toda creación, edición y presentación ocurre en modales. Cada tipo tiene su propio modal.
 
-### Modal de detalle: Monstruo / NPC
+#### Modal de detalle: Monstruo / NPC
 
 Se abre al hacer clic sobre el ítem en la lista del panel. Es el punto central de interacción para la presentación a jugadores.
 
@@ -344,28 +309,28 @@ Se abre al hacer clic sobre el ítem en la lista del panel. Es el punto central 
 - **Tamaño del modal**: mínimo 80 % del viewport de ancho y 60 % del viewport de alto.
 - **Comportamiento al cerrar**: cerrar el modal (botón, backdrop o transición a edición) siempre establece `visibleToPlayer = false` si el ítem estaba visible. La presentación está ligada a la vida del modal.
 
-### Modal de captura: Monstruo
+#### Modal de captura: Monstruo
 
 - **Imagen:** área de carga de imagen local (click o drag & drop). Muestra preview si ya hay imagen. No es obligatoria.
 - **Nombre:** campo de texto libre.
 - **Notas:** editor WYSIWYG con renderización Markdown directa (Tiptap). Igual que las notas de escena.
 - Acciones: Guardar / Cancelar.
 
-### Modal de captura: NPC
+#### Modal de captura: NPC
 
 - **Imagen:** área de carga de imagen local (click o drag & drop). Muestra preview si ya hay imagen. No es obligatoria.
 - **Nombre:** campo de texto libre.
 - **Notas:** editor WYSIWYG con renderización Markdown directa (Tiptap).
 - Acciones: Guardar / Cancelar.
 
-### Modal de captura: Nota
+#### Modal de captura: Nota
 
 - **Ruta del padre:** muestra la ruta de jerarquía en formato `/ nombre-padre / nombre-nota` si tiene padre, o `/` si es una nota raíz. No es editable directamente: refleja quién es el padre. Se muestra en la parte superior del modal como breadcrumb.
 - **Nombre:** campo de texto libre. Debajo del campo se muestra en tiempo real el slug generado (guiones medios, minúsculas, sin caracteres especiales). El slug es el identificador persistido.
 - **Contenido:** editor WYSIWYG con renderización directa en estilo Notion (el usuario escribe Markdown y la sintaxis se convierte visualmente en tiempo real: `**texto**` se convierte en **texto**, `# Título` se convierte en un encabezado, etc.).
 - Acciones: Guardar / Cancelar.
 
-### Modal de vista: Nota
+#### Modal de vista: Nota
 
 Cuando el DM solo quiere leer una nota sin editar:
 
@@ -374,11 +339,11 @@ Cuando el DM solo quiere leer una nota sin editar:
 - **Contenido:** contenido MD renderizado como HTML, sin editor activo.
 - Acciones: Cerrar / Editar (abre el modal de captura).
 
-## Editor WYSIWYG para notas
+### Editor WYSIWYG para notas
 
 El editor debe ofrecer renderización directa en línea (inline rendering): el Markdown no se muestra como texto plano con asteriscos sino que se aplica el formato visualmente mientras se escribe, similar a Notion o Typora.
 
-### Librería recomendada: Tiptap
+#### Librería recomendada: Tiptap
 
 Tiptap (sobre ProseMirror) es la opción recomendada:
 
@@ -393,7 +358,7 @@ Alternativa si Tiptap resulta excesiva en bundle o en complejidad de integració
 
 La decisión final entre Tiptap y la implementación propia se toma en el plan técnico, evaluando tamaño de bundle y complejidad de integración con el stack actual.
 
-## Visibilidad en la ventana de jugador
+### Visibilidad en la ventana de jugador
 
 - El DM controla con un toggle individual si cada monstruo o NPC se muestra en la ventana de jugador.
 - Un monstruo con visibilidad activada en jugador muestra únicamente su imagen (sin nombre).
@@ -403,7 +368,7 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - La visibilidad de jugador es estado de escena, no preferencia de UI local.
 - **Al cerrar el modal de detalle** del DM, el ítem se oculta automáticamente de la ventana de jugador. La presentación está ligada al ciclo de vida del modal de detalle.
 
-### Overlay de jugador
+#### Overlay de jugador
 
 - Cuando hay uno o más ítems visibles, se muestra un overlay de presentación que **cubre toda la ventana de jugador** con un fondo oscuro semitransparente (y blur sutil).
 - Las entidades visibles se presentan centradas en la pantalla dentro de un contenedor decorativo.
@@ -411,9 +376,9 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - **Zoom**: hacer clic sobre la imagen la amplía a `min(72vw, 72vh)` (y vuelve a 440 px al hacer clic de nuevo). Un icono 🔍 en la esquina inferior derecha indica la acción disponible.
 - Si hay múltiples entidades visibles simultáneamente, aparecen en fila horizontal con scroll si supera el ancho disponible.
 
-## Modelo de interacción
+### Modelo de interacción
 
-### Panel lateral izquierdo
+#### Panel lateral izquierdo
 
 - El panel se muestra por defecto al abrir o cargar una escena.
 - El panel puede ocultarse con un control visible (botón o flecha). Al ocultarse, el viewport del mapa se expande para ocupar el espacio liberado.
@@ -421,20 +386,20 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - Las tres secciones (Monstruos, NPCs, Notas) coexisten en el panel; pueden estar siempre visibles en scroll o ser acordeones colapsables (a definir en plan).
 - El panel no interfiere con herramientas de edición sobre el canvas.
 
-### Agregar / editar
+#### Agregar / editar
 
 - Clic en `+` abre el modal de captura correspondiente vacío.
 - Clic en editar abre el modal de captura correspondiente con los datos actuales.
 - Guardar escribe el ítem en el estado de escena y cierra el modal.
 - Cancelar descarta cambios y cierra el modal.
 
-### Eliminar
+#### Eliminar
 
 - Eliminar muestra una confirmación mínima antes de borrar.
 - Eliminar un monstruo o NPC lo quita de la escena; si estaba visible en jugador, deja de aparecer.
 - Eliminar una nota raíz elimina también sus notas hijas (con confirmación explícita si tiene hijos).
 
-### Notas anidadas
+#### Notas anidadas
 
 - Solo existen dos niveles: nota raíz y nota hija.
 - Una nota hija no puede tener hijos.
@@ -442,7 +407,7 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - Al agregar una nota hija, el modal de captura muestra la ruta del padre en el breadcrumb.
 - Al editar una nota hija, el breadcrumb refleja su padre.
 
-## Layout y estilo
+### Layout y estilo
 
 - El panel lateral izquierdo vive a la izquierda del canvas, debajo de la toolbar principal si existe.
 - Ancho fijo suficiente para thumbnails de imagen, nombre y controles de ítem sin truncar.
@@ -452,7 +417,7 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - El estilo debe seguir el tema oscuro actual de la app.
 - Los controles del panel no deben confundirse visualmente con controles de edición del canvas.
 
-## Persistencia
+### Persistencia
 
 - Los monstruos, NPCs y notas se guardan dentro del archivo `.ttrpgscene` de la escena activa.
 - Se agrega un campo opcional `sceneAside` (o similar) al schema de escena.
@@ -461,14 +426,14 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - El slug de la nota se calcula al capturar y se persiste como identificador; el nombre legible se persiste por separado.
 - La visibilidad de cada monstruo/NPC en jugador se persiste como campo del ítem en la escena.
 
-## IPC / Electron
+### IPC / Electron
 
-- Los cambios en el panel del DM se sincronizan a la ventana de jugador mediante los canales IPC existentes de actualización de escena (ver Spec 25).
+- Los cambios en el panel del DM se sincronizan a la ventana de jugador mediante los canales IPC existentes de actualización de escena (ver ventana de jugador).
 - No se requieren canales IPC nuevos si los existentes ya transfieren el estado completo de escena.
 - Si la imagen se persiste como ruta absoluta, la ventana de jugador debe poder resolverla con el mismo protocolo seguro usado para mapas/tokens.
 - No se exponen APIs de Node.js o Electron directamente al renderer.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Sistema de iniciativa o combate.
 - Hoja de personaje o bloque de estadísticas.
@@ -481,7 +446,7 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - Rich text más allá de lo que soporte la librería elegida (tablas, imágenes inline en notas, etc.).
 - Drag & drop para reordenar ítems de la lista.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - La ventana del DM muestra un panel lateral izquierdo.
 - El panel lateral puede ocultarse y mostrarse; el canvas ajusta su tamaño al espacio disponible.
@@ -513,7 +478,7 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - El panel lateral no aparece en la ventana de jugador.
 - No se agregan accesos directos del renderer a Node.js, Electron internals o filesystem.
 
-## Riesgos
+### Riesgos
 
 - **Tamaño de bundle con Tiptap:** ProseMirror es pesado; si afecta el tiempo de carga de la app, evaluar la alternativa de implementación propia con preview separado.
   **Mitigación:** lazy loading del editor; el modal solo carga Tiptap cuando se abre por primera vez.
@@ -521,35 +486,31 @@ La decisión final entre Tiptap y la implementación propia se toma en el plan t
 - **Portabilidad de imágenes entre máquinas:** las rutas absolutas son frágiles si la escena se mueve a otra máquina, igual que ocurre con mapas y tokens hoy.
   **Mitigación:** mismo comportamiento que el patrón existente de tokens/mapas; la portabilidad cross-máquina está fuera de alcance de esta spec.
 
-- **Sincronización a jugador del nuevo campo de escena:** si el IPC de Spec 25 serializa solo campos conocidos, el nuevo campo `sceneAside` podría perderse en tránsito.
+- **Sincronización a jugador del nuevo campo de escena:** si el IPC de ventana de jugador serializa solo campos conocidos, el nuevo campo `sceneAside` podría perderse en tránsito.
   **Mitigación:** verificar que el canal IPC usa serialización completa del objeto de escena o añadir el nuevo campo al schema de transferencia.
 
 - **Colisión de slugs en notas:** dos notas con el mismo nombre raíz tendrían el mismo slug.
   **Mitigación:** al guardar, verificar unicidad en el nivel correspondiente y agregar sufijo numérico si es necesario (`mi-nota`, `mi-nota-2`).
 
-## Notas de implementación futura
+### Notas de implementación futura
 
 - `sceneAside` es un campo opcional de primer nivel en el schema de escena Zod; si no existe, se inicializa como `{ monsters: [], npcs: [], notes: [] }`.
 - Las notas hija guardan referencia al slug del padre, no a un id autogenerado; esto simplifica la edición manual del `.ttrpgscene`.
 - La visibilidad de monstruos/NPCs en jugador (`visibleToPlayer: boolean`) se incluye en el estado de escena para que la sincronización IPC la transmita automáticamente.
-- El panel lateral izquierdo es un componente React independiente del sidebar derecho existente (Spec 11). Ambos paneles coexisten.
+- El panel lateral izquierdo es un componente React independiente del sidebar derecho existente (sidebar derecho). Ambos paneles coexisten.
 - Si en el futuro se quieren relacionar monstruos/NPCs con tokens del mapa, el slug puede servir como clave de relación sin requerir UUIDs nuevos.
 
----
+## Labels de Mapa Solo DM
 
-## Fuente: 28-dm-map-labels.md
-
-# Spec 28 - Labels de Mapa Solo DM
-
-## Objetivo
+### Objetivo
 
 Permitir que el DM agregue textos tipo label sobre el mapa para identificar zonas, notas tacticas o referencias de preparacion, visibles solamente en el render del DM.
 
-## Contexto
+### Contexto
 
 El DM necesita marcar areas del mapa con nombres o pistas operativas sin mostrarlas a los jugadores. Hoy existen herramientas visuales compartidas entre DM y ventana de jugador, pero no una herramienta de texto privada para preparacion o control durante la sesion.
 
-## Alcance
+### Alcance
 
 - Agregar labels de texto sobre el mapa desde la UI del DM.
 - Los labels se muestran solo en la vista del DM.
@@ -559,7 +520,7 @@ El DM necesita marcar areas del mapa con nombres o pistas operativas sin mostrar
 - Persistir los labels dentro de la escena `.ttrpgscene`.
 - Cargar labels guardados cuando se abre una escena.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Texto visible para jugadores.
 - Texto enriquecido multilinea avanzado.
@@ -568,23 +529,23 @@ El DM necesita marcar areas del mapa con nombres o pistas operativas sin mostrar
 - Markdown, HTML o links clicables.
 - Colisiones automaticas con tokens, efectos o figuras.
 
-## Comportamiento
+### Comportamiento
 
-### Crear label
+#### Crear label
 
 - El usuario puede crear un label desde una accion de DM en la interfaz existente.
 - El label se crea en el centro aproximado del viewport visible o en la celda/punto donde se haya invocado la accion si el flujo contextual lo permite.
 - El texto inicial puede ser `Label` o un valor editable inmediatamente despues de crear.
 - El label queda seleccionado despues de crearse para que el DM pueda editarlo desde el aside.
 
-### Mostrar label
+#### Mostrar label
 
 - En el render del DM, el label se dibuja en coordenadas de mundo y se mueve con el mapa.
 - En la ventana de jugador, el label no se renderiza.
 - El label debe mantenerse por encima del mapa y de overlays tacticos que puedan ocultar informacion de preparacion del DM, sin modificar el orden publico de capas para el jugador.
 - El label debe seguir siendo legible sobre mapas oscuros o claros mediante color, sombra y opacidad configurables.
 
-### Seleccionar y mover
+#### Seleccionar y mover
 
 - El label es seleccionable con click igual que otros objetos.
 - Al estar seleccionado, puede arrastrarse libremente sobre el mapa.
@@ -592,7 +553,7 @@ El DM necesita marcar areas del mapa con nombres o pistas operativas sin mostrar
 - Delete y Backspace eliminan el label seleccionado, siguiendo el comportamiento actual de objetos seleccionables.
 - Escape deselecciona o cancela segun el comportamiento global actual.
 
-### Propiedades en aside derecho
+#### Propiedades en aside derecho
 
 Cuando un label esta seleccionado, el aside derecho muestra un acordeon de propiedades con el tipo `Label` o `Texto`.
 
@@ -613,7 +574,7 @@ Restricciones:
 - El color debe validarse como color CSS seguro usado por el input de color.
 - La fuente debe seleccionarse desde una lista cerrada de fonts del sistema.
 
-## Modelo de datos
+### Modelo de datos
 
 Agregar una entidad persistente para labels de DM:
 
@@ -636,7 +597,7 @@ type SceneLabel = {
 
 La escena debe guardar un arreglo de labels, por ejemplo `labels: SceneLabel[]`, manteniendo compatibilidad con escenas previas sin labels.
 
-## Arquitectura
+### Arquitectura
 
 - La definicion del tipo vive en dominio o tipos compartidos de escena.
 - La serializacion y carga de `.ttrpgscene` debe aceptar escenas antiguas sin `labels`.
@@ -644,7 +605,7 @@ La escena debe guardar un arreglo de labels, por ejemplo `labels: SceneLabel[]`,
 - La ventana de jugador recibe la escena sin renderizar labels, o filtra labels en su adaptador de render.
 - El renderer no accede directamente a filesystem ni Electron internals.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El DM puede crear un label de texto sobre el mapa.
 - El label se ve en la vista del DM.
@@ -656,21 +617,17 @@ La escena debe guardar un arreglo de labels, por ejemplo `labels: SceneLabel[]`,
 - Los labels se guardan y cargan dentro de `.ttrpgscene`.
 - Escenas antiguas sin labels siguen cargando correctamente.
 
----
+## Sistema de Templates de Monstruos
 
-## Fuente: 19-entity-templates-and-rendering/spec.md
-
-# Spec 29 - Sistema de Templates de Monstruos
-
-## Objetivo
+### Objetivo
 
 Permitir que el DM administre templates de Markdown para notas de monstruos, elija un template al crear o editar un monstruo, rellene datos con una estructura prehecha y visualice el resultado con estilos CSS propios del template.
 
-## Contexto
+### Contexto
 
 Las notas de monstruos ya aceptan Markdown y tablas GFM. Para preparar encuentros mas rapido, el DM necesita templates por sistema de juego que funcionen como statblocks reutilizables. El primer template incluido sera D&D 5.5e, inspirado visualmente en statblocks de AideDD dentro de su contenedor `jaune`, pero traducido y estructurado con los campos definidos para esta aplicacion.
 
-## Alcance
+### Alcance
 
 - Crear un sistema persistente de templates de monstruos dentro del software.
 - Agregar una opcion en el menu de aplicacion: `File` / `Archivo` -> `Administrar templates de monstruos`.
@@ -690,7 +647,7 @@ Las notas de monstruos ya aceptan Markdown y tablas GFM. Para preparar encuentro
 - Incluir un template semilla D&D 5.5e en espanol.
 - Guardar templates de forma local para que persistan entre sesiones de la app.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Marketplace o descarga remota de templates.
 - Sincronizacion entre computadores.
@@ -700,9 +657,9 @@ Las notas de monstruos ya aceptan Markdown y tablas GFM. Para preparar encuentro
 - Editor visual avanzado de tablas o layout del template.
 - Templates para NPCs o notas generales en esta iteracion.
 
-## Comportamiento
+### Comportamiento
 
-### Administrar templates
+#### Administrar templates
 
 - Desde el menu de aplicacion, el DM abre `Administrar templates de monstruos`.
 - El modal muestra a la izquierda los templates existentes.
@@ -719,7 +676,7 @@ Las notas de monstruos ya aceptan Markdown y tablas GFM. Para preparar encuentro
 - El usuario puede guardar cambios.
 - El template semilla D&D 5.5e debe estar disponible aunque no existan templates del usuario.
 
-### Usar un template en monstruos
+#### Usar un template en monstruos
 
 - En el modal de crear/editar monstruo, sobre el editor de notas, se muestra un selector:
   - `Sin template`;
@@ -733,7 +690,7 @@ Las notas de monstruos ya aceptan Markdown y tablas GFM. Para preparar encuentro
 - El Markdown visible/editable del usuario no debe incluir HTML estructural del card; el render del template agrega el wrapper HTML/clases necesarias segun el template seleccionado.
 - Si el template fue eliminado o no se puede cargar, el monstruo se renderiza con el estilo Markdown normal y muestra un estado recuperable, sin romper la nota.
 
-## Template semilla D&D 5.5e
+### Template semilla D&D 5.5e
 
 El template debe capturar los siguientes campos en espanol y usar un estilo de card claro en blancos/grises con acentos rojos, borde redondeado, ancho amplio cercano a `672px` y tabla compacta de caracteristicas similar a un statblock moderno:
 
@@ -765,11 +722,9 @@ El template debe capturar los siguientes campos en espanol y usar un estilo de c
 Markdown base sugerido:
 
 ```md
-# {{Nombre}}
+## {{Nombre}}
 
 *{{Descripcion corta}}, {{alineacion}}*
-
----
 
 **CA** {{CA}}  
 **Iniciativa** {{Iniciativa}}  
@@ -788,23 +743,23 @@ Markdown base sugerido:
 **VD** {{VD}}  
 **Bonif.** {{Bonif}}
 
-## Rasgos
+### Rasgos
 
 **{{Rasgo 1}}.** {{Descripcion del rasgo.}}
 
-## Acciones
+### Acciones
 
 **{{Accion 1}}.** {{Descripcion de la accion.}}
 
-## Reacciones
+### Reacciones
 
 **{{Reaccion 1}}.** {{Descripcion de la reaccion.}}
 
-## Acciones Legendarias
+### Acciones Legendarias
 
 **{{Accion legendaria 1}}.** {{Descripcion de la accion legendaria.}}
 
-## Acciones de Guarida
+### Acciones de Guarida
 
 **{{Accion de guarida 1}}.** {{Descripcion de la accion de guarida.}}
 ```
@@ -861,7 +816,7 @@ CSS base sugerido:
 }
 ```
 
-## Modelo de datos
+### Modelo de datos
 
 Template:
 
@@ -891,7 +846,7 @@ Persistencia local de templates:
 - El archivo debe incluir version de formato.
 - Los templates built-in pueden declararse en codigo o en un asset local; si el usuario los edita, se guarda una copia editable.
 
-## Seguridad y CSS
+### Seguridad y CSS
 
 - El CSS de templates debe estar scoped al contenedor del template.
 - El renderer no debe inyectar CSS global sin prefijo o id de alcance.
@@ -899,7 +854,7 @@ Persistencia local de templates:
 - No se debe permitir que el CSS del template afecte la app completa, modales externos o controles del sistema.
 - Si se decide sanitizar Markdown/HTML en una spec futura, este flujo debe integrarse con esa sanitizacion.
 
-## Arquitectura
+### Arquitectura
 
 - `domain` define tipos y validaciones de `MonsterTemplate`.
 - `infrastructure` maneja lectura/escritura del archivo local de templates.
@@ -909,7 +864,7 @@ Persistencia local de templates:
 - El detalle del monstruo aplica el render Markdown existente con CSS scoped.
 - No debe haber acceso directo desde renderer a filesystem o Electron internals.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Existe un menu de aplicacion para abrir `Administrar templates de monstruos`.
 - El administrador permite ver, editar, previsualizar y guardar templates.

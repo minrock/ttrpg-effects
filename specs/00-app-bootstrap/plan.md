@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 00 - Electron Bootstrap
+# Plan - Bootstrap de la Aplicacion
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener bootstrap de la aplicacion, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/00-app-bootstrap/spec.md`
+## Electron Bootstrap
+
+### 1. Resumen
+
 - **Objetivo:** Crear el bootstrap minimo de una app Electron + Vite + React + TypeScript que abra una ventana inicial, cargue un logo PNG y deje lista la base tecnica para las siguientes specs.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** `pnpm`, Electron, Vite, React, TypeScript, asset inicial de logo.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Inicializacion del proyecto Node con `pnpm`.
 - Configuracion base de Electron con proceso `main`, `preload` seguro y renderer React.
@@ -19,7 +22,7 @@
 - Scripts basicos: `pnpm dev`, `pnpm build`, `pnpm lint` y `pnpm typecheck` si el scaffolding lo permite en esta fase.
 - Documentacion minima para ejecutar la app localmente.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Carga de mapas.
 - Canvas principal, PixiJS o motor visual.
@@ -27,7 +30,7 @@
 - Herramientas tacticas, medicion, iluminacion, niebla de guerra o tokens.
 - Empaquetado final, code signing, notarizacion o auto-update.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** Crear la separacion inicial entre `src/main`, `src/preload` y `src/renderer`, dejando reservadas las fronteras futuras para `domain`, `application`, `infrastructure` y `render`.
 - **Persistencia:** No se implementa persistencia en este spec. No se agrega SQLite ni repositorios.
@@ -36,33 +39,33 @@
 - **Render / PixiJS:** No incorporar PixiJS todavia. La pantalla inicial sera React/CSS y solo validara carga de assets.
 - **Validacion:** No hay datos externos ni payloads IPC de producto. Se validara que la ventana cargue sin errores visibles y que el renderer no dependa de Node.js.
 - **Dependencias nuevas:** Electron, Vite, React, React DOM, TypeScript y tooling minimo de lint/typecheck. No introducir librerias visuales pesadas.
-- **Comandos:** Aunque el spec fuente menciona `npm`, este proyecto estandariza `pnpm`; todos los scripts y documentacion usaran `pnpm`.
+- **Comandos:** Aunque el documento consolidado menciona `npm`, este proyecto estandariza `pnpm`; todos los scripts y documentacion usaran `pnpm`.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** No se crean entidades de dominio en esta spec.
 - **Reglas puras:** No hay reglas de mapa, grilla, medicion, luces ni sesiones.
 - **Coordenadas / unidades:** No aplica en el bootstrap.
 - **Errores de dominio:** No aplica. Los errores relevantes seran de arranque, carga de assets o configuracion Electron/Vite.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - No se crean modulos de dominio.
 - Mantener la carpeta ausente o vacia hasta que una spec funcional la necesite.
 
-### `application`
+#### `application`
 
 - No se crean casos de uso.
 - Evitar introducir servicios prematuros para la pantalla tecnica inicial.
 
-### `infrastructure`
+#### `infrastructure`
 
 - No se implementan repositorios, DB ni filesystem.
 - Crear estructura de assets estatica para el logo, por ejemplo `assets/logo/logo.png` o el equivalente compatible con Vite/Electron.
 
-### `main`
+#### `main`
 
 - Crear el entrypoint del proceso main de Electron.
 - Crear una `BrowserWindow` principal con preload configurado.
@@ -71,25 +74,25 @@
 - Manejar ciclo de vida basico de Electron: `ready`, cierre de ventanas y reactivacion en macOS.
 - Aplicar configuracion segura de `webPreferences`.
 
-### `preload`
+#### `preload`
 
 - Crear un preload minimo con `contextBridge`.
 - Exponer una API pequena solo si hace falta para mostrar version o metadata tecnica.
 - No exponer canales IPC genericos ni objetos Electron completos.
 
-### `renderer`
+#### `renderer`
 
 - Crear app React minima.
 - Mostrar logo, nombre `TTRPG Effects`, estado `Bootstrap listo` y version inicial `0.0.0`.
 - Mantener UI sobria y tecnica; no construir una landing page.
 - Agregar estilos base legibles para una ventana inicial.
 
-### `render`
+#### `render`
 
 - No se crea capa PixiJS ni canvas.
-- Dejar el proyecto preparado para agregar `src/render/pixi` en la Spec 01 sin reestructurar el bootstrap.
+- Dejar el proyecto preparado para agregar `src/render/pixi` en la motor visual sin reestructurar el bootstrap.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Inicializar `package.json`, `pnpm-lock.yaml`, configuracion TypeScript, Vite y Electron.
 2. Crear estructura base `src/main`, `src/preload`, `src/renderer` y assets iniciales.
@@ -99,7 +102,7 @@
 6. Documentar en README o doc equivalente como instalar dependencias y ejecutar la app.
 7. Ejecutar verificacion de typecheck/build y smoke manual de `pnpm dev` cuando sea viable.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** No requeridos para esta spec porque no hay logica de dominio.
 - **Integration tests:** No requeridos inicialmente. Considerar smoke test futuro para arranque Electron si el tooling queda disponible.
@@ -108,7 +111,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, confirmar que Electron abre una ventana al 100% del area usable de la pantalla, muestra el logo, `TTRPG Effects`, `Bootstrap listo` y `0.0.0`, y cierra normalmente.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Elegir un scaffolding que mezcle main, preload y renderer demasiado pronto.
   **Mitigacion:** Crear entradas separadas y mantener el renderer sin acceso directo a Node/Electron.
@@ -119,7 +122,7 @@
 - **Riesgo:** Comandos inconsistentes entre spec y convenciones del repo.
   **Mitigacion:** Documentar y usar solo `pnpm`.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - `pnpm dev` abre una ventana Electron.
 - La ventana abre al 100% del area usable de la pantalla.
@@ -129,15 +132,15 @@
 - La app puede cerrarse normalmente.
 - El repo contiene instrucciones basicas para instalar dependencias y ejecutar el proyecto con `pnpm`.
 - El renderer no accede directamente a Node.js, filesystem, SQLite ni Electron internals.
-- La estructura queda lista para incorporar PixiJS y las capas de render en la Spec 01.
+- La estructura queda lista para incorporar PixiJS y las capas de render en la motor visual.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - README o documentacion de ejecucion local.
 - El propio plan puede actualizarse si el scaffolding elegido cambia nombres de archivos sin romper las fronteras de arquitectura.
-- Registrar cualquier desviacion relevante frente al spec fuente, especialmente el uso de `pnpm` en lugar de `npm`.
+- Registrar cualquier desviacion relevante frente al alcance definido, especialmente el uso de `pnpm` en lugar de `npm`.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Logo PNG inicial agregado y visible.
@@ -149,4 +152,4 @@
 - [x] Ventana inicial configurada para abrir al 100% del area usable de pantalla.
 - [x] Documentacion de ejecucion local actualizada.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
-- [x] Sin dependencias visuales pesadas introducidas antes de la Spec 01.
+- [x] Sin dependencias visuales pesadas introducidas antes de la motor visual.

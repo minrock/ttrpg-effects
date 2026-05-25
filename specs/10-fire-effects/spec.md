@@ -1,10 +1,14 @@
-# Spec 09 - Zonas de Fuego Animado y Pintado por Celdas
+# Spec - Efectos de Fuego
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de efectos de fuego, consolidando el alcance funcional vigente en el proyecto.
+
+## Zonas de Fuego Animado y Pintado por Celdas
+
+### Objetivo
 
 Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El fuego debe representarse como un GIF interno de area, con transparencia, enmascarado a un circulo seleccionable o a grupos contiguos de celdas de grilla pintadas con un pincel circular.
 
-## Alcance
+### Alcance
 
 - Usar un asset interno generado para el proyecto en `src/renderer/public/effects/area-fire.gif`.
 - Eliminar el modo de dibujo freehand para fuego.
@@ -22,7 +26,7 @@ Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El f
 - Guardar y cargar las celdas pintadas dentro de `.ttrpgscene`.
 - La luz emitida por el fuego debe revelar la capa de oscuridad igual que una luz normal.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Dibujo de multiples tiles por una misma region contigua.
 - Dibujo freehand/poligonal para fuego.
@@ -32,9 +36,9 @@ Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El f
 - Importar multiples assets de fuego.
 - Renderizar emojis dentro del fuego; el GIF animado reemplaza esa decoracion.
 
-## Modelo de interaccion
+### Modelo de interaccion
 
-### Fuego circular
+#### Fuego circular
 
 - Al crear fuego desde el menu contextual, el modo inicial sigue siendo un fuego circular.
 - El fuego circular conserva un centro en coordenadas de mundo.
@@ -43,7 +47,7 @@ Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El f
 - El contorno/handle de luz controla el radio de iluminacion si `emitsLight` esta activo.
 - El panel de propiedades permite ajustar radio, color, opacidad, escala y radio de luz.
 
-### Pintado por celdas
+#### Pintado por celdas
 
 - Debe existir un modo `Pintar fuego` disponible desde el menu contextual.
 - En modo pintado, click o drag sobre el mapa agrega celdas de grilla al fuego.
@@ -57,7 +61,7 @@ Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El f
 - El resultado debe persistir como coordenadas de mundo por celda, no como coordenadas de pantalla.
 - Las celdas se calculan usando el origen mundial (0, 0) como base, identico al grid visual, para garantizar alineacion cuando el mapa se mueve.
 
-### Iluminacion por celdas
+#### Iluminacion por celdas
 
 - En modo `cells`, la luz del fuego no usa un radio circular; se deriva geometricamente del contorno de las celdas pintadas.
 - Las celdas cardinalmente adyacentes al area de fuego (sin ser fuego) emiten **luz brillante** (anillo 1).
@@ -66,7 +70,7 @@ Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El f
 - El fog of war se revela sobre el fuego + anillo brillante + anillo tenue.
 - En modo `cells` no se muestran los handles de radio de fuego ni de luz (circulos naranjas/amarillos), ya que la iluminacion esta determinada por la forma pintada.
 
-## Persistencia
+### Persistencia
 
 La escena debe conservar:
 
@@ -81,7 +85,7 @@ La escena debe conservar:
 - Visibilidad.
 - Emision de luz y radio de luz.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Se carga `src/renderer/public/effects/area-fire.gif` como asset interno del renderer, sin protocolo `map-asset:` ni rutas locales de usuario.
 - El modo freehand de fuego ya no aparece en UI ni en schema nuevo.

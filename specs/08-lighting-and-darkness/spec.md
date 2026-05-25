@@ -1,21 +1,14 @@
-# Spec consolidado - Lighting And Darkness
+# Spec - Luces y Oscuridad
 
-<!-- Archivo consolidado mecanicamente desde:
-- 06-lighting-darkness-and-fire.md
-- 13-light-resize-handles.md
--->
+Este documento describe de forma unificada la funcionalidad de luces y oscuridad, consolidando el alcance funcional vigente en el proyecto.
 
----
+## Iluminacion, Oscuridad y Fuego Animado
 
-## Fuente: 06-lighting-darkness-and-fire.md
-
-# Spec 06 - Iluminacion, Oscuridad y Fuego Animado
-
-## Objetivo
+### Objetivo
 
 Implementar una capa de oscuridad global, fuentes de luz que aclaren o revelen el mapa, linternas/conos de vision y fuego animado superpuesto.
 
-## Alcance
+### Alcance
 
 - Capa global de oscuridad configurable.
 - Luz puntual.
@@ -25,7 +18,7 @@ Implementar una capa de oscuridad global, fuentes de luz que aclaren o revelen e
 - Movimiento, seleccion, ocultado y borrado de efectos.
 - Guardado y carga de efectos en la sesion.
 
-## Capa de oscuridad
+### Capa de oscuridad
 
 - Debe cubrir el mapa o el area de mundo visible.
 - Debe tener opacidad configurable.
@@ -34,7 +27,7 @@ Implementar una capa de oscuridad global, fuentes de luz que aclaren o revelen e
 - El revelado debe mantenerse claro aunque la opacidad de oscuridad global este alta.
 - **La capa de oscuridad solo se renderiza en la ventana del jugador.**  En la ventana del DM la capa siempre tiene opacidad cero para que el DM vea el mapa completo.  Los controles de oscuridad del DM configuran el efecto para jugadores sin afectar la vista del DM.
 
-## Luces
+### Luces
 
 Tipos iniciales:
 
@@ -63,7 +56,7 @@ Reglas especificas:
 - La luz conica revela un sector conico del mapa debajo de la oscuridad.
 - El motor visual puede usar blend modes para perforar la oscuridad, pero debe tener un resultado claro en Electron: una estrategia aceptada es renderizar una copia del mapa encima del overlay y enmascararla con la geometria de cada luz.
 
-## Fuego visual
+### Fuego visual
 
 El fuego debe ser un efecto visual superpuesto al mapa.
 
@@ -76,7 +69,7 @@ Requerimientos:
 
 Decision posterior:
 
-- Spec 09 usa un GIF interno generado para el proyecto, servido desde `/effects/area-fire.gif`.
+- efectos de fuego usa un GIF interno generado para el proyecto, servido desde `/effects/area-fire.gif`.
 - El fuego puede ser circular o pintado como cuadrados de grilla con un pincel circular.
 - El fuego circular usa un unico GIF escalado al diametro del circulo y enmascarado por su geometria.
 - El fuego pintado agrupa celdas contiguas; cada region contigua usa un unico GIF escalado a su bounding box y enmascarado por las celdas.
@@ -89,7 +82,7 @@ Fuente de asset:
 - Asset interno generado para el proyecto: `src/renderer/public/effects/area-fire.gif`.
 - No se usa asset externo ni licencia de terceros para el fuego actual.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - La capa de oscuridad se ve sobre el mapa.
 - Una luz puntual aclara visualmente una zona.
@@ -100,33 +93,29 @@ Fuente de asset:
 - El fuego puede seleccionarse y borrarse.
 - Las luces y fuego se guardan y cargan con la escena.
 
-## Riesgos
+### Riesgos
 
 - Blend modes inconsistentes entre plataformas.
 - Efectos demasiado costosos para imagenes grandes.
 - Fuego visualmente llamativo pero poco integrado con la iluminacion.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - PixiJS deberia facilitar mascaras, sprites y blend modes.
 - La primera version no requiere sombras por paredes.
 - Preparar el modelo de datos para futura interaccion con paredes y niebla de guerra.
 
----
+## Handles de Tamaño para Luces
 
-## Fuente: 13-light-resize-handles.md
-
-# Spec 13 - Handles de Tamaño para Luces
-
-## Estado
+### Estado
 
 Aceptado para implementación.
 
-## Objetivo
+### Objetivo
 
 Ajustar la usabilidad de la luz puntual y la luz cónica para que su tamaño pueda agrandarse o reducirse directamente desde el canvas, usando handles equivalentes a los de las formas editables.
 
-## Contexto
+### Contexto
 
 La app ya permite:
 
@@ -138,7 +127,7 @@ La app ya permite:
 
 Hoy la edición de tamaño de luces no es tan directa como la de las formas. Esta spec busca igualar esa experiencia para que el usuario no tenga que depender solo de inputs o sliders.
 
-## Alcance
+### Alcance
 
 - Agregar resize interactivo para luz puntual.
 - Agregar resize interactivo para luz cónica.
@@ -149,7 +138,7 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
 - Persistir el nuevo radio/longitud usando el modelo actual de `SceneLight.radius`.
 - Mantener compatibilidad con escenas existentes.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Cambiar el ángulo de apertura de la luz cónica.
 - Agregar luz brillante/tenue diferenciada.
@@ -159,9 +148,9 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
 - Rediseñar el panel lateral o menú contextual.
 - Múltiples selecciones simultáneas.
 
-## Modelo de interacción
+### Modelo de interacción
 
-### Luz puntual
+#### Luz puntual
 
 - Al seleccionar una luz puntual, se muestra su círculo de alcance como ya ocurre visualmente.
 - Se agrega un handle en el borde derecho del círculo, alineado desde el centro hacia `0°`.
@@ -170,7 +159,7 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
 - El radio mínimo debe evitar que la luz colapse visualmente. Valor sugerido: `10` unidades de mundo.
 - El handle debe ser legible sobre mapa claro u oscuro.
 
-### Luz cónica
+#### Luz cónica
 
 - Al seleccionar una luz cónica, se conserva el anillo/manivela de orientación actual.
 - Se agrega un handle de longitud en el extremo del cono, ubicado sobre la dirección central del cono a distancia `radius`.
@@ -179,7 +168,7 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
 - El ángulo de apertura se mantiene fijo en `60°`.
 - El radio mínimo debe evitar que el cono colapse visualmente. Valor sugerido: `10` unidades de mundo.
 
-## Reglas visuales
+### Reglas visuales
 
 - Los handles de resize deben aparecer solo para la luz seleccionada.
 - El handle de resize debe diferenciarse de:
@@ -193,20 +182,20 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
   - máscara de darkvision,
   - aportes de visión/fog si dependen de luces visibles.
 
-## Persistencia
+### Persistencia
 
 - No se requiere un nuevo campo si `SceneLight.radius` representa el radio de luz puntual y la longitud de luz cónica.
 - Guardar escena debe conservar el valor actualizado.
 - Cargar escena debe restaurar las luces con el tamaño modificado.
 - Escenas antiguas siguen cargando con su `radius` existente.
 
-## Reglas de coordenadas
+### Reglas de coordenadas
 
 - El cálculo de resize debe usar coordenadas de mundo.
 - El resultado no debe depender del zoom de cámara.
 - Mover el mapa o hacer pan/zoom no debe desincronizar el handle.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - Al seleccionar una luz puntual aparece un handle en el borde de su círculo.
 - Arrastrar el handle de luz puntual agranda o reduce su radio.
@@ -220,14 +209,14 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
 - Los handles no aparecen en luces no seleccionadas.
 - No se agregan accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 
-## Riesgos
+### Riesgos
 
 - Confundir hit testing entre manivela de rotación y handle de longitud en la luz cónica.
 - Que el resize se sienta distinto al de las formas si no se reutilizan patrones existentes.
 - Que la máscara de oscuridad o darkvision no se actualice durante el drag.
 - Que el handle sea difícil de ver sobre mapas con alto contraste.
 
-## Notas de implementación
+### Notas de implementación
 
 - Reutilizar el patrón ya implementado para resize de círculo/cono en formas tácticas cuando sea posible.
 - Mantener la lógica de cálculo en PixiViewport o extraer helper puro si empieza a repetirse demasiado.

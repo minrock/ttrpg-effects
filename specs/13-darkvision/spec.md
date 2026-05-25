@@ -1,10 +1,14 @@
-# Spec 12 - Visión en la Oscuridad
+# Spec - Vision en la Oscuridad
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de vision en la oscuridad, consolidando el alcance funcional vigente en el proyecto.
+
+## Visión en la Oscuridad
+
+### Objetivo
 
 Implementar un modo de **Visión en la oscuridad** inspirado en DnD: cuando esté activo, el mapa base se muestra en blanco y negro, la oscuridad ambiental deja de cubrir el mapa con overlay, y las áreas iluminadas por luces visibles recuperan color.
 
-## Contexto
+### Contexto
 
 La app ya tiene:
 
@@ -16,7 +20,7 @@ La app ya tiene:
 
 La visión en la oscuridad es una experiencia visual distinta al overlay de oscuridad: no oculta el mapa con una capa negra, sino que convierte el mapa a escala de grises y reserva el color para las zonas con iluminación.
 
-## Alcance
+### Alcance
 
 - Agregar un toggle `Visión en la oscuridad` dentro del submenú lateral `Oscuridad`.
 - Al activar `Visión en la oscuridad`, desactivar visualmente el overlay de oscuridad.
@@ -33,7 +37,7 @@ La visión en la oscuridad es una experiencia visual distinta al overlay de oscu
 - Guardar y cargar el estado de `Visión en la oscuridad` dentro de `.ttrpgscene`.
 - **El modo darkvision solo se aplica en la ventana del jugador.**  En la ventana del DM el mapa siempre se ve a color (sin filtro de grises) independientemente de si `darkvisionEnabled` está activo en la escena.  Esta regla es coherente con que la oscuridad ambiental tampoco afecta la vista del DM.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Reglas completas de visión de DnD por criatura/token.
 - Diferenciar darkvision por distancia individual de personajes.
@@ -43,7 +47,7 @@ La visión en la oscuridad es una experiencia visual distinta al overlay de oscu
 - Cambiar el sistema de fog of war.
 - Simular visión en oscuridad por token virtual.
 
-## Modelo de interacción
+### Modelo de interacción
 
 - En el accordion `Oscuridad`, aparece un control `Visión en la oscuridad`.
 - Al activarlo:
@@ -57,14 +61,14 @@ La visión en la oscuridad es una experiencia visual distinta al overlay de oscu
 - Si el overlay de oscuridad estaba activo antes de activar visión en la oscuridad, esa configuración debe poder recuperarse al desactivar el modo.
 - El usuario debe poder tener luces visibles encima del mapa y moverlas mientras el color se actualiza en tiempo real.
 
-## Reglas visuales
+### Reglas visuales
 
-### Mapa sin luces
+#### Mapa sin luces
 
 - Con `Visión en la oscuridad` activa y sin luces visibles, todo el mapa base se renderiza en blanco y negro.
 - La grilla, formas, mediciones, selección y UI React no deben forzarse a blanco y negro salvo decisión técnica posterior.
 
-### Mapa con luces
+#### Mapa con luces
 
 - Las luces visibles definen máscaras donde el mapa vuelve a color.
 - Una luz puntual recupera color dentro de su radio circular.
@@ -72,19 +76,19 @@ La visión en la oscuridad es una experiencia visual distinta al overlay de oscu
 - El fuego con luz recupera color en su área de iluminación actual.
 - Si varias luces se solapan, el área resultante se mantiene a color.
 
-### Relación con oscuridad ambiental
+#### Relación con oscuridad ambiental
 
 - La visión en la oscuridad no debe dibujar el overlay negro de oscuridad encima del mapa.
 - El control de opacidad/overlay de oscuridad puede seguir visible, pero no debe afectar visualmente mientras `Visión en la oscuridad` esté activa.
 - Al apagar `Visión en la oscuridad`, el overlay debe volver a usar su configuración normal.
 
-### Relación con niebla
+#### Relación con niebla
 
 - La niebla de guerra sigue siendo independiente.
 - Si `Niebla` está activa, las zonas no reveladas siguen ocultas aunque `Visión en la oscuridad` esté activa.
 - La visión en la oscuridad afecta solo lo que ya es visible bajo fog of war.
 
-## Persistencia
+### Persistencia
 
 La escena debe conservar si `Visión en la oscuridad` está activa.
 
@@ -99,7 +103,7 @@ Requisitos:
 - Guardar escena debe preservar el estado del toggle.
 - No se deben introducir datos dependientes de pantalla o viewport.
 
-## Render / PixiJS
+### Render / PixiJS
 
 La implementación debe mantener PixiJS encapsulado en `src/render/pixi`.
 
@@ -119,7 +123,7 @@ La estrategia exacta puede variar, pero debe cumplir:
 - El comportamiento funciona con zoom, pan y movimiento de luces.
 - Se limpian filtros, sprites, máscaras y render textures al actualizar/destruir escena.
 
-## UI / UX
+### UI / UX
 
 - El toggle vive en el accordion `Oscuridad` del sidebar derecho.
 - El texto sugerido es `Visión en la oscuridad`.
@@ -127,7 +131,7 @@ La estrategia exacta puede variar, pero debe cumplir:
 - No debe ocupar mucho espacio ni desplazar controles críticos.
 - Al activarse, debe ser evidente visualmente que el modo cambió.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - Existe un toggle `Visión en la oscuridad` en el menú lateral `Oscuridad`.
 - Activar el toggle desactiva visualmente el overlay negro de oscuridad.
@@ -143,14 +147,14 @@ La estrategia exacta puede variar, pero debe cumplir:
 - Escenas antiguas cargan con visión en la oscuridad desactivada.
 - No se agregan accesos directos del renderer a Node.js, Electron internals o filesystem.
 
-## Riesgos
+### Riesgos
 
 - Aplicar filtros y máscaras sobre mapas grandes puede afectar rendimiento.
 - Duplicar el sprite del mapa para versión gris/color puede complicar sincronización de posición, escala y textura.
 - Mezclar oscuridad, fog of war y darkvision puede producir orden de capas incorrecto si no se mantiene una separación clara.
 - Algunos filtros de Pixi pueden comportarse distinto según renderer WebGL/WebGPU.
 
-## Preguntas abiertas antes del plan
+### Preguntas abiertas antes del plan
 
 - Confirmar si `Visión en la oscuridad` debe afectar **solo el mapa base** o también assets futuros como tokens/minis.
 - Confirmar si las formas, mediciones, grilla, fuego y overlays deben conservar color normal aunque el mapa esté en blanco y negro.

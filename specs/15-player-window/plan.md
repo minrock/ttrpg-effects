@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 25 Ventana de jugador
+# Plan - Ventana de Jugador
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener ventana de jugador, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/15-player-window/spec.md`
+## Ventana de jugador
+
+### 1. Resumen
+
 - **Objetivo:** Implementar una segunda ventana Electron read-only para jugadores que renderiza la misma escena del DM, sincroniza escena/apuntadores en vivo, permite pan/zoom local independiente y aplica diferencias visuales propias de jugador para niebla y tokens ocultos.
 - **Estado:** Implementado.
 - **Prioridad:** Alta
 - **Dependencias:** Specs 01, 04, 08, 11, 12, 15, 22 y 24. Reutiliza el protocolo seguro de carga de imagenes de mapa/tokens y el asset interno del apuntador arcano.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Boton principal en toolbar DM para abrir/enfocar `Ventana de jugador`.
 - Nueva `BrowserWindow` Electron secundaria, con preload seguro y renderer en modo jugador.
@@ -35,7 +38,7 @@
 - Reapertura de ventana jugador con snapshot actual completo.
 - Cierre de ventana jugador sin afectar al DM.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Interaccion del jugador con mapa/tokens.
 - Vistas distintas por jugador o por token.
@@ -44,7 +47,7 @@
 - Cambios de schema `.ttrpgscene` obligatorios.
 - Reglas nuevas de linea de vision por personaje.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** DM sigue siendo fuente de verdad de la escena. La ventana jugador recibe snapshots/eventos desde main/preload y renderiza con componentes compartidos en modo read-only para edicion, pero conserva camara local independiente.
 - **Persistencia:** No se modifica `.ttrpgscene`. La preferencia `showDmFogOverlay` es estado local de UI del DM.
@@ -53,7 +56,7 @@
 - **Validacion:** Los payloads IPC deben usar tipos compartidos y validaciones basicas para escena/camara/eventos. La ventana jugador debe tolerar assets faltantes con placeholders/feedback no invasivo.
 - **Dependencias nuevas:** Ninguna prevista.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:**
   - `ViewportCameraSnapshot`: posicion y zoom de camara en espacio de pantalla/mundo segun modelo actual.
@@ -68,9 +71,9 @@
 - **Coordenadas / unidades:** La camara de jugador se inicializa desde el DM si hay snapshot disponible, pero luego cambia localmente. El apuntador se emite en coordenadas de mundo y usa tamano basado en grilla.
 - **Errores de dominio:** Si el snapshot de camara es invalido, conservar la ultima camara valida del jugador o caer a default.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear tipos puros para sincronizacion de viewport/jugador, por ejemplo `src/domain/player/player-window.ts`.
 - Agregar helpers testeables para:
@@ -79,19 +82,19 @@
   - validar/normalizar camara.
 - Tests unitarios de filtrado de tokens ocultos y presentacion de niebla.
 
-### `application`
+#### `application`
 
 - No se requiere persistencia nueva.
 - Puede agregarse un servicio/hook de orquestacion en renderer para construir `PlayerWindowSnapshot` desde el estado actual del DM.
 - Mantener resolucion de URLs de mapa/tokens fuera del dominio.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Reutilizar protocolos existentes para mapa y tokens en la ventana jugador.
 - Confirmar que CSP/protocolos permiten los mismos assets en ambas ventanas.
 - No agregar SQLite ni repositorios.
 
-### `main`
+#### `main`
 
 - Agregar modulo de ventana jugador, por ejemplo `src/main/windows/playerWindow.ts`.
 - Crear/enfocar `BrowserWindow` secundaria con configuracion segura:
@@ -108,7 +111,7 @@
   - evento de cierre opcional.
 - Main debe rutear eventos DM -> ventana jugador y no aceptar eventos jugador -> DM que cambien estado.
 
-### `preload`
+#### `preload`
 
 - Exponer funciones especificas bajo `window.ttrpg`:
   - `openPlayerWindow()`;
@@ -122,7 +125,7 @@
 - No exponer canales genericos ni objetos Electron.
 - Tipar payloads compartidos con renderer/main.
 
-### `renderer`
+#### `renderer`
 
 - Detectar `view=player` en bootstrap o App y renderizar `PlayerApp`/modo jugador.
 - En DM:
@@ -143,7 +146,7 @@
   - permitir zoom local solo si esta desbloqueado;
   - reproducir apuntadores recibidos.
 
-### `render`
+#### `render`
 
 - Extender `MapViewport`/`PixiViewport` con:
   - `viewRole`;
@@ -164,7 +167,7 @@
 - Filtrar tokens ocultos antes de renderizar jugador o dentro del adapter con politica explicita.
 - Ajustar render de fog para soportar `player-blocking` negro/opaco y `dm-hidden`.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Crear tipos/helpers de dominio para rol de vista, snapshot de jugador, camara y politicas de niebla/tokens.
 2. Agregar tests de dominio para tokens ocultos, presentacion de fog y normalizacion de camara.
@@ -183,7 +186,7 @@
 15. Verificar cierre/reapertura de ventana jugador con estado actual y camara local independiente.
 16. Ejecutar validacion automatica y smoke manual en Electron.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Helpers de dominio para politicas de rol, tokens ocultos, fog presentation y camara.
 - **Integration tests:** Si la estructura lo permite, tests de preload/IPC con handlers mockeados. Como minimo typecheck de payloads compartidos.
@@ -192,7 +195,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** `pnpm dev`, abrir ventana jugador, mover/zoomear DM y confirmar que jugador no se mueve, pan con barra espaciadora en jugador, bloquear/desbloquear zoom en jugador, cargar mapa, cargar escena, ocultar token, activar niebla, disparar apuntador, cerrar/reabrir jugador.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Snapshot completo en cada cambio puede ser costoso.
   **Mitigacion:** Empezar con snapshot debounced/throttled; separar apuntador como evento ligero y no incluir pan/zoom continuo del DM.
@@ -207,7 +210,7 @@
 - **Riesgo:** Apuntador pierde timing entre ventanas.
   **Mitigacion:** Emitir evento temporal simple y aceptar diferencia minima; usar timestamp solo si se necesita compensar latencia.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - La toolbar DM tiene boton para abrir/enfocar `Ventana de jugador`.
 - Se abre una segunda `BrowserWindow` real con solo viewport.
@@ -226,16 +229,16 @@
 - Cerrar/reabrir la ventana jugador conserva el flujo y carga el estado actual.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/15-player-window/spec.md`
 - Este plan.
 - Si durante la implementacion cambia la estrategia de query/hash o canales IPC, actualizar spec y plan.
-- Si se cambia el comportamiento de niebla del DM, registrar la decision tambien en spec 08 si corresponde.
-- Si se cambia el comportamiento del apuntador, registrar la decision tambien en spec 24 si corresponde.
+- Si se cambia el comportamiento de niebla del DM, registrar la decision tambien en niebla de guerra si corresponde.
+- Si se cambia el comportamiento del apuntador, registrar la decision tambien en apuntador arcano si corresponde.
 - Este ajuste reemplaza la decision previa de sincronizacion continua de camara DM -> jugador por camara local independiente del jugador.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Ajuste de camara independiente implementado.
 - [x] Controles locales de jugador implementados.

@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 01 - Motor Visual y Capas de Render
+# Plan - Motor Visual y Capas de Render
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener motor visual y capas de render, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/01-render-engine/spec.md`
+## Motor Visual y Capas de Render
+
+### 1. Resumen
+
 - **Objetivo:** Implementar el lienzo visual principal con PixiJS, una camara basica con pan/zoom, conversion centralizada pantalla <-> mundo y una estructura explicita de capas de render.
 - **Estado:** Implementado
 - **Prioridad:** Alta
-- **Dependencias:** Spec 00 implementada, Electron/Vite/React funcionales, PixiJS, tipos de coordenadas de dominio.
+- **Dependencias:** bootstrap de la app implementada, Electron/Vite/React funcionales, PixiJS, tipos de coordenadas de dominio.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Integrar PixiJS dentro del renderer sin acoplarlo a reglas de dominio.
 - Crear el canvas principal de la aplicacion.
@@ -20,7 +23,7 @@
 - Dibujar elementos de prueba en capas distintas para validar orden, zoom y pan.
 - Limpiar correctamente PixiJS, listeners y recursos al desmontar la vista.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Carga real de mapas desde archivos.
 - Calibracion de grilla.
@@ -29,7 +32,7 @@
 - Persistencia en SQLite o `.ttrpgscene`.
 - Edicion avanzada de capas desde UI.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El renderer React monta un componente contenedor, pero la logica de camara, coordenadas y orden de capas vive en modulos testeables fuera de React. PixiJS queda encapsulado en `src/render/pixi`.
 - **Persistencia:** No se implementa persistencia en esta spec. Las posiciones de prueba pueden vivir en memoria y no deben tocar SQLite ni filesystem.
@@ -38,42 +41,42 @@
 - **Validacion:** Validar matematicamente conversiones pantalla <-> mundo con tests unitarios. Validar manualmente que el canvas aparece y que pan/zoom no rompe el layout.
 - **Dependencias nuevas:** Agregar `pixi.js`. No agregar librerias extra de gestos, estado global o UI salvo necesidad posterior.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Crear tipos para `ScreenPoint`, `WorldPoint`, `CameraState`, `ZoomLevel` y nombres de capas. Evitar objetos sueltos para coordenadas.
 - **Reglas puras:** Implementar `screenToWorld`, `worldToScreen`, `panCamera` y `zoomCameraAtScreenPoint` como funciones puras testeables sin DOM, React, Electron ni PixiJS.
 - **Coordenadas / unidades:** La camara mantiene posicion en mundo y zoom de navegacion. Todas las entidades de mapa futuras deben almacenar posiciones en mundo, no en pantalla.
 - **Errores de dominio:** Rechazar o limitar zoom invalido, como `0`, valores negativos, `NaN` o infinito. Definir minimo y maximo de zoom para evitar estados inutilizables.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/shared/coordinates.ts` o modulo equivalente para tipos de coordenadas.
 - Crear `src/domain/map/camera.ts` o modulo equivalente para estado y transformaciones de camara.
 - Agregar tests unitarios para conversion pantalla <-> mundo, pan y zoom centrado en cursor.
 
-### `application`
+#### `application`
 
 - No crear casos de uso persistentes todavia.
 - Si hace falta, crear un servicio liviano de inicializacion visual solo si reduce acoplamiento entre React y `render`.
 
-### `infrastructure`
+#### `infrastructure`
 
 - No crear repositorios, DB, migraciones ni filesystem.
 - No cargar assets externos para el mapa en esta spec.
 
-### `main`
+#### `main`
 
 - No modificar comportamiento de ventana salvo que el canvas revele un problema de sizing.
-- Mantener configuracion segura de Electron ya definida en Spec 00.
+- Mantener configuracion segura de Electron ya definida en bootstrap de la app.
 
-### `preload`
+#### `preload`
 
 - No exponer nuevas APIs.
 - Mantener preload minimo y sin canales IPC genericos.
 
-### `renderer`
+#### `renderer`
 
 - Reemplazar o evolucionar la pantalla tecnica inicial hacia una vista de herramienta con canvas central.
 - Crear un componente React para montar el viewport PixiJS, por ejemplo `MapViewport`.
@@ -81,7 +84,7 @@
 - No exponer `Grab` como boton o modo persistente en la UI; la navegacion por drag usa exclusivamente la barra espaciadora.
 - Usar hooks para ciclo de vida del viewport y eventos de resize, sin meter calculos de coordenadas en componentes.
 
-### `render`
+#### `render`
 
 - Crear `src/render/pixi/PixiViewport.ts` o adaptador equivalente.
 - Crear contenedores de capas en orden: fondo tecnico, mapa, grilla base, tokens, oscuridad, luces, efectos animados, oscuridad magica, fog of war, obstaculos, formas/mediciones/paths, seleccion y apuntador.
@@ -97,7 +100,7 @@
 - Dibujar elementos de prueba, por ejemplo fondo, grilla simple y marcadores en dos capas, para comprobar orden visual.
 - Destruir `Application`, contenedores, texturas/listeners y observers al desmontar.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Agregar `pixi.js` con `pnpm` y confirmar que build/typecheck siguen funcionando.
 2. Crear tipos y funciones puras de coordenadas/camara en `domain`.
@@ -108,7 +111,7 @@
 7. Ajustar estilos para que el canvas ocupe el area principal de la ventana al 100%.
 8. Ejecutar typecheck, lint, build y smoke manual con `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Coordenadas, conversiones pantalla/mundo, pan, zoom centrado y limites de zoom.
 - **Integration tests:** No requeridos salvo que se agregue un servicio intermedio.
@@ -117,7 +120,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, confirmar que el canvas aparece, los elementos de prueba se ven en capas distintas, `Space` + drag hace pan, soltar `Space` vuelve a seleccion, zoom responde fluidamente y la ventana puede cerrarse sin errores.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Acoplar PixiJS directamente a componentes React y dificultar futuras herramientas.
   **Mitigacion:** Encapsular PixiJS en `src/render/pixi` y exponer una API pequena al componente.
@@ -130,7 +133,7 @@
 - **Riesgo:** Preparar mal el orden de capas y bloquear iluminacion futura.
   **Mitigacion:** Crear todas las capas nominales aunque algunas solo tengan placeholders.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Existe un canvas principal renderizado dentro de la ventana Electron.
 - PixiJS inicializa sin errores visibles.
@@ -145,13 +148,13 @@
 - El renderer React no contiene reglas complejas de coordenadas o render.
 - `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - Actualizar README si cambian comandos o se agregan notas para probar pan/zoom.
 - Actualizar este plan si se cambia la estructura propuesta de `domain` o `render`.
 - Registrar cualquier decision distinta a PixiJS antes de implementar.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] `pixi.js` agregado y justificado.

@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 12 - Visión en la Oscuridad
+# Plan - Vision en la Oscuridad
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener vision en la oscuridad, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/13-darkvision/spec.md`
+## Visión en la Oscuridad
+
+### 1. Resumen
+
 - **Objetivo:** Agregar un modo persistible de visión en la oscuridad que renderice el mapa base en blanco y negro y recupere color dentro de las geometrías de luces visibles.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 06, 08, 09 y 11; modelo de escena versionado; render Pixi de mapa, oscuridad, luces, fuego y fog of war.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Agregar toggle `Visión en la oscuridad` en el accordion `Oscuridad`.
 - Persistir el estado del toggle en `.ttrpgscene`.
@@ -28,7 +31,7 @@
 - Limpiar filtros, sprites, máscaras y render textures asociados.
 - Agregar/actualizar tests de schema para compatibilidad y persistencia.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Darkvision por token/personaje.
 - Distancias individuales de darkvision.
@@ -38,7 +41,7 @@
 - Cambiar color de herramientas, formas o tokens futuros.
 - Implementar luz brillante/tenue diferenciada dentro de esta spec.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El estado se modela en `domain/sessions`; la UI vive en `renderer`; el efecto visual vive encapsulado en `render/pixi`.
 - **Persistencia:** Extender `SceneDarkness` con `darkvisionEnabled: boolean`. El schema debe defaultar `false` para escenas viejas.
@@ -47,16 +50,16 @@
 - **Validacion:** Validar `darkvisionEnabled` como booleano; escenas sin campo cargan con `false`.
 - **Dependencias nuevas:** Ninguna esperada. Usar filtros y máscaras disponibles en PixiJS.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Agregar `darkvisionEnabled` a `SceneDarkness`.
 - **Reglas puras:** No hay cálculo nuevo de dominio para darkvision; se reutiliza geometría de luces ya existente.
 - **Coordenadas / unidades:** Las máscaras usan coordenadas de mundo y las mismas geometrías de luces actuales.
 - **Errores de dominio:** No se agregan errores nuevos; schema debe recuperar escenas antiguas con default.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Actualizar `src/domain/sessions/scene-document.ts`.
 - Actualizar `src/domain/sessions/scene-schema.ts` con default `darkvisionEnabled: false`.
@@ -65,23 +68,23 @@
   - escena vieja sin `darkvisionEnabled`,
   - escena nueva con `darkvisionEnabled: true`.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - En `src/renderer/src/App.tsx`:
   - Agregar handler para alternar `scene.darkness.darkvisionEnabled`.
@@ -90,7 +93,7 @@
 - En `src/renderer/src/styles.css`:
   - Ajustar estilos mínimos si el nuevo control necesita orden/espaciado.
 
-### `render`
+#### `render`
 
 - En `src/render/pixi/PixiViewport.ts`:
   - Detectar `darkness.darkvisionEnabled`.
@@ -101,7 +104,7 @@
   - Asegurar sincronización de posición, escala y textura de sprites de mapa.
   - Destruir/limpiar sprite color, máscara y filtros al cambiar mapa o destruir viewport.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. [x] Extender `SceneDarkness` con `darkvisionEnabled`.
 2. [x] Actualizar schema con default compatible.
@@ -116,7 +119,7 @@
 11. [x] Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 12. [ ] Smoke manual visual: cargar mapa, activar darkvision, mover luz, cambiar radio/dirección, activar fog y apagar darkvision.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Schema de escena para `darkvisionEnabled`.
 - **Integration tests:** No se esperan nuevos.
@@ -125,7 +128,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** `pnpm dev` arranca correctamente. Queda pendiente la validación visual completa con mapa cargado, darkvision, luces y fog dentro de la ventana Electron.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Duplicar sprite del mapa puede quedar desincronizado con posición/escala.
   **Mitigacion:** Centralizar actualización de sprites de mapa en el mismo flujo de `setMap`/`drawMapImage`.
@@ -136,7 +139,7 @@
 - **Riesgo:** Fog y darkvision pueden competir en capas.
   **Mitigacion:** Mantener fog of war como capa independiente por encima del mapa/darkvision.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - El accordion `Oscuridad` incluye toggle `Visión en la oscuridad`.
 - Activar darkvision muestra el mapa base en blanco y negro.
@@ -152,13 +155,13 @@
 - Escenas antiguas cargan con `darkvisionEnabled: false`.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/13-darkvision/spec.md`
 - `specs/13-darkvision/plan.md`
 - `README.md` si se documenta el uso del modo.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.
@@ -170,16 +173,16 @@
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
-## 12. Decisiones cerradas para este plan
+### 12. Decisiones cerradas para este plan
 
 - Darkvision afecta solo el mapa base.
 - Grilla, formas, mediciones, fuego, selección, UI y overlays no-map conservan color normal.
 - Activar darkvision no modifica `darkness.enabled`; solo ignora visualmente el overlay de oscuridad.
 - Las zonas a color usan la geometría actual de luces y fuegos emisores, sin distinguir luz brillante/tenue todavía.
 
-## 13. Cambio posterior: darkvision solo en ventana de jugador
+### 13. Cambio posterior: darkvision solo en ventana de jugador
 
-El modo darkvision (mapa en escala de grises + revelado a color por luces) pasó a ser **exclusivo de la ventana del jugador** (ver spec 25 y rama `feature/dm-darkness-passthrough`).
+El modo darkvision (mapa en escala de grises + revelado a color por luces) pasó a ser **exclusivo de la ventana del jugador** (ver ventana de jugador y rama `feature/dm-darkness-passthrough`).
 
 - `drawDarkvisionLayer()` fuerza `nextSig = ""` cuando `viewRole === "dm"`, lo que activa el camino de limpieza existente y elimina el filtro grayscale y la máscara de color del sprite del mapa.
 - `updateBaseMapVisibility()` guarda con condición `viewRole !== "dm"` antes de asignar el filtro grayscale, evitando que el filtro persista aunque `darkvisionEnabled` esté activo en escena.

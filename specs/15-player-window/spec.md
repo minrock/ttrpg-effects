@@ -1,20 +1,24 @@
-# Spec 25 - Ventana de jugador
+# Spec - Ventana de Jugador
 
-## Estado
+Este documento describe de forma unificada la funcionalidad de ventana de jugador, consolidando el alcance funcional vigente en el proyecto.
+
+## Ventana de jugador
+
+### Estado
 
 Implementada.
 
-## Objetivo
+### Objetivo
 
 Agregar una ventana Electron secundaria para jugadores que muestre una copia sincronizada de la escena del DM, sin controles de edicion. La ventana de jugador debe servir para proyectar o mover a otro monitor una vista limpia del mapa, con pan/zoom independiente del DM y reglas visuales orientadas a jugadores.
 
-## Contexto
+### Contexto
 
 La app se usa en mesa presencial. El DM necesita editar mapa, tokens, efectos, luces, niebla y herramientas tacticas desde la ventana principal, mientras los jugadores ven una version limpia del mismo viewport.
 
 Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, herramientas de edicion y feedback visual para manipular la escena. Esta spec separa la vista de control del DM de una vista read-only para jugadores.
 
-## Alcance
+### Alcance
 
 - Agregar un boton principal en la ventana del DM para abrir la `Ventana de jugador`.
 - Crear una segunda ventana Electron real (`BrowserWindow`) para la vista de jugadores.
@@ -47,9 +51,9 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Las interacciones y ediciones solo ocurren desde la ventana del DM.
 - Si la ventana de jugador esta cerrada y se vuelve a abrir, debe cargar el estado actual completo del DM.
 
-## Diferencias entre vista DM y vista jugador
+### Diferencias entre vista DM y vista jugador
 
-### Niebla de guerra
+#### Niebla de guerra
 
 - En la ventana del jugador, la niebla de guerra debe mostrarse negra/opaca como bloqueo visual real del mapa.
 - En la ventana del DM, la niebla de guerra debe poder verse con opacidad reducida para que el DM entienda que zonas esta descubriendo.
@@ -58,7 +62,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - El control de visibilidad de niebla para DM es una preferencia de vista del DM, no una regla de escena para jugadores.
 - La ventana del jugador siempre respeta la niebla activa de la escena cuando `fogOfWar.enabled` esta encendido.
 
-### Oscuridad y vision
+#### Oscuridad y vision
 
 - La ventana del jugador debe respetar las capas y reglas visuales existentes:
   - oscuridad ambiental;
@@ -77,7 +81,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - La oscuridad magica conserva prioridad visual sobre mapa, luces y darkvision en ambas ventanas, segun su spec.
 - La ventana del jugador debe respetar el orden de capas de gameplay: mapa -> tokens -> oscuridad ambiental -> luces/efectos -> oscuridad magica -> fog of war -> herramientas de area/seleccion. En particular, los tokens quedan debajo de oscuridad/fog y la niebla queda por encima de oscuridad magica.
 
-### Tokens ocultos
+#### Tokens ocultos
 
 - Los tokens con `visible === false` no se muestran en la ventana del jugador.
 - En la ventana del DM, los tokens ocultos se siguen mostrando para control del DM.
@@ -85,7 +89,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - El indicador de ojo cerrado debe ser legible y no debe confundirse con seleccion ni badge numerico.
 - La seleccion de token en DM no se refleja como control editable en jugador.
 
-### Apuntador arcano
+#### Apuntador arcano
 
 - El apuntador se dispara desde la ventana del DM.
 - La misma animacion temporal debe aparecer en la ventana del jugador:
@@ -96,9 +100,9 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - mismo asset visual.
 - La ventana del jugador no puede crear apuntadores.
 
-## Modelo de interaccion
+### Modelo de interaccion
 
-### Abrir ventana de jugador
+#### Abrir ventana de jugador
 
 - La toolbar principal del DM incluye un boton `Ventana de jugador` o texto equivalente.
 - Si la ventana no existe, el boton crea y abre una nueva `BrowserWindow`.
@@ -106,7 +110,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - La ventana debe abrirse con una vista limpia del mapa y ocupar el 100% del area disponible de su contenido.
 - La ventana puede moverse a otro monitor/proyector por el sistema operativo.
 
-### Vista read-only con navegacion local
+#### Vista read-only con navegacion local
 
 - La ventana de jugador no permite:
   - seleccionar elementos;
@@ -126,7 +130,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Al soltar la barra espaciadora, el cursor vuelve a modo normal y no se activa ninguna herramienta de edicion.
 - El boton local de bloqueo de zoom debe ser visible pero discreto, sin convertirse en toolbar de edicion.
 
-### Sincronizacion
+#### Sincronizacion
 
 - El DM es la fuente de verdad.
 - Toda actualizacion de escena en el DM debe publicar un snapshot o patch a la ventana de jugador.
@@ -140,7 +144,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Si se cierra la ventana de jugador, el DM no pierde estado ni falla al seguir editando.
 - Si se reabre la ventana, recibe el estado actual completo.
 
-## Render
+### Render
 
 - La ventana de jugador debe reutilizar el motor de viewport Pixi siempre que sea razonable, configurado en modo read-only/player.
 - No debe duplicarse logica de dominio para calculos de mapa, grilla, vision, luces o efectos.
@@ -154,7 +158,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Las animaciones de efectos existentes deben seguir corriendo en jugador.
 - Las animaciones temporales del apuntador deben poder replicarse desde eventos emitidos por DM.
 
-## IPC / Electron
+### IPC / Electron
 
 - Agregar canales IPC especificos, tipados y validables para:
   - abrir/enfocar ventana de jugador;
@@ -169,7 +173,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - La ventana de jugador no debe cargar contenido remoto.
 - La CSP debe seguir permitiendo assets internos y protocolos seguros ya existentes para mapa/tokens.
 
-## Estado y persistencia
+### Estado y persistencia
 
 - No se agregan datos obligatorios al formato `.ttrpgscene` para abrir la ventana de jugador.
 - La existencia o posicion de la ventana de jugador no se guarda en la escena.
@@ -177,13 +181,13 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Los tokens ocultos ya se basan en estado de escena existente.
 - El apuntador sigue siendo temporal y no se guarda.
 
-## Controles nuevos
+### Controles nuevos
 
-### Toolbar DM
+#### Toolbar DM
 
 - Boton principal para abrir/enfocar la ventana de jugador.
 
-### Ventana de jugador
+#### Ventana de jugador
 
 - Boton flotante o control discreto `Zoom bloqueado` / `Zoom desbloqueado`.
 - El boton debe estar disponible en la vista jugador aunque no existan toolbar/sidebar.
@@ -192,14 +196,14 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - rueda/trackpad para zoom cuando el zoom esta desbloqueado.
 - No se agregan controles para crear, editar, seleccionar, borrar o revelar elementos.
 
-### Sidebar DM / Niebla
+#### Sidebar DM / Niebla
 
 - Nuevo control para el DM:
   - mostrar/ocultar la niebla de guerra en la vista DM.
 - Este control no cambia lo que ven los jugadores.
 - Si la niebla esta activa en escena y la ventana de jugador existe, jugador la ve como bloqueo negro/opaco.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Diferentes vistas por jugador o por token.
 - Linea de vision automatica por personaje.
@@ -209,7 +213,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Persistir ubicacion/tamano de la ventana de jugador.
 - Streaming externo o captura de pantalla.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - La ventana principal del DM muestra un boton para abrir la ventana de jugador.
 - Al usar el boton se abre una segunda ventana Electron real.
@@ -237,7 +241,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Reabrir la ventana de jugador carga el estado actual completo.
 - No se agregan accesos directos inseguros de Electron al renderer.
 
-## Riesgos
+### Riesgos
 
 - Mantener dos viewports Pixi sincronizados puede exponer diferencias de timing si se usan efectos animados o eventos temporales.
 - Enviar snapshots completos de escena en cada cambio puede ser costoso con mapas grandes o muchos objetos; puede requerir throttling, patches o dirty tracking.
@@ -245,7 +249,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Los assets de mapa/tokens deben resolverse en la ventana de jugador usando los mismos protocolos seguros que la ventana del DM.
 - La diferencia de niebla DM vs jugador puede complicar la capa de render si se mezcla con oscuridad y darkvision; conviene modelarla como opcion de vista, no como mutacion de escena.
 
-## Notas de implementacion futura
+### Notas de implementacion futura
 
 - La implementacion usa la misma entrada renderer con query `?view=player`.
 - `MapViewport` y `PixiViewport` se reutilizan con props de rol, read-only, presentacion de niebla y politica de tokens ocultos.

@@ -1,23 +1,14 @@
-# Spec consolidado - Shapes And Measurement
+# Spec - Figuras y Medicion
 
-<!-- Archivo consolidado mecanicamente desde:
-- 07-tactical-tools-and-measurement.md
-- 10-shapes-submenu-and-editable.md
-- 14-emoji-fill-for-effects-and-shapes.md
-- 18-path-area-tool.md
--->
+Este documento describe de forma unificada la funcionalidad de figuras y medicion, consolidando el alcance funcional vigente en el proyecto.
 
----
+## Herramientas Tacticas y Medicion
 
-## Fuente: 07-tactical-tools-and-measurement.md
-
-# Spec 07 - Herramientas Tacticas y Medicion
-
-## Objetivo
+### Objetivo
 
 Implementar herramientas para medir distancias y dibujar areas tacticas utiles en D&D 5e y juegos similares.
 
-## Alcance
+### Alcance
 
 - Medicion lineal.
 - Lineas.
@@ -29,7 +20,7 @@ Implementar herramientas para medir distancias y dibujar areas tacticas utiles e
 - Medidas en pies y metros.
 - Diagonales configurables.
 
-## Reglas iniciales
+### Reglas iniciales
 
 - Sistema principal: D&D 5e.
 - Distancia por defecto: 5 ft por casilla.
@@ -37,7 +28,7 @@ Implementar herramientas para medir distancias y dibujar areas tacticas utiles e
 - Diagonal por defecto: 5 ft.
 - Diagonal configurable para soportar variantes.
 
-## Comportamiento de formas
+### Comportamiento de formas
 
 - Las formas se crean desde el menu contextual o herramienta activa.
 - Las formas persisten hasta que el usuario las borre.
@@ -45,13 +36,13 @@ Implementar herramientas para medir distancias y dibujar areas tacticas utiles e
 - Las formas pueden moverse o ajustarse si la herramienta lo permite.
 - Las formas pueden encajar en la grilla si snap-to-grid esta activo.
 
-## Preguntas pendientes
+### Preguntas pendientes
 
 - Los conos deben seguir plantilla exacta de D&D 5e o geometria libre medida?
 - Los cubos se alinean siempre a grilla o pueden rotarse/liberarse?
 - Las esferas se representan solo como circulo 2D o con ayudas de diametro/radio?
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El usuario puede crear una medicion lineal.
 - La medicion muestra distancia en la unidad activa.
@@ -61,29 +52,25 @@ Implementar herramientas para medir distancias y dibujar areas tacticas utiles e
 - El usuario puede seleccionar y borrar formas.
 - Las mediciones respetan la configuracion de diagonales.
 
-## Riesgos
+### Riesgos
 
 - Sobrecargar el MVP con demasiada exactitud de reglas.
 - Hacer formas visualmente bonitas pero poco legibles en proyeccion.
 - No distinguir entre forma temporal y forma persistente.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - Guardar formas en coordenadas de mundo.
 - Guardar unidad y modo de diagonal en configuracion global de escena.
 - Diseñar estilos de alto contraste pero no invasivos.
 
----
+## Submenú de Herramientas de Área y Formas Editables
 
-## Fuente: 10-shapes-submenu-and-editable.md
-
-# Spec 10 - Submenú de Herramientas de Área y Formas Editables
-
-## Objetivo
+### Objetivo
 
 Reorganizar las formas del menú contextual en un submenú llamado "Herramientas de área", eliminar la línea sin etiqueta, y añadir handles interactivos para redimensionar y rotar círculo, cono y rectángulo directamente sobre el mapa.
 
-## Alcance
+### Alcance
 
 - Agrupar círculo, cono, rectángulo y línea (medición) en un submenú "Herramientas de área" dentro del menú contextual.
 - Eliminar la forma `line` (línea sin etiqueta); la línea de medición pasa a ser la única línea disponible.
@@ -93,7 +80,7 @@ Reorganizar las formas del menú contextual en un submenú llamado "Herramientas
 - El rectángulo puede redimensionarse arrastrando cada esquina de forma independiente en X e Y.
 - Los handles de las formas son visibles solo cuando el elemento está seleccionado.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Luces (point light, cone light): no se modifican.
 - Fuego (fire, fire-paint): no se modifica.
@@ -103,16 +90,16 @@ Reorganizar las formas del menú contextual en un submenú llamado "Herramientas
 - Múltiples selecciones simultáneas.
 - Transformaciones proporcionales del rectángulo (sin shift).
 
-## Modelo de interacción
+### Modelo de interacción
 
-### Submenú "Herramientas de área"
+#### Submenú "Herramientas de área"
 
 - El menú contextual expone una entrada "Herramientas de área ▶" que abre un submenú anidado.
 - El submenú contiene: Línea, Círculo, Cono, Rectángulo.
 - El resto del menú contextual (Pintar fuego, luces, configuración) permanece igual.
 - Las formas del nivel raíz del menú contextual desaparecen; solo existirán dentro del submenú.
 
-### Línea (ex-medición)
+#### Línea (ex-medición)
 
 - La forma `measurement` pasa a ser simplemente "Línea" en la UI.
 - El tipo interno sigue siendo `measurement` para compatibilidad con escenas guardadas.
@@ -120,23 +107,23 @@ Reorganizar las formas del menú contextual en un submenú llamado "Herramientas
 - La forma `line` (sin etiqueta) se elimina del dominio, schema y UI.
 - Las escenas existentes con tipo `line` se migran o ignoran silenciosamente al cargar.
 
-### Círculo - handle de radio
+#### Círculo - handle de radio
 
 - Al seleccionar un círculo, aparece un handle circular en el borde (punto en el extremo derecho del radio).
 - Arrastrar el handle cambia el radio del círculo.
 - El radio mínimo es 10 unidades de mundo.
 - El color del handle es el mismo color de contorno del círculo (azul, `#7fb8ff`).
 
-### Cono - handles de rotación y tamaño
+#### Cono - handles de rotación y tamaño
 
 - Al seleccionar un cono, aparece un anillo de rotación alrededor del origen del cono.
 - Un handle sobre ese anillo indica la dirección actual; arrastrarlo cambia la dirección del cono.
 - Un handle en el extremo del cono (a distancia `radius` del origen, en la dirección del cono) permite cambiar el radio.
 - El radio mínimo es 10 unidades de mundo.
 - El ángulo de apertura del cono es fijo en 60°; no se expone handle para modificarlo.
-- El mecanismo de rotación y resize es equivalente al del cono de luz (spec 06).
+- El mecanismo de rotación y resize es equivalente al del cono de luz (iluminacion).
 
-### Rectángulo - handles de esquinas
+#### Rectángulo - handles de esquinas
 
 - Al seleccionar un rectángulo, aparece un handle en cada una de sus cuatro esquinas.
 - Arrastrar una esquina redimensiona el rectángulo en X e Y de forma independiente.
@@ -144,7 +131,7 @@ Reorganizar las formas del menú contextual en un submenú llamado "Herramientas
 - El tamaño mínimo en cada eje es 10 unidades de mundo.
 - Se persiste `width`, `height` y `position` (esquina superior izquierda, o centro si ya se usa así).
 
-## Persistencia
+### Persistencia
 
 El schema de escena debe conservar:
 
@@ -152,7 +139,7 @@ El schema de escena debe conservar:
 - La forma `line` se elimina del schema; las escenas viejas con `type: "line"` se cargan omitiendo esas formas con un warning.
 - No se añaden nuevos campos al schema para las formas existentes; `radius`, `direction`, `width` y `height` ya están presentes.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - El menú contextual muestra "Herramientas de área" como entrada de submenú.
 - El submenú contiene: Línea, Círculo, Cono, Rectángulo.
@@ -165,17 +152,13 @@ El schema de escena debe conservar:
 - Las formas editadas persisten correctamente en `.ttrpgscene`.
 - No se agregan accesos directos del renderer a Node.js, Electron internals o filesystem.
 
----
+## Relleno de Emojis para Efectos y Formas
 
-## Fuente: 14-emoji-fill-for-effects-and-shapes.md
-
-# Spec 14 - Relleno de Emojis para Efectos y Formas
-
-## Objetivo
+### Objetivo
 
 Permitir que efectos y formas rendericen emojis representativos dentro de su área, para que el mapa proyectado comunique visualmente qué elemento existe en una zona sin depender solo de contornos o colores.
 
-## Contexto
+### Contexto
 
 La app ya permite:
 
@@ -187,7 +170,7 @@ La app ya permite:
 
 Actualmente las áreas se representan con rellenos, bordes o efectos animados. Esta spec añade una capa visual adicional basada en emojis para formas tácticas, útil para identificar zonas como veneno, hielo, magia u otros estados futuros.
 
-## Alcance
+### Alcance
 
 - Renderizar emojis dentro de formas de área, excepto línea.
 - Renderizar emojis distribuidos sobre líneas.
@@ -198,7 +181,7 @@ Actualmente las áreas se representan con rellenos, bordes o efectos animados. E
 - Mantener selección, movimiento, resize y borrado funcionando.
 - Mantener persistencia suficiente para que una escena guardada pueda restaurar el emoji elegido por forma si se agrega configuración.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Animar emojis.
 - Reemplazar el GIF de fuego por emojis.
@@ -208,15 +191,15 @@ Actualmente las áreas se representan con rellenos, bordes o efectos animados. E
 - Cambiar el sistema de formas tácticas más allá de su decoración visual.
 - Aplicar emojis a mapas, grilla, luces o tokens futuros.
 
-## Modelo de interacción
+### Modelo de interacción
 
-### Fuego
+#### Fuego
 
 - El fuego no renderiza emojis.
-- La representacion visual del fuego vive en Spec 09 como GIF interno enmascarado.
+- La representacion visual del fuego vive en efectos de fuego como GIF interno enmascarado.
 - El selector de emojis no aplica a fuego.
 
-### Formas de área
+#### Formas de área
 
 Aplica a:
 
@@ -235,7 +218,7 @@ Reglas:
   - cono: dentro del sector,
   - rectángulo: dentro de sus límites.
 
-### Línea
+#### Línea
 
 Aplica a la forma interna `measurement`, usada como línea.
 
@@ -248,11 +231,11 @@ Reglas:
 - Si la línea es más corta que una casilla, debe mostrar al menos un emoji.
 - Los emojis deben seguir la dirección de la línea en posición, pero no es obligatorio rotar el glifo.
 
-## Configuración de emoji
+### Configuración de emoji
 
 Decisión inicial propuesta:
 
-- Fuego: sin emoji; usa el GIF interno enmascarado definido por Spec 09.
+- Fuego: sin emoji; usa el GIF interno enmascarado definido por efectos de fuego.
 - Formas tácticas: agregar una propiedad opcional de emoji por forma, por ejemplo `emoji?: string`.
 - La UI debe ofrecer un único selector con opción vacía y los emojis permitidos.
 - El conjunto permitido inicial vive en TypeScript y contiene: `💧`, `💨`, `🤐`, `🤢`, `💀`, `☠️`, `🔮`.
@@ -266,7 +249,7 @@ Requisitos:
 - Escenas antiguas sin emoji deben cargar sin cambios.
 - El renderer debe tolerar emojis vacíos o inválidos sin romper.
 
-## Reglas visuales
+### Reglas visuales
 
 - Los emojis deben renderizarse sobre el relleno de la forma, pero debajo de selección/handles.
 - El tamaño del emoji debe escalar de forma legible con la grilla.
@@ -275,9 +258,9 @@ Requisitos:
 - El patrón debe evitar que los emojis se salgan visualmente del área.
 - Para áreas pequeñas, renderizar pocos emojis o uno centrado.
 
-## Reglas de distribución
+### Reglas de distribución
 
-### Mosaico para áreas
+#### Mosaico para áreas
 
 - Generar candidatos en una grilla interna basada en `grid.cellSizeWorld`.
 - Aplicar jitter estable a cada candidato para que no se vea perfectamente mecánico.
@@ -285,18 +268,18 @@ Requisitos:
 - Usar una semilla estable basada en el `id` del elemento, tipo y coordenadas principales.
 - Recalcular cuando cambie geometría, radio, tamaño, posición, dirección o grilla.
 
-### Línea
+#### Línea
 
 - Calcular longitud del segmento en coordenadas de mundo.
 - Calcular cantidad como `max(1, floor(longitud / grid.cellSizeWorld))`.
 - Distribuir puntos interpolados desde inicio hasta fin.
 - Evitar colocar emojis exactamente encima de handles si es posible.
 
-## Persistencia
+### Persistencia
 
 Fuego:
 
-- No requiere campo nuevo para emoji, porque no renderiza emojis. Su representacion visual vive en Spec 09.
+- No requiere campo nuevo para emoji, porque no renderiza emojis. Su representacion visual vive en efectos de fuego.
 
 Formas:
 
@@ -304,7 +287,7 @@ Formas:
 - El schema debe aceptar escenas antiguas sin `emoji`.
 - Guardar/cargar debe preservar el emoji configurado.
 
-## Render / PixiJS
+### Render / PixiJS
 
 - La implementación debe vivir encapsulada en `src/render/pixi`.
 - Usar texto Pixi para renderizar emojis.
@@ -314,7 +297,7 @@ Formas:
 - Evitar recrear patrones costosos en cada frame si no cambió la escena.
 - Limpiar textos al redibujar capas.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - El fuego circular y el fuego pintado no muestran emojis.
 - Círculos, conos y rectángulos pueden renderizar un emoji dentro del área.
@@ -328,7 +311,7 @@ Formas:
 - Escenas antiguas sin emojis cargan sin errores.
 - No se agregan accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 
-## Riesgos
+### Riesgos
 
 - Renderizar muchos emojis puede afectar rendimiento en mapas grandes o áreas enormes.
 - Emojis pueden variar visualmente entre sistemas operativos.
@@ -336,7 +319,7 @@ Formas:
 - Los emojis pueden tapar demasiado el mapa si son grandes o muy densos.
 - Persistir emojis implica migración suave del schema de formas.
 
-## Notas de implementación
+### Notas de implementación
 
 - Empezar con una densidad conservadora y ajustar manualmente.
 - Usar una función determinista simple para jitter por elemento.
@@ -344,23 +327,19 @@ Formas:
 - Para formas, considerar helpers puros para `pointInCircle`, `pointInCone`, `pointInRect` si la lógica crece.
 - En el plan decidir si las formas tienen emoji por defecto o si se agrega UI para configurarlo.
 
----
+## Herramienta de Path
 
-## Fuente: 18-path-area-tool.md
-
-# Spec 18 - Herramienta de Path
-
-## Objetivo
+### Objetivo
 
 Agregar una herramienta para pintar caminos segmentados sobre el mapa. El usuario podra crear un `Path` haciendo clicks sucesivos sobre la grilla; cada punto se ajusta al centro de la celda elegida, la distancia total se recalcula en vivo y el resultado final queda como un objeto seleccionable y editable.
 
-## Contexto
+### Contexto
 
 La app ya permite crear formas tacticas, mediciones lineales, fuego, luces, niebla, oscuridad ambiental y efectos. Las mediciones actuales sirven para un segmento simple, pero no cubren bien caminos compuestos por varios tramos, como rutas de movimiento, recorridos por pasillos o trayectorias tacticas con giros.
 
 Esta spec agrega una herramienta especializada para paths poligonales, reutilizando las reglas de medicion existentes para unidad, distancia por celda y diagonales configurables.
 
-## Alcance
+### Alcance
 
 - Agregar una accion `Path/Camino` dentro de `Herramientas de area` en el menu contextual.
 - Entrar en modo de dibujo de path al elegir la accion.
@@ -382,7 +361,7 @@ Esta spec agrega una herramienta especializada para paths poligonales, reutiliza
 - Recalcular la distancia cuando cambien reglas de medida, unidad, distancia por celda o modo diagonal.
 - No renderizar emojis en paths.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Paths curvos o suavizados.
 - Flechas de direccion.
@@ -395,9 +374,9 @@ Esta spec agrega una herramienta especializada para paths poligonales, reutiliza
 - Snap libre fuera de grilla para esta herramienta.
 - Emojis o patrones visuales dentro/sobre el path.
 
-## Modelo de interaccion
+### Modelo de interaccion
 
-### Activacion
+#### Activacion
 
 - El usuario abre el menu contextual con click derecho sobre el canvas.
 - Entra a `Herramientas de area`.
@@ -406,7 +385,7 @@ Esta spec agrega una herramienta especializada para paths poligonales, reutiliza
 - No se crea ningun punto inmediatamente al elegir la accion.
 - El cursor cambia a un cursor asociado a pintado/trazado de path para mostrar que la herramienta esta activa.
 
-### Crear puntos
+#### Crear puntos
 
 - El primer click normal sobre el mapa crea el primer punto del path.
 - Cada punto se ubica en el centro de la celda de grilla donde el usuario hizo click.
@@ -414,7 +393,7 @@ Esta spec agrega una herramienta especializada para paths poligonales, reutiliza
 - Cada click normal agrega un nuevo punto confirmado.
 - La herramienta permanece activa hasta que el usuario confirme con `Enter` o cancele con `Escape`.
 
-### Feedback temporal
+#### Feedback temporal
 
 Mientras se dibuja:
 
@@ -427,7 +406,7 @@ Mientras se dibuja:
   - el segmento temporal hasta la posicion actual del cursor.
 - Si el cursor esta sobre la misma celda que el ultimo punto, la distancia temporal no debe sumar un tramo artificial.
 
-### Confirmar
+#### Confirmar
 
 - Al presionar `Enter`, el path se confirma.
 - Para confirmarse, debe tener al menos dos puntos distintos.
@@ -436,19 +415,19 @@ Mientras se dibuja:
 - El modo de dibujo termina.
 - Si el usuario presiona `Enter` con menos de dos puntos distintos, no se crea ningun objeto y se mantiene o cancela el modo segun sea mas consistente con las herramientas existentes. El plan debe definir la decision final.
 
-### Cancelar
+#### Cancelar
 
 - Al presionar `Escape`, se descarta todo el path temporal.
 - El modo de dibujo termina.
 - No se crea ningun objeto persistente.
 
-### Backspace durante dibujo
+#### Backspace durante dibujo
 
 - Al presionar `Backspace`, se elimina el ultimo punto confirmado.
 - Si `Backspace` elimina el ultimo punto restante, se sale del modo de dibujo y se descarta el path temporal.
 - `Backspace` no debe borrar otros objetos seleccionados mientras el modo path esta activo.
 
-## Path confirmado
+### Path confirmado
 
 Una vez confirmado:
 
@@ -459,7 +438,7 @@ Una vez confirmado:
 - No muestra propiedades de color, opacidad, emoji, radio ni longitud editable directa.
 - La unica propiedad mostrada en el panel de seleccion es la distancia total en la unidad activa.
 
-## Edicion posterior
+### Edicion posterior
 
 El path confirmado debe permitir edicion de puntos si es viable dentro del modelo de interaccion actual.
 
@@ -475,7 +454,7 @@ Requisitos:
 - Hacer click o arrastrar desde los segmentos o puntos intermedios del path no mueve el path; solo lo selecciona.
 - No se requiere agregar o eliminar puntos en modo edicion para esta spec.
 
-## Reglas de medicion
+### Reglas de medicion
 
 - La distancia del path es la sumatoria de las distancias de cada segmento.
 - Cada segmento debe usar las mismas reglas actuales de medicion de la app:
@@ -487,7 +466,7 @@ Requisitos:
 - El modelo persistido debe guardar coordenadas/puntos en espacio de mundo o grilla, no una distancia congelada.
 - La distancia puede derivarse al renderizar o al mostrar propiedades.
 
-## Modelo de datos
+### Modelo de datos
 
 Agregar un nuevo tipo persistible para paths.
 
@@ -503,7 +482,7 @@ Opcion sugerida:
 
 Cada punto debe guardar una posicion estable en espacio de mundo o una referencia derivable de la grilla. Como el snap es al centro de celda, el plan puede decidir si se guardan coordenadas de mundo ya centradas o indices de celda, pero debe evitar depender de coordenadas de pantalla.
 
-## Persistencia
+### Persistencia
 
 - Guardar paths dentro de `.ttrpgscene`.
 - Cargar escenas con paths preservando orden de puntos e ids.
@@ -511,7 +490,7 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 - Si el schema usa union discriminada de formas, agregar `path` de forma retrocompatible.
 - No persistir distancia calculada como fuente de verdad.
 
-## Render / PixiJS
+### Render / PixiJS
 
 - Renderizar path en la capa de formas/mediciones, como parte de las herramientas de area finales, por encima de mapa, tokens, oscuridad, luces, oscuridad magica y fog of war.
 - Renderizar el path temporal solo mientras se esta dibujando.
@@ -523,7 +502,7 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 - El path debe respetar pan y zoom.
 - Limpiar recursos temporales al confirmar, cancelar, cargar escena o resetear escena.
 
-## UI / UX
+### UI / UX
 
 - La opcion en el menu contextual se llama `Path/Camino`.
 - Debe vivir dentro de `Herramientas de area`.
@@ -537,7 +516,7 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 - Al arrastrar el path desde la zona externa del circulo, el cursor cambia a `grabbing`.
 - Si el sidebar esta cerrado y se selecciona un path confirmado, debe seguir el comportamiento existente para propiedades de objetos seleccionados.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El menu contextual muestra `Path/Camino` dentro de `Herramientas de area`.
 - Al elegir `Path/Camino`, la app entra en modo de dibujo y cambia el cursor.
@@ -565,7 +544,7 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 - Guardar/cargar escena preserva el path y sus puntos.
 - Escenas antiguas sin paths cargan sin errores.
 
-## Riesgos
+### Riesgos
 
 - La edicion de puntos puede chocar con el modelo actual de seleccion si todas las formas asumen un solo centro o un solo handle.
 - La medicion por diagonales puede requerir reutilizar helpers existentes para evitar duplicar reglas.
@@ -573,7 +552,7 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 - `Backspace` debe distinguir claramente entre borrar punto temporal y borrar objeto seleccionado.
 - Guardar indices de celda podria complicarse si luego se ajusta la grilla; guardar mundo podria ser mas simple pero requiere recalcular centro de celda al editar.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - Reutilizar helpers de medicion existentes antes de agregar calculos nuevos.
 - Mantener la logica de distancia en dominio o helpers testeables, no dentro de React.

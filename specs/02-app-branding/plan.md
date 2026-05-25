@@ -1,10 +1,14 @@
-# Plan de implementacion tecnica - 20 Icono de la aplicacion
+# Plan - Branding de la Aplicacion
 
-## Archivo a modificar
+Este documento describe de forma unificada el plan tecnico para implementar y mantener branding de la aplicacion, consolidando los pasos y criterios vigentes en el proyecto.
+
+## Icono de la aplicacion
+
+### Archivo a modificar
 
 `src/main/index.ts`
 
-## Cambios
+### Cambios
 
 **1. Nombre del proceso** — antes de `app.whenReady()`:
 
@@ -24,12 +28,12 @@ app.dock?.setIcon(appIconPath);
 
 `appIconPath` ya esta definido en el mismo archivo.
 
-## Verificacion
+### Verificacion
 
 - `pnpm typecheck` sin errores.
 - En macOS: `pnpm dev` muestra el logo en el dock.
 
-## Checklist
+### Checklist
 
 - [x] `app.setName("TTRPG Effects")` agregado en `main/index.ts`.
 - [x] `app.dock?.setIcon` agregado en `main/index.ts`.

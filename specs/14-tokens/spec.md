@@ -1,10 +1,14 @@
-# Spec 22 - Minis Virtuales y Marcadores Futuros
+# Spec - Tokens y Minis Virtuales
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de tokens y minis virtuales, consolidando el alcance funcional vigente en el proyecto.
+
+## Minis Virtuales y Marcadores Futuros
+
+### Objetivo
 
 Definir e implementar un modulo opcional para tokens, minis virtuales o marcadores sin afectar el flujo principal de minis fisicas.
 
-## Alcance
+### Alcance
 
 - Crear tokens desde el menu contextual.
 - Cargar imagenes de tokens con el protocolo local seguro de assets, sin `file://` ni `data:`.
@@ -19,14 +23,14 @@ Definir e implementar un modulo opcional para tokens, minis virtuales o marcador
 - Configurar nombre, tipo, tamano, color de circunferencia de seleccion, badge numerico y orden.
 - Guardar tokens en la escena `.ttrpgscene`.
 
-## Tamano de tokens
+### Tamano de tokens
 
 - Diminuto, Pequeno y Mediano ocupan 1 casilla x 1 casilla.
 - Grande ocupa 2 casillas x 2 casillas.
 - Enorme ocupa 3 casillas x 3 casillas.
 - Gargantuesco ocupa 4 casillas x 4 casillas.
 
-## Seleccion y repetidos
+### Seleccion y repetidos
 
 - Cada token puede definir el color de su circunferencia de seleccion.
 - Si existe mas de un token con el mismo nombre, los tokens muestran un badge numerico estable como numero pequeno en la esquina, sin encerrarlo en un circulo.
@@ -37,14 +41,14 @@ Definir e implementar un modulo opcional para tokens, minis virtuales o marcador
 - El campo `type` permanece oculto para el usuario y solo existe como dato interno/persistido.
 - El badge, el orden y la visibilidad deben persistirse para que la escena cargue igual despues de guardarla.
 
-## Persistencia
+### Persistencia
 
 - La escena guarda `tokens`.
 - Cada token guarda `id`, `name`, `type`, `imagePath`, `position`, `size`, `footprintCells`, `selectionColor`, `badgeNumber`, `order` y `visible`.
 - Al cargar una escena se resuelven las rutas locales de imagen a URLs del protocolo local antes de renderizar.
 - Las escenas antiguas sin `tokens` siguen siendo validas y cargan con `tokens: []`.
 
-## Fuera del MVP
+### Fuera del MVP
 
 - Combate automatizado.
 - Hojas de personaje.
@@ -54,14 +58,14 @@ Definir e implementar un modulo opcional para tokens, minis virtuales o marcador
 - Asociacion automatica de tokens a luces o vision.
 - Vista separada de jugador/DM.
 
-## Principios
+### Principios
 
 - Las minis fisicas siguen siendo el caso principal.
 - Los tokens no deben ser requeridos para usar luces o herramientas.
 - Los tokens deben ser una capa opcional.
 - El usuario debe poder ignorar completamente este modulo.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El usuario puede crear un token con imagen cargada por protocolo seguro.
 - El token se renderiza sobre la grilla con el tamano correcto.
@@ -76,7 +80,7 @@ Definir e implementar un modulo opcional para tokens, minis virtuales o marcador
 - Al crear mas de un token con el mismo nombre, aparece un badge numerico.
 - El token se guarda y carga con la escena, incluyendo su orden.
 
-## Riesgos
+### Riesgos
 
 - Convertir la app en un VTT completo antes de resolver la mesa fisica.
 - Agregar complejidad visual innecesaria sobre la proyeccion.

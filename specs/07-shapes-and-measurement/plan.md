@@ -1,30 +1,19 @@
-# Plan consolidado - Shapes And Measurement
+# Plan - Figuras y Medicion
 
-<!-- Archivo consolidado mecanicamente desde:
-- 07-tactical-tools-and-measurement.plan.md
-- 10-shapes-submenu-and-editable.plan.md
-- 14-emoji-fill-for-effects-and-shapes.plan.md
-- 18-path-area-tool.plan.md
--->
+Este documento describe de forma unificada el plan tecnico para implementar y mantener figuras y medicion, consolidando los pasos y criterios vigentes en el proyecto.
 
----
+## Herramientas Tacticas y Medicion
 
-## Fuente: 07-tactical-tools-and-measurement.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 07 - Herramientas Tacticas y Medicion
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/07-shapes-and-measurement/spec.md`
 - **Objetivo:** Implementar mediciones y formas tacticas persistentes con unidades, diagonales configurables, snap-to-grid opcional, seleccion, ajuste y borrado.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 00-06 implementadas, grilla calibrable, estado de escena versionado, menu contextual, seleccion/borrado, PixiJS viewport y capas de render existentes.
-- **Nota documental:** El encabezado interno del spec fuente fue corregido a `Spec 07` durante la implementacion.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Medicion lineal con etiqueta de distancia.
 - Linea tactica persistente.
@@ -38,7 +27,7 @@
 - Persistencia de formas en `scene.shapes`.
 - Tests de dominio para distancia, diagonales, unidades, snap y validacion de formas.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Plantillas avanzadas exactas por sistema fuera de D&D 5e.
 - Rotacion libre de rectangulos/cubos si no es necesaria para el MVP.
@@ -48,7 +37,7 @@
 - Sincronizacion multiusuario.
 - Resolver el bug abierto de mascaras de luz registrado en `./bugs/bug-mask-lights-to-see-through-darkness-overlay/`.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** Las reglas de medicion, diagonales, snap y geometria viven en `domain/measurement` y `domain/tools` o un nuevo `domain/shapes`. React solo orquesta UI/estado y PixiJS solo renderiza entidades serializables.
 - **Persistencia:** Usar `scene.shapes` como fuente de verdad para mediciones y formas tacticas. Ampliar `SceneShape` y `scene-schema.ts` con tipos discriminados, ids estables y coordenadas de mundo.
@@ -57,16 +46,16 @@
 - **Validacion:** Validar ids no vacios, tipo de forma soportado, puntos finitos, radios/anchos/altos positivos, longitud minima donde aplique y unidades validas.
 - **Dependencias nuevas:** Ninguna prevista.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** `MeasurementLine`, `TacticalLine`, `CircleShape`, `ConeShape`, `RectangleShape`, `ShapeId`, `ShapeKind`, `DistanceLabel`, `MeasurementSettings`.
 - **Reglas puras:** Calcular distancia en mundo, convertir a celdas, convertir a pies/metrico, calcular distancia diagonal segun modo, aplicar snap-to-grid, crear/mover/ajustar/borrar formas.
 - **Coordenadas / unidades:** Todas las formas se guardan en coordenadas de mundo. La distancia se calcula usando `grid.cellSizeWorld`, `grid.distancePerCell`, `grid.metricDistancePerCell` y `grid.unit`.
 - **Errores de dominio:** Coordenadas invalidas, dimensiones no positivas, shape kind invalido, medicion sin puntos suficientes, configuracion de grilla invalida.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/measurement/measurement.ts` para calculos de distancia, unidades y diagonales.
 - Crear o ampliar `src/domain/tools/tactical-elements.ts` para convertir placeholders actuales en entidades tacticas persistibles.
@@ -80,28 +69,28 @@
   - Snap-to-grid.
   - Creacion/actualizacion de formas.
 
-### `application`
+#### `application`
 
 - Mantener guardar/cargar usando use cases existentes.
 - Si la logica de creacion crece, crear helpers puros para aplicar acciones sobre `SceneDocument`.
 - No agregar repositorios ni servicios nuevos.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 - La validacion de archivo de escena queda en `scene-schema.ts`.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 - No agregar dialogos ni IPC.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 - No exponer APIs nuevas.
 
-### `renderer`
+#### `renderer`
 
 - Cambiar la creacion desde menu contextual para crear formas en `scene.shapes` en lugar de solo `interaction.elements` cuando corresponda.
 - Agregar controles compactos para unidad (`ft`/`m`), snap-to-grid y modo de diagonal.
@@ -110,7 +99,7 @@
 - Agregar panel de propiedades contextual para radio/longitud/ancho/alto segun forma.
 - Mantener controles discretos para no cubrir mapa durante sesion.
 
-### `render`
+#### `render`
 
 - Extender `PixiViewport` para recibir `scene.shapes`.
 - Renderizar lineas, mediciones, circulos, conos y rectangulos desde datos persistidos.
@@ -119,9 +108,8 @@
 - Implementar drag de forma seleccionada y, si es viable, manijas simples de ajuste.
 - Mantener limpieza de listeners/texturas y evitar duplicar sistemas de coordenadas.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
-1. Corregir el encabezado del spec fuente para que diga `Spec 07` si se decide incluir limpieza documental.
 2. Revisar el modelo actual de `interaction.elements` y decidir migracion incremental hacia `scene.shapes`.
 3. Diseñar tipos discriminados para `SceneShape` y actualizar `scene-document.ts`.
 4. Actualizar `scene-schema.ts` para validar formas tacticas completas.
@@ -135,7 +123,7 @@
 12. Verificar guardar/cargar escena con formas.
 13. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Distancias, diagonales, unidades, snap-to-grid, creacion/actualizacion de formas y validacion de schema.
 - **Integration tests:** Guardar/cargar escena con `shapes` persistidas usando use cases existentes.
@@ -144,7 +132,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, cargar mapa, calibrar grilla, crear medicion, alternar ft/m, cambiar diagonal, crear circulo/cono/rectangulo, mover/seleccionar/borrar, guardar escena y cargarla de vuelta.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Duplicar estado entre `interaction.elements` y `scene.shapes`.
   **Mitigacion:** Usar `scene.shapes` como fuente de verdad para formas persistentes y reservar `interaction` para seleccion, contexto y herramienta activa.
@@ -157,7 +145,7 @@
 - **Riesgo:** Interacciones de drag compitan con pan/map adjust.
   **Mitigacion:** Priorizar hit testing de elementos seleccionables y mantener pan cuando no hay hit.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - El usuario puede crear una medicion lineal desde el menu contextual.
 - La medicion muestra distancia en unidad activa.
@@ -169,16 +157,14 @@
 - Las formas se guardan y cargan con la escena.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - Actualizar README con pasos para probar herramientas tacticas y medicion.
-- Corregir encabezado del spec fuente si se acepta la limpieza documental.
 - Registrar cualquier decision concreta sobre geometria de conos/cubos si cambia durante implementacion.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
-- [x] Encabezado del spec fuente revisado/corregido si aplica.
 - [x] Tipos de formas persistentes creados o ampliados.
 - [x] Schema de escena actualizado.
 - [x] Reglas de medicion implementadas.
@@ -198,23 +184,16 @@
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
----
+## Submenú de Herramientas de Área y Formas Editables
 
-## Fuente: 10-shapes-submenu-and-editable.plan.md
+### 1. Resumen
 
-# Plan de implementación técnica - 10 - Submenú de Herramientas de Área y Formas Editables
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/07-shapes-and-measurement/spec.md`
 - **Objetivo:** Agrupar círculo, cono, rectángulo y línea en un submenú "Herramientas de área", eliminar la forma `line` sin etiqueta, y añadir handles interactivos para redimensionar y rotar estas formas directamente sobre el mapa.
 - **Estado:** Pendiente
 - **Prioridad:** Alta
 - **Dependencias:** Specs 03, 07; sistema de formas táctica existente; PixiJS viewport.
 
----
-
-## 2. Alcance
+### 2. Alcance
 
 - Eliminar la forma `line` del dominio, UI y schema (con migración silenciosa para escenas viejas).
 - Renombrar `measurement` a "Línea" en la UI; el tipo interno permanece `measurement`.
@@ -225,17 +204,15 @@
 - Los handles solo son visibles cuando el elemento está seleccionado.
 - Actualizar callbacks de viewport, estado React y propiedades del panel lateral.
 
----
+### 3. Decisiones técnicas
 
-## 3. Decisiones técnicas
-
-### Eliminación de `line`
+#### Eliminación de `line`
 - Se elimina `"line"` de `TacticalElementKind` y `TacticalShapeKind` en el dominio; ya no se puede crear.
 - En el schema Zod (`scene-schema.ts`) se usa `.transform()` en el array de formas para filtrar silenciosamente formas con `type: "line"` al cargar escenas antiguas.
 - `SceneShape["type"]` en `scene-document.ts` se limita a `"measurement" | "circle" | "cone" | "rectangle"`.
 - El test de `shapes.test.ts` que crea una forma `"line"` se migra a `"measurement"`.
 
-### Handle del rectángulo — esquinas
+#### Handle del rectángulo — esquinas
 - La posición del rectángulo en el dominio es el **centro** (`points[0]` = centro). Las cuatro esquinas son:
   - 0 = top-left: `(cx - w/2, cy - h/2)`
   - 1 = top-right: `(cx + w/2, cy - h/2)`
@@ -244,34 +221,32 @@
 - Al arrastrar esquina `i`, la esquina opuesta `(i+2) % 4` queda fija. El nuevo centro es el punto medio entre cursor y esquina fija. Nuevo `width = |cursor.x - esquinaFija.x|`, `height = |cursor.y - esquinaFija.y|`.
 - Se añade campo `handleIndex?: number` a `PointerDragState` para saber qué esquina se arrastra.
 
-### Handle de rotación del cono de forma
+#### Handle de rotación del cono de forma
 - Se usa radio fijo `SHAPE_CONE_ROTATION_RING_RADIUS = 72` (igual que el cono de luz).
 - El handle de resize del cono se sitúa en la punta: `(cx + cos(dir)*radius, cy + sin(dir)*radius)`. Si `radius < 80`, puede solaparse visualmente con el anillo; el handle de punta tiene prioridad en hit-test.
 - Se reutiliza la callback `onShapeDirectionChange` del viewport; en App.tsx se extiende el handler para llamar `updateShape(shape, { direction })` cuando la forma es un cono (en lugar de `rotateLinearShape` que aplica solo a `measurement`).
 
-### Nuevas callbacks del viewport
+#### Nuevas callbacks del viewport
 | Callback | Cuándo se emite |
 |---|---|
 | `onShapeRadiusChange(elementId, radius)` | Arrastrar handle de borde del círculo o punta del cono |
 | `onShapeRectResize(elementId, width, height, anchorX, anchorY)` | Arrastrar esquina del rectángulo |
 | `onShapeDirectionChange` (ya existe) | Arrastrar anillo del cono de forma (extender handler en App.tsx) |
 
-### Submenú en el menú contextual
+#### Submenú en el menú contextual
 - CSS hover + `:focus-within` (adecuado para app Electron de escritorio).
 - Estructura HTML: `<li class="has-submenu">` con `<button>` y `<menu>` anidado que se revela con CSS.
 - No se añade estado React adicional; el menú contextual ya tiene backdrop de cierre.
 
----
+### 4. Cambios por capa
 
-## 4. Cambios por capa
-
-### 4.1 `src/domain/tools/tactical-elements.ts`
+#### 4.1 `src/domain/tools/tactical-elements.ts`
 
 - Eliminar `"line"` del array `tacticalElementKinds`.
 - Eliminar `case "line"` de `getTacticalElementLabel`.
 - Cambiar label de `"measurement"` a `"Linea"`.
 
-### 4.2 `src/domain/shapes/shapes.ts`
+#### 4.2 `src/domain/shapes/shapes.ts`
 
 - Cambiar `TacticalShapeKind` de `"measurement" | "line" | ...` a `"measurement" | "circle" | "cone" | "rectangle"`.
 - Eliminar `case "line"` de `createTacticalShape`.
@@ -279,11 +254,11 @@
 - Añadir función `setShapeRadius(shape: SceneShape, radius: number): SceneShape` para círculo y cono (wrapper de `updateShape({ radius })`).
 - Añadir función `setRectangleCorner(shape: SceneShape, cornerIndex: 0|1|2|3, cursor: WorldPoint): SceneShape` que computa nuevas dimensiones y anchor desde la esquina opuesta fija.
 
-### 4.3 `src/domain/sessions/scene-document.ts`
+#### 4.3 `src/domain/sessions/scene-document.ts`
 
 - Cambiar `SceneShape["type"]` a `"measurement" | "circle" | "cone" | "rectangle"` (quitar `"line"`).
 
-### 4.4 `src/domain/sessions/scene-schema.ts`
+#### 4.4 `src/domain/sessions/scene-schema.ts`
 
 - Cambiar `linearShapeSchema` de `z.enum(["measurement", "line"])` a `z.literal("measurement")`.
 - En el array `shapes`, añadir `.transform()` que filtra silenciosamente objetos `"line"` antes del discriminated union, o usar un `z.union` que atrapa `line` con `.transform(() => null)` y luego filtra nulos:
@@ -293,9 +268,9 @@
            .transform(arr => arr.filter(Boolean))
   ```
 
-### 4.5 `src/render/pixi/PixiViewport.ts`
+#### 4.5 `src/render/pixi/PixiViewport.ts`
 
-#### 4.5.1 Tipos
+##### 4.5.1 Tipos
 
 Extender `PointerDragState["mode"]`:
 ```
@@ -312,7 +287,7 @@ onShapeRadiusChange?: (elementId: string, radius: number) => void;
 onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
 ```
 
-#### 4.5.2 Hit tests nuevos (solo operan sobre la forma seleccionada)
+##### 4.5.2 Hit tests nuevos (solo operan sobre la forma seleccionada)
 
 | Función | Condición |
 |---|---|
@@ -321,7 +296,7 @@ onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: 
 | `hitTestConeShapeResizeHandle(pt)` | Forma seleccionada es cono; distancia a la punta ≤ 18 |
 | `hitTestRectCornerHandle(pt) → cornerIndex \| null` | Forma seleccionada es rectángulo; distancia a alguna esquina ≤ 16 |
 
-#### 4.5.3 Integración en `handlePointerDown`
+##### 4.5.3 Integración en `handlePointerDown`
 
 Insertar los nuevos hit tests antes del `hitTestElement` general, en orden de prioridad:
 1. `hitTestCircleResizeHandle` → mode `shape-circle-resize`
@@ -329,7 +304,7 @@ Insertar los nuevos hit tests antes del `hitTestElement` general, en orden de pr
 3. `hitTestConeShapeRotationHandle` → mode `shape-cone-rotate`
 4. `hitTestRectCornerHandle` → mode `shape-rect-resize`, guardar `cornerIndex` en drag state
 
-#### 4.5.4 Integración en `handlePointerMove`
+##### 4.5.4 Integración en `handlePointerMove`
 
 Añadir ramas para:
 - `"shape-circle-resize"` → `updateCircleRadiusFromScreenPoint(elementId, point)`
@@ -337,7 +312,7 @@ Añadir ramas para:
 - `"shape-cone-rotate"` → `updateConeDirectionFromScreenPoint(elementId, point)`
 - `"shape-rect-resize"` → `updateRectCornerFromScreenPoint(elementId, handleIndex, point)`
 
-#### 4.5.5 Métodos privados de actualización
+##### 4.5.5 Métodos privados de actualización
 
 ```ts
 updateCircleRadiusFromScreenPoint(elementId, screenPoint)
@@ -361,7 +336,7 @@ updateRectCornerFromScreenPoint(elementId, cornerIndex, screenPoint)
   // onShapeRectResize(elementId, width, height, anchorX, anchorY)
 ```
 
-#### 4.5.6 Render de handles (solo para elemento seleccionado)
+##### 4.5.6 Render de handles (solo para elemento seleccionado)
 
 Añadir en `drawInteractiveElements()` dentro del bloque de selección:
 
@@ -390,13 +365,13 @@ function drawRectCornerHandles(shape: SceneShape): Graphics
   // 4 puntos en esquinas + cuadrado de borde (stroke naranja)
 ```
 
-#### 4.5.7 Ajustar `drawElement` en PixiViewport
+##### 4.5.7 Ajustar `drawElement` en PixiViewport
 
 El helper `drawElement` pinta el icono de arrastre de los elementos (no la forma real). Para `"line"`, eliminarlo del `switch`. Cambia el `case "measurement"` + `case "line"` combinado a solo `case "measurement"`.
 
-### 4.6 `src/renderer/src/App.tsx`
+#### 4.6 `src/renderer/src/App.tsx`
 
-#### 4.6.1 Contexto: eliminar `"line"`
+##### 4.6.1 Contexto: eliminar `"line"`
 
 - Eliminar las referencias a `"line"` en `selectedMeasurement`:
   ```ts
@@ -405,7 +380,7 @@ El helper `drawElement` pinta el icono de arrastre de los elementos (no la forma
   ```
 - Eliminar `case "line"` del label en el panel de propiedades.
 
-#### 4.6.2 Submenú "Herramientas de área"
+##### 4.6.2 Submenú "Herramientas de área"
 
 Reemplazar el bloque `{tacticalElementKinds.map(...)}` por una estructura con items directos (luces, fuego) y un submenú para formas:
 
@@ -427,7 +402,7 @@ Reemplazar el bloque `{tacticalElementKinds.map(...)}` por una estructura con it
 </li>
 ```
 
-#### 4.6.3 Nuevos handlers
+##### 4.6.3 Nuevos handlers
 
 ```ts
 const handleShapeRadiusChange = useCallback((elementId: string, radius: number) => {
@@ -453,7 +428,7 @@ const handleShapeRectResize = useCallback(
 );
 ```
 
-#### 4.6.4 Extender `handleShapeDirectionChange`
+##### 4.6.4 Extender `handleShapeDirectionChange`
 
 ```ts
 const handleShapeDirectionChange = useCallback((elementId: string, direction: number) => {
@@ -469,14 +444,14 @@ const handleShapeDirectionChange = useCallback((elementId: string, direction: nu
 }, []);
 ```
 
-#### 4.6.5 Pasar nuevas props a `<MapViewport>`
+##### 4.6.5 Pasar nuevas props a `<MapViewport>`
 
 ```tsx
 onShapeRadiusChange={handleShapeRadiusChange}
 onShapeRectResize={handleShapeRectResize}
 ```
 
-### 4.7 `src/renderer/src/components/MapViewport.tsx`
+#### 4.7 `src/renderer/src/components/MapViewport.tsx`
 
 Añadir props e inicialización de viewport:
 ```ts
@@ -485,7 +460,7 @@ onShapeRectResize: (elementId: string, width: number, height: number, anchorX: n
 ```
 Pasar al `PixiViewport` en el `useEffect` de inicialización.
 
-### 4.8 `src/renderer/src/styles.css`
+#### 4.8 `src/renderer/src/styles.css`
 
 Añadir estilos para el submenú:
 ```css
@@ -495,9 +470,7 @@ Añadir estilos para el submenú:
 .has-submenu:focus-within .context-submenu { display: flex; flex-direction: column; }
 ```
 
----
-
-## 5. Plan de trabajo
+### 5. Plan de trabajo
 
 1. **Dominio** — Quitar `line` de tipos, `createTacticalShape`, validaciones y helpers en `tactical-elements.ts` y `shapes.ts`.
 2. **Dominio** — Añadir `setShapeRadius` y `setRectangleCorner` en `shapes.ts`.
@@ -521,9 +494,7 @@ Añadir estilos para el submenú:
 20. **CSS** — Estilos del submenú.
 21. **Verificación** — `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
 
----
-
-## 6. Criterios de aceptación
+### 6. Criterios de aceptación
 
 - No existe `"line"` en el dominio ni en la UI; las formas `line` en archivos `.ttrpgscene` antiguos se descartan silenciosamente.
 - El menú contextual muestra "Herramientas de área ▶" que abre un submenú con Línea, Círculo, Cono, Rectángulo.
@@ -535,9 +506,7 @@ Añadir estilos para el submenú:
 - Los cambios de radio, dirección y dimensiones persisten en `.ttrpgscene`.
 - `pnpm typecheck` y `pnpm test` pasan en verde.
 
----
-
-## 7. Verificación
+### 7. Verificación
 
 - **Unit tests:** `shapes.test.ts`, `scene-schema.test.ts`
 - **Typecheck:** `pnpm typecheck`
@@ -546,9 +515,7 @@ Añadir estilos para el submenú:
 - **Build:** `pnpm build`
 - **Smoke manual:** `pnpm dev`, abrir menú contextual → "Herramientas de área", crear cada forma, seleccionarla, probar todos los handles, guardar y recargar escena.
 
----
-
-## 8. Checklist de cierre
+### 8. Checklist de cierre
 
 - [ ] `line` eliminado del dominio, schema y UI.
 - [ ] Migración silenciosa de formas `line` antiguas verificada.
@@ -560,23 +527,18 @@ Añadir estilos para el submenú:
 - [ ] Tests actualizados y pasando.
 - [ ] Smoke manual ejecutado.
 
----
+## Relleno de Emojis para Efectos y Formas
 
-## Fuente: 14-emoji-fill-for-effects-and-shapes.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 14 - Relleno de Emojis para Efectos y Formas
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/07-shapes-and-measurement/spec.md`
-- **Objetivo:** Renderizar emojis representativos dentro de formas de área y líneas, con distribución estable y persistencia opcional para emojis de formas. El fuego queda excluido porque usa GIF interno enmascarado definido por Spec 09.
+- **Objetivo:** Renderizar emojis representativos dentro de formas de área y líneas, con distribución estable y persistencia opcional para emojis de formas. El fuego queda excluido porque usa GIF interno enmascarado definido por efectos de fuego.
 - **Estado:** Implementado
 - **Prioridad:** Media
 - **Dependencias:** Specs 07, 09, 10 y 11; render Pixi de formas/fuego; schema versionado de escenas; grilla actual.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Render de emojis dentro de círculo, cono y rectángulo.
 - Render de emojis distribuidos a lo largo de línea/medición.
@@ -588,7 +550,7 @@ Añadir estilos para el submenú:
 - UI mínima con un selector único para configurar emoji de la forma seleccionada.
 - Documentación de comportamiento.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Animación de emojis.
 - Sprites o imágenes externas.
@@ -598,7 +560,7 @@ Añadir estilos para el submenú:
 - Emojis para tokens/minis futuros.
 - Persistencia de emoji para fuego, porque fuego no usa emojis.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El dato persistente de emoji vive en `domain/sessions` como propiedad opcional de `SceneShape`; la UI solo edita ese campo; Pixi renderiza el patrón sin introducir reglas de negocio en React.
 - **Persistencia:** Extender `SceneShape` con `emoji?: string`; el schema acepta ausencia del campo y la UI solo guarda uno de los emojis permitidos.
@@ -608,7 +570,7 @@ Añadir estilos para el submenú:
 - **Emojis permitidos:** Centralizar el set en `src/domain/shapes/shape-emojis.ts` para que UI, dominio y render compartan fuente.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Agregar `emoji?: string` a `SceneShape`.
 - **Reglas puras:** Agregar helpers puros para:
@@ -619,9 +581,9 @@ Añadir estilos para el submenú:
 - **Coordenadas / unidades:** Todos los puntos se calculan en coordenadas de mundo. La densidad usa `grid.cellSizeWorld`; el tamaño visual usa una fracción del tamaño de celda.
 - **Errores de dominio:** No se esperan errores bloqueantes. Emojis vacíos o demasiado largos se ignoran o recortan de forma segura.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Actualizar `src/domain/sessions/scene-document.ts` con `SceneShape.emoji?: string`.
 - Actualizar `src/domain/sessions/scene-schema.ts` para aceptar `emoji` opcional.
@@ -631,31 +593,31 @@ Añadir estilos para el submenú:
 - Agregar o extender helper de formas si conviene para `updateShape({ emoji })`.
 - Crear helper puro para distribución de emojis si el cálculo se mantiene testeable fuera de Pixi.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - En `src/renderer/src/App.tsx`:
   - Agregar selector compacto para editar emoji de forma seleccionada.
   - Permitir limpiar emoji.
   - Usar `updateSelectedShape({ emoji })` o helper equivalente.
-- No agregar control para fuego, porque fuego usa el GIF interno de Spec 09.
+- No agregar control para fuego, porque fuego usa el GIF interno de efectos de fuego.
 
-### `render`
+#### `render`
 
 - En `src/render/pixi/PixiViewport.ts`:
   - Dibujar emojis de formas en `drawTacticalShape`.
@@ -664,14 +626,14 @@ Añadir estilos para el submenú:
   - Mantener fuentes/tamaños legibles con `grid.cellSizeWorld`.
   - Usar jitter determinista estable basado en id/tipo/índice.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. [x] Extender `SceneShape` con `emoji?: string`.
 2. [x] Actualizar schema para aceptar `emoji` opcional y mantener compatibilidad.
 3. [x] Agregar tests de schema para formas con y sin emoji.
 4. [x] Agregar UI mínima en panel de forma seleccionada con selector único de emoji.
 5. [x] Implementar helpers de distribución para área y línea.
-6. [x] Excluir fuego del render de emojis; Spec 09 lo representa con GIF interno enmascarado.
+6. [x] Excluir fuego del render de emojis; efectos de fuego lo representa con GIF interno enmascarado.
 7. [x] Implementar render de emojis en círculo, cono y rectángulo.
 8. [x] Implementar render de emojis sobre línea/measurement.
 9. [x] Ajustar tamaño, opacidad y densidad para legibilidad.
@@ -679,7 +641,7 @@ Añadir estilos para el submenú:
 11. [x] Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 12. [ ] Smoke manual en `pnpm dev`: fuego circular, fuego pintado, línea, círculo, cono y rectángulo.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Schema de escena para `emoji`; helpers puros de distribución si se extraen.
 - **Integration tests:** No se esperan nuevos.
@@ -688,7 +650,7 @@ Añadir estilos para el submenú:
 - **Build:** `pnpm build`
 - **Manual / smoke:** Crear fuego circular y pintado y confirmar que no muestra emojis; crear línea, círculo, cono y rectángulo con emoji; mover/redimensionar; guardar/cargar.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Demasiados textos Pixi degradan rendimiento.
   **Mitigacion:** Densidad conservadora y límite máximo de emojis por elemento.
@@ -701,7 +663,7 @@ Añadir estilos para el submenú:
 - **Riesgo:** Las áreas pequeñas quedan vacías.
   **Mitigacion:** Garantizar al menos un emoji centrado cuando existe espacio razonable.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Fuego circular y fuego por celdas no muestran emojis.
 - Círculo, cono y rectángulo pueden mostrar emoji dentro del área.
@@ -715,13 +677,13 @@ Añadir estilos para el submenú:
 - Escenas antiguas sin emoji cargan sin errores.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/07-shapes-and-measurement/spec.md`
 - `specs/07-shapes-and-measurement/plan.md`
 - `README.md`
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.
@@ -733,23 +695,18 @@ Añadir estilos para el submenú:
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
----
+## Herramienta de Path
 
-## Fuente: 18-path-area-tool.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 18 Herramienta de Path
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/07-shapes-and-measurement/spec.md`
 - **Objetivo:** Agregar la herramienta `Path/Camino` dentro de `Herramientas de area` para dibujar caminos segmentados con snap al centro de celda, preview de distancia acumulada, confirmacion con `Enter`, cancelacion con `Escape`, borrado incremental con `Backspace`, persistencia y edicion posterior de puntos.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 03, 07, 10, 11, 13 y 15; helpers actuales de medicion; modelo `SceneShape`; menu contextual; render PixiJS de formas/handles; panel de propiedades en sidebar.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Agregar `Path/Camino` dentro del submenu contextual `Herramientas de area`.
 - Entrar en modo temporal de dibujo de path al elegir la accion.
@@ -770,7 +727,7 @@ Añadir estilos para el submenú:
 - Evitar emojis en paths.
 - Agregar tests de dominio/schema para paths.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Paths curvos.
 - Flechas de direccion.
@@ -783,7 +740,7 @@ Añadir estilos para el submenú:
 - Emojis en paths.
 - Cambios de IPC, preload, main o filesystem.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El path se modela como una forma tactica de dominio (`SceneShape`) con `type: "path"`. React maneja el estado temporal de dibujo; PixiJS renderiza preview/handles y reporta interacciones. La distancia se calcula con helpers de dominio, no dentro de Pixi o JSX.
 - **Persistencia:** Extender `SceneShape` y el schema Zod para aceptar `type: "path"` con `points`. No persistir la distancia calculada; se deriva de `points`, `grid` y `settings`.
@@ -793,7 +750,7 @@ Añadir estilos para el submenú:
 - **Validacion:** Schema debe requerir al menos dos puntos para paths persistidos. El estado temporal puede tener cero o un punto, pero nunca debe guardarse.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:**
   - Extender `SceneShape["type"]` con `"path"`.
@@ -815,9 +772,9 @@ export function measurePathDistance(
 - **Coordenadas / unidades:** La distancia se calcula convirtiendo cada segmento a celdas con `grid.cellSizeWorld` y usando `diagonalMode`, `distancePerCell`, `metricDistancePerCell` y `unit`.
 - **Errores de dominio:** Path con menos de dos puntos, puntos no finitos o id vacio deben rechazarse igual que las formas existentes.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - **`src/domain/sessions/scene-document.ts`**
   - Agregar `"path"` a `SceneShape["type"]`.
@@ -853,23 +810,23 @@ export function measurePathDistance(
   - Mover punto manteniendo orden.
   - Validar rechazo de path invalido.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - **`src/renderer/src/App.tsx`**
   - Agregar estado temporal de dibujo:
@@ -889,7 +846,7 @@ export function measurePathDistance(
   - Mostrar propiedades de path seleccionado con solo `Distancia total`.
   - Usar `measurePathDistance` para la propiedad, de modo que cambie con unidad/reglas.
   - No exponer selector de emoji para `path`.
-  - Si se selecciona path y sidebar esta cerrado, reutilizar comportamiento de spec 15.
+  - Si se selecciona path y sidebar esta cerrado, reutilizar comportamiento de propiedades del objeto seleccionado.
 
 - **`src/renderer/src/components/MapViewport.tsx`**
   - Agregar props para path temporal:
@@ -902,7 +859,7 @@ export function measurePathDistance(
     - move de punto de path confirmado.
   - Pasar estos datos/callbacks a `PixiViewport`.
 
-### `render`
+#### `render`
 
 - **`src/render/pixi/PixiViewport.ts`**
   - Renderizar `SceneShape` con `type: "path"`.
@@ -922,7 +879,7 @@ export function measurePathDistance(
   - Mantener seleccion/handles por encima de overlays.
   - Limpiar preview temporal al cancelar, confirmar, cargar escena o resetear.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Extender tipos de dominio para `SceneShape.type === "path"`.
 2. Agregar `measurePathDistance` y tests unitarios.
@@ -940,7 +897,7 @@ export function measurePathDistance(
 14. Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 15. Probar manualmente en `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:**
   - `measurePathDistance` suma dos o mas segmentos.
@@ -969,7 +926,7 @@ export function measurePathDistance(
   12. Guardar/cargar escena y confirmar que el path persiste.
   13. Confirmar que `Escape` cancela sin crear objeto.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** El modelo actual de formas asume pocos handles o geometria simple.
   **Mitigacion:** Implementar path como caso explicito en `PixiViewport` y helpers de dominio; no forzar la logica de linea existente.
@@ -984,7 +941,7 @@ export function measurePathDistance(
 - **Riesgo:** Snap al centro de celda se comporta distinto al ajustar la grilla despues.
   **Mitigacion:** Persistir coordenadas de mundo y recalcular distancia con la grilla actual; al editar puntos, volver a snapear al centro vigente.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - `Path/Camino` aparece dentro de `Herramientas de area`.
 - Activar `Path/Camino` cambia el cursor y no crea punto automatico.
@@ -1006,13 +963,13 @@ export function measurePathDistance(
 - Escenas antiguas sin paths cargan sin errores.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/07-shapes-and-measurement/spec.md`
 - `specs/07-shapes-and-measurement/plan.md`
 - Si se ajusta el comportamiento general de herramientas tacticas, actualizar specs 07, 10, 11, 13 o 15 solo en los puntos afectados.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] `SceneShape` extendido con `path`.
 - [x] Helper `measurePathDistance` agregado.

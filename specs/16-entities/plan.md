@@ -1,40 +1,19 @@
-# Plan - Entities
+# Plan - Sistema de Entidades
 
-<!-- Archivo consolidado mecanicamente desde:
-- 16-entity-system/plan.md
-- 17-entity-library/plan.md
-- 18-entity-scene-panel/plan.md
-- 19-entity-templates-and-rendering/plan.md
--->
+Este documento describe de forma unificada el plan tecnico para implementar y mantener sistema de entidades, consolidando los pasos y criterios vigentes en el proyecto.
 
----
+## Biblioteca Persistente de Monstruos
 
-## Fuente: 16-entity-system/plan.md
+### 1. Resumen
 
-# Plan - Entity System
-
-<!--
-No habia un plan antiguo consolidado para este modulo en `main`.
-Carpeta reservada para la futura unificacion de entidades.
--->
-
----
-
-## Fuente: 17-entity-library/plan.md
-
-# Plan de implementacion tecnica - 30 - Biblioteca Persistente de Monstruos
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/16-entities/spec.md`
 - **Objetivo:** Agregar una biblioteca local persistente de monstruos en SQLite para buscar, reutilizar y crear monstruos desde el flujo `+ Agregar monstruo`, manteniendo las escenas `.ttrpgscene` portables.
 - **Estado:** Implementado
 - **Prioridad:** Alta
-- **Dependencias:** Spec 26 para aside DM, Spec 29 para templates Markdown/CSS de monstruos, decisiones de seguridad Electron del proyecto, SQLite local sin servicios externos.
+- **Dependencias:** panel de entidades del DM, templates Markdown/CSS de monstruos, decisiones de seguridad Electron del proyecto y SQLite local sin servicios externos.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Modelo de dominio `MonsterLibraryEntry`.
 - Conversion pura de entrada de biblioteca a instancia `SceneMonster`.
@@ -46,7 +25,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - Flujo para crear un monstruo nuevo, guardarlo en DB y agregarlo inmediatamente a la escena.
 - Persistencia portable de la instancia dentro de `.ttrpgscene`.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Edicion global de biblioteca desde una pantalla dedicada.
 - Actualizar entradas de biblioteca desde instancias ya agregadas a escena.
@@ -56,7 +35,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - Versionado de monstruos o tracking de cambios entre DB y escenas.
 - Dependencia obligatoria de imagen.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** La biblioteca queda modelada por dominio + casos de uso + repositorio. El renderer solo consume acciones tipadas via preload; no toca SQLite ni filesystem.
 - **Persistencia:** Usar SQLite local en `app.getPath("userData")/ttrpg-effects.sqlite`. Mantener `.ttrpgscene` como snapshot portable de la escena.
@@ -65,7 +44,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - **Validacion:** Validar nombre, sistema, template, Markdown, imagen opcional, fechas e ids en dominio/main. Usar queries parametrizadas.
 - **Dependencias nuevas:** Se usa `node:sqlite` (built-in de Node.js 22+) en lugar de `better-sqlite3`. Elimina dependencias nativas y el problema de ABI mismatch entre el Node.js del sistema y el bundleado por Electron. En desarrollo y build se agrega `NODE_OPTIONS=--experimental-sqlite` porque Electron 39 bundlea Node.js 22 donde el modulo es experimental; en la app empaquetada macOS se inyecta via `LSEnvironment` en el `Info.plist` (configurado en `electron-builder`).
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** `MonsterLibraryEntry`, `MonsterLibrarySearchQuery`, `MonsterLibrarySaveInput`.
 - **Reglas puras:**
@@ -76,9 +55,9 @@ Carpeta reservada para la futura unificacion de entidades.
 - **Coordenadas / unidades:** No aplica.
 - **Errores de dominio:** Nombre vacio, sistema vacio, contenido invalido si se decide requerir contenido, id invalido, templateId vacio.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/monster-library/monster-library.ts`.
 - Definir tipos de entrada persistente y payloads.
@@ -86,7 +65,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - Agregar helper de preview Markdown.
 - Tests unitarios para validacion y conversion a `SceneMonster`.
 
-### `application`
+#### `application`
 
 - Crear `src/application/services/monster-library-repository.ts`.
 - Crear casos de uso en `src/application/use-cases/monster-library.ts`:
@@ -95,7 +74,7 @@ Carpeta reservada para la futura unificacion de entidades.
   - `saveMonsterLibraryEntryUseCase`.
 - Mantener las interfaces sin dependencia de SQLite.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Agregar repositorio SQLite en `src/infrastructure/database` o `src/infrastructure/repositories`.
 - Crear inicializacion de DB y migracion inicial.
@@ -104,14 +83,14 @@ Carpeta reservada para la futura unificacion de entidades.
 - Implementar queries parametrizadas para search/get/save.
 - Asegurar creacion del directorio `userData` si hace falta.
 
-### `main`
+#### `main`
 
 - Inicializar DB al arrancar la app.
 - Registrar IPC `monster-library:*`.
 - Validar payloads recibidos antes de tocar la DB.
 - Devolver errores serializables y amigables.
 
-### `preload`
+#### `preload`
 
 - Exponer funciones especificas:
   - `searchMonsterLibrary(query)`;
@@ -120,23 +99,23 @@ Carpeta reservada para la futura unificacion de entidades.
 - Actualizar `src/preload/ttrpg-api.d.ts`.
 - No exponer canales genericos ni objetos Electron.
 
-### `renderer`
+#### `renderer`
 
 - Modificar `MonsterSection` para que `+ Agregar monstruo` abra el modal de biblioteca.
 - Crear `MonsterLibraryModal`.
 - Reutilizar o adaptar `MonsterModal` para crear una entrada nueva desde el flujo de biblioteca.
-- Cargar templates existentes del spec 29 para el formulario nuevo.
+- Cargar templates existentes del templates de monstruos para el formulario nuevo.
 - Al seleccionar entrada existente, convertirla a `SceneMonster` y llamar `onAdd`.
 - Al guardar entrada nueva, invocar preload para persistirla y luego agregarla a escena.
 - Mostrar estado de carga, errores y lista vacia.
 - Las cards de la grilla muestran la imagen del monstruo (100% del ancho de la card, aspect-ratio 16:9, `object-fit: cover`) con un placeholder cuando no hay imagen. Debajo: nombre, sistema y boton `Agregar a escena`. Las URLs de imagen se resuelven en paralelo via `resolveAsideUrl` al cargar las entries.
 - Los onChange del formulario de nuevo monstruo leen `event.currentTarget.value` fuera del updater funcional para evitar el error de `currentTarget null` en React 18 StrictMode.
 
-### `render`
+#### `render`
 
 - Sin cambios esperados.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Agregar dependencia SQLite elegida y confirmar que `pnpm build`/empaquetado siguen funcionando.
 2. Crear dominio de biblioteca y tests de conversion/validacion.
@@ -150,7 +129,7 @@ Carpeta reservada para la futura unificacion de entidades.
 10. Verificar portabilidad de `.ttrpgscene` y que la escena no dependa de la DB.
 11. Ejecutar tests, typecheck, lint focalizado y build.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** validacion de `MonsterLibraryEntry`, preview Markdown, conversion a `SceneMonster` con id unico.
 - **Integration tests:** repositorio SQLite con DB temporal, migracion inicial, save/get/search.
@@ -159,7 +138,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - **Build:** `pnpm build`
 - **Manual / smoke:** En `pnpm dev`, crear monstruo nuevo desde biblioteca, confirmar que aparece en DB/listado, agregar existente a escena, guardar/cargar escena y confirmar que el monstruo queda portable.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** ~~Dependencia nativa SQLite complica build o DMG.~~
   **Resuelto:** Se migro a `node:sqlite` (built-in), eliminando dependencias nativas por completo. El flag `--experimental-sqlite` se inyecta en `package.json` scripts y en `LSEnvironment` para la app empaquetada.
@@ -172,7 +151,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - **Riesgo:** Duplicados confusos.
   **Mitigacion:** Permitir duplicados inicialmente, pero mostrar sistema/template y fecha; un spec futuro puede agregar deduplicacion o update.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - [x] `+ Agregar monstruo` abre modal de biblioteca.
 - [x] El modal muestra buscador y grilla/listado de monstruos.
@@ -188,13 +167,13 @@ Carpeta reservada para la futura unificacion de entidades.
 - [x] Tests y validaciones pasan.
 - [x] Las cards de la grilla muestran imagen a ancho completo (16:9) con placeholder si no hay imagen.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/16-entities/spec.md`
 - `./specs/16-entities/plan.md`
 - Specs relacionados con aside DM y templates de monstruos si la implementacion cambia flujos existentes.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.
@@ -206,39 +185,21 @@ Carpeta reservada para la futura unificacion de entidades.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] `node:sqlite` (built-in) usado como alternativa sin dependencias nativas a `better-sqlite3`.
 
----
+## Panel lateral izquierdo del DM: Monstruos, NPCs y Notas
 
-## Fuente: 18-entity-scene-panel/plan.md
+### 1. Resumen
 
-# Plan consolidado - Entity Scene Panel
-
-<!-- Archivo consolidado mecanicamente desde:
-- 26-dm-scene-aside.plan.md
-- 28-dm-map-labels.plan.md
--->
-
----
-
-## Fuente: 26-dm-scene-aside.plan.md
-
-# Plan de implementación técnica - 26 - Panel lateral izquierdo del DM: Monstruos, NPCs y Notas
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/16-entities/spec.md`
 - **Objetivo:** Agregar un panel lateral izquierdo a la ventana del DM para gestionar Monstruos, NPCs y Notas de escena. El panel persiste en `.ttrpgscene`, sincroniza a la ventana de jugador el subconjunto visible (imágenes de monstruos, nombre/imagen de NPCs), y ofrece un editor WYSIWYG con renderización Markdown directa para las notas.
 - **Estado:** Implementado
 - **Prioridad:** Media
 - **Dependencias:**
-  - Spec 25 (ventana de jugador / IPC de escena): el snapshot `PlayerWindowSnapshot` ya contiene la escena completa; el nuevo campo `sceneAside` viajará automáticamente por el mismo canal `player-window:publish-scene`.
+  - ventana de jugador (ventana de jugador / IPC de escena): el snapshot `PlayerWindowSnapshot` ya contiene la escena completa; el nuevo campo `sceneAside` viajará automáticamente por el mismo canal `player-window:publish-scene`.
   - Patrón IPC de imágenes: `token:open-image`, `token:resolve-url`, protocolo `map-asset:` — todo ya registrado y funcional.
   - Schema Zod de escena: `sceneDocumentV1Schema` en `scene-schema.ts` — se extiende con campo opcional.
 
----
+### 2. Alcance
 
-## 2. Alcance
-
-### Incluido
+#### Incluido
 
 - Tipos de dominio: `SceneMonster`, `SceneNpc`, `SceneNote` (raíz y hija), `SceneAside`.
 - Extensión del schema Zod `sceneDocumentV1Schema` con campo opcional `sceneAside`.
@@ -254,7 +215,7 @@ Carpeta reservada para la futura unificacion de entidades.
 - Sincronización del nuevo campo `sceneAside` a jugador a través del canal existente.
 - Tests unitarios de dominio: slug, unicidad, CRUD, invariantes de dos niveles.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Sistema de iniciativa o combate.
 - Relaciones entre aside y tokens del canvas.
@@ -263,11 +224,9 @@ Carpeta reservada para la futura unificacion de entidades.
 - Portabilidad cross-máquina de imágenes.
 - Tablas, imágenes inline en contenido de notas, exportación MD a archivo.
 
----
+### 3. Decisiones técnicas
 
-## 3. Decisiones técnicas
-
-- **Arquitectura:** Se respetan las fronteras existentes: dominio sin imports de React/Electron/PixiJS; application sin UI; infrastructure solo en `main`; renderer solo consume preload API. El panel aside es un componente React del renderer, igual que el sidebar derecho (Spec 11).
+- **Arquitectura:** Se respetan las fronteras existentes: dominio sin imports de React/Electron/PixiJS; application sin UI; infrastructure solo en `main`; renderer solo consume preload API. El panel aside es un componente React del renderer, igual que el sidebar derecho (sidebar derecho).
 
 - **Persistencia:** Se agrega `sceneAside` como campo opcional en el schema Zod con `.optional()` y `.default(() => createDefaultSceneAside())`. Los archivos de escena existentes sin ese campo parsean sin error. Las imágenes se guardan como `imagePath` (ruta absoluta), igual que tokens y mapas.
 
@@ -284,11 +243,9 @@ Carpeta reservada para la futura unificacion de entidades.
   - `marked` — rendering MD a HTML en `NoteViewModal`, `MonsterDetailModal`, `NpcDetailModal` (MIT, ~10 KB).
   - Ninguna dependencia para la slugificación (función pura local de ~10 líneas).
 
----
+### 4. Diseño de dominio
 
-## 4. Diseño de dominio
-
-### Entidades / tipos
+#### Entidades / tipos
 
 ```ts
 // src/domain/sessions/scene-aside.ts
@@ -321,7 +278,7 @@ export interface SceneAside {
 }
 ```
 
-### Reglas puras (`scene-aside.ts`)
+#### Reglas puras (`scene-aside.ts`)
 
 - `slugify(name: string): string` — minúsculas, reemplaza espacios/caracteres especiales por `-`, colapsa guiones múltiples, elimina guiones al inicio/fin.
 - `ensureUniqueSlug(base: string, existing: readonly string[]): string` — agrega sufijo `-2`, `-3`, … si hay colisión.
@@ -333,20 +290,18 @@ export interface SceneAside {
 - `getPlayerVisibleMonsters(aside): readonly SceneMonster[]` — filtra `visibleToPlayer && imagePath !== null`.
 - `getPlayerVisibleNpcs(aside): readonly SceneNpc[]` — filtra `visibleToPlayer`.
 
-### Coordenadas / unidades
+#### Coordenadas / unidades
 
 No aplica; el aside es metadata de escena sin coordenadas de mundo.
 
-### Errores de dominio
+#### Errores de dominio
 
 - Intentar agregar nota hija a una nota que ya tiene padre → error: `"Las notas solo admiten dos niveles."`.
 - Slug vacío después de slugificar → error: `"El nombre debe contener al menos un carácter válido."`.
 
----
+### 5. Cambios por capa
 
-## 5. Cambios por capa
-
-### `domain`
+#### `domain`
 
 **Archivos nuevos:**
 - `src/domain/sessions/scene-aside.ts` — tipos `SceneMonster`, `SceneNpc`, `SceneNote`, `SceneAside`; funciones puras `slugify`, `ensureUniqueSlug`, `createDefaultSceneAside`, operaciones CRUD, `getNotePath`, `getPlayerVisibleMonsters`, `getPlayerVisibleNpcs`.
@@ -358,15 +313,15 @@ No aplica; el aside es metadata de escena sin coordenadas de mundo.
 **Tests:**
 - `src/domain/sessions/scene-aside.test.ts` — cubre `slugify`, `ensureUniqueSlug`, invariante de dos niveles, `getNotePath`, filtros de visibilidad.
 
-### `application`
+#### `application`
 
 No se agregan casos de uso propios: las operaciones de aside se realizan directamente en el reducer/estado del renderer (igual que tokens, luces y shapes). Si en el futuro se necesita lógica transaccional, se puede extraer a un caso de uso.
 
-### `infrastructure`
+#### `infrastructure`
 
 No se agrega infraestructura nueva. El aside se serializa junto con el resto de la escena en `ElectronSceneFileStorage` (ya existente). Las imágenes del aside usan `ElectronMapImageStorage` existente a través de los nuevos handlers IPC.
 
-### `main`
+#### `main`
 
 **Archivos nuevos:**
 - `src/main/ipc/aside-ipc.ts` — registra:
@@ -376,7 +331,7 @@ No se agrega infraestructura nueva. El aside se serializa junto con el resto de 
 **Archivos modificados:**
 - `src/main/index.ts` — importar y llamar `registerAsideIpc(storage)` junto a los demás `register*Ipc`.
 
-### `preload`
+#### `preload`
 
 **Archivos modificados:**
 - `src/preload/index.ts` — exponer en `contextBridge`:
@@ -390,7 +345,7 @@ No se agrega infraestructura nueva. El aside se serializa junto con el resto de 
   resolveAsideUrl: (imagePath: string) => Promise<string | null>;
   ```
 
-### `renderer`
+#### `renderer`
 
 **Archivos nuevos:**
 
@@ -420,13 +375,11 @@ src/renderer/src/components/aside/
 
 El estado `sceneAside` vive en `useState` de `App` al mismo nivel que `scene`. Cuando el usuario carga/guarda/resetea la escena, el aside va incluido en `SceneDocument`. Los handlers de CRUD del aside llaman a las funciones puras de dominio y actualizan el estado, seguido de `publishPlayerScene` con el snapshot actualizado (igual que cualquier otro cambio de escena).
 
-### `render`
+#### `render`
 
 No hay cambios en PixiJS. El aside es completamente HTML/React.
 
----
-
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. **Dominio — tipos y funciones puras**
    - Crear `src/domain/sessions/scene-aside.ts` con todos los tipos e interfaces.
@@ -482,7 +435,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
    - Las URLs ya llegan como `map-asset:` paths resolubles en ambas ventanas sin cambios adicionales.
 
 9. **Estilos**
-   - Seguir el tema oscuro existente: mismo fondo y colores que el sidebar derecho (Spec 11).
+   - Seguir el tema oscuro existente: mismo fondo y colores que el sidebar derecho (sidebar derecho).
    - Thumbnails 40×40 px con `object-fit: cover`, borde redondeado.
    - Breadcrumb de ruta en tono apagado (gris).
    - Acordeones con la misma tipografía y separadores que el sidebar derecho.
@@ -493,9 +446,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
     - `pnpm test` (dominio)
     - Smoke en `pnpm dev`: agregar monstruo/NPC/nota, editar, eliminar, toggle jugador, guardar escena, reabrir y verificar persistencia, abrir ventana de jugador y verificar overlay.
 
----
-
-## 7. Testing y verificación
+### 7. Testing y verificación
 
 - **Unit tests:**
   - `scene-aside.test.ts`: `slugify` (casos límite: vacío, caracteres especiales, mayúsculas, espacios, guiones múltiples), `ensureUniqueSlug` (sin colisión, colisión simple, colisión múltiple), invariante de dos niveles (rechazar nota hija de hija), `getNotePath` (raíz, hijo con padre), filtros de visibilidad.
@@ -523,9 +474,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
   - Abrir escena antigua (sin `sceneAside`) → verificar que carga sin error y el panel está vacío.
   - Verificar que el panel no aparece en la ventana de jugador.
 
----
-
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Bundle de Tiptap/ProseMirror puede ser grande (~150-200 KB gzip) e impactar el tiempo de arranque.
   **Mitigación:** `React.lazy` + `Suspense` en `NoteEditModal`; el bundle de Tiptap se descarga solo al abrir el modal por primera vez. Verificar con `pnpm build` y revisar el análisis de chunks.
@@ -542,9 +491,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Riesgo:** Colapsado/expansión del panel izquierdo puede requerir ajustar el cálculo de ancho del canvas, que hoy asume sidebar derecho únicamente.
   **Mitigación:** usar `flex` en el layout principal de `App.tsx`; el canvas ya crece/encoge con `flex-1`. Agregar el aside como hermano izquierdo en el mismo contenedor flex no requiere cálculos manuales.
 
----
-
-## 9. Criterios de aceptación
+### 9. Criterios de aceptación
 
 - `pnpm typecheck` pasa sin errores.
 - `pnpm lint` pasa sin errores.
@@ -563,17 +510,13 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - Escenas existentes sin `sceneAside` cargan sin errores con el panel vacío.
 - No hay accesos directos del renderer a Node.js, Electron internals o filesystem.
 
----
-
-## 10. Documentación afectada
+### 10. Documentación afectada
 
 - `specs/16-entities/spec.md` — actualizar estado a "En progreso" / "Implementada" al completar.
 - `src/domain/sessions/scene-document.ts` — el tipo `SceneDocumentV1` documenta el nuevo campo opcional.
 - No se requiere actualizar otras specs, ya que el IPC de jugador y el protocolo `map-asset:` no se modifican.
 
----
-
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] `src/domain/sessions/scene-aside.ts` creado con todos los tipos y funciones puras.
 - [x] `src/domain/sessions/scene-aside.test.ts` con cobertura de slug, unicidad, niveles, paths y filtros.
@@ -600,23 +543,18 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas (solo Tiptap, tiptap-markdown y marked, todas MIT).
 
----
+## Labels de Mapa Solo DM
 
-## Fuente: 28-dm-map-labels.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 28 - Labels de Mapa Solo DM
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/16-entities/spec.md`
 - **Objetivo:** Agregar labels de texto privados del DM, editables desde el aside derecho, persistidos en escena y excluidos del render de jugador.
 - **Estado:** Implementado
 - **Prioridad:** Media
-- **Dependencias:** Spec 02 para formato `.ttrpgscene`, Spec 11 para aside derecho, Spec 15 para propiedades de objeto seleccionado, Spec 25 para ventana de jugador.
+- **Dependencias:** persistencia de escena para formato `.ttrpgscene`, sidebar derecho para aside derecho, propiedades del objeto seleccionado para propiedades de objeto seleccionado, ventana de jugador para ventana de jugador.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Tipo persistente `SceneLabel`.
 - Estado de labels en escena.
@@ -628,7 +566,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - Guardado/carga de labels en `.ttrpgscene`.
 - Filtro para que labels no aparezcan en ventana de jugador.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Labels visibles para jugadores.
 - Markdown/HTML/rich text.
@@ -637,7 +575,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - Edicion multilinea avanzada.
 - Sincronizacion colaborativa.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** Los labels son entidad de escena y deben vivir en tipos de dominio/escena, no como estado suelto del componente visual.
 - **Persistencia:** Agregar `labels?: SceneLabel[]` o `labels: SceneLabel[]` con fallback vacio al cargar escenas antiguas.
@@ -646,38 +584,38 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Validacion:** Sanitizar como texto plano; validar opacidad y colores; restringir font a lista cerrada.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** `SceneLabel` con `id`, `text`, `position`, `fontFamily`, `color`, `opacity` y `shadow`.
 - **Reglas puras:** Normalizar labels cargados desde escena, aplicando defaults cuando falten campos.
 - **Coordenadas / unidades:** Posicion en coordenadas de mundo, independiente de zoom y pantalla.
 - **Errores de dominio:** Escenas con labels invalidos deben degradar a defaults seguros o excluir labels corruptos con warning recuperable si existe infraestructura para warnings.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Agregar tipo de label en el modelo de escena.
 - Agregar helper de normalizacion/defaults si el formato actual ya tiene capa de migracion o parseo.
 
-### `application`
+#### `application`
 
 - Asegurar que guardado/carga preserve `labels`.
 - Si existe constructor o migrador de escena, inicializar `labels` como arreglo vacio.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados fuera de serializacion existente de `.ttrpgscene`.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - Agregar accion para crear label desde UI DM, idealmente dentro de un grupo de herramientas DM o escena.
 - Agregar estado y reducers/handlers para crear, actualizar, mover y borrar labels.
@@ -692,7 +630,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
   - slider/input de blur de sombra;
   - slider de opacidad.
 
-### `render`
+#### `render`
 
 - Renderizar labels con `Text` o `BitmapText` si el sistema actual lo recomienda para rendimiento.
 - Ubicar labels en capa visible solo para DM.
@@ -701,7 +639,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - Limpiar objetos PixiJS al redibujar/destruir viewport.
 - Asegurar que el player viewport no dibuje labels.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Actualizar tipos de escena y defaults para soportar `labels`.
 2. Conectar labels al estado principal de escena y persistencia existente.
@@ -712,7 +650,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 7. Verificar que player window no renderiza labels.
 8. Ejecutar typecheck, tests relevantes, lint y build.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** normalizacion/defaults de labels si existe capa testeable de escena.
 - **Integration tests:** guardado/carga preserva labels si ya hay tests de serializacion.
@@ -721,7 +659,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Build:** `pnpm build`
 - **Manual / smoke:** Crear label, editar propiedades, arrastrar, borrar, guardar escena, cargar escena y abrir player window confirmando que no aparece.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** El label se renderiza accidentalmente en ventana de jugador.
   **Mitigacion:** Mantener capa DM-only o filtro explicito en player viewport y probar manualmente.
@@ -732,7 +670,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Riesgo:** Labels quedan ilegibles sobre algunos mapas.
   **Mitigacion:** Permitir color, sombra y opacidad configurables.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - [x] Se puede crear un label en el mapa.
 - [x] El label se muestra en DM.
@@ -744,13 +682,13 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - [x] Escenas antiguas sin labels cargan sin error.
 - [x] Validaciones pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/16-entities/spec.md`
 - `./specs/16-entities/plan.md`
 - Specs de ventana de jugador o propiedades seleccionadas solo si la implementacion cambia decisiones globales.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.
@@ -762,23 +700,18 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
----
+## Sistema de Templates de Monstruos
 
-## Fuente: 19-entity-templates-and-rendering/plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 29 - Sistema de Templates de Monstruos
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/16-entities/spec.md`
 - **Objetivo:** Agregar templates persistentes de Markdown/CSS para notas de monstruos, con administrador desde menu de aplicacion, selector en el modal de monstruo y template semilla D&D 5.5e.
 - **Estado:** Implementado
 - **Prioridad:** Media
-- **Dependencias:** Spec 26 para aside DM, Spec 27 para menu de aplicacion, fix de Markdown GFM para tablas, modelo actual de `SceneMonster`.
+- **Dependencias:** panel de entidades del DM para aside DM, menu de aplicacion para menu de aplicacion, fix de Markdown GFM para tablas, modelo actual de `SceneMonster`.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Modelo `MonsterTemplate`.
 - Store local versionado para templates.
@@ -790,7 +723,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - Persistencia de `templateId` en monstruos.
 - Render del detalle de monstruo con CSS scoped del template.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Marketplace o importacion remota.
 - Plantillas para NPCs/notas generales.
@@ -798,7 +731,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - Sanitizacion avanzada de HTML/CSS mas alla del scoping definido.
 - Migracion compleja de templates existentes, porque no existen en versiones previas.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** Los templates son configuracion local de la app, no parte del dominio tactico del mapa, pero sus tipos viven en dominio/shared para compartir entre main, preload y renderer.
 - **Persistencia:** Archivo JSON versionado en `app.getPath("userData")`, por ejemplo `monster-templates.json`. Los built-ins se mezclan al listar y no se duplican hasta que el usuario los edite.
@@ -811,7 +744,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Validacion:** Validar id, name, system, markdown y css como strings limitados. Rechazar payloads no serializables.
 - **Dependencias nuevas:** Ninguna en primera implementacion. Usar textareas simples y el render Markdown existente.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** `MonsterTemplate`, `MonsterTemplateStore`, `SceneMonster.templateId`.
 - **Reglas puras:**
@@ -822,16 +755,16 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Coordenadas / unidades:** No aplica.
 - **Errores de dominio:** Template invalido, template duplicado, template built-in protegido contra delete directo.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/monster-templates/monster-template.ts`.
 - Definir `MonsterTemplate`, defaults y built-in D&D 5.5e.
 - Agregar `templateId?: string | null` a `SceneMonster`.
 - Agregar helpers para normalizar templates y generar ids si aplica.
 
-### `application`
+#### `application`
 
 - Crear interfaz `MonsterTemplateRepository`.
 - Crear casos de uso:
@@ -840,21 +773,21 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
   - eliminar template.
 - Asegurar mezcla de built-ins y templates del usuario.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Implementar repositorio filesystem Electron para templates.
 - Leer/escribir JSON versionado en `userData`.
 - Manejar archivo ausente como lista vacia.
 - Proteger contra JSON corrupto con error recuperable y fallback a built-ins.
 
-### `main`
+#### `main`
 
 - Registrar IPC de templates.
 - Extender menu de aplicacion con `Administrar templates de monstruos`.
 - Enviar evento al renderer principal para abrir el modal manager.
 - Validar payloads antes de guardar.
 
-### `preload`
+#### `preload`
 
 - Exponer funciones:
   - `listMonsterTemplates()`
@@ -863,7 +796,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
   - `onOpenMonsterTemplateManager(callback)`
 - No exponer canales IPC genericos.
 
-### `renderer`
+#### `renderer`
 
 - Agregar estado/listado de templates en `App`.
 - Agregar modal `MonsterTemplateManagerModal`.
@@ -876,11 +809,11 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - En `MonsterDetailModal`, resolver template por id y aplicar CSS scoped al contenedor del Markdown.
 - Mantener `Sin template` como opcion default.
 
-### `render`
+#### `render`
 
 - Sin cambios esperados.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Crear tipos de dominio, built-in D&D 5.5e y normalizadores.
 2. Extender `SceneMonster` con `templateId` compatible hacia atras.
@@ -893,7 +826,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 9. Verificar guardado/carga de escenas con `templateId`.
 10. Ejecutar validaciones y actualizar checklist.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** normalizacion de templates, mezcla built-in/user, CSS scoping.
 - **Integration tests:** repositorio filesystem con archivo ausente, archivo valido y JSON corrupto si el proyecto tiene harness.
@@ -902,7 +835,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Build:** `pnpm build`
 - **Manual / smoke:** abrir manager desde menu, editar template, previsualizar, guardar, crear monstruo con template, ver detalle con tabla y estilos, guardar/cargar escena y confirmar `templateId`.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** CSS del template afecta otras partes de la app.
   **Mitigacion:** Envolver preview/detalle en contenedor con scope unico y prefijar reglas o inyectarlas dentro de un scope controlado.
@@ -915,7 +848,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - **Riesgo:** CSS/HTML inseguro.
   **Mitigacion:** No permitir acceso a Electron/Node desde renderer, scoping de CSS y mantener el Markdown dentro del contenedor.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - [x] El menu de aplicacion abre el administrador de templates.
 - [x] El administrador lista el template D&D 5.5e por defecto con card claro y tabla de caracteristicas compacta.
@@ -930,13 +863,13 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - [x] Templates faltantes no rompen la visualizacion.
 - [x] Validaciones pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/16-entities/spec.md`
 - `./specs/16-entities/plan.md`
 - Si se implementa, actualizar specs relacionadas con aside DM y menu de aplicacion si cambia una decision global.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.

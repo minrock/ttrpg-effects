@@ -1,10 +1,14 @@
-# Spec 23 - Aguas, rios y cuerpos de agua
+# Spec - Efectos de Agua
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de efectos de agua, consolidando el alcance funcional vigente en el proyecto.
+
+## Aguas, rios y cuerpos de agua
+
+### Objetivo
 
 Agregar un efecto de agua que permita dibujar rios/riachuelos abiertos y cuerpos de agua cerrados sobre el mapa, usando tiles GIF internos para representar movimiento de agua y costa.
 
-## Alcance
+### Alcance
 
 - Crear una herramienta de efecto `Agua`.
 - Permitir que el usuario dibuje una linea/polilinea sobre el mapa.
@@ -13,7 +17,7 @@ Agregar un efecto de agua que permita dibujar rios/riachuelos abiertos y cuerpos
 - Permitir controlar el ancho del rio/riachuelo.
 - Usar assets internos del renderer, sin rutas locales ni protocolo `map-asset:`.
 
-## Assets animados
+### Assets animados
 
 El efecto usa 9 GIFs internos en `src/renderer/public/effects/water/`:
 
@@ -35,7 +39,7 @@ La base visual inicial del agua usa el GIF provisto por el usuario (`Q52D8P.gif`
 - Las costas diagonales deben ser una division diagonal completa: tierra de un lado de la diagonal y agua del otro.
 - Las diagonales no deben verse como islas, parches circulares o esquinas curvas; deben leerse como costa diagonal continua.
 
-## Dibujo de rios y riachuelos
+### Dibujo de rios y riachuelos
 
 - El usuario inicia el dibujo desde el menu contextual o el submenu de efectos.
 - Click normal agrega puntos a la polilinea.
@@ -57,7 +61,7 @@ La base visual inicial del agua usa el GIF provisto por el usuario (`Q52D8P.gif`
 - Los dos circulos de rotacion deben tener suficiente separacion visual para que sus manivelas se puedan manipular sin interferirse.
 - El panel lateral derecho debe permitir ajustar `hue` y `saturation` del GIF de agua.
 
-## Dibujo de cuerpos cerrados
+### Dibujo de cuerpos cerrados
 
 - Si al confirmar la polilinea el ultimo punto queda cerca del punto inicial, se cierra el loop automaticamente.
 - El resultado se guarda como `water-body`.
@@ -69,14 +73,14 @@ La base visual inicial del agua usa el GIF provisto por el usuario (`Q52D8P.gif`
 - Los dos circulos de rotacion del cuerpo cerrado deben tener suficiente separacion visual para evitar interferencias al arrastrar.
 - El cuerpo cerrado debe conservar su forma al seleccionarlo, moverlo, guardarlo y cargarlo.
 
-## Reglas de cierre
+### Reglas de cierre
 
 - La deteccion de loop debe usar una distancia configurable o constante razonable basada en el tamano de celda actual.
 - El cierre debe comparar el ultimo punto con el primer punto en coordenadas de mundo.
 - Si el usuario confirma con menos de 2 puntos, no se crea agua.
 - Si el usuario confirma un loop con menos de 3 puntos utiles, no se crea cuerpo cerrado.
 
-## Persistencia
+### Persistencia
 
 La escena debe conservar:
 
@@ -92,7 +96,7 @@ La escena debe conservar:
 - Opacidad.
 - Orden de render.
 
-## Render
+### Render
 
 - El agua debe renderizarse sobre el mapa y debajo de figuras, mediciones, tokens y UI de seleccion.
 - La animacion se carga como asset interno del renderer.
@@ -102,7 +106,7 @@ La escena debe conservar:
 - Para rios o cuerpos muy grandes, el render puede aumentar progresivamente el tamano de tile hasta un limite documentado para mantener una cantidad razonable de sprites animados.
 - El agua no debe revelar oscuridad por si misma; si en el futuro se agrega brillo/reflejo, debe definirse en otro spec.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Existen los 9 GIFs internos del efecto de agua.
 - El usuario puede dibujar una linea abierta y confirmar un rio/riachuelo.

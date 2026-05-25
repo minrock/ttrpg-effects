@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 24 Apuntador arcano
+# Plan - Apuntador Arcano
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener apuntador arcano, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/17-arcane-pointer/spec.md`
+## Apuntador arcano
+
+### 1. Resumen
+
 - **Objetivo:** Implementar un modo temporal de apuntador que renderiza un circulo arcano pixel-art con fade in/out sobre una celda, configurable por tamano de criatura desde el aside derecho.
 - **Estado:** Implementado
 - **Prioridad:** Media
-- **Dependencias:** Spec 01 para capas Pixi, spec 03 para modelo de interaccion, spec 11 para sidebar derecho, spec 22 para categorias de tamano de criaturas y asset interno `src/renderer/public/effects/arcane-pointer.gif`.
+- **Dependencias:** motor visual para capas Pixi, interaccion y navegacion para modelo de interaccion, sidebar derecho para sidebar derecho, tokens y tamanos de criatura para categorias de tamano de criaturas y asset interno `src/renderer/public/effects/arcane-pointer.gif`.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Agregar modo `Apuntador` como toggle visible en la barra superior.
 - Mostrar configuracion del apuntador en el aside derecho cuando el modo este activo.
@@ -26,7 +29,7 @@
 - Cancelar/desactivar el modo con `Escape`.
 - Limpiar sprites/animaciones al terminar o destruir el viewport.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Persistir apuntadores en `.ttrpgscene`.
 - Guardar historial de apuntadores.
@@ -34,7 +37,7 @@
 - Sincronizacion remota o multiplayer.
 - Audio, texto, particulas extra o reglas de medicion.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El modo vive en estado de interaccion/renderer. La configuracion visual del modo vive en React y se pasa al adapter Pixi mediante props/callbacks especificos.
 - **Persistencia:** No se modifica el schema `.ttrpgscene`; los apuntadores activos y su configuracion no se guardan.
@@ -43,7 +46,7 @@
 - **Validacion:** Validar que el tamano elegido pertenezca al set permitido. Si no hay grilla, usar un tamano default seguro.
 - **Dependencias nuevas:** Ninguna prevista.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:**
   - `ArcanePointerCreatureSize = "tiny" | "small" | "medium" | "large" | "huge" | "gargantuan"`.
@@ -56,9 +59,9 @@
 - **Coordenadas / unidades:** El click se convierte de pantalla a mundo. Con grilla se hace snap al centro de celda. El diametro se calcula desde `grid.cellSizeWorld`.
 - **Errores de dominio:** Tamano desconocido cae a `medium` o se rechaza en helper controlado.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear helper testeable para tamanos del apuntador, por ejemplo `src/domain/pointer/arcane-pointer.ts`.
 - Agregar tests unitarios para:
@@ -66,26 +69,26 @@
   - diametro visual por grilla;
   - curva de alpha/fade.
 
-### `application`
+#### `application`
 
 - No se requieren casos de uso persistentes.
 - El flujo queda como estado visual local y callbacks de renderer.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Registrar el asset generado en `src/renderer/public/effects/arcane-pointer.gif`.
 - No se requieren repositorios, SQLite ni filesystem.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 - Mantener CSP compatible con assets internos desde `'self'`.
 
-### `preload`
+#### `preload`
 
 - Sin API nueva.
 
-### `renderer`
+#### `renderer`
 
 - Agregar estado de modo `Apuntador` en `App`.
 - Agregar estado de configuracion `pointerCreatureSize`, default `medium`.
@@ -99,7 +102,7 @@
   - tamano seleccionado;
   - llave de limpieza para nueva escena, carga de escena o cambio de mapa.
 
-### `render`
+#### `render`
 
 - Cargar el GIF `arcane-pointer.gif` en `PixiViewport`.
 - Agregar `setArcanePointerMode`.
@@ -109,7 +112,7 @@
 - Remover y destruir sprites al terminar.
 - Limpiar apuntadores activos al destruir viewport, al cargar nueva escena o cuando se indique desde React.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Crear helper de dominio para tamanos de apuntador y curva de alpha.
 2. Agregar tests unitarios del helper.
@@ -120,7 +123,7 @@
 7. Asegurar que `Escape`, cambio de modos y nueva/carga de escena cancelen el modo o limpien apuntadores activos segun corresponda.
 8. Ejecutar verificacion automatica y smoke manual.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Mapeo de tamano a footprint, diametro por grilla y curva de alpha.
 - **Integration tests:** No previstos para IPC/persistencia porque no hay cambios de escena.
@@ -129,7 +132,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** `pnpm dev`, activar `Apuntador`, cambiar tamano en aside, clickear varias celdas, confirmar fade in/out, confirmar que no selecciona elementos, probar `Escape`, probar pan con barra espaciadora.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Acumular sprites temporales si se disparan muchos apuntadores.
   **Mitigacion:** Destruir cada sprite al terminar y limpiar todos al destruir/cambiar escena.
@@ -140,7 +143,7 @@
 - **Riesgo:** El GIF no carga.
   **Mitigacion:** Fallback vectorial simple de circulo arcano o anillo visible.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - El boton `Apuntador` aparece en la barra superior y alterna el modo.
 - El aside derecho muestra selector de tamano de criatura cuando el modo esta activo.
@@ -153,13 +156,13 @@
 - No se guarda ningun apuntador en `.ttrpgscene`.
 - `pnpm typecheck`, `pnpm test` y `pnpm lint` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/17-arcane-pointer/spec.md`
 - Este plan.
 - Si durante implementacion cambia la ubicacion del asset o el comportamiento del modo, actualizar ambos.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.

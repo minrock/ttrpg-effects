@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 17 Submenu de Efectos y Oscuridad Magica
+# Plan - Oscuridad Magica
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener oscuridad magica, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/12-magical-darkness/spec.md`
+## Submenu de Efectos y Oscuridad Magica
+
+### 1. Resumen
+
 - **Objetivo:** Reorganizar el menu contextual para agrupar fuego y luces en `Efectos`, y agregar un efecto persistible `Oscuridad magica` que tape mapa, luces y darkvision sin tapar formas/mediciones/seleccion.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 03, 06, 09, 10, 12, 13 y 15; modelo actual `SceneEffect`; render PixiJS con capas; panel contextual del sidebar.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Agregar submenu contextual `Efectos`.
 - Mover al submenu `Efectos`:
@@ -31,7 +34,7 @@
 - Guardar/cargar oscuridad magica en `.ttrpgscene`.
 - Agregar tests de dominio/schema necesarios.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Color configurable.
 - Formas no circulares.
@@ -41,7 +44,7 @@
 - Cambios en fog of war fuera del orden de capas necesario.
 - Cambios en el numero de version del documento si la union nueva es retrocompatible.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** La oscuridad magica vive en dominio como un efecto de escena, no como estado visual de Pixi. Renderer/React orquesta creacion y propiedades; Pixi solo renderiza y reporta interacciones.
 - **Persistencia:** Convertir `SceneEffect` en union discriminada: `SceneFireEffect | SceneMagicalDarknessEffect`. Guardar ambos dentro de `effects`.
@@ -51,7 +54,7 @@
 - **Validacion:** Schema Zod con discriminated union por `kind`. Escenas antiguas con solo `fire` siguen cargando.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:**
   - Renombrar o especializar el fuego actual a `SceneFireEffect`.
@@ -76,9 +79,9 @@ export interface SceneMagicalDarknessEffect {
 - **Coordenadas / unidades:** Posicion y radio se guardan en coordenadas de mundo, igual que fuego/luces/formas. La UI del radio en el panel se expresa en cuadros de grilla y se convierte con `grid.cellSizeWorld`; tambien muestra la equivalencia segun `grid.unit`, `distancePerCell` o `metricDistancePerCell`.
 - **Errores de dominio:** Id vacio, posicion no finita o radio invalido deben rechazarse/sanitizarse igual que efectos existentes.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - **`src/domain/sessions/scene-document.ts`**
   - Convertir `SceneEffect` en union discriminada.
@@ -95,23 +98,23 @@ export interface SceneMagicalDarknessEffect {
   - `setMagicalDarknessRadius` si ayuda a reutilizar resize.
   - Tests unitarios.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - **`src/renderer/src/App.tsx`**
   - Extender `handleCreateElement` o agregar flujo especifico para `magical-darkness`.
@@ -134,7 +137,7 @@ export interface SceneMagicalDarknessEffect {
   - Tipos permanecen `readonly SceneEffect[]`, pero callbacks de resize pueden necesitar nombres genericos:
     - `onEffectRadiusChange` o mantener `onFireZoneRadiusChange` solo para fuego y agregar `onMagicalDarknessRadiusChange`.
 
-### `render`
+#### `render`
 
 - **`src/domain/map/render-layers.ts`**
   - Agregar capa `magicalDarkness` despues de `effects` y antes de `fogOfWar`.
@@ -160,7 +163,7 @@ export interface SceneMagicalDarknessEffect {
   - Confirmar que `findSelectableElement` incluye oscuridad magica.
   - Confirmar que `drawSelection` puede seleccionar este tipo sin romper radio visual.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Convertir `SceneEffect` a union `fire | magical-darkness` en tipos.
 2. Crear modulo de dominio `magical-darkness` con helpers y tests.
@@ -177,7 +180,7 @@ export interface SceneMagicalDarknessEffect {
 13. Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 14. Smoke manual en `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:**
   - Crear oscuridad magica con defaults.
@@ -202,7 +205,7 @@ export interface SceneMagicalDarknessEffect {
   9. Crear figuras/mediciones encima y confirmar que se ven sobre la oscuridad magica.
   10. Guardar/cargar escena y confirmar persistencia.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Funciones actuales de fuego asumen que todo `SceneEffect` tiene `zone`.
   **Mitigacion:** Convertir a union discriminada y filtrar por `kind === "fire"` en todos los consumidores.
@@ -215,7 +218,7 @@ export interface SceneMagicalDarknessEffect {
 - **Riesgo:** Menu contextual anidado se vuelve dificil de usar.
   **Mitigacion:** Reutilizar el patron existente de `Herramientas de area` y mantener labels cortos.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Existe submenu contextual `Efectos`.
 - `Fuego`, `Pintar fuego`, `Luz puntual`, `Luz conica` y `Oscuridad magica` estan dentro de `Efectos`.
@@ -235,13 +238,13 @@ export interface SceneMagicalDarknessEffect {
 - Escenas antiguas siguen cargando.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/12-magical-darkness/spec.md`
 - `specs/12-magical-darkness/plan.md`
 - Si la implementacion modifica el alcance de efectos/fuego/luces, actualizar specs 06, 09, 10, 12 o 15 solo en los puntos afectados.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] `SceneEffect` convertido en union discriminada.
 - [x] Helper de oscuridad magica creado.

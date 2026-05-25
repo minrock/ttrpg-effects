@@ -1,16 +1,19 @@
-# Plan de implementacion tecnica - 23 Aguas, rios y cuerpos de agua
+# Plan - Efectos de Agua
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener efectos de agua, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/11-water-effects/spec.md`
+## Aguas, rios y cuerpos de agua
+
+### 1. Resumen
+
 - **Objetivo:** Implementar un efecto de agua que permita dibujar rios/riachuelos abiertos y cuerpos de agua cerrados, renderizados con GIFs internos de agua/costa, seleccionables, editables y persistibles en `.ttrpgscene`.
 - **Estado:** Implementado
 - **Prioridad:** Media
 - **Dependencias:** Specs 02 (formato de escena), 03 (modelo de interaccion), 04 (grilla/mapa), 11 (aside derecho), 15 (propiedades de objeto seleccionado), 17 (submenu de efectos), 18 (patron de herramienta tipo path), 23 assets GIF internos de agua.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Crear efecto `water` con variantes `river` y `water-body`.
 - Agregar herramienta `Agua` en el submenu de efectos.
@@ -29,7 +32,7 @@
 - Guardar/cargar efectos de agua en `.ttrpgscene`.
 - Mostrar propiedades del agua seleccionada en el aside derecho.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Simulacion fisica de corriente, profundidad o terreno.
 - Reglas automaticas de movimiento dificil, nado o combate.
@@ -38,7 +41,7 @@
 - Importar tiles de agua externos desde UI.
 - Generacion procedural en runtime de nuevos GIFs.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El dominio define tipos, validaciones, deteccion de loop, medicion/ancho y geometria serializable. React orquesta la herramienta y el estado visual. PixiJS queda encapsulado en el adapter de render.
 - **Persistencia:** Extender el documento versionado de escena con `effects` de tipo `water`. Escenas antiguas deben cargar sin agua inicializando campos ausentes de forma segura.
@@ -47,7 +50,7 @@
 - **Validacion:** Validar variante, puntos finitos, ancho positivo, opacidad, visibilidad e ids estables en schema de escena.
 - **Dependencias nuevas:** Ninguna prevista.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:**
   - `SceneWaterEffect`.
@@ -65,36 +68,36 @@
 - **Coordenadas / unidades:** Puntos y ancho se guardan en coordenadas de mundo. El threshold de cierre se calcula desde `grid.cellSizeWorld`, por ejemplo media celda.
 - **Errores de dominio:** Rechazar trazos sin puntos suficientes, ancho no positivo, puntos no finitos y variante desconocida.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/effects/water.ts` con tipos y helpers puros.
 - Extender tipos de escena para incluir `water` dentro de efectos.
 - Actualizar schema de escena para validar/persistir agua.
 - Agregar tests unitarios para loop, normalizacion, creacion, movimiento y clamps de ancho.
 
-### `application`
+#### `application`
 
 - Reusar el flujo actual de estado de escena/efectos.
 - Si existen helpers de creacion/actualizacion de efectos, extenderlos para agua.
 - Mantener reglas de geometria fuera de React.
 
-### `infrastructure`
+#### `infrastructure`
 
 - No se requieren cambios de filesystem/SQLite.
 - Asegurar que los assets internos de agua queden versionados en `src/renderer/public/effects/water/`.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 - Mantener CSP compatible con carga interna desde `'self'`.
 
-### `preload`
+#### `preload`
 
 - Sin API nueva.
 
-### `renderer`
+#### `renderer`
 
 - Agregar accion `Agua` en el submenu de efectos.
 - Agregar modo de herramienta `water-draw`.
@@ -110,7 +113,7 @@
   - Hue y saturacion editables para el GIF de agua.
 - Permitir mover efectos de agua seleccionados como otros efectos.
 
-### `render`
+#### `render`
 
 - Agregar render de preview de agua durante dibujo.
 - Renderizar rios como un trazo ancho con agua interior y costas en ambos lados.
@@ -129,7 +132,7 @@
 - Hacer la limpieza de capas compatible con `GifSprite`: destruir recursivamente los hijos y luego el objeto, sin usar opciones de destruccion de texturas compartidas.
 - Aplicar un limite razonable de sprites animados por efecto de agua; si se supera, aumentar el tile size progresivamente hasta un maximo para preservar rendimiento.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Registrar los 9 GIFs internos de agua en `src/renderer/public/effects/water/`.
 2. Modelar `SceneWaterEffect` y helpers puros en dominio.
@@ -144,7 +147,7 @@
 11. Integrar guardado/carga de `.ttrpgscene`.
 12. Ejecutar verificacion automatica y smoke manual.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Deteccion de loop, normalizacion de puntos, validacion de minimo de puntos, ancho de rio, traslado de agua y schema de escena.
 - **Integration tests:** Guardar/cargar escena con rio y cuerpo cerrado.
@@ -153,7 +156,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** `pnpm dev`, cargar mapa, crear rio abierto, editar ancho, moverlo, crear loop cerrado, confirmar relleno interior/costa, guardar escena, cargar escena y verificar que ambos efectos reaparecen.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Render costoso si se crean demasiados sprites para costas largas o cuerpos grandes.
   **Mitigacion:** Agrupar segmentos, usar mascaras por geometria y limitar objetos por segmento significativo, no por pixel/celda.
@@ -164,7 +167,7 @@
 - **Riesgo:** Persistencia incompatible con escenas antiguas.
   **Mitigacion:** Schema tolerante con `effects` existentes y defaults seguros para escenas sin agua.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Existen y se versionan los 9 GIFs internos de agua.
 - El usuario puede crear un rio abierto desde la herramienta `Agua`.
@@ -181,13 +184,13 @@
 - Agua se puede seleccionar, mover, ocultar y guardar/cargar.
 - `pnpm typecheck` y `pnpm test` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `./specs/11-water-effects/spec.md`
 - Este plan.
 - Si durante implementacion cambia el formato `.ttrpgscene`, actualizar docs/schema relacionados.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.

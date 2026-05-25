@@ -1,27 +1,19 @@
-# Plan consolidado - Sidebar And Properties
+# Plan - Sidebar y Propiedades
 
-<!-- Archivo consolidado mecanicamente desde:
-- 11-right-sidebar-controls.plan.md
-- 15-selected-object-properties-sidebar.plan.md
--->
+Este documento describe de forma unificada el plan tecnico para implementar y mantener sidebar y propiedades, consolidando los pasos y criterios vigentes en el proyecto.
 
----
+## Menú Lateral Derecho de Controles
 
-## Fuente: 11-right-sidebar-controls.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 11 - Menú Lateral Derecho de Controles
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/06-sidebar-and-properties/spec.md`
 - **Objetivo:** Reemplazar la barra horizontal de controles por un panel lateral derecho colapsable con accordions para Grilla, Figuras, Oscuridad y Niebla, preservando los handlers y el estado actual.
 - **Estado:** Cerrado / Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 03, 04, 06, 07, 08, 09 y 10; layout actual en `src/renderer/src/App.tsx`; estilos globales en `src/renderer/src/styles.css`.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Crear un panel lateral derecho fijo dentro del layout principal.
 - Mover los controles actuales de `.grid-controls` al panel lateral.
@@ -42,7 +34,7 @@
 - Mantener intactas las reglas de dominio y render.
 - Mantener accesibilidad básica con botones, labels y `aria-expanded`.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Persistir estado abierto/cerrado de accordions.
 - Cambiar reglas de medición, grilla, oscuridad, niebla, fuego o visión.
@@ -50,7 +42,7 @@
 - Introducir dependencias nuevas de iconos.
 - Rediseñar paneles de propiedades de luces, fuego o formas.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El cambio vive en `renderer`; no se tocan `domain`, `application`, `main`, `preload`, `infrastructure` ni `render`.
 - **Persistencia:** No se agregan campos a `.ttrpgscene`; los controles siguen modificando `grid`, `settings`, `darkness` y `fogOfWar`. La visibilidad del sidebar es estado local de UI.
@@ -59,7 +51,7 @@
 - **Validacion:** Mantener los mismos límites actuales de inputs. Para `Valor por casilla`, editar `distancePerCell` cuando la unidad sea `ft` y `metricDistancePerCell` cuando la unidad sea `m`.
 - **Dependencias nuevas:** `@radix-ui/react-switch` para el switch accesible de `Ajustar grilla`. Los iconos se resuelven con caracteres/símbolos simples o CSS.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** No se crean ni modifican tipos de dominio.
 - **Reglas puras:** No hay reglas puras nuevas.
@@ -68,30 +60,30 @@
   - `m`: actualiza `grid.metricDistancePerCell`.
 - **Errores de dominio:** No se agregan errores nuevos.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Sin cambios esperados.
 - Sin tests unitarios nuevos de dominio.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - En `src/renderer/src/App.tsx`:
   - Extraer o reestructurar los controles actuales de grilla/oscuridad/niebla a un panel lateral.
@@ -113,11 +105,11 @@
   - Asegurar scroll vertical del panel si hace falta.
   - Evitar solapes y truncamientos de inputs/selects.
 
-### `render`
+#### `render`
 
 - Sin cambios esperados.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Revisar el layout actual de `App.tsx` y `.grid-controls` en `styles.css`.
 2. Definir el estado local de accordions abiertos en `App.tsx`.
@@ -138,7 +130,7 @@
 17. Ejecutar validaciones automáticas.
 18. Realizar smoke manual en `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** No se esperan tests de dominio nuevos.
 - **Integration tests:** No se esperan tests de integración nuevos.
@@ -148,7 +140,7 @@
 - **Manual / smoke:** `pnpm dev`, abrir/cerrar cada accordion, ocultar/mostrar sidebar, modificar grilla, snap, diagonal, valor por casilla, oscuridad y niebla; confirmar que el canvas queda visible y usable.
 - **Validación ejecutada:** `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** El panel lateral reduce demasiado el área útil del canvas.
   **Mitigacion:** Usar ancho estable pero contenido compacto, y verificar con viewport de Electron.
@@ -159,7 +151,7 @@
 - **Riesgo:** El refactor visual desconecte handlers existentes.
   **Mitigacion:** Mover JSX sin cambiar lógica y verificar manualmente cada control.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - La antigua barra horizontal de controles ya no aparece como una sola línea sobre el mapa.
 - Hay un panel lateral derecho visible.
@@ -177,13 +169,13 @@
 - El sidebar puede volver a mostrarse desde un control visible.
 - `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/06-sidebar-and-properties/spec.md`
 - `specs/06-sidebar-and-properties/plan.md`
 - `README.md` solo si el flujo de uso documentado menciona la barra horizontal anterior.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.
@@ -195,30 +187,25 @@
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Dependencia `@radix-ui/react-switch` justificada para switch accesible.
 
-## 12. Cierre
+### 12. Cierre
 
 - Spec implementada en `src/renderer/src/App.tsx` y `src/renderer/src/styles.css`.
 - Sidebar derecho agrupado por Grilla, Figuras, Oscuridad y Niebla.
 - Sidebar ocultable/mostrable para ampliar el viewport del mapa.
 - README actualizado para reemplazar referencias a la barra horizontal.
 
----
+## Propiedades del Objeto Seleccionado en Sidebar
 
-## Fuente: 15-selected-object-properties-sidebar.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 15 - Propiedades del Objeto Seleccionado en Sidebar
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/06-sidebar-and-properties/spec.md`
 - **Objetivo:** Mover las propiedades contextuales del objeto seleccionado desde la franja superior hacia un accordion contextual dentro del sidebar derecho, recuperando espacio vertical para el mapa.
 - **Estado:** Implementado
 - **Prioridad:** Media
-- **Dependencias:** Spec 11 para sidebar derecho y accordions; controles existentes de propiedades por tipo; seleccion actual de elementos en canvas.
+- **Dependencias:** sidebar derecho para sidebar derecho y accordions; controles existentes de propiedades por tipo; seleccion actual de elementos en canvas.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Crear un accordion contextual de propiedades arriba de los accordions existentes del sidebar.
 - Reutilizar los controles actuales de propiedades para luces, fuego, mediciones y formas.
@@ -228,7 +215,7 @@
 - Mantener los callbacks actuales de edicion sin cambiar el modelo de datos.
 - Ajustar estilos para que los controles sean legibles en columna y no generen overflow horizontal.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Cambiar la logica de seleccion o deseleccion en PixiJS.
 - Cambiar schemas de escena o persistencia `.ttrpgscene`.
@@ -237,7 +224,7 @@
 - Crear paneles flotantes, tabs o atajos nuevos.
 - Cambiar el menu contextual de click derecho.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El cambio vive en `renderer`; se mantiene la separacion actual porque la UI seguira leyendo el objeto seleccionado y llamando a los handlers existentes sin mover reglas al render ni al dominio.
 - **Persistencia:** Sin cambios. Las propiedades editadas siguen usando los modelos actuales de luces, efectos y formas.
@@ -246,36 +233,36 @@
 - **Validacion:** Mantener las validaciones actuales de inputs numericos, selects, sliders y color pickers.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Sin tipos nuevos de dominio.
 - **Reglas puras:** Sin reglas nuevas.
 - **Coordenadas / unidades:** Se conservan las unidades actuales de cada control, incluyendo pies/metros y valores por celda.
 - **Errores de dominio:** Sin errores nuevos. Los controles deben mantener el comportamiento existente ante valores invalidos o incompletos.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
-
-- Sin cambios esperados.
-
-### `application`
+#### `domain`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `application`
 
 - Sin cambios esperados.
 
-### `main`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `main`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `preload`
+
+- Sin cambios esperados.
+
+#### `renderer`
 
 - Identificar el bloque actual que renderiza propiedades contextuales en la franja superior.
 - Extraer ese bloque a un componente reutilizable si hoy esta embebido en `App.tsx`.
@@ -292,11 +279,11 @@
 - Ajustar CSS de propiedades para layout vertical dentro del sidebar.
 - Verificar que ocultar manualmente el sidebar siga funcionando y que una nueva seleccion lo vuelva a abrir.
 
-### `render`
+#### `render`
 
 - Sin cambios esperados.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. [x] Revisar en `App.tsx` y componentes cercanos donde vive la franja actual de propiedades seleccionadas.
 2. [x] Extraer el contenido de propiedades a un bloque contextual dentro del sidebar sin duplicar estado.
@@ -309,7 +296,7 @@
 9. [x] Ejecutar typecheck/lint/build.
 10. [x] Hacer smoke manual en `pnpm dev` seleccionando objetos y editando propiedades.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** No se esperan nuevos tests de dominio. Si se extrae logica pura de metadatos, cubrirla con test liviano si el proyecto ya tiene patron cercano.
 - **Integration tests:** No se esperan nuevos.
@@ -318,7 +305,7 @@
 - **Build:** `pnpm build` ejecutado correctamente.
 - **Manual / smoke:** Validado en `pnpm dev`; el accordion contextual aparece en el sidebar y el flujo funciona segun pruebas manuales del usuario.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Al mover JSX se rompen callbacks de actualizacion por tipo.
   **Mitigacion:** Extraer el componente preservando props/handlers actuales y verificar cada tipo en smoke manual.
@@ -329,7 +316,7 @@
 - **Riesgo:** Quedan estilos de la franja superior afectando otros controles.
   **Mitigacion:** Revisar clases compartidas antes de borrar o renombrar estilos.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Al seleccionar una luz puntual, sus propiedades aparecen en el accordion contextual del sidebar.
 - Al seleccionar una luz conica, sus propiedades aparecen en el accordion contextual del sidebar.
@@ -344,12 +331,12 @@
 - No hay cambios de schema ni persistencia.
 - `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/06-sidebar-and-properties/spec.md`
 - `specs/06-sidebar-and-properties/plan.md`
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.

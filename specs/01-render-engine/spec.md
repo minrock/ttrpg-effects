@@ -1,10 +1,14 @@
-# Spec 01 - Motor Visual y Capas de Render
+# Spec - Motor Visual y Capas de Render
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de motor visual y capas de render, consolidando el alcance funcional vigente en el proyecto.
+
+## Motor Visual y Capas de Render
+
+### Objetivo
 
 Definir e implementar la base visual donde se renderizaran el mapa, grilla, oscuridad, luces, efectos animados, formas tacticas y UI contextual.
 
-## Alcance
+### Alcance
 
 - Crear el lienzo principal de la aplicacion.
 - Definir el sistema de coordenadas del mundo.
@@ -13,7 +17,7 @@ Definir e implementar la base visual donde se renderizaran el mapa, grilla, oscu
 - Preparar soporte para pan, zoom y render de alta fluidez.
 - El pan/drag del mapa se activa solo mientras la barra espaciadora esta oprimida.
 
-## Tecnologia propuesta
+### Tecnologia propuesta
 
 Recomendacion inicial: PixiJS dentro de Electron.
 
@@ -30,7 +34,7 @@ Alternativas:
 - Three.js: potente, pero mas orientado a 3D de lo necesario.
 - WebGL directo: flexible, pero demasiado costoso para el MVP.
 
-## Orden de capas
+### Orden de capas
 
 Orden recomendado de abajo hacia arriba:
 
@@ -50,7 +54,7 @@ Orden recomendado de abajo hacia arriba:
 El fondo tecnico del canvas puede existir como fallback visual, pero no debe considerarse una capa de gameplay por encima del mapa.
 La secuencia de gameplay que no debe romperse es: mapa -> tokens -> oscuridad -> luces -> oscuridad magica -> fog -> herramientas de area; la grilla queda como referencia base bajo oscuridad/fog.
 
-## Sistema de coordenadas
+### Sistema de coordenadas
 
 - Debe existir coordenada de pantalla.
 - Debe existir coordenada de mundo/mapa.
@@ -62,7 +66,7 @@ La secuencia de gameplay que no debe romperse es: mapa -> tokens -> oscuridad ->
 - Mientras `Space` esta oprimido no se pueden seleccionar ni editar elementos del mapa.
 - Al soltar `Space`, el cursor vuelve al puntero normal y la herramienta activa vuelve a seleccion, incluso si antes estaba en otro modo como pintar fuego o niebla.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Existe un lienzo principal renderizado dentro de la ventana Electron.
 - El motor visual inicializa sin errores.
@@ -74,13 +78,13 @@ La secuencia de gameplay que no debe romperse es: mapa -> tokens -> oscuridad ->
 - Es posible dibujar elementos de prueba en capas distintas.
 - La base permite agregar mapa, grilla y luces sin reescritura mayor.
 
-## Riesgos
+### Riesgos
 
 - Acoplar demasiado el motor visual a React.
 - No separar coordenadas de mundo y pantalla.
 - No preparar correctamente el orden de capas para iluminacion.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - React debe controlar paneles, menus e inputs.
 - PixiJS debe controlar render interactivo del mapa.

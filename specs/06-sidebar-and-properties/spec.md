@@ -1,29 +1,22 @@
-# Spec consolidado - Sidebar And Properties
+# Spec - Sidebar y Propiedades
 
-<!-- Archivo consolidado mecanicamente desde:
-- 11-right-sidebar-controls.md
-- 15-selected-object-properties-sidebar.md
--->
+Este documento describe de forma unificada la funcionalidad de sidebar y propiedades, consolidando el alcance funcional vigente en el proyecto.
 
----
-
-## Fuente: 11-right-sidebar-controls.md
-
-# Spec 11 - Menú Lateral Derecho de Controles
+## Menú Lateral Derecho de Controles
 
 **Estado:** Cerrada / Implementada
 
-## Objetivo
+### Objetivo
 
 Reemplazar la barra horizontal de controles de grilla, figuras, oscuridad y niebla por un menú lateral derecho organizado en secciones tipo accordion. La nueva UI debe ser más legible durante una sesión, ocupar menos ancho superior del mapa y agrupar acciones por intención.
 
-## Contexto
+### Contexto
 
 Actualmente los controles aparecen en una barra horizontal sobre el canvas. En pantallas anchas funciona, pero la densidad es alta: grilla, opacidad, celda, unidad, snap, diagonal, preset, oscuridad, niebla, color y reveal compiten en una sola línea.
 
 La nueva experiencia debe mover esos controles a un panel lateral derecho con submenús colapsables. La intención es que el mapa tenga más aire visual y que cada grupo de acciones sea más fácil de encontrar.
 
-## Alcance
+### Alcance
 
 - Crear un panel lateral fijo a la derecha del viewport.
 - Mover la barra horizontal de controles actuales a ese panel lateral.
@@ -37,9 +30,9 @@ La nueva experiencia debe mover esos controles a un panel lateral derecho con su
 - Adaptar el layout para que el canvas siga ocupando el área disponible restante.
 - Permitir ocultar/mostrar el panel lateral completo para ampliar el viewport del mapa.
 
-## Agrupación requerida
+### Agrupación requerida
 
-### Grilla
+#### Grilla
 
 Sección para controles directamente relacionados con la grilla visual:
 
@@ -53,7 +46,7 @@ Sección para controles directamente relacionados con la grilla visual:
 
 Icono sugerido: grilla/cuadrícula.
 
-### Figuras
+#### Figuras
 
 Sección para controles que afectan herramientas de medición y formas tácticas:
 
@@ -66,7 +59,7 @@ Nota: si `valor por casilla` ya está representado internamente por `distancePer
 
 Icono sugerido: formas geométricas o regla.
 
-### Oscuridad
+#### Oscuridad
 
 Sección para controles de oscuridad ambiental:
 
@@ -75,7 +68,7 @@ Sección para controles de oscuridad ambiental:
 
 Icono sugerido: luna, sombra o círculo oscuro.
 
-### Niebla
+#### Niebla
 
 Sección para controles de fog of war:
 
@@ -88,7 +81,7 @@ Sección para controles de fog of war:
 
 Icono sugerido: nube, ojo cubierto o niebla.
 
-## Modelo de interacción
+### Modelo de interacción
 
 - Cada sección del panel lateral es un accordion.
 - Las secciones pueden iniciar cerradas para reducir ruido visual.
@@ -105,7 +98,7 @@ Icono sugerido: nube, ojo cubierto o niebla.
 - Los controles internos deben conservar los mismos handlers y efectos que hoy tienen en la barra horizontal.
 - El panel no debe interferir con click derecho, selección, pan, zoom, pintado de fuego, niebla o herramientas tácticas sobre el canvas.
 
-## Layout y estilo
+### Layout y estilo
 
 - El panel vive al lado derecho de la app, debajo de la toolbar principal si la toolbar superior sigue existiendo.
 - El panel debe tener ancho estable y suficiente para inputs/selects sin truncarlos.
@@ -118,7 +111,7 @@ Icono sugerido: nube, ojo cubierto o niebla.
 - Si el proyecto ya tiene icon library disponible, usarla; si no, se puede resolver con símbolos/componentes simples sin introducir dependencia pesada.
 - El texto interno no debe solaparse ni salirse de sus controles.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Cambiar reglas de grilla, medición, oscuridad, niebla o visión.
 - Cambiar el comportamiento de `Pintar fuego`, luces o formas, salvo retirar acciones redundantes de la toolbar superior.
@@ -127,7 +120,7 @@ Icono sugerido: nube, ojo cubierto o niebla.
 - Rediseñar la toolbar principal de carga/guardado/mapa, salvo ajustes mínimos de layout necesarios.
 - Cambiar atajos de teclado.
 
-## Persistencia
+### Persistencia
 
 No se agregan campos a `.ttrpgscene`.
 
@@ -138,7 +131,7 @@ La spec es de presentación e interacción de UI. Los valores editados por el pa
 - `darkness`
 - `fogOfWar`
 
-## Accesibilidad y UX
+### Accesibilidad y UX
 
 - Cada header de accordion debe ser un botón real o equivalente accesible.
 - Usar `aria-expanded` en headers de accordion.
@@ -147,7 +140,7 @@ La spec es de presentación e interacción de UI. Los valores editados por el pa
 - El tamaño visual del título debe mejorar escaneo sin hacer que los inputs internos parezcan secundarios ilegibles.
 - Los controles frecuentes deben mantener feedback claro de estado activo/inactivo.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - La barra horizontal de controles ya no aparece como una sola línea sobre el mapa.
 - Existe un panel lateral derecho con secciones accordion.
@@ -170,29 +163,25 @@ La spec es de presentación e interacción de UI. Los valores editados por el pa
 - No se agregan cambios de persistencia innecesarios.
 - No se agregan accesos directos del renderer a Node.js, Electron internals o filesystem.
 
-## Decisiones para implementación
+### Decisiones para implementación
 
 - El panel lateral queda visible por defecto y puede ocultarse/mostrarse desde un control global.
 - Varias secciones pueden permanecer abiertas simultáneamente.
 - `Valor por casilla` edita `distancePerCell` cuando la unidad activa es `ft` y `metricDistancePerCell` cuando la unidad activa es `m`.
 
-## Cierre
+### Cierre
 
 - Implementada en el renderer con panel lateral derecho, accordions y colapso global del sidebar.
 - No introduce cambios de persistencia ni APIs nuevas.
 - La validación automática quedó registrada en el plan de implementación.
 
----
+## Propiedades del Objeto Seleccionado en Sidebar
 
-## Fuente: 15-selected-object-properties-sidebar.md
-
-# Spec 15 - Propiedades del Objeto Seleccionado en Sidebar
-
-## Objetivo
+### Objetivo
 
 Mover las propiedades del objeto seleccionado desde la franja superior horizontal hacia el panel lateral derecho, usando un accordion contextual que aparece solo mientras hay un objeto seleccionado.
 
-## Contexto
+### Contexto
 
 Actualmente, cuando se selecciona una luz, fuego o forma táctica, sus propiedades aparecen en una barra horizontal superior debajo del estado de escena. Esto reduce el espacio vertical del mapa y separa controles contextuales del resto de herramientas que ya viven en el sidebar derecho.
 
@@ -210,7 +199,7 @@ La app ya tiene:
   - rectángulo.
 - Selección y deselección de objetos desde el canvas.
 
-## Alcance
+### Alcance
 
 - Mover las propiedades del objeto seleccionado al sidebar derecho.
 - Mostrar un accordion contextual arriba de todos los accordions existentes.
@@ -221,7 +210,7 @@ La app ya tiene:
 - Eliminar la franja superior de propiedades para recuperar espacio vertical del mapa.
 - Mantener la edición de propiedades funcionando igual que antes.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Cambiar el modelo de datos de luces, fuego o formas.
 - Rediseñar todos los controles del sidebar.
@@ -230,9 +219,9 @@ La app ya tiene:
 - Crear tabs o paneles flotantes.
 - Cambiar el menú contextual de click derecho.
 
-## Modelo de interacción
+### Modelo de interacción
 
-### Al seleccionar un objeto
+#### Al seleccionar un objeto
 
 - Si el sidebar derecho está visible:
   - aparece un accordion arriba de todos los demás.
@@ -249,24 +238,24 @@ La app ya tiene:
   - `Cono`,
   - `Rectángulo`.
 
-### Al cambiar la selección
+#### Al cambiar la selección
 
 - El mismo accordion contextual cambia su título y contenido según el nuevo objeto.
 - El accordion permanece en la primera posición del sidebar.
 - Los valores mostrados deben corresponder al nuevo objeto seleccionado.
 
-### Al deseleccionar
+#### Al deseleccionar
 
 - El accordion contextual desaparece.
 - El sidebar no se cierra automáticamente.
 - Los accordions normales del sidebar conservan su estado abierto/cerrado.
 
-### Al ocultar manualmente el sidebar
+#### Al ocultar manualmente el sidebar
 
 - El usuario puede ocultar el sidebar aunque haya un objeto seleccionado.
 - Si luego selecciona otro objeto mientras el sidebar está oculto, debe abrirse automáticamente otra vez.
 
-## Reglas de UI
+### Reglas de UI
 
 - El accordion contextual debe estar arriba de:
   - Grilla,
@@ -287,7 +276,7 @@ La app ya tiene:
   - controles específicos por tipo.
 - El contenido debe ser escaneable en columna y no desbordarse horizontalmente.
 
-## Estado
+### Estado
 
 El estado de propiedades sigue derivándose del objeto seleccionado actual.
 
@@ -298,18 +287,18 @@ Requisitos:
 - El accordion contextual puede tener estado local abierto/cerrado, pero al seleccionar un objeto debe abrirse.
 - La visibilidad del sidebar sigue siendo estado UI local.
 
-## Persistencia
+### Persistencia
 
 - Sin cambios en `.ttrpgscene`.
 - Los cambios de propiedades siguen guardándose a través de los modelos existentes.
 - No se agregan campos nuevos.
 
-## Render / PixiJS
+### Render / PixiJS
 
 - Sin cambios esperados en PixiJS.
 - El canvas debe ganar el espacio vertical que antes ocupaba la barra de propiedades.
 
-## Criterios de aceptación
+### Criterios de aceptación
 
 - Al seleccionar una luz puntual, sus propiedades aparecen en el accordion contextual del sidebar.
 - Al seleccionar una luz cónica, sus propiedades aparecen en el accordion contextual del sidebar.
@@ -324,14 +313,14 @@ Requisitos:
 - No hay cambios de schema ni persistencia.
 - No se agregan accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 
-## Riesgos
+### Riesgos
 
 - El accordion contextual puede volverse muy alto si contiene muchos controles.
 - Al abrir automáticamente el sidebar, puede sorprender si el usuario quería máximo viewport.
 - Mover JSX existente puede romper callbacks o controles por tipo.
 - Si el estado abierto/cerrado del accordion contextual no se maneja bien, puede quedar cerrado al seleccionar un objeto.
 
-## Notas de implementación
+### Notas de implementación
 
 - Reutilizar el componente `SidebarAccordion`.
 - Extraer el contenido actual de `properties-panel` a un bloque reutilizable si evita duplicación.

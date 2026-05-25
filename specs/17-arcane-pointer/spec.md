@@ -1,20 +1,24 @@
-# Spec 24 - Apuntador arcano
+# Spec - Apuntador Arcano
 
-## Estado
+Este documento describe de forma unificada la funcionalidad de apuntador arcano, consolidando el alcance funcional vigente en el proyecto.
+
+## Apuntador arcano
+
+### Estado
 
 Aceptado para implementacion.
 
-## Objetivo
+### Objetivo
 
 Agregar un modo `Apuntador` para llamar la atencion sobre una celda del mapa durante la sesion, renderizando una animacion temporal de un circulo arcano pixel-art que aparece y desaparece alrededor de la celda seleccionada.
 
-## Contexto
+### Contexto
 
 La app se usa como herramienta visual de mesa. Ya existen modos y toggles superiores para acciones globales como bloqueo de zoom, carga de mapa y controles de escena. Tambien existen assets animados internos para fuego y agua con estetica pixel-art.
 
 El apuntador debe servir para senalar una posicion sin crear una figura tactica persistente ni alterar mapa, niebla, oscuridad, luces, tokens o efectos.
 
-## Alcance
+### Alcance
 
 - Crear un modo `Apuntador`.
 - Exponer el modo como un boton toggle visible en la barra superior, con comportamiento similar al toggle de zoom.
@@ -31,7 +35,7 @@ El apuntador debe servir para senalar una posicion sin crear una figura tactica 
 - Se pueden disparar varios apuntadores de forma consecutiva sin bloquear la interaccion.
 - Usar un asset interno generado para el proyecto con estetica pixel-art coherente con agua y fuego.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Persistir apuntadores en escena.
 - Historial de apuntadores.
@@ -40,7 +44,7 @@ El apuntador debe servir para senalar una posicion sin crear una figura tactica 
 - Sonido, vibracion, particulas adicionales o texto.
 - Medicion de distancia o seleccion de objetos mediante el apuntador.
 
-## Asset visual
+### Asset visual
 
 Se debe generar un asset de circulo arcano pixel-art:
 
@@ -56,16 +60,16 @@ Se debe generar un asset de circulo arcano pixel-art:
   - `src/renderer/public/effects/arcane-pointer.gif`, si es animado;
   - o `src/renderer/public/effects/arcane-pointer.png`, si es estatico.
 
-## Modelo de interaccion
+### Modelo de interaccion
 
-### Activar modo
+#### Activar modo
 
 - La barra superior muestra un boton toggle `Apuntador`.
 - Si el modo esta apagado, click en el boton lo activa.
 - Si el modo esta activo, click en el boton lo desactiva.
 - Al activarse, no debe romper el bloqueo de zoom ni cambiar el estado de mapa/grilla/niebla.
 
-### Click en mapa
+#### Click en mapa
 
 - Con `Apuntador` activo, el usuario hace click normal sobre el canvas.
 - El punto del click se ajusta al centro de la celda de grilla mas cercana.
@@ -73,7 +77,7 @@ Se debe generar un asset de circulo arcano pixel-art:
 - El modo puede permanecer activo despues del click para permitir senalar varias celdas seguidas.
 - `Escape` desactiva el modo apuntador.
 
-### Configuracion en aside
+#### Configuracion en aside
 
 - Cuando `Apuntador` esta activo, el aside derecho muestra una seccion de configuracion del apuntador.
 - La configuracion incluye un selector de tamano de criatura.
@@ -89,13 +93,13 @@ Se debe generar un asset de circulo arcano pixel-art:
 - La opcion por defecto es `Mediano`.
 - El selector solo afecta nuevos apuntadores disparados despues del cambio; no modifica animaciones temporales ya activas.
 
-### Conflictos con otros modos
+#### Conflictos con otros modos
 
 - Si `Apuntador` esta activo, el click normal debe disparar el apuntador y no seleccionar ni mover elementos.
 - Si el usuario activa otro modo exclusivo, como niebla, fuego, path o agua, `Apuntador` debe desactivarse.
 - El pan con barra espaciadora debe seguir funcionando como modo temporal de navegacion. Al soltar la barra, si `Apuntador` estaba activo antes del pan, puede volver a estar activo.
 
-## Render
+### Render
 
 - El apuntador se renderiza en una capa visual superior al mapa, grilla, niebla, oscuridad, luces, efectos, tokens y figuras.
 - Debe quedar por debajo de UI React, menus contextuales y modales.
@@ -110,7 +114,7 @@ Se debe generar un asset de circulo arcano pixel-art:
 - Para tamanos de criatura de 2x2, 3x3 y 4x4, el diametro visual se calcula sobre el lado del footprint cuadrado y se escala levemente por encima de ese lado.
 - Si no hay grilla cargada, usar un tamano default razonable y centrar en coordenada de mundo del click.
 
-## Estado y persistencia
+### Estado y persistencia
 
 - El modo `Apuntador` vive en estado de interaccion/renderer.
 - Cada animacion activa debe tener:
@@ -123,14 +127,14 @@ Se debe generar un asset de circulo arcano pixel-art:
 - Los apuntadores activos no se guardan en `.ttrpgscene`.
 - Al cargar o crear nueva escena, se cancelan apuntadores activos.
 
-## Seguridad y arquitectura
+### Seguridad y arquitectura
 
 - El asset se carga desde rutas internas del renderer (`/effects/...`).
 - No requiere IPC nuevo.
 - No requiere acceso a filesystem desde renderer.
 - La logica de tiempo/animacion debe quedar encapsulada en el adapter Pixi o en un helper testeable si se modela como dominio puro.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Existe el spec y el asset interno del circulo arcano.
 - La barra superior permite activar/desactivar `Apuntador`.

@@ -1,14 +1,17 @@
-# Plan de implementacion tecnica - 09 - Zonas de Fuego Animado y Pintado por Celdas
+# Plan - Efectos de Fuego
 
-## 1. Resumen
+Este documento describe de forma unificada el plan tecnico para implementar y mantener efectos de fuego, consolidando los pasos y criterios vigentes en el proyecto.
 
-- **Spec fuente:** `./specs/10-fire-effects/spec.md`
+## Zonas de Fuego Animado y Pintado por Celdas
+
+### 1. Resumen
+
 - **Objetivo:** Reemplazar el freehand por fuego animado con GIF interno enmascarado y pintado por celdas de grilla con pincel circular.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** Specs 03, 06, 07 y 08; sistema de efectos existente; escena versionada; PixiJS viewport.
 
-## 2. Alcance
+### 2. Alcance
 
 - Usar `src/renderer/public/effects/area-fire.gif` como asset interno del renderer.
 - Remover herramienta freehand de fuego.
@@ -25,7 +28,7 @@
 - Iluminacion por celdas: anillo 1 (luz brillante) y anillo 2 (luz tenue) calculados geometricamente desde el contorno de celdas pintadas.
 - Mantener la luz del fuego integrada al erase mask de oscuridad y fog of war.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Dominio:** `FireZone` queda como union `circle | cells`; `cells` guarda celdas `{ x, y, size }` y `radius` para el pincel.
 - **Render:** El fuego usa `GifSprite` de Pixi desde un asset interno servido por Vite/Electron (`/effects/area-fire.gif`). El renderer aplica mascaras `Graphics` para circulos, circulos abiertos y grupos de celdas. Si el GIF falla, se conserva fallback vectorial rojo.
@@ -33,9 +36,9 @@
 - **Persistencia:** El schema acepta zonas `cells` y mantiene default circular para escenas viejas sin `zone`.
 - **Seguridad:** No hay IPC ni acceso filesystem nuevo.
 
-## 4. Cambios por capa
+### 4. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Reemplazar zona freehand por zona `cells`.
 - Agregar helper `createCellFireZone`.
@@ -43,7 +46,7 @@
 - Mantener sanitizacion de radio, color, escala, opacidad y luz.
 - Actualizar tests de dominio para celdas pintadas.
 
-### `renderer`
+#### `renderer`
 
 - Reemplazar modo `fire-freehand` por `fire-paint`.
 - Agregar callback `onFirePaint`.
@@ -51,7 +54,7 @@
 - Si no hay fuego por celdas seleccionado, crear un nuevo efecto `fire` con zona `cells`.
 - Exponer control de pincel en propiedades del fuego por celdas.
 
-### `render`
+#### `render`
 
 - Cargar `area-fire.gif` desde assets publicos del renderer, no desde `map-asset:`.
 - Renderizar zona circular con un solo `GifSprite` escalado y una mascara circular.
@@ -64,7 +67,7 @@
 - Mantener luz del fuego como fuente que revela/aclara la capa de oscuridad, pero no como erase mask de fog of war. La niebla solo se revela por herramientas de niebla/manual reveal.
 - Celdas pintadas usan origen (0,0) mundial para garantizar alineacion con el grid al mover el mapa.
 
-## 5. Plan de trabajo
+### 5. Plan de trabajo
 
 1. Agregar asset interno `area-fire.gif` al renderer public.
 2. Cambiar modelo `FireZone` de `freehand` a `cells`.
@@ -77,7 +80,7 @@
 9. Actualizar README/spec/plan.
 10. Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 
-## 6. Criterios de aceptacion
+### 6. Criterios de aceptacion
 
 - El render carga el GIF interno `area-fire.gif` desde `/effects/area-fire.gif`.
 - No queda modo freehand para fuego en UI.
@@ -95,7 +98,7 @@
 - Guardar/cargar conserva zonas `cells`.
 - La luz del fuego revela oscuridad igual que una luz normal.
 
-## 7. Verificacion
+### 7. Verificacion
 
 - **Unit tests:** dominio de fuego y schema de escenas.
 - **Typecheck:** `pnpm typecheck`
@@ -104,7 +107,7 @@
 - **Build:** `pnpm build`
 - **Smoke manual:** `pnpm dev`, crear fuego circular, ajustar radio naranja, confirmar que usa un solo GIF escalado; activar `Pintar fuego`, pintar una celda, un bloque 2x2/3x3 y regiones separadas, confirmar un GIF por region contigua, guardar/cargar escena.
 
-## 8. Checklist de cierre
+### 8. Checklist de cierre
 
 - [x] GIF interno agregado al render.
 - [x] Freehand removido del flujo principal.

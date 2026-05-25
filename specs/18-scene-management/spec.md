@@ -1,16 +1,20 @@
-# Spec 16 - Nueva Escena y Reinicio de Estado
+# Spec - Gestion de Escena
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de gestion de escena, consolidando el alcance funcional vigente en el proyecto.
+
+## Nueva Escena y Reinicio de Estado
+
+### Objetivo
 
 Agregar una accion de `Nueva escena` que limpie todo lo cargado en memoria y deje la aplicacion en el mismo estado funcional que al abrirla desde cero. Si existe contenido cargado o cambios en la escena actual, la app debe preguntar si el usuario quiere guardar antes de descartar.
 
-## Contexto
+### Contexto
 
 La app ya permite cargar mapas, crear luces, fuego, formas, mediciones, niebla, oscuridad y guardar/cargar escenas `.ttrpgscene`. Actualmente no existe un flujo explicito para empezar una escena nueva sin cerrar y volver a abrir el software.
 
 Esto genera friccion cuando el usuario quiere cambiar de mapa o mesa rapidamente, porque debe borrar elementos manualmente o reiniciar la app.
 
-## Alcance
+### Alcance
 
 - Agregar una accion visible `Nueva escena` solo cuando la escena tenga contenido o cambios.
 - Limpiar todo el estado en memoria de la escena actual.
@@ -23,7 +27,7 @@ Esto genera friccion cuando el usuario quiere cambiar de mapa o mesa rapidamente
 - Si el usuario decide no guardar, limpiar la escena inmediatamente.
 - Si el usuario cancela el modal o cancela el dialogo de guardado, conservar la escena actual sin cambios.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Autosave.
 - Historial de escenas recientes.
@@ -33,9 +37,9 @@ Esto genera friccion cuando el usuario quiere cambiar de mapa o mesa rapidamente
 - Crear persistencia en SQLite.
 - Confirmar cierre de aplicacion o cierre de ventana.
 
-## Modelo de interaccion
+### Modelo de interaccion
 
-### Escena vacia
+#### Escena vacia
 
 Si la escena esta vacia:
 
@@ -43,7 +47,7 @@ Si la escena esta vacia:
 - No se muestra modal.
 - El canvas queda limpio y listo para cargar mapa o crear elementos nuevos.
 
-### Escena con contenido o cambios
+#### Escena con contenido o cambios
 
 Si el usuario hace click en `Nueva escena` y hay contenido cargado:
 
@@ -54,7 +58,7 @@ Si el usuario hace click en `Nueva escena` y hay contenido cargado:
   - `Descartar cambios`,
   - `Cancelar`.
 
-### Guardar y crear nueva
+#### Guardar y crear nueva
 
 Si el usuario elige `Guardar y crear nueva`:
 
@@ -68,7 +72,7 @@ Si el usuario elige `Guardar y crear nueva`:
    - se conserva todo como estaba;
    - se muestra el error recuperable si aplica.
 
-### Descartar cambios
+#### Descartar cambios
 
 Si el usuario elige `Descartar cambios`:
 
@@ -76,7 +80,7 @@ Si el usuario elige `Descartar cambios`:
 - Se limpia inmediatamente la escena actual.
 - No se abre dialogo de guardado.
 
-### Cancelar
+#### Cancelar
 
 Si el usuario elige `Cancelar`, presiona `Escape` o cierra el modal:
 
@@ -85,7 +89,7 @@ Si el usuario elige `Cancelar`, presiona `Escape` o cierra el modal:
 - No se borra nada.
 - La escena actual queda intacta.
 
-## Estado inicial esperado
+### Estado inicial esperado
 
 Al crear una escena nueva, deben volver a valores iniciales:
 
@@ -107,7 +111,7 @@ Al crear una escena nueva, deben volver a valores iniciales:
 
 La UI puede conservar preferencias puramente visuales de la aplicacion si no pertenecen a la escena, por ejemplo el sidebar abierto/cerrado, siempre que no provoque confusion ni preserve controles contextuales de objetos ya borrados.
 
-## Deteccion de contenido o cambios
+### Deteccion de contenido o cambios
 
 Para esta spec, una escena se considera no vacia o con riesgo de perdida si existe al menos una de estas condiciones:
 
@@ -123,7 +127,7 @@ Para esta spec, una escena se considera no vacia o con riesgo de perdida si exis
 
 Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe, se puede iniciar con una funcion derivada del estado actual y dejar la bandera explicita para una mejora posterior.
 
-## UI
+### UI
 
 - La accion `Nueva escena` debe estar disponible junto a las acciones principales de escena solo cuando haya contenido o cambios que limpiar.
 - El modal debe ser claro, compacto y consistente con el look and feel oscuro/dorado de la app.
@@ -135,7 +139,7 @@ Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe
 - `Escape` debe cancelar el modal.
 - El foco inicial debe estar en la accion segura o primaria, evitando descartes accidentales.
 
-## Persistencia
+### Persistencia
 
 - No cambia el schema `.ttrpgscene`.
 - Se reutiliza el flujo actual de guardado.
@@ -144,21 +148,21 @@ Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe
 - El guardado debe pasar por la API de preload/IPC existente.
 - La nueva escena no debe escribir automaticamente en disco.
 
-## IPC / Electron
+### IPC / Electron
 
 - Reutilizar el canal de guardado existente si cumple la necesidad.
 - No exponer APIs genericas de Electron, filesystem o IPC al renderer.
 - Si se necesita una nueva accion en preload, debe ser especifica y tipada.
 - Los errores de guardado deben ser serializables y recuperables.
 
-## Render / PixiJS
+### Render / PixiJS
 
 - Al crear nueva escena, el render debe limpiar mapa, texturas, sprites, luces, efectos, formas, seleccion, overlays y fog.
 - No deben quedar listeners duplicados ni recursos visuales antiguos.
 - El canvas debe quedar en un estado valido aunque no haya mapa.
 - La camara debe volver al estado inicial definido por la app.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - Existe una accion visible `Nueva escena` cuando la escena tiene contenido o cambios.
 - Si la escena esta vacia, no se muestra la accion `Nueva escena`.
@@ -175,7 +179,7 @@ Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe
 - No cambia el formato `.ttrpgscene`.
 - No se agregan accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 
-## Riesgos
+### Riesgos
 
 - Borrar parcialmente el estado y dejar recursos visuales antiguos en PixiJS.
 - Considerar vacia una escena que tiene cambios importantes no guardados.
@@ -183,7 +187,7 @@ Si ya existe una bandera de cambios sin guardar, debe reutilizarse. Si no existe
 - Duplicar logica de guardado en vez de reutilizar el flujo existente.
 - Resetear preferencias de UI que no pertenecen a la escena y generar una experiencia molesta.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - Buscar una funcion factory o constante de escena inicial y reutilizarla para evitar defaults duplicados.
 - Si no existe una forma centralizada de crear escena inicial, introducir una helper local o de dominio para esta spec.

@@ -1,10 +1,14 @@
-# Spec 17 - Submenu de Efectos y Oscuridad Magica
+# Spec - Oscuridad Magica
 
-## Objetivo
+Este documento describe de forma unificada la funcionalidad de oscuridad magica, consolidando el alcance funcional vigente en el proyecto.
+
+## Submenu de Efectos y Oscuridad Magica
+
+### Objetivo
 
 Reorganizar luces y fuego dentro de un nuevo submenu `Efectos` en el menu contextual, y agregar un nuevo efecto persistible llamado `Oscuridad magica`: un circulo negro editable que se impone sobre mapa, luces y vision en la oscuridad, pero deja visibles las figuras tacticas, mediciones y seleccion por encima.
 
-## Contexto
+### Contexto
 
 El menu contextual ya tiene un submenu `Herramientas de area` para linea, circulo, cono y rectangulo. Actualmente fuego, pintar fuego y luces viven como acciones sueltas en el menu contextual. La app tambien tiene:
 
@@ -19,7 +23,7 @@ El menu contextual ya tiene un submenu `Herramientas de area` para linea, circul
 
 La nueva funcionalidad agrupa los efectos visuales y agrega una oscuridad magica que debe comportarse como un bloqueo visual especial, por encima de las fuentes de luz y darkvision.
 
-## Alcance
+### Alcance
 
 - Crear un submenu `Efectos` en el menu contextual.
 - Mover al submenu `Efectos`:
@@ -39,7 +43,7 @@ La nueva funcionalidad agrupa los efectos visuales y agrega una oscuridad magica
 - Guardar y cargar oscuridad magica dentro de `.ttrpgscene`.
 - Mantener figuras, mediciones, emojis de formas, handles y seleccion visibles por encima de la oscuridad magica.
 
-## Fuera de alcance
+### Fuera de alcance
 
 - Colores configurables para oscuridad magica.
 - Formas no circulares de oscuridad magica.
@@ -49,9 +53,9 @@ La nueva funcionalidad agrupa los efectos visuales y agrega una oscuridad magica
 - Permitir que una luz normal revele oscuridad magica.
 - Integrar permisos por token o personaje para ver a traves de oscuridad magica.
 
-## Modelo de interaccion
+### Modelo de interaccion
 
-### Menu contextual
+#### Menu contextual
 
 El menu contextual debe quedar organizado con submenus:
 
@@ -69,7 +73,7 @@ El menu contextual debe quedar organizado con submenus:
 
 Las acciones de fuego y luces dejan de vivir como botones sueltos en la raiz del menu contextual.
 
-### Crear oscuridad magica
+#### Crear oscuridad magica
 
 - El usuario abre click derecho sobre el mapa/canvas.
 - Entra a `Efectos`.
@@ -77,7 +81,7 @@ Las acciones de fuego y luces dejan de vivir como botones sueltos en la raiz del
 - Se crea un circulo centrado en la posicion de mundo del click.
 - El nuevo efecto queda seleccionado.
 
-### Editar oscuridad magica
+#### Editar oscuridad magica
 
 - Al seleccionar oscuridad magica, aparece su panel de propiedades en el sidebar contextual.
 - El panel muestra al menos:
@@ -89,38 +93,38 @@ Las acciones de fuego y luces dejan de vivir como botones sueltos en la raiz del
 - El efecto puede moverse arrastrando su centro.
 - `Delete` o `Backspace` lo borra cuando esta seleccionado.
 
-## Reglas visuales
+### Reglas visuales
 
-### Mapa iluminado
+#### Mapa iluminado
 
 Si el mapa se ve normal o esta iluminado por luces:
 
 - La oscuridad magica se renderiza como un circulo negro encima del mapa y de las luces.
 - La zona cubierta no debe mostrar el mapa ni la iluminacion debajo, salvo que la opacidad del efecto haya sido reducida manualmente.
 
-### Mapa oscuro con fuentes de luz
+#### Mapa oscuro con fuentes de luz
 
 Si hay oscuridad ambiental activa y una luz revela una zona:
 
 - La oscuridad magica permanece negra sobre esa luz.
 - La luz no perfora ni aclara la oscuridad magica.
 
-### Vision en la oscuridad
+#### Vision en la oscuridad
 
 Si `Vision en la oscuridad` esta activa:
 
 - La oscuridad magica permanece oscura.
 - Darkvision no convierte la zona de oscuridad magica en blanco y negro visible.
-- Las zonas iluminadas fuera de la oscuridad magica siguen recuperando color segun la spec 12.
+- Las zonas iluminadas fuera de la oscuridad magica siguen recuperando color segun la vision en la oscuridad.
 
-### Opacidad baja
+#### Opacidad baja
 
 - La opacidad controla solo el relleno del circulo.
 - Si la opacidad baja, el contenido debajo puede verse parcialmente.
 - El borde negro del circulo permanece visible con opacidad alta para advertir que la zona sigue siendo oscuridad magica.
 - El borde debe tener pocos pixeles de ancho y no debe confundirse con handles de seleccion.
 
-### Orden de capas
+#### Orden de capas
 
 La oscuridad magica se sobrepone a:
 
@@ -144,7 +148,7 @@ La oscuridad magica queda por debajo de:
 
 Requisito clave: el orden de gameplay debe mantenerse como mapa -> tokens -> oscuridad ambiental -> luces -> oscuridad magica -> fog -> herramientas de area. Las figuras y mediciones deben verse arriba de la oscuridad magica para que el usuario pueda identificar areas afectadas por otros efectos.
 
-## Modelo de datos
+### Modelo de datos
 
 La oscuridad magica debe ser persistible y tener id estable.
 
@@ -170,7 +174,7 @@ Campos no requeridos:
 
 Si por compatibilidad conviene mantener una union de efectos con campos compartidos, el plan puede definir la forma exacta, pero no debe mezclar la oscuridad magica con fuego si eso complica validacion o render.
 
-## Persistencia
+### Persistencia
 
 - Guardar oscuridad magica dentro de `.ttrpgscene`.
 - Cargar escenas con oscuridad magica sin perder radio, opacidad, posicion, visibilidad e id.
@@ -181,7 +185,7 @@ Si por compatibilidad conviene mantener una union de efectos con campos comparti
   - opacidad inicial `1`;
   - visible `true`.
 
-## Render / PixiJS
+### Render / PixiJS
 
 - La oscuridad magica debe renderizarse en una capa propia o en una subcapa de efectos con orden superior a mapa/luces/darkvision.
 - Debe dibujarse despues de luces y overlays visuales que revelan el mapa.
@@ -192,7 +196,7 @@ Si por compatibilidad conviene mantener una union de efectos con campos comparti
 - Debe funcionar con pan y zoom.
 - Debe limpiarse al borrar el efecto o resetear/cargar escena.
 
-## UI / UX
+### UI / UX
 
 - El submenu se llama `Efectos`.
 - La opcion se llama `Oscuridad magica`.
@@ -203,7 +207,7 @@ Si por compatibilidad conviene mantener una union de efectos con campos comparti
 - Si existe control `Visible` para efectos, debe mantenerse.
 - Debe conservar el look and feel oscuro/dorado actual.
 
-## Criterios de aceptacion
+### Criterios de aceptacion
 
 - El menu contextual muestra un submenu `Efectos`.
 - `Fuego`, `Pintar fuego`, `Luz puntual`, `Luz conica` y `Oscuridad magica` aparecen dentro de `Efectos`.
@@ -224,14 +228,14 @@ Si por compatibilidad conviene mantener una union de efectos con campos comparti
 - Escenas antiguas siguen cargando.
 - No se agregan accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 
-## Riesgos
+### Riesgos
 
 - El orden de capas puede hacer que la oscuridad magica tape handles o seleccion si se dibuja demasiado arriba.
 - Integrarla con darkvision puede romper el enmascarado de mapa gris/color si se mezcla en la capa equivocada.
 - Extender `SceneEffect` puede afectar validacion de fuego si no se modela como union clara.
 - Si se reutiliza la capa de oscuridad ambiental, las luces podrian perforar accidentalmente la oscuridad magica.
 
-## Notas de implementacion
+### Notas de implementacion
 
 - Preferir una capa de render especifica para oscuridad magica o dibujarla despues de los efectos de iluminacion y antes de shapes/selection.
 - Reutilizar patrones de resize de circulos/luces para el radio.

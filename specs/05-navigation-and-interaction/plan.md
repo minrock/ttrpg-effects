@@ -1,27 +1,19 @@
-# Plan consolidado - Navigation And Interaction
+# Plan - Navegacion e Interaccion
 
-<!-- Archivo consolidado mecanicamente desde:
-- 03-interaction-model.plan.md
-- 19-navigation-legend.plan.md
--->
+Este documento describe de forma unificada el plan tecnico para implementar y mantener navegacion e interaccion, consolidando los pasos y criterios vigentes en el proyecto.
 
----
+## Modelo de Interaccion
 
-## Fuente: 03-interaction-model.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 03 - Modelo de Interaccion
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/05-navigation-and-interaction/spec.md`
 - **Objetivo:** Implementar un modelo base de interaccion sobre el viewport: menu contextual, herramientas activas, creacion de elementos visibles, seleccion, borrado, pan, zoom bloqueable y atajos de teclado.
 - **Estado:** Implementado
 - **Prioridad:** Alta
-- **Dependencias:** Spec 00, Spec 01, Spec 02, PixiJS viewport, conversion pantalla <-> mundo, estado de escena en renderer.
+- **Dependencias:** bootstrap de la app, motor visual, persistencia de escena, PixiJS viewport, conversion pantalla <-> mundo, estado de escena en renderer.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Click derecho sobre el canvas para abrir menu contextual en posicion de pantalla y mundo.
 - Crear elementos visibles de prueba desde el menu contextual: medicion, circulo, cono, rectangulo, luz puntual, luz conica y fuego animado placeholder.
@@ -35,7 +27,7 @@
 - Permitir alternar bloqueo/desbloqueo de zoom desde el menu contextual de click derecho.
 - Mantener pan disponible como navegacion basica.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Geometria tactica definitiva con reglas completas.
 - Mediciones exactas en pies/metros.
@@ -45,51 +37,51 @@
 - Atajos numericos avanzados.
 - Menus complejos o paneles grandes de edicion.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** La maquina de interaccion vive en modulos testeables de `domain` o `application`, mientras React controla UI y PixiJS dibuja/recibe eventos mediante APIs explicitas. El renderer no debe mezclar reglas de seleccion con detalles internos de PixiJS.
 - **Persistencia:** La interaccion puede mantener elementos en memoria. Se preparara el modelo para mapearlo al formato de escena, pero persistir cada elemento queda para una integracion posterior si aumenta demasiado el alcance.
-- **IPC / Electron:** No se agregan canales IPC nuevos. Guardar/cargar escenas sigue usando lo implementado en Spec 02.
+- **IPC / Electron:** No se agregan canales IPC nuevos. Guardar/cargar escenas sigue usando lo implementado en persistencia de escena.
 - **Render / PixiJS:** El viewport debe exponer callbacks/eventos de alto nivel (`contextmenu`, `select`, `createElementAt`, `deleteElement`) o metodos equivalentes. PixiJS queda encapsulado en `src/render/pixi`.
 - **Validacion:** Validar que las acciones destructivas solo corran cuando exista seleccion. Validar que los elementos creados tengan ids estables y posiciones en mundo.
 - **Dependencias nuevas:** Ninguna prevista. Usar React, PixiJS y utilidades propias.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Crear tipos para `InteractionTool`, `InteractionMode`, `SelectableElement`, `ContextMenuState`, `SelectionState`, `ScaleLockState` y `TacticalElement`.
 - **Reglas puras:** Seleccionar elemento por id, borrar seleccion, crear elemento por tipo en coordenada de mundo, cambiar herramienta activa, cerrar menu, aplicar bloqueo de zoom.
 - **Coordenadas / unidades:** El menu contextual guarda posicion de pantalla para UI y posicion de mundo para crear elementos. Los elementos creados almacenan coordenadas de mundo.
 - **Errores de dominio:** Intentar borrar sin seleccion no hace nada. Crear elemento sin posicion de mundo valida debe rechazarse. Zoom bloqueado ignora cambios de rueda sin alterar camara.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/interaction/interaction-state.ts` con tipos y reducers/funciones puras.
 - Crear `src/domain/tools/tactical-elements.ts` o modulo equivalente con tipos de elementos visibles.
 - Agregar tests para crear elementos, seleccionar, borrar, cancelar con Escape y bloquear zoom.
 
-### `application`
+#### `application`
 
 - Crear un servicio/use-case liviano para orquestar acciones de interaccion si ayuda a separar React de reglas.
 - Mantener el estado serializable para que futuras specs lo puedan persistir.
 
-### `infrastructure`
+#### `infrastructure`
 
 - No agregar filesystem, DB ni repositorios.
 - No tocar SQLite.
 
-### `main`
+#### `main`
 
 - No modificar ventanas ni IPC.
 - Mantener seguridad Electron existente.
 
-### `preload`
+#### `preload`
 
 - No exponer nuevas APIs.
 - Mantener preload limitado a app info y escenas.
 
-### `renderer`
+#### `renderer`
 
 - Agregar menu contextual React posicionado sobre el canvas.
 - Agregar accion compacta de bloqueo/desbloqueo de zoom dentro del menu contextual.
@@ -98,7 +90,7 @@
 - Mantener estado visual de seleccion, menu y lock sin acceso directo a filesystem/Electron.
 - Mostrar contador o nombre del elemento seleccionado para que el usuario vea claramente que la interaccion funciona.
 
-### `render`
+#### `render`
 
 - Extender `PixiViewport` para:
   - Emitir coordenada de mundo en click derecho.
@@ -110,7 +102,7 @@
 - Implementar hit testing simple por bounds/radio para elementos placeholder.
 - Limpiar listeners nuevos al destruir.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. Crear tipos y funciones puras de interaccion y elementos tacticos.
 2. Agregar tests unitarios para crear, seleccionar, borrar, cancelar y bloqueo de zoom.
@@ -123,7 +115,7 @@
 9. Agregar atajos `Delete`, `Backspace` y `Escape`.
 10. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Reducer/funciones de interaccion, creacion de elementos, seleccion, borrado, Escape, bloqueo de zoom.
 - **Integration tests:** No requeridos inicialmente salvo que se cree un servicio de aplicacion.
@@ -133,10 +125,10 @@
 - **Manual / smoke:** Ejecutar `pnpm dev`, click derecho sobre el canvas, crear varios elementos, seleccionar uno, borrarlo con `Delete`, crear otro, borrarlo con `Backspace`, abrir menu y cerrarlo con `Escape`, activar bloqueo de zoom y confirmar que la rueda no cambia el zoom.
 - **Manual / smoke contextual:** Abrir menu con click derecho, alternar bloqueo de zoom desde el menu y confirmar que el boton de toolbar refleja el mismo estado.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Mezclar zoom de navegacion con escala calibrada del mapa.
-  **Mitigacion:** Nombrar explicitamente el estado de bloqueo y documentar que en esta spec bloquea cambios de rueda; calibracion real queda para Spec 04.
+  **Mitigacion:** Nombrar explicitamente el estado de bloqueo y documentar que en esta spec bloquea cambios de rueda; calibracion real queda para mapa y grilla.
 - **Riesgo:** Acoplar seleccion a objetos PixiJS concretos.
   **Mitigacion:** Usar ids estables y estado serializable; Pixi solo renderiza y reporta ids.
 - **Riesgo:** Menu contextual tapa demasiado el mapa.
@@ -146,7 +138,7 @@
 - **Riesgo:** Crear demasiada logica final de herramientas prematuramente.
   **Mitigacion:** Usar placeholders visibles y tipos preparados, sin implementar reglas tacticas completas.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Click derecho abre un menu contextual en la posicion correcta del canvas.
 - El menu contextual permite crear elementos visibles sin cargar imagen de mapa.
@@ -159,13 +151,13 @@
 - Pan sigue funcionando para navegar.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - Actualizar README con instrucciones para probar interaccion sin mapa cargado.
 - Actualizar este plan si se decide persistir elementos en `.ttrpgscene` dentro de esta spec.
 - Registrar cualquier cambio en controles base.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tipos de interaccion y elementos tacticos creados.
@@ -189,23 +181,18 @@
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
----
+## Leyenda de Navegacion
 
-## Fuente: 19-navigation-legend.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 19 Leyenda de Navegacion
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/05-navigation-and-interaction/spec.md`
 - **Objetivo:** Agregar un pill informativo fijo en la parte inferior central del viewport del mapa con los atajos de navegacion: panning (boton central o Space + click izquierdo) y zoom (rueda).
 - **Estado:** Pendiente
 - **Prioridad:** Baja
 - **Dependencias:** Ninguna nueva. Solo afecta renderer.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Nuevo componente React `NavigationLegend` puramente presentacional.
 - Tres variantes de icono SVG de mouse: boton izquierdo, boton central y rueda de scroll resaltados.
@@ -213,14 +200,14 @@
 - Pill posicionado absolutamente en la parte inferior central de `.map-viewport`.
 - Estilos en `styles.css`.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Toggle de visibilidad.
 - Animaciones.
 - Atajos adicionales.
 - Cambios en Pixi, dominio, IPC, preload, main o filesystem.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Ubicacion:** El componente se renderiza como hijo del div `.map-viewport` en `MapViewport.tsx`. Este div ya tiene `position: relative` y `overflow: hidden`, por lo que sirve como contexto de posicionamiento para el pill absoluto.
 - **No se necesita wrapper extra:** El host div de Pixi (`.map-viewport`) puede tener hijos React. Pixi agrega el canvas via `appendChild` imperativo; el pill queda como sibling del canvas en el DOM, por encima visualmente via `z-index`.
@@ -228,7 +215,7 @@
 - **Sin estado ni props:** `NavigationLegend` es un componente estatico sin props.
 - **CSS en `styles.css`:** Sin archivo CSS nuevo; se agregan clases al archivo monolitico existente siguiendo las convenciones actuales.
 
-## 4. Estructura de archivos
+### 4. Estructura de archivos
 
 | Archivo | Accion |
 |---|---|
@@ -236,9 +223,9 @@
 | `src/renderer/src/components/MapViewport.tsx` | Modificar — agregar `<NavigationLegend />` como hijo |
 | `src/renderer/src/styles.css` | Modificar — agregar estilos del pill |
 
-## 5. Diseno del componente
+### 5. Diseno del componente
 
-### `NavigationLegend.tsx`
+#### `NavigationLegend.tsx`
 
 ```
 NavigationLegend
@@ -254,7 +241,7 @@ NavigationLegend
         └── MouseIcon highlight="scroll"
 ```
 
-### `MouseIcon` SVG
+#### `MouseIcon` SVG
 
 SVG de 16x22px (proporciones de mouse). Muestra:
 - Contorno del cuerpo del mouse.
@@ -272,7 +259,7 @@ Colores del SVG:
 - Zona no resaltada: `rgba(255,255,255,0.1)`.
 - Zona resaltada: `rgba(255, 240, 168, 0.9)` (dorado de la app, `#fff0a8`).
 
-## 6. Estilos CSS
+### 6. Estilos CSS
 
 ```css
 .navigation-legend {
@@ -333,7 +320,7 @@ Colores del SVG:
 }
 ```
 
-## 7. Cambio en MapViewport.tsx
+### 7. Cambio en MapViewport.tsx
 
 El div host actualmente es self-closing:
 ```tsx
@@ -347,7 +334,7 @@ Cambiar a:
 </div>
 ```
 
-## 8. Plan de trabajo
+### 8. Plan de trabajo
 
 1. Crear `NavigationLegend.tsx` con el componente y el SVG `MouseIcon`.
 2. Agregar estilos en `styles.css`.
@@ -355,7 +342,7 @@ Cambiar a:
 4. Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
 5. Verificar visualmente en `pnpm dev`.
 
-## 9. Verificacion
+### 9. Verificacion
 
 - **Typecheck:** `pnpm typecheck`
 - **Tests:** `pnpm test` (no se esperan cambios de tests; el componente es presentacional)
@@ -370,7 +357,7 @@ Cambiar a:
   6. Abrir/cerrar sidebar; confirmar que el pill sigue centrado respecto al viewport.
   7. Abrir menu contextual; confirmar que el pill queda por debajo del menu.
 
-## 10. Checklist de cierre
+### 10. Checklist de cierre
 
 - [x] `NavigationLegend.tsx` creado.
 - [x] `MouseIcon` SVG implementado con cuatro variantes (left, right, middle, scroll).

@@ -1,27 +1,19 @@
-# Plan consolidado - Lighting And Darkness
+# Plan - Luces y Oscuridad
 
-<!-- Archivo consolidado mecanicamente desde:
-- 06-lighting-darkness-and-fire.plan.md
-- 13-light-resize-handles.plan.md
--->
+Este documento describe de forma unificada el plan tecnico para implementar y mantener luces y oscuridad, consolidando los pasos y criterios vigentes en el proyecto.
 
----
+## Iluminacion, Oscuridad y Fuego Animado
 
-## Fuente: 06-lighting-darkness-and-fire.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 06 - Iluminacion, Oscuridad y Fuego Animado
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/08-lighting-and-darkness/spec.md`
 - **Objetivo:** Implementar oscuridad global configurable, luces puntuales/conicas y fuego animado seleccionable sobre el mapa, con guardado/carga dentro del formato de escena.
 - **Estado:** Implementado
 - **Prioridad:** Alta
-- **Dependencias:** Specs 00-04 implementadas, Spec 05 `adjust-map` considerada como base previa de ajuste de mapa, PixiJS viewport, modelo de interaccion, formato `.ttrpgscene`, assets CC0/generados para fuego.
+- **Dependencias:** bootstrap, motor visual, persistencia, interaccion, mapa y grilla implementados, ajuste de mapa `adjust-map` considerada como base previa de ajuste de mapa, PixiJS viewport, modelo de interaccion, formato `.ttrpgscene`, assets CC0/generados para fuego.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Capa de oscuridad global configurable por activacion, color y opacidad.
 - Luz puntual con posicion, radio, color, intensidad y opacidad.
@@ -33,7 +25,7 @@
 - Guardado/carga de luces y efectos en `.ttrpgscene`.
 - Tests de dominio para validaciones y transformaciones.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Sombras por paredes.
 - Vision por tokens/minis.
@@ -43,7 +35,7 @@
 - Marketplace/biblioteca de assets.
 - Sincronizacion multiusuario.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** Las entidades de luces/fuego y sus validaciones viven en `domain/lighting` y `domain/effects`. React solo maneja controles/estado visual. PixiJS renderiza adapters desde entidades serializables.
 - **Persistencia:** Reutilizar y ampliar `SceneDocumentV1` si es compatible sin migracion mayor. Guardar luces en `scene.lights` y fuego en `scene.effects`. Mantener ids estables y coordenadas de mundo.
@@ -53,44 +45,44 @@
 - **Validacion:** Clamp de opacidad/intensidad `0..1`, radio/longitud positiva, direccion normalizada `0..360`, color hex valido, escala positiva. El angulo de cono debe conservarse en 60 grados.
 - **Dependencias nuevas:** Ninguna prevista. Si se usa asset externo, guardar archivo, fuente y licencia junto al asset. Si se genera fuego procedural, no agregar dependencia.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** `LightSource`, `PointLight`, `ConeLight`, `AnimatedFireEffect`, `LightId`, `EffectId`, `LightKind`, `EffectKind`.
 - **Reglas puras:** Crear luz por tipo, actualizar propiedades, mover en coordenadas de mundo, ocultar/mostrar, borrar por id, asociar fuego a luz calida opcional. En luces conicas, cualquier actualizacion debe preservar angulo fijo de 60 grados.
 - **Coordenadas / unidades:** Todas las posiciones/radios se guardan en mundo. La UI convierte longitud de cono en cuadros usando `grid.cellSizeWorld` y muestra la distancia segun `grid.distancePerCell`. Direccion de luz conica se expresa en grados.
 - **Errores de dominio:** Radio/longitud invalida, color invalido, intensidad/opacidad fuera de rango, direccion invalida, id duplicado.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Crear `src/domain/lighting/lights.ts` con tipos y funciones puras de luces.
 - Crear `src/domain/effects/fire.ts` con tipos y funciones puras de fuego.
 - Agregar tests para creacion, actualizacion, clamps, borrado y serializacion compatible con escena.
 - Revisar `scene-document.ts` y `scene-schema.ts` para soportar propiedades completas de luces/fuego.
 
-### `application`
+#### `application`
 
 - Si el estado crece, crear helpers para mapear elementos interactivos a `scene.lights`/`scene.effects`.
 - Mantener operaciones serializables y puras para que guardar/cargar siga siendo simple.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Agregar asset local de fuego si se usa sprite sheet.
 - Guardar licencia/fuente si el asset no es generado internamente.
 - No agregar repositorios, DB ni filesystem adicional.
 
-### `main`
+#### `main`
 
 - No agregar IPC nuevo en la primera version.
 - Mantener seguridad Electron ya configurada.
 
-### `preload`
+#### `preload`
 
 - No exponer APIs nuevas.
 - Guardar/cargar sigue pasando por escena.
 
-### `renderer`
+#### `renderer`
 
 - Añadir acciones de creacion: `Luz puntual`, `Luz conica`, `Fuego`.
 - Añadir panel compacto de propiedades para el elemento seleccionado cuando sea luz/fuego.
@@ -99,7 +91,7 @@
 - Mostrar estado claro de seleccion y tipo de elemento seleccionado.
 - Para luz conica seleccionada, mostrar aro/manija de orientacion en el canvas; arrastrar el origen mueve la luz y arrastrar la manija cambia la direccion.
 
-### `render`
+#### `render`
 
 - Extender `PixiViewport` para renderizar:
   - Oscuridad global como overlay configurable.
@@ -112,9 +104,9 @@
 - Implementar movimiento por drag para elementos seleccionados si no compite con pan.
 - Limpiar texturas, timers/tickers y listeners al destruir.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
-1. Revisar estado actual de Spec 05 y resolver cualquier dependencia necesaria del ajuste de mapa.
+1. Revisar estado actual de ajuste de mapa y resolver cualquier dependencia necesaria del ajuste de mapa.
 2. Crear tipos/reglas de dominio para luces y fuego.
 3. Actualizar schema de escena para propiedades completas de `lights` y `effects`.
 4. Agregar tests unitarios de validacion, clamps y serializacion.
@@ -127,7 +119,7 @@
 11. Conectar guardar/cargar escena con luces/fuego.
 12. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build` y smoke manual con `pnpm dev`.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** Validacion de luces/fuego, clamps de radio/opacidad/intensidad, direccion, angulo fijo de 60 grados para conos, serializacion.
 - **Integration tests:** Cargar/guardar escena con luces y fuego usando use cases existentes.
@@ -136,7 +128,7 @@
 - **Build:** `pnpm build`
 - **Manual / smoke:** Ejecutar `pnpm dev`, cargar mapa, activar oscuridad, subir overlay alto, crear luz puntual y luz conica, confirmar que el mapa se ve claro dentro del circulo/cono, ajustar longitud del cono en cuadros, orientar el cono desde el aro/manija, crear fuego, seleccionarlo, moverlo, borrarlo, guardar escena y cargarla de vuelta.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** Blend modes/masks inconsistentes entre plataformas.
   **Mitigacion:** Implementar fallback visual sin mask avanzada y verificar en Electron/macOS.
@@ -149,7 +141,7 @@
 - **Riesgo:** Paneles tapen la proyeccion.
   **Mitigacion:** Controles compactos y contextualizados al seleccionado.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - La capa de oscuridad se ve sobre el mapa y puede configurarse.
 - Una luz puntual aclara visualmente una zona.
@@ -164,13 +156,13 @@
 - Luces/fuego se guardan y cargan con la escena.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - Actualizar README con pasos para probar oscuridad, luces y fuego.
 - Documentar asset de fuego interno generado para el proyecto.
 - Actualizar este plan si se decide usar un sistema distinto de blend/mask.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tipos/reglas de luces creados.
@@ -198,32 +190,27 @@
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
 
-## 12. Cambio posterior: oscuridad solo en ventana de jugador
+### 12. Cambio posterior: oscuridad solo en ventana de jugador
 
-La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador** (ver spec 25 y rama `feature/dm-darkness-passthrough`).
+La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador** (ver ventana de jugador y rama `feature/dm-darkness-passthrough`).
 
 - `drawDarknessLayer()` retorna inmediatamente cuando `viewRole === "dm"`, dejando la capa siempre vacía en la ventana del DM.
 - `setViewRole()` programa un redibujado de la capa de oscuridad al cambiar de rol.
 - Los controles de oscuridad del DM siguen afectando la ventana del jugador a través del snapshot de escena; el DM simplemente no ve el efecto en su propio canvas.
 - Se agrega un badge flotante en la esquina superior izquierda del viewport del DM que informa cuando oscuridad y/o darkvision están activos para el jugador.
 
----
+## Handles de Tamaño para Luces
 
-## Fuente: 13-light-resize-handles.plan.md
+### 1. Resumen
 
-# Plan de implementacion tecnica - 13 - Handles de Tamaño para Luces
-
-## 1. Resumen
-
-- **Spec fuente:** `./specs/08-lighting-and-darkness/spec.md`
 - **Objetivo:** Permitir redimensionar luz puntual y luz cónica directamente desde el canvas con handles de tamaño, reutilizando la experiencia de edición ya usada por formas tácticas.
 - **Estado:** Implementado y aceptado
 - **Prioridad:** Media
 - **Dependencias:** Specs 06, 10, 12; selección y drag de elementos en PixiViewport; modelo actual `SceneLight.radius`.
 
-## 2. Alcance
+### 2. Alcance
 
-### Incluido
+#### Incluido
 
 - Resize interactivo para luz puntual seleccionada.
 - Resize interactivo para luz cónica seleccionada.
@@ -234,7 +221,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - Persistencia mediante el campo existente `SceneLight.radius`.
 - Pruebas de dominio o UI indirecta donde aplique y verificación manual en Electron.
 
-### Fuera de alcance
+#### Fuera de alcance
 
 - Cambiar ángulo de luz cónica.
 - Diferenciar luz brillante y luz tenue.
@@ -243,7 +230,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - Rediseñar sidebar, menú contextual o panel compacto de luces.
 - Selección múltiple.
 
-## 3. Decisiones tecnicas
+### 3. Decisiones tecnicas
 
 - **Arquitectura:** El dominio mantiene `SceneLight.radius`; React actualiza estado de escena; Pixi solo calcula interacción canvas y emite callbacks tipados.
 - **Persistencia:** No se agregan campos. Guardar/cargar conserva el nuevo tamaño usando `SceneLight.radius`.
@@ -252,37 +239,37 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - **Validacion:** El radio mínimo se limita en renderer antes de emitir el callback. El schema existente ya valida `radius` como positivo.
 - **Dependencias nuevas:** Ninguna.
 
-## 4. Diseno de dominio
+### 4. Diseno de dominio
 
 - **Entidades / tipos:** Sin tipos nuevos de escena. Reusar `SceneLight.radius`.
 - **Reglas puras:** No se esperan nuevas reglas puras. El cálculo principal es distancia mundo entre centro de luz y cursor.
 - **Coordenadas / unidades:** El resize se calcula en coordenadas de mundo usando `screenToWorld`, independiente del zoom. Para cono, el handle se ubica en dirección central a distancia `radius`.
 - **Errores de dominio:** No se agregan errores nuevos. Valores inválidos se evitan con radio mínimo.
 
-## 5. Cambios por capa
+### 5. Cambios por capa
 
-### `domain`
+#### `domain`
 
 - Sin cambios esperados.
 - Si se encuentra duplicación importante en cálculo de radio, se puede extraer helper puro pequeño y testearlo.
 
-### `application`
+#### `application`
 
 - Sin cambios esperados.
 
-### `infrastructure`
+#### `infrastructure`
 
 - Sin cambios esperados.
 
-### `main`
+#### `main`
 
 - Sin cambios esperados.
 
-### `preload`
+#### `preload`
 
 - Sin cambios esperados.
 
-### `renderer`
+#### `renderer`
 
 - En `src/renderer/src/App.tsx`:
   - Agregar callback `handleLightRadiusChange`.
@@ -292,7 +279,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
   - Agregar prop `onLightRadiusChange`.
   - Conectarla al constructor de `PixiViewport`.
 
-### `render`
+#### `render`
 
 - En `src/render/pixi/PixiViewport.ts`:
   - Agregar callback `onLightRadiusChange` a `PixiViewportOptions`.
@@ -304,7 +291,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
   - Actualizar radio con `Math.max(10, distanciaMundo)`.
   - Re-renderizar capas dependientes al recibir nuevo estado desde React.
 
-## 6. Plan de trabajo
+### 6. Plan de trabajo
 
 1. [x] Revisar implementación actual de selección, rotación y resize en `PixiViewport`.
 2. [x] Agregar `onLightRadiusChange` en opciones de Pixi y flujo React.
@@ -318,7 +305,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 10. [x] Ejecutar `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build`.
 11. [ ] Smoke manual en `pnpm dev` con luz puntual, luz cónica, oscuridad y darkvision.
 
-## 7. Testing y verificacion
+### 7. Testing y verificacion
 
 - **Unit tests:** No se esperan nuevos si el cálculo queda acotado al viewport. Si se extrae helper de distancia/radio, agregar test unitario.
 - **Integration tests:** No se esperan nuevos.
@@ -327,7 +314,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - **Build:** `pnpm build`
 - **Manual / smoke:** Crear luz puntual, seleccionarla y arrastrar handle de borde; crear luz cónica, rotarla y redimensionarla; activar oscuridad y darkvision para verificar máscaras.
 
-## 8. Riesgos y mitigaciones
+### 8. Riesgos y mitigaciones
 
 - **Riesgo:** El handle de resize del cono compite con la manivela de rotación.
   **Mitigacion:** Ubicar resize en el extremo del cono y evaluar hit tests en orden explícito.
@@ -338,7 +325,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - **Riesgo:** El radio queda demasiado pequeño o inválido.
   **Mitigacion:** Aplicar mínimo de `10` unidades de mundo antes de emitir el cambio.
 
-## 9. Criterios de aceptacion
+### 9. Criterios de aceptacion
 
 - Al seleccionar una luz puntual aparece un handle de radio en su borde.
 - Arrastrar el handle de luz puntual cambia su radio.
@@ -350,13 +337,13 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - Guardar y cargar escena conserva los tamaños modificados.
 - `pnpm typecheck`, `pnpm test`, `pnpm lint` y `pnpm build` pasan.
 
-## 10. Documentacion afectada
+### 10. Documentacion afectada
 
 - `specs/08-lighting-and-darkness/spec.md`
 - `specs/08-lighting-and-darkness/plan.md`
 - `README.md` si se documenta el uso final de resize de luces.
 
-## 11. Checklist de cierre
+### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
 - [x] Tests relevantes agregados o actualizados.
