@@ -2,7 +2,7 @@
 
 ## 1. Resumen
 
-- **Spec fuente:** `./specs/22-recent-scenes-menu/spec.md`
+- **Spec fuente:** `./specs/19-recent-scenes-menu/spec.md`
 - **Objetivo:** Agregar un submenu nativo `File > Abrir recientes` con las ultimas 5 escenas `.ttrpgscene`, persistido entre ejecuciones y conectado al renderer por IPC seguro.
 - **Estado:** Implementado
 - **Prioridad:** Media

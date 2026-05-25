@@ -1,3 +1,263 @@
+# Spec - Entities
+
+<!-- Archivo consolidado mecanicamente desde:
+- 16-entity-system/spec.md
+- 17-entity-library/spec.md
+- 18-entity-scene-panel/spec.md
+- 19-entity-templates-and-rendering/spec.md
+-->
+
+---
+
+## Fuente: 16-entity-system/spec.md
+
+# Spec - Entity System
+
+<!--
+No habia una spec antigua consolidada para este modulo en `main`.
+Carpeta reservada para la futura unificacion de entidades.
+-->
+
+---
+
+## Fuente: 17-entity-library/spec.md
+
+# Spec 30 - Biblioteca Persistente de Monstruos
+
+## Objetivo
+
+Agregar una biblioteca local persistente de monstruos para que el DM pueda reutilizar statblocks entre escenas. Al agregar un monstruo a la campaña/escena, el usuario puede elegir uno existente desde un listado con buscador o crear uno nuevo. Si crea uno nuevo, este se guarda en la base de datos local y se inserta inmediatamente en la escena actual.
+
+## Contexto
+
+El aside del DM ya permite crear monstruos dentro de una escena y el spec 29 agrego templates Markdown/CSS para facilitar statblocks por sistema. Sin embargo, los monstruos creados viven solamente dentro de la escena. Para preparar campañas de forma mas eficiente, se necesita una biblioteca persistente que sobreviva entre escenas y pueda alimentar el flujo de agregar monstruos.
+
+La app debe seguir funcionando sin servicios externos. La persistencia recomendada es SQLite local en el proceso `main`, guardada bajo `app.getPath("userData")`, expuesta al renderer mediante preload + IPC tipado.
+
+## Alcance
+
+- Crear una biblioteca local persistente de monstruos respaldada por SQLite.
+- Agregar flujo de seleccion al hacer `+ Agregar monstruo`:
+  - abrir modal tipo grilla/listado;
+  - buscar por nombre;
+  - filtrar o visualizar sistema/template;
+  - seleccionar un monstruo existente;
+  - crear un monstruo nuevo si no existe.
+- Al elegir un monstruo existente:
+  - se crea una instancia dentro de la escena actual;
+  - se copian nombre, contenido/notas, template/sistema e imagen si aplica;
+  - se genera un id unico de escena para evitar colisiones.
+- Al crear un monstruo nuevo:
+  - se guarda primero en la biblioteca local;
+  - se agrega inmediatamente como instancia en la escena actual;
+  - queda disponible para futuras escenas.
+- Persistir en la DB:
+  - nombre de monstruo;
+  - sistema al que pertenece;
+  - `templateId` usado cuando aplique;
+  - contenido Markdown del statblock/notas;
+  - metadata minima de auditoria local.
+- Mantener el `.ttrpgscene` como formato portable de escena: la escena guarda la instancia de monstruo, no depende de que la biblioteca exista.
+
+## Fuera de alcance
+
+- Sincronizacion cloud o multiusuario.
+- Marketplace/descarga remota de monstruos.
+- Compendios protegidos por copyright.
+- Importacion masiva desde archivos externos.
+- Versionado complejo de monstruos ya insertados en escenas.
+- Actualizacion automatica de instancias existentes cuando cambia el monstruo en biblioteca.
+- Busqueda full-text avanzada en esta primera iteracion.
+- Imagen obligatoria del monstruo.
+
+## Comportamiento
+
+### Abrir biblioteca desde agregar monstruo
+
+- En el aside DM, la accion `+ Agregar monstruo` deja de abrir directamente el formulario vacio.
+- En su lugar abre un modal de biblioteca de monstruos.
+- El modal debe ser tipo grilla/listado y tener buscador visible arriba.
+- Cada item muestra:
+  - imagen del monstruo a ancho completo de la card (aspect-ratio 16:9, placeholder si no hay imagen);
+  - nombre;
+  - sistema y template usado si existe.
+- El listado debe permitir seleccionar un monstruo y agregarlo a la escena.
+
+### Buscar y seleccionar
+
+- El usuario puede escribir en el buscador.
+- El listado filtra por nombre y, si es razonable en la implementacion, tambien por sistema.
+- Si no hay resultados, se muestra estado vacio con accion `Crear monstruo nuevo`.
+- Al seleccionar un monstruo existente:
+  - se crea una instancia `SceneMonster`;
+  - `visibleToPlayer` inicia en `false`;
+  - `templateId` se copia si existe;
+  - `notes` se inicializa con el contenido Markdown guardado;
+  - `name` se copia desde la biblioteca;
+  - `id` se slugifica y se hace unico dentro de la escena.
+
+### Crear monstruo nuevo
+
+- Desde el modal de biblioteca, el usuario puede elegir `Nuevo monstruo`.
+- Se abre el formulario de monstruo actual, pero conectado a la biblioteca.
+- El usuario captura:
+  - nombre;
+  - sistema;
+  - template;
+  - contenido Markdown;
+  - imagen opcional si el flujo actual ya la soporta.
+- Al guardar:
+  - se valida que el nombre no este vacio;
+  - se guarda el monstruo en SQLite;
+  - se agrega inmediatamente una instancia a la escena actual;
+  - el modal se cierra o vuelve al listado con feedback claro.
+
+### Editar monstruo de escena vs biblioteca
+
+- Editar un monstruo ya agregado a la escena modifica la instancia de escena, como hoy.
+- En esta primera iteracion, editar una instancia de escena no actualiza automaticamente la biblioteca.
+- Si se requiere guardar cambios de una instancia hacia biblioteca, quedara para un spec futuro como `Actualizar entrada de biblioteca`.
+
+## Modelo de datos
+
+### Entidad de biblioteca
+
+```ts
+type MonsterLibraryEntry = {
+  id: string;
+  name: string;
+  system: string;
+  templateId: string | null;
+  contentMarkdown: string;
+  imagePath: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+### Instancia en escena
+
+`SceneMonster` mantiene su rol actual como copia/instancia dentro de una escena:
+
+```ts
+type SceneMonster = {
+  id: string;
+  name: string;
+  imagePath: string | null;
+  visibleToPlayer: boolean;
+  notes: string;
+  templateId?: string | null;
+};
+```
+
+La escena no debe guardar solo una referencia a la biblioteca. Debe guardar los datos necesarios para abrirse de forma portable aunque la DB local no exista.
+
+## Persistencia SQLite
+
+La DB vive en `app.getPath("userData")`, por ejemplo:
+
+```text
+TTRPG Effects/ttrpg-effects.sqlite
+```
+
+Tabla inicial sugerida:
+
+```sql
+CREATE TABLE monster_library_entries (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  system TEXT NOT NULL,
+  template_id TEXT,
+  content_markdown TEXT NOT NULL,
+  image_path TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX monster_library_entries_name_idx
+  ON monster_library_entries (name);
+
+CREATE INDEX monster_library_entries_system_idx
+  ON monster_library_entries (system);
+```
+
+Migraciones:
+
+- Deben ser versionadas.
+- Deben ejecutarse desde `main` al iniciar la app o al inicializar el repositorio.
+- La version de migracion puede vivir en `PRAGMA user_version` o tabla `schema_migrations`.
+
+## Arquitectura
+
+- `domain` define `MonsterLibraryEntry`, validaciones y conversion de entrada de biblioteca a `SceneMonster`.
+- `application` define casos de uso:
+  - listar/buscar monstruos;
+  - guardar monstruo nuevo;
+  - obtener monstruo por id;
+  - convertir entrada a instancia de escena.
+- `infrastructure` implementa repositorio SQLite.
+- `main` inicializa DB, migraciones y registra IPC.
+- `preload` expone funciones especificas:
+  - `searchMonsterLibrary(query)`
+  - `saveMonsterLibraryEntry(entry)`
+  - `getMonsterLibraryEntry(id)`
+- `renderer` consume la API desde el modal de biblioteca.
+- El renderer no accede directamente a SQLite, filesystem ni Electron internals.
+
+## IPC
+
+Canales sugeridos:
+
+- `monster-library:search`
+- `monster-library:save`
+- `monster-library:get`
+
+Los payloads deben validarse en `main` antes de tocar la DB.
+
+## UI / UX
+
+- Modal amplio, tipo grilla/listado, reutilizando el look del aside DM.
+- Buscador arriba, siempre visible.
+- Resultados escaneables en cards compactas.
+- Acciones principales:
+  - `Agregar a escena`;
+  - `Nuevo monstruo`.
+- Si no hay resultados:
+  - mostrar estado vacio;
+  - ofrecer `Crear monstruo nuevo`.
+- El formulario de nuevo monstruo debe mantener el selector de template del spec 29.
+- El sistema puede autocompletarse desde el template seleccionado si el template tiene `system`.
+
+## Validacion
+
+- `name` requerido, trim, longitud razonable.
+- `system` requerido, trim, con default si viene vacio desde UI.
+- `contentMarkdown` requerido o default vacio permitido solo si el usuario confirma.
+- `templateId` debe ser string no vacio o `null`.
+- `imagePath` debe ser string no vacio o `null`.
+- Fechas en ISO string.
+- Queries parametrizadas, nunca concatenar SQL con input de usuario.
+
+## Criterios de aceptacion
+
+- Al hacer `+ Agregar monstruo`, se abre el modal de biblioteca.
+- El modal muestra una grilla/listado con buscador.
+- El usuario puede buscar monstruos por nombre.
+- El usuario puede seleccionar un monstruo existente y agregarlo a la escena.
+- El monstruo agregado a escena conserva nombre, template, contenido Markdown e imagen si existe.
+- El usuario puede crear un monstruo nuevo desde ese flujo.
+- El monstruo nuevo se guarda en SQLite y queda disponible al volver a abrir el modal.
+- El monstruo nuevo se agrega inmediatamente a la escena.
+- Las escenas guardadas siguen siendo portables: incluyen los datos del monstruo insertado.
+- La DB se maneja desde `main`/infraestructura, no desde renderer.
+- Las consultas usan parametros SQL.
+- Hay migracion inicial versionada.
+- Tests relevantes cubren conversion de biblioteca a `SceneMonster` y validaciones basicas.
+
+---
+
+## Fuente: 18-entity-scene-panel/spec.md
+
 # Spec consolidado - Entity Scene Panel
 
 <!-- Archivo consolidado mecanicamente desde:
@@ -395,3 +655,270 @@ La escena debe guardar un arreglo de labels, por ejemplo `labels: SceneLabel[]`,
 - Delete/Backspace elimina el label seleccionado.
 - Los labels se guardan y cargan dentro de `.ttrpgscene`.
 - Escenas antiguas sin labels siguen cargando correctamente.
+
+---
+
+## Fuente: 19-entity-templates-and-rendering/spec.md
+
+# Spec 29 - Sistema de Templates de Monstruos
+
+## Objetivo
+
+Permitir que el DM administre templates de Markdown para notas de monstruos, elija un template al crear o editar un monstruo, rellene datos con una estructura prehecha y visualice el resultado con estilos CSS propios del template.
+
+## Contexto
+
+Las notas de monstruos ya aceptan Markdown y tablas GFM. Para preparar encuentros mas rapido, el DM necesita templates por sistema de juego que funcionen como statblocks reutilizables. El primer template incluido sera D&D 5.5e, inspirado visualmente en statblocks de AideDD dentro de su contenedor `jaune`, pero traducido y estructurado con los campos definidos para esta aplicacion.
+
+## Alcance
+
+- Crear un sistema persistente de templates de monstruos dentro del software.
+- Agregar una opcion en el menu de aplicacion: `File` / `Archivo` -> `Administrar templates de monstruos`.
+- El administrador abre un modal con:
+  - listado lateral de templates guardados;
+  - editor de Markdown;
+  - editor de CSS scoped;
+  - previsualizacion del template;
+  - boton para alternar entre editar y previsualizar;
+  - boton guardar.
+- Agregar selector de template en el formulario de monstruo:
+  - `Sin template`;
+  - templates guardados.
+- Al elegir un template, las notas del monstruo se rellenan con el Markdown del template.
+- Las notas de monstruo se editan como Markdown plano para preservar tablas GFM, pipes y placeholders sin que un editor rich text reserialice el contenido.
+- Renderizar la vista de detalle del monstruo aplicando el CSS del template si el monstruo fue creado o marcado con ese template.
+- Incluir un template semilla D&D 5.5e en espanol.
+- Guardar templates de forma local para que persistan entre sesiones de la app.
+
+## Fuera de alcance
+
+- Marketplace o descarga remota de templates.
+- Sincronizacion entre computadores.
+- Variables interactivas con formularios por campo.
+- Importar contenido protegido o copiar statblocks completos de terceros.
+- Soporte completo de CSS arbitrario global.
+- Editor visual avanzado de tablas o layout del template.
+- Templates para NPCs o notas generales en esta iteracion.
+
+## Comportamiento
+
+### Administrar templates
+
+- Desde el menu de aplicacion, el DM abre `Administrar templates de monstruos`.
+- El modal muestra a la izquierda los templates existentes.
+- La derecha muestra:
+  - nombre del template;
+  - sistema o etiqueta, por ejemplo `D&D 5.5e`;
+  - textarea/editor para Markdown;
+  - textarea/editor para CSS;
+  - boton `Previsualizar` / `Editar`;
+  - boton `Guardar`.
+- En modo edicion se editan Markdown y CSS.
+- En modo previsualizacion se renderiza el Markdown con el CSS scoped del template.
+- El usuario puede crear un template nuevo duplicando uno existente o desde un template vacio.
+- El usuario puede guardar cambios.
+- El template semilla D&D 5.5e debe estar disponible aunque no existan templates del usuario.
+
+### Usar un template en monstruos
+
+- En el modal de crear/editar monstruo, sobre el editor de notas, se muestra un selector:
+  - `Sin template`;
+  - un item por template guardado.
+- Si el usuario elige `Sin template`, las notas se comportan como hasta ahora.
+- Si el usuario elige un template y las notas estan vacias, se rellena el Markdown del template.
+- Si las notas ya tienen contenido y el usuario cambia de template, se debe pedir confirmacion antes de reemplazar las notas.
+- El monstruo guarda el `templateId` usado.
+- En la vista de detalle del monstruo, si `templateId` existe y el template esta disponible, el Markdown se renderiza dentro de un contenedor con el CSS scoped del template.
+- El Markdown del monstruo no debe pasar por un editor rich text que agregue lineas vacias entre filas de tabla o transforme caracteres especiales.
+- El Markdown visible/editable del usuario no debe incluir HTML estructural del card; el render del template agrega el wrapper HTML/clases necesarias segun el template seleccionado.
+- Si el template fue eliminado o no se puede cargar, el monstruo se renderiza con el estilo Markdown normal y muestra un estado recuperable, sin romper la nota.
+
+## Template semilla D&D 5.5e
+
+El template debe capturar los siguientes campos en espanol y usar un estilo de card claro en blancos/grises con acentos rojos, borde redondeado, ancho amplio cercano a `672px` y tabla compacta de caracteristicas similar a un statblock moderno:
+
+- Nombre.
+- Descripcion corta, alineacion.
+- Clase de Armadura usando `CA`.
+- Iniciativa.
+- Puntos de golpe usando `PG`.
+- Velocidad.
+- Tabla de caracteristicas:
+  - `FUE` para STR.
+  - `DES` para DEX.
+  - `CON`.
+  - `INT`.
+  - `SAB` para WIS.
+  - `CAR` para CHA.
+- Habilidades.
+- Inmunidades.
+- Sentidos.
+- Idiomas.
+- Valor de Desafio usando `VD`.
+- Bono de Competencia usando `Bonif.`.
+- Rasgos.
+- Acciones.
+- Acciones Legendarias.
+- Acciones de Guarida.
+- Reacciones.
+
+Markdown base sugerido:
+
+```md
+# {{Nombre}}
+
+*{{Descripcion corta}}, {{alineacion}}*
+
+---
+
+**CA** {{CA}}  
+**Iniciativa** {{Iniciativa}}  
+**PG** {{PG}}  
+**Velocidad** {{Velocidad}}
+
+| | MOD | SALV. | | MOD | SALV. | | MOD | SALV. |
+| --- | ---: | ---: | --- | ---: | ---: | --- | ---: | ---: |
+| **FUE** {{FUE}} | {{FUE_MOD}} | {{FUE_SALV}} | **DES** {{DES}} | {{DES_MOD}} | {{DES_SALV}} | **CON** {{CON}} | {{CON_MOD}} | {{CON_SALV}} |
+| **INT** {{INT}} | {{INT_MOD}} | {{INT_SALV}} | **SAB** {{SAB}} | {{SAB_MOD}} | {{SAB_SALV}} | **CAR** {{CAR}} | {{CAR_MOD}} | {{CAR_SALV}} |
+
+**Habilidades** {{Habilidades}}  
+**Inmunidades** {{Inmunidades}}  
+**Sentidos** {{Sentidos}}  
+**Idiomas** {{Idiomas}}  
+**VD** {{VD}}  
+**Bonif.** {{Bonif}}
+
+## Rasgos
+
+**{{Rasgo 1}}.** {{Descripcion del rasgo.}}
+
+## Acciones
+
+**{{Accion 1}}.** {{Descripcion de la accion.}}
+
+## Reacciones
+
+**{{Reaccion 1}}.** {{Descripcion de la reaccion.}}
+
+## Acciones Legendarias
+
+**{{Accion legendaria 1}}.** {{Descripcion de la accion legendaria.}}
+
+## Acciones de Guarida
+
+**{{Accion de guarida 1}}.** {{Descripcion de la accion de guarida.}}
+```
+
+CSS base sugerido:
+
+```css
+.monster-card.dnd-55e {
+  max-width: 760px;
+  margin: 0 auto;
+  border: 1px solid #d1a843;
+  border-radius: 8px;
+  padding: 18px 20px;
+  color: #2b1a0b;
+  background: #f7e7b6;
+  box-shadow: inset 0 0 0 3px rgb(255 255 255 / 34%), 0 12px 24px rgb(0 0 0 / 24%);
+}
+
+.monster-card.dnd-55e h1 {
+  margin: 0 0 4px;
+  color: #7b1d12;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  letter-spacing: 0;
+}
+
+.monster-card.dnd-55e h2 {
+  margin: 18px 0 8px;
+  border-bottom: 2px solid #b73121;
+  color: #7b1d12;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.25rem;
+}
+
+.monster-card.dnd-55e table {
+  width: 100%;
+  margin: 12px 0;
+  border-collapse: collapse;
+}
+
+.monster-card.dnd-55e th,
+.monster-card.dnd-55e td {
+  border: 1px solid rgb(123 29 18 / 24%);
+  padding: 6px 8px;
+}
+
+.monster-card.dnd-55e th {
+  color: #fff7d8;
+  background: #7b1d12;
+}
+
+.monster-card.dnd-55e strong {
+  color: #7b1d12;
+}
+```
+
+## Modelo de datos
+
+Template:
+
+```ts
+type MonsterTemplate = {
+  id: string;
+  name: string;
+  system: string;
+  markdown: string;
+  css: string;
+  builtIn: boolean;
+  updatedAt: string;
+};
+```
+
+Monstruo:
+
+```ts
+type SceneMonster = {
+  templateId?: string | null;
+};
+```
+
+Persistencia local de templates:
+
+- Los templates se guardan en almacenamiento local de la app, por ejemplo `userData/monster-templates.json`.
+- El archivo debe incluir version de formato.
+- Los templates built-in pueden declararse en codigo o en un asset local; si el usuario los edita, se guarda una copia editable.
+
+## Seguridad y CSS
+
+- El CSS de templates debe estar scoped al contenedor del template.
+- El renderer no debe inyectar CSS global sin prefijo o id de alcance.
+- El HTML renderizado desde Markdown debe mantenerse dentro del contenedor de preview/detalle.
+- No se debe permitir que el CSS del template afecte la app completa, modales externos o controles del sistema.
+- Si se decide sanitizar Markdown/HTML en una spec futura, este flujo debe integrarse con esa sanitizacion.
+
+## Arquitectura
+
+- `domain` define tipos y validaciones de `MonsterTemplate`.
+- `infrastructure` maneja lectura/escritura del archivo local de templates.
+- `main` registra IPC especifico para listar, guardar y eliminar templates.
+- `preload` expone funciones pequenas y tipadas para templates.
+- `renderer` muestra el administrador de templates y consume la lista en el formulario de monstruo.
+- El detalle del monstruo aplica el render Markdown existente con CSS scoped.
+- No debe haber acceso directo desde renderer a filesystem o Electron internals.
+
+## Criterios de aceptacion
+
+- Existe un menu de aplicacion para abrir `Administrar templates de monstruos`.
+- El administrador permite ver, editar, previsualizar y guardar templates.
+- El template D&D 5.5e existe por defecto.
+- Al crear/editar monstruo se puede elegir `Sin template` o un template guardado.
+- Elegir un template rellena las notas cuando estan vacias.
+- Si las notas tienen contenido, cambiar de template pide confirmacion antes de reemplazar.
+- La vista de detalle renderiza tablas Markdown como tablas.
+- La vista de detalle aplica CSS scoped del template seleccionado.
+- El CSS del template no afecta el resto de la app.
+- El `templateId` del monstruo se guarda y carga dentro de `.ttrpgscene`.
+- Si un template falta, el monstruo sigue siendo visible con Markdown normal.

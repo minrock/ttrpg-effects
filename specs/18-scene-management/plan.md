@@ -2,7 +2,7 @@
 
 ## 1. Resumen
 
-- **Spec fuente:** `./specs/21-scene-management/spec.md`
+- **Spec fuente:** `./specs/18-scene-management/spec.md`
 - **Objetivo:** Agregar una accion `Nueva escena` que aparezca solo cuando haya contenido o cambios, pregunte si se desea guardar antes de descartar y luego reinicie la app al estado inicial sin cerrar Electron.
 - **Estado:** Implementado
 - **Prioridad:** Alta
@@ -157,8 +157,8 @@
 
 ## 10. Documentacion afectada
 
-- `specs/21-scene-management/spec.md`
-- `specs/21-scene-management/plan.md`
+- `specs/18-scene-management/spec.md`
+- `specs/18-scene-management/plan.md`
 
 ## 11. Checklist de cierre
 

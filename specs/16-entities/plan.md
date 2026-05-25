@@ -1,3 +1,215 @@
+# Plan - Entities
+
+<!-- Archivo consolidado mecanicamente desde:
+- 16-entity-system/plan.md
+- 17-entity-library/plan.md
+- 18-entity-scene-panel/plan.md
+- 19-entity-templates-and-rendering/plan.md
+-->
+
+---
+
+## Fuente: 16-entity-system/plan.md
+
+# Plan - Entity System
+
+<!--
+No habia un plan antiguo consolidado para este modulo en `main`.
+Carpeta reservada para la futura unificacion de entidades.
+-->
+
+---
+
+## Fuente: 17-entity-library/plan.md
+
+# Plan de implementacion tecnica - 30 - Biblioteca Persistente de Monstruos
+
+## 1. Resumen
+
+- **Spec fuente:** `./specs/16-entities/spec.md`
+- **Objetivo:** Agregar una biblioteca local persistente de monstruos en SQLite para buscar, reutilizar y crear monstruos desde el flujo `+ Agregar monstruo`, manteniendo las escenas `.ttrpgscene` portables.
+- **Estado:** Implementado
+- **Prioridad:** Alta
+- **Dependencias:** Spec 26 para aside DM, Spec 29 para templates Markdown/CSS de monstruos, decisiones de seguridad Electron del proyecto, SQLite local sin servicios externos.
+
+## 2. Alcance
+
+### Incluido
+
+- Modelo de dominio `MonsterLibraryEntry`.
+- Conversion pura de entrada de biblioteca a instancia `SceneMonster`.
+- Repositorio SQLite local con migracion inicial versionada.
+- Casos de uso para buscar, obtener y guardar monstruos.
+- IPC/preload tipados para la biblioteca.
+- Modal de biblioteca tipo grilla/listado con buscador.
+- Flujo para agregar un monstruo existente a la escena.
+- Flujo para crear un monstruo nuevo, guardarlo en DB y agregarlo inmediatamente a la escena.
+- Persistencia portable de la instancia dentro de `.ttrpgscene`.
+
+### Fuera de alcance
+
+- Edicion global de biblioteca desde una pantalla dedicada.
+- Actualizar entradas de biblioteca desde instancias ya agregadas a escena.
+- Sincronizacion cloud, multiusuario o servicios externos.
+- Importacion/exportacion masiva.
+- Busqueda full-text avanzada.
+- Versionado de monstruos o tracking de cambios entre DB y escenas.
+- Dependencia obligatoria de imagen.
+
+## 3. Decisiones tecnicas
+
+- **Arquitectura:** La biblioteca queda modelada por dominio + casos de uso + repositorio. El renderer solo consume acciones tipadas via preload; no toca SQLite ni filesystem.
+- **Persistencia:** Usar SQLite local en `app.getPath("userData")/ttrpg-effects.sqlite`. Mantener `.ttrpgscene` como snapshot portable de la escena.
+- **IPC / Electron:** Crear canales especificos `monster-library:search`, `monster-library:get` y `monster-library:save`. Validar payloads en `main` antes de invocar casos de uso.
+- **Render / PixiJS:** Sin cambios. La biblioteca alimenta el aside DM; los monstruos no son entidades PixiJS.
+- **Validacion:** Validar nombre, sistema, template, Markdown, imagen opcional, fechas e ids en dominio/main. Usar queries parametrizadas.
+- **Dependencias nuevas:** Se usa `node:sqlite` (built-in de Node.js 22+) en lugar de `better-sqlite3`. Elimina dependencias nativas y el problema de ABI mismatch entre el Node.js del sistema y el bundleado por Electron. En desarrollo y build se agrega `NODE_OPTIONS=--experimental-sqlite` porque Electron 39 bundlea Node.js 22 donde el modulo es experimental; en la app empaquetada macOS se inyecta via `LSEnvironment` en el `Info.plist` (configurado en `electron-builder`).
+
+## 4. Diseno de dominio
+
+- **Entidades / tipos:** `MonsterLibraryEntry`, `MonsterLibrarySearchQuery`, `MonsterLibrarySaveInput`.
+- **Reglas puras:**
+  - normalizar entradas desde payloads externos;
+  - generar ids estables para biblioteca;
+  - convertir una entrada de biblioteca a `SceneMonster` con id unico en escena;
+  - extraer preview breve del Markdown para el listado.
+- **Coordenadas / unidades:** No aplica.
+- **Errores de dominio:** Nombre vacio, sistema vacio, contenido invalido si se decide requerir contenido, id invalido, templateId vacio.
+
+## 5. Cambios por capa
+
+### `domain`
+
+- Crear `src/domain/monster-library/monster-library.ts`.
+- Definir tipos de entrada persistente y payloads.
+- Agregar helper `createSceneMonsterFromLibraryEntry(entry, existingIds)`.
+- Agregar helper de preview Markdown.
+- Tests unitarios para validacion y conversion a `SceneMonster`.
+
+### `application`
+
+- Crear `src/application/services/monster-library-repository.ts`.
+- Crear casos de uso en `src/application/use-cases/monster-library.ts`:
+  - `searchMonsterLibraryUseCase`;
+  - `getMonsterLibraryEntryUseCase`;
+  - `saveMonsterLibraryEntryUseCase`.
+- Mantener las interfaces sin dependencia de SQLite.
+
+### `infrastructure`
+
+- Agregar repositorio SQLite en `src/infrastructure/database` o `src/infrastructure/repositories`.
+- Crear inicializacion de DB y migracion inicial.
+- Usar `PRAGMA user_version` o tabla `schema_migrations`.
+- Crear tabla `monster_library_entries`.
+- Implementar queries parametrizadas para search/get/save.
+- Asegurar creacion del directorio `userData` si hace falta.
+
+### `main`
+
+- Inicializar DB al arrancar la app.
+- Registrar IPC `monster-library:*`.
+- Validar payloads recibidos antes de tocar la DB.
+- Devolver errores serializables y amigables.
+
+### `preload`
+
+- Exponer funciones especificas:
+  - `searchMonsterLibrary(query)`;
+  - `getMonsterLibraryEntry(id)`;
+  - `saveMonsterLibraryEntry(input)`.
+- Actualizar `src/preload/ttrpg-api.d.ts`.
+- No exponer canales genericos ni objetos Electron.
+
+### `renderer`
+
+- Modificar `MonsterSection` para que `+ Agregar monstruo` abra el modal de biblioteca.
+- Crear `MonsterLibraryModal`.
+- Reutilizar o adaptar `MonsterModal` para crear una entrada nueva desde el flujo de biblioteca.
+- Cargar templates existentes del spec 29 para el formulario nuevo.
+- Al seleccionar entrada existente, convertirla a `SceneMonster` y llamar `onAdd`.
+- Al guardar entrada nueva, invocar preload para persistirla y luego agregarla a escena.
+- Mostrar estado de carga, errores y lista vacia.
+- Las cards de la grilla muestran la imagen del monstruo (100% del ancho de la card, aspect-ratio 16:9, `object-fit: cover`) con un placeholder cuando no hay imagen. Debajo: nombre, sistema y boton `Agregar a escena`. Las URLs de imagen se resuelven en paralelo via `resolveAsideUrl` al cargar las entries.
+- Los onChange del formulario de nuevo monstruo leen `event.currentTarget.value` fuera del updater funcional para evitar el error de `currentTarget null` en React 18 StrictMode.
+
+### `render`
+
+- Sin cambios esperados.
+
+## 6. Plan de trabajo
+
+1. Agregar dependencia SQLite elegida y confirmar que `pnpm build`/empaquetado siguen funcionando.
+2. Crear dominio de biblioteca y tests de conversion/validacion.
+3. Crear interfaces de repositorio y casos de uso.
+4. Implementar repositorio SQLite con migracion inicial.
+5. Registrar IPC en `main` y API en `preload`.
+6. Implementar modal de biblioteca con buscador y cards/listado.
+7. Conectar `+ Agregar monstruo` al modal de biblioteca.
+8. Implementar seleccion de entrada existente -> instancia `SceneMonster`.
+9. Implementar crear nuevo -> guardar en SQLite -> agregar a escena.
+10. Verificar portabilidad de `.ttrpgscene` y que la escena no dependa de la DB.
+11. Ejecutar tests, typecheck, lint focalizado y build.
+
+## 7. Testing y verificacion
+
+- **Unit tests:** validacion de `MonsterLibraryEntry`, preview Markdown, conversion a `SceneMonster` con id unico.
+- **Integration tests:** repositorio SQLite con DB temporal, migracion inicial, save/get/search.
+- **Typecheck:** `pnpm typecheck`
+- **Lint:** `pnpm lint` o ESLint focalizado si el lint completo sigue fallando por archivos preexistentes.
+- **Build:** `pnpm build`
+- **Manual / smoke:** En `pnpm dev`, crear monstruo nuevo desde biblioteca, confirmar que aparece en DB/listado, agregar existente a escena, guardar/cargar escena y confirmar que el monstruo queda portable.
+
+## 8. Riesgos y mitigaciones
+
+- **Riesgo:** ~~Dependencia nativa SQLite complica build o DMG.~~
+  **Resuelto:** Se migro a `node:sqlite` (built-in), eliminando dependencias nativas por completo. El flag `--experimental-sqlite` se inyecta en `package.json` scripts y en `LSEnvironment` para la app empaquetada.
+- **Riesgo:** La escena queda acoplada a ids de biblioteca local.
+  **Mitigacion:** Guardar copia completa del monstruo en `SceneMonster`; usar la DB solo como fuente para crear instancias.
+- **Riesgo:** Busqueda lenta con muchas entradas.
+  **Mitigacion:** Indices por `name` y `system`; limitar resultados; dejar FTS para spec futuro.
+- **Riesgo:** SQL injection.
+  **Mitigacion:** Todas las queries parametrizadas, sin concatenar input.
+- **Riesgo:** Duplicados confusos.
+  **Mitigacion:** Permitir duplicados inicialmente, pero mostrar sistema/template y fecha; un spec futuro puede agregar deduplicacion o update.
+
+## 9. Criterios de aceptacion
+
+- [x] `+ Agregar monstruo` abre modal de biblioteca.
+- [x] El modal muestra buscador y grilla/listado de monstruos.
+- [x] Se puede buscar por nombre.
+- [x] Se puede agregar un monstruo existente a la escena.
+- [x] Se puede crear un monstruo nuevo desde el modal.
+- [x] Crear nuevo guarda en SQLite y agrega inmediatamente a escena.
+- [x] Al reabrir el modal, el monstruo nuevo aparece en la biblioteca.
+- [x] La instancia de escena conserva nombre, Markdown, template e imagen opcional.
+- [x] Guardar/cargar `.ttrpgscene` preserva el monstruo aunque la DB no se consulte.
+- [x] SQLite se usa solo desde `main`/infraestructura (via `node:sqlite` built-in).
+- [x] Hay migracion inicial versionada.
+- [x] Tests y validaciones pasan.
+- [x] Las cards de la grilla muestran imagen a ancho completo (16:9) con placeholder si no hay imagen.
+
+## 10. Documentacion afectada
+
+- `./specs/16-entities/spec.md`
+- `./specs/16-entities/plan.md`
+- Specs relacionados con aside DM y templates de monstruos si la implementacion cambia flujos existentes.
+
+## 11. Checklist de cierre
+
+- [x] Implementacion completada dentro del alcance.
+- [x] Tests relevantes agregados o actualizados.
+- [x] `pnpm typecheck` ejecutado.
+- [x] ESLint focalizado ejecutado.
+- [x] `pnpm build` ejecutado si aplica.
+- [x] Smoke/manual test realizado.
+- [x] Documentacion actualizada si cambio una decision.
+- [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
+- [x] `node:sqlite` (built-in) usado como alternativa sin dependencias nativas a `better-sqlite3`.
+
+---
+
+## Fuente: 18-entity-scene-panel/plan.md
+
 # Plan consolidado - Entity Scene Panel
 
 <!-- Archivo consolidado mecanicamente desde:
@@ -13,7 +225,7 @@
 
 ## 1. Resumen
 
-- **Spec fuente:** `./specs/18-entity-scene-panel/spec.md`
+- **Spec fuente:** `./specs/16-entities/spec.md`
 - **Objetivo:** Agregar un panel lateral izquierdo a la ventana del DM para gestionar Monstruos, NPCs y Notas de escena. El panel persiste en `.ttrpgscene`, sincroniza a la ventana de jugador el subconjunto visible (imágenes de monstruos, nombre/imagen de NPCs), y ofrece un editor WYSIWYG con renderización Markdown directa para las notas.
 - **Estado:** Implementado
 - **Prioridad:** Media
@@ -355,7 +567,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 
 ## 10. Documentación afectada
 
-- `specs/18-entity-scene-panel/spec.md` — actualizar estado a "En progreso" / "Implementada" al completar.
+- `specs/16-entities/spec.md` — actualizar estado a "En progreso" / "Implementada" al completar.
 - `src/domain/sessions/scene-document.ts` — el tipo `SceneDocumentV1` documenta el nuevo campo opcional.
 - No se requiere actualizar otras specs, ya que el IPC de jugador y el protocolo `map-asset:` no se modifican.
 
@@ -396,7 +608,7 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 
 ## 1. Resumen
 
-- **Spec fuente:** `./specs/18-entity-scene-panel/spec.md`
+- **Spec fuente:** `./specs/16-entities/spec.md`
 - **Objetivo:** Agregar labels de texto privados del DM, editables desde el aside derecho, persistidos en escena y excluidos del render de jugador.
 - **Estado:** Implementado
 - **Prioridad:** Media
@@ -534,8 +746,8 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 
 ## 10. Documentacion afectada
 
-- `./specs/18-entity-scene-panel/spec.md`
-- `./specs/18-entity-scene-panel/plan.md`
+- `./specs/16-entities/spec.md`
+- `./specs/16-entities/plan.md`
 - Specs de ventana de jugador o propiedades seleccionadas solo si la implementacion cambia decisiones globales.
 
 ## 11. Checklist de cierre
@@ -544,6 +756,192 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - [x] Tests relevantes agregados o actualizados.
 - [x] `pnpm typecheck` ejecutado.
 - [x] `pnpm lint` ejecutado.
+- [x] `pnpm build` ejecutado si aplica.
+- [ ] Smoke/manual test realizado si aplica.
+- [x] Documentacion actualizada si cambio una decision.
+- [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
+- [x] Sin dependencias nuevas no justificadas.
+
+---
+
+## Fuente: 19-entity-templates-and-rendering/plan.md
+
+# Plan de implementacion tecnica - 29 - Sistema de Templates de Monstruos
+
+## 1. Resumen
+
+- **Spec fuente:** `./specs/16-entities/spec.md`
+- **Objetivo:** Agregar templates persistentes de Markdown/CSS para notas de monstruos, con administrador desde menu de aplicacion, selector en el modal de monstruo y template semilla D&D 5.5e.
+- **Estado:** Implementado
+- **Prioridad:** Media
+- **Dependencias:** Spec 26 para aside DM, Spec 27 para menu de aplicacion, fix de Markdown GFM para tablas, modelo actual de `SceneMonster`.
+
+## 2. Alcance
+
+### Incluido
+
+- Modelo `MonsterTemplate`.
+- Store local versionado para templates.
+- IPC y preload tipados para listar/guardar/eliminar templates.
+- Menu de aplicacion `Administrar templates de monstruos`.
+- Modal administrador con listado, edicion, preview y guardado.
+- Template built-in D&D 5.5e en espanol con estilo claro blanco/gris y acentos rojos.
+- Selector de template en crear/editar monstruo.
+- Persistencia de `templateId` en monstruos.
+- Render del detalle de monstruo con CSS scoped del template.
+
+### Fuera de alcance
+
+- Marketplace o importacion remota.
+- Plantillas para NPCs/notas generales.
+- Editor visual por campos.
+- Sanitizacion avanzada de HTML/CSS mas alla del scoping definido.
+- Migracion compleja de templates existentes, porque no existen en versiones previas.
+
+## 3. Decisiones tecnicas
+
+- **Arquitectura:** Los templates son configuracion local de la app, no parte del dominio tactico del mapa, pero sus tipos viven en dominio/shared para compartir entre main, preload y renderer.
+- **Persistencia:** Archivo JSON versionado en `app.getPath("userData")`, por ejemplo `monster-templates.json`. Los built-ins se mezclan al listar y no se duplican hasta que el usuario los edite.
+- **IPC / Electron:** Nuevos canales especificos:
+  - `monster-template:list`
+  - `monster-template:save`
+  - `monster-template:delete`
+  - `monster-template:open-manager`
+- **Render / PixiJS:** No aplica. El render es React/Markdown dentro de modales de aside.
+- **Validacion:** Validar id, name, system, markdown y css como strings limitados. Rechazar payloads no serializables.
+- **Dependencias nuevas:** Ninguna en primera implementacion. Usar textareas simples y el render Markdown existente.
+
+## 4. Diseno de dominio
+
+- **Entidades / tipos:** `MonsterTemplate`, `MonsterTemplateStore`, `SceneMonster.templateId`.
+- **Reglas puras:**
+  - normalizar templates guardados;
+  - mezclar built-ins con templates del usuario;
+  - generar CSS scoped por template;
+  - fallback seguro si falta un template.
+- **Coordenadas / unidades:** No aplica.
+- **Errores de dominio:** Template invalido, template duplicado, template built-in protegido contra delete directo.
+
+## 5. Cambios por capa
+
+### `domain`
+
+- Crear `src/domain/monster-templates/monster-template.ts`.
+- Definir `MonsterTemplate`, defaults y built-in D&D 5.5e.
+- Agregar `templateId?: string | null` a `SceneMonster`.
+- Agregar helpers para normalizar templates y generar ids si aplica.
+
+### `application`
+
+- Crear interfaz `MonsterTemplateRepository`.
+- Crear casos de uso:
+  - listar templates;
+  - guardar template;
+  - eliminar template.
+- Asegurar mezcla de built-ins y templates del usuario.
+
+### `infrastructure`
+
+- Implementar repositorio filesystem Electron para templates.
+- Leer/escribir JSON versionado en `userData`.
+- Manejar archivo ausente como lista vacia.
+- Proteger contra JSON corrupto con error recuperable y fallback a built-ins.
+
+### `main`
+
+- Registrar IPC de templates.
+- Extender menu de aplicacion con `Administrar templates de monstruos`.
+- Enviar evento al renderer principal para abrir el modal manager.
+- Validar payloads antes de guardar.
+
+### `preload`
+
+- Exponer funciones:
+  - `listMonsterTemplates()`
+  - `saveMonsterTemplate(template)`
+  - `deleteMonsterTemplate(id)`
+  - `onOpenMonsterTemplateManager(callback)`
+- No exponer canales IPC genericos.
+
+### `renderer`
+
+- Agregar estado/listado de templates en `App`.
+- Agregar modal `MonsterTemplateManagerModal`.
+- Agregar selector de template en `MonsterModal`.
+- Usar textarea Markdown plano para notas de monstruos, preservando tablas GFM y placeholders del template.
+- Mantener las notas sin HTML estructural visible; el render del template envuelve el Markdown con el HTML/clases requeridas por el card.
+- Si notas vacias, insertar Markdown del template.
+- Si notas con contenido, pedir confirmacion antes de reemplazar.
+- Guardar `templateId` junto al monstruo.
+- En `MonsterDetailModal`, resolver template por id y aplicar CSS scoped al contenedor del Markdown.
+- Mantener `Sin template` como opcion default.
+
+### `render`
+
+- Sin cambios esperados.
+
+## 6. Plan de trabajo
+
+1. Crear tipos de dominio, built-in D&D 5.5e y normalizadores.
+2. Extender `SceneMonster` con `templateId` compatible hacia atras.
+3. Implementar repositorio filesystem y casos de uso de templates.
+4. Registrar IPC y preload API de templates.
+5. Agregar item de menu para abrir el manager desde la app.
+6. Implementar modal administrador con lista, edicion, preview y guardar.
+7. Integrar selector de template en `MonsterModal`.
+8. Aplicar render Markdown + CSS scoped en `MonsterDetailModal`.
+9. Verificar guardado/carga de escenas con `templateId`.
+10. Ejecutar validaciones y actualizar checklist.
+
+## 7. Testing y verificacion
+
+- **Unit tests:** normalizacion de templates, mezcla built-in/user, CSS scoping.
+- **Integration tests:** repositorio filesystem con archivo ausente, archivo valido y JSON corrupto si el proyecto tiene harness.
+- **Typecheck:** `pnpm typecheck`
+- **Lint:** `pnpm lint`
+- **Build:** `pnpm build`
+- **Manual / smoke:** abrir manager desde menu, editar template, previsualizar, guardar, crear monstruo con template, ver detalle con tabla y estilos, guardar/cargar escena y confirmar `templateId`.
+
+## 8. Riesgos y mitigaciones
+
+- **Riesgo:** CSS del template afecta otras partes de la app.
+  **Mitigacion:** Envolver preview/detalle en contenedor con scope unico y prefijar reglas o inyectarlas dentro de un scope controlado.
+- **Riesgo:** El usuario pierde notas al cambiar template.
+  **Mitigacion:** Confirmacion obligatoria si las notas no estan vacias.
+- **Riesgo:** Built-ins editables generan confusion entre base y copia del usuario.
+  **Mitigacion:** Si se edita un built-in, guardar override local manteniendo el mismo id o crear copia claramente nombrada, segun implementacion elegida.
+- **Riesgo:** Archivo de templates corrupto rompe el menu.
+  **Mitigacion:** Fallback a built-ins y error serializable.
+- **Riesgo:** CSS/HTML inseguro.
+  **Mitigacion:** No permitir acceso a Electron/Node desde renderer, scoping de CSS y mantener el Markdown dentro del contenedor.
+
+## 9. Criterios de aceptacion
+
+- [x] El menu de aplicacion abre el administrador de templates.
+- [x] El administrador lista el template D&D 5.5e por defecto con card claro y tabla de caracteristicas compacta.
+- [x] Se puede editar Markdown y CSS de un template.
+- [x] Se puede previsualizar el template.
+- [x] Se puede guardar un template y verlo tras reiniciar la app.
+- [x] El modal de monstruo permite elegir `Sin template` o un template.
+- [x] El template rellena notas vacias sin romper tablas GFM.
+- [x] Cambiar template con notas existentes pide confirmacion.
+- [x] El detalle del monstruo usa Markdown GFM y CSS scoped.
+- [x] `templateId` se persiste en `.ttrpgscene`.
+- [x] Templates faltantes no rompen la visualizacion.
+- [x] Validaciones pasan.
+
+## 10. Documentacion afectada
+
+- `./specs/16-entities/spec.md`
+- `./specs/16-entities/plan.md`
+- Si se implementa, actualizar specs relacionadas con aside DM y menu de aplicacion si cambia una decision global.
+
+## 11. Checklist de cierre
+
+- [x] Implementacion completada dentro del alcance.
+- [x] Tests relevantes agregados o actualizados.
+- [x] `pnpm typecheck` ejecutado.
+- [x] ESLint focalizado sobre archivos modificados ejecutado. `pnpm lint` completo sigue fallando por `index.js` raiz preexistente.
 - [x] `pnpm build` ejecutado si aplica.
 - [ ] Smoke/manual test realizado si aplica.
 - [x] Documentacion actualizada si cambio una decision.

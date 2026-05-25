@@ -2,7 +2,7 @@
 
 ## 1. Resumen
 
-- **Spec fuente:** `./specs/20-arcane-pointer/spec.md`
+- **Spec fuente:** `./specs/17-arcane-pointer/spec.md`
 - **Objetivo:** Implementar un modo temporal de apuntador que renderiza un circulo arcano pixel-art con fade in/out sobre una celda, configurable por tamano de criatura desde el aside derecho.
 - **Estado:** Implementado
 - **Prioridad:** Media
@@ -155,7 +155,7 @@
 
 ## 10. Documentacion afectada
 
-- `./specs/20-arcane-pointer/spec.md`
+- `./specs/17-arcane-pointer/spec.md`
 - Este plan.
 - Si durante implementacion cambia la ubicacion del asset o el comportamiento del modo, actualizar ambos.
 
