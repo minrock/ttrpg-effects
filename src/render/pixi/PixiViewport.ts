@@ -4103,11 +4103,11 @@ function drawSceneLight(light: SceneLight): Graphics {
   if (light.kind === "point") {
     return graphic
       .circle(light.position.x, light.position.y, light.radius)
-      .fill({ color, alpha: light.opacity * 0.06 * light.intensity })
+      .fill({ color, alpha: light.opacity * 0.14 * light.intensity })
       .circle(light.position.x, light.position.y, light.radius * 0.52)
-      .fill({ color, alpha: light.opacity * 0.08 * light.intensity })
+      .fill({ color, alpha: light.opacity * 0.22 * light.intensity })
       .circle(light.position.x, light.position.y, Math.max(12, light.radius * 0.14))
-      .fill({ color, alpha: light.opacity * 0.18 * light.intensity });
+      .fill({ color, alpha: light.opacity * 0.42 * light.intensity });
   }
 
   return drawConeShape(
@@ -4118,10 +4118,10 @@ function drawSceneLight(light: SceneLight): Graphics {
     getLightRenderAngle(light),
     light.direction
   )
-    .fill({ color, alpha: light.opacity * 0.06 * light.intensity })
-    .stroke({ color, width: 3, alpha: light.opacity * 0.55 * light.intensity })
+    .fill({ color, alpha: light.opacity * 0.16 * light.intensity })
+    .stroke({ color, width: 3, alpha: light.opacity * 0.75 * light.intensity })
     .circle(light.position.x, light.position.y, Math.max(10, light.radius * 0.08))
-    .fill({ color, alpha: light.opacity * 0.18 * light.intensity });
+    .fill({ color, alpha: light.opacity * 0.42 * light.intensity });
 }
 
 function worldToScreen(

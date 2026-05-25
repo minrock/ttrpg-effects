@@ -200,6 +200,8 @@ export function App(): JSX.Element {
     normalizeCameraSnapshot({ center: { x: scene.camera.x, y: scene.camera.y }, zoom: scene.camera.zoom })
   );
   const [playerCameraSyncKey, setPlayerCameraSyncKey] = useState(0);
+  const playerCameraSyncKeyRef = useRef(playerCameraSyncKey);
+  playerCameraSyncKeyRef.current = playerCameraSyncKey;
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
   const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
@@ -224,6 +226,23 @@ export function App(): JSX.Element {
   const nextTokenId = useRef(1);
   const nextLabelId = useRef(1);
   const nextRevealId = useRef(1);
+  const syncSceneEntityCounters = useCallback((targetScene: SceneDocument): void => {
+    nextShapeId.current = getNextNumericIdForPrefixes(
+      targetScene.shapes.map((shape) => shape.id),
+      ["measurement-", "circle-", "cone-", "rectangle-", "path-"]
+    );
+    nextLightId.current = getNextNumericIdForPrefixes(
+      targetScene.lights.map((light) => light.id),
+      ["point-light-", "cone-light-"]
+    );
+    nextEffectId.current = getNextNumericIdForPrefixes(
+      targetScene.effects.map((effect) => effect.id),
+      ["fire-", "magical-darkness-", "water-"]
+    );
+    nextTokenId.current = getNextNumericId(targetScene.tokens.map((token) => token.id), "token-");
+    nextLabelId.current = getNextNumericId(targetScene.labels.map((label) => label.id), "label-");
+    nextRevealId.current = getNextNumericId(targetScene.fogOfWar.revealedAreas.map((area) => area.id), "reveal-");
+  }, []);
   const viewportHandleRef = useRef<MapViewportHandle | null>(null);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
   isSpaceDragActiveRef.current = isSpaceDragActive;
@@ -234,6 +253,10 @@ export function App(): JSX.Element {
   const selectedElementIdRef = useRef(interaction.selectedElementId);
   selectedElementIdRef.current = interaction.selectedElementId;
   sceneRef.current = scene;
+
+  useEffect(() => {
+    syncSceneEntityCounters(sceneRef.current);
+  }, [syncSceneEntityCounters]);
 
   // Phase 1: Reconstruct the runtime map URL on mount if the scene has a map but no URL yet.
   // This covers renderer remounts where scene was restored from sessionStorage but mapImageUrl was lost.
@@ -357,8 +380,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `${kind}-${nextShapeId.current}`;
-    nextShapeId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, [`${kind}-`], nextShapeId);
     const shape = createTacticalShape({
       id,
       kind,
@@ -379,8 +401,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `${kind}-light-${nextLightId.current}`;
-    nextLightId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, [`${kind}-light-`], nextLightId);
     const light = createLightSource(id, kind, interaction.contextMenu.world);
 
     setScene((current) => ({
@@ -395,8 +416,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `fire-${nextEffectId.current}`;
-    nextEffectId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, ["fire-"], nextEffectId);
     const effect = createAnimatedFireEffect(id, interaction.contextMenu.world);
 
     setScene((current) => ({
@@ -411,8 +431,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `magical-darkness-${nextEffectId.current}`;
-    nextEffectId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, ["magical-darkness-"], nextEffectId);
     const effect = createMagicalDarknessEffect(id, interaction.contextMenu.world);
 
     setScene((current) => ({
@@ -427,8 +446,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `label-${nextLabelId.current}`;
-    nextLabelId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, ["label-"], nextLabelId);
     const label = createSceneLabel(id, interaction.contextMenu.world);
 
     setScene((current) => ({
@@ -645,8 +663,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `path-${nextShapeId.current}`;
-    nextShapeId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, ["path-"], nextShapeId);
     const path = createPathShape({ id, points: draft.points });
 
     setScene((sceneCurrent) => ({
@@ -687,8 +704,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `water-${nextEffectId.current}`;
-    nextEffectId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, ["water-"], nextEffectId);
 
     try {
       const effect = createWaterEffect({
@@ -961,6 +977,39 @@ export function App(): JSX.Element {
     });
   }
 
+  function publishLoadedPlayerScene({
+    scene: loadedScene,
+    sceneAside: loadedSceneAside,
+    mapImageUrl: loadedMapImageUrl,
+    tokenImageUrls: loadedTokenImageUrls,
+    camera,
+    cameraSyncKey
+  }: {
+    readonly scene: SceneDocument;
+    readonly sceneAside: SceneAside;
+    readonly mapImageUrl: string | null;
+    readonly tokenImageUrls: Readonly<Record<string, string>>;
+    readonly camera: ViewportCameraSnapshot;
+    readonly cameraSyncKey: number;
+  }): void {
+    if (!isPlayerWindowOpenRef.current || window.ttrpg === undefined) {
+      return;
+    }
+
+    void window.ttrpg.publishPlayerScene({
+      scene: {
+        ...loadedScene,
+        sceneAside: loadedSceneAside,
+        labels: []
+      },
+      mapImageUrl: loadedMapImageUrl,
+      tokenImageUrls: loadedTokenImageUrls,
+      camera,
+      cameraSyncKey,
+      showDmFogOverlay
+    });
+  }
+
   async function runSceneOperation(
     actionLabel: "guardada" | "cargada",
     operation: () => Promise<SceneOperationResult>
@@ -979,19 +1028,30 @@ export function App(): JSX.Element {
       }
 
       setScene(result.scene);
-      setSceneAside(result.scene.sceneAside ?? createDefaultSceneAside());
+      const loadedSceneAside = result.scene.sceneAside ?? createDefaultSceneAside();
+      setSceneAside(loadedSceneAside);
       if (actionLabel === "cargada") {
-        playerCameraRef.current = normalizeCameraSnapshot({
+        const loadedCamera = normalizeCameraSnapshot({
           center: { x: result.scene.camera.x, y: result.scene.camera.y },
           zoom: result.scene.camera.zoom
         });
-        setPlayerCameraSyncKey((current) => current + 1);
+        const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
+        playerCameraRef.current = loadedCamera;
+        playerCameraSyncKeyRef.current = nextCameraSyncKey;
+        setPlayerCameraSyncKey(nextCameraSyncKey);
         setMapImageUrl(result.mapImageUrl ?? null);
         setTokenImageUrls(result.tokenImageUrls ?? {});
         setInteraction((current) => setZoomLocked(current, result.scene.grid.locked));
         setArcanePointerResetKey((current) => current + 1);
-        nextTokenId.current = getNextNumericId(result.scene.tokens.map((token) => token.id), "token-");
-        nextLabelId.current = getNextNumericId(result.scene.labels.map((label) => label.id), "label-");
+        syncSceneEntityCounters(result.scene);
+        publishLoadedPlayerScene({
+          scene: result.scene,
+          sceneAside: loadedSceneAside,
+          mapImageUrl: result.mapImageUrl ?? null,
+          tokenImageUrls: result.tokenImageUrls ?? {},
+          camera: loadedCamera,
+          cameraSyncKey: nextCameraSyncKey
+        });
       }
       setCurrentFilePath(result.filePath);
       setFeedback(`Escena ${actionLabel}`);
@@ -1326,11 +1386,10 @@ export function App(): JSX.Element {
       }
 
       const revealArea = createStrokeRevealArea({
-        id: `reveal-${nextRevealId.current}`,
+        id: getNextAvailableSceneId(current, ["reveal-"], nextRevealId),
         points,
         radius: current.fogOfWar.revealRadius
       });
-      nextRevealId.current += 1;
 
       return {
         ...current,
@@ -1371,8 +1430,7 @@ export function App(): JSX.Element {
         };
       }
 
-      const id = `fire-${nextEffectId.current}`;
-      nextEffectId.current += 1;
+      const id = getNextAvailableSceneId(current, ["fire-"], nextEffectId);
       const radius =
         activeFire?.zone.kind === "circle" || activeFire?.zone.kind === "cells"
           ? activeFire.zone.radius
@@ -1535,8 +1593,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    const id = `token-${nextTokenId.current}`;
-    nextTokenId.current += 1;
+    const id = getNextAvailableSceneId(sceneRef.current, ["token-"], nextTokenId);
     const tokenName = name.trim() || getFileBaseName(imagePath);
 
     setScene((current) => {
@@ -3202,6 +3259,62 @@ function getNextNumericId(ids: readonly string[], prefix: string): number {
   }
 
   return Math.max(...values) + 1;
+}
+
+function getNextNumericIdForPrefixes(ids: readonly string[], prefixes: readonly string[]): number {
+  const values = ids.flatMap((id) => {
+    const prefix = prefixes.find((candidate) => id.startsWith(candidate));
+
+    if (prefix === undefined) {
+      return [];
+    }
+
+    const value = Number.parseInt(id.slice(prefix.length), 10);
+    return Number.isFinite(value) ? [value] : [];
+  });
+
+  if (values.length === 0) {
+    return 1;
+  }
+
+  return Math.max(...values) + 1;
+}
+
+function getNextAvailableSceneId(
+  scene: SceneDocument,
+  prefixes: readonly string[],
+  nextId: { current: number }
+): string {
+  const usedIds = new Set(getSceneObjectIds(scene));
+
+  for (const prefix of prefixes) {
+    nextId.current = Math.max(nextId.current, getNextNumericId([...usedIds], prefix));
+  }
+
+  while (true) {
+    for (const prefix of prefixes) {
+      const candidate = `${prefix}${nextId.current}`;
+
+      if (!usedIds.has(candidate)) {
+        nextId.current += 1;
+        return candidate;
+      }
+    }
+
+    nextId.current += 1;
+  }
+}
+
+function getSceneObjectIds(scene: SceneDocument): readonly string[] {
+  return [
+    ...scene.shapes.map((shape) => shape.id),
+    ...scene.lights.map((light) => light.id),
+    ...scene.effects.map((effect) => effect.id),
+    ...scene.tokens.map((token) => token.id),
+    ...scene.labels.map((label) => label.id),
+    ...scene.fogOfWar.revealedAreas.map((area) => area.id),
+    ...scene.fogOfWar.obstacles.map((obstacle) => obstacle.id)
+  ];
 }
 
 function sameTokenName(left: string, right: string): boolean {
