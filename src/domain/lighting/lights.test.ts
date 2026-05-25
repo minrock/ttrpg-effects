@@ -13,6 +13,8 @@ describe("lights", () => {
       id: "light-1",
       kind: "point",
       radius: 90,
+      intensity: 1,
+      opacity: 0.85,
       angle: 360,
       visible: true
     });
@@ -21,6 +23,8 @@ describe("lights", () => {
       id: "light-2",
       kind: "cone",
       radius: 140,
+      intensity: 1,
+      opacity: 0.85,
       angle: 60,
       visible: true
     });
