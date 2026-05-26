@@ -234,6 +234,197 @@ Los payloads deben validarse en `main` antes de tocar la DB.
 - Hay migracion inicial versionada.
 - Tests relevantes cubren conversion de biblioteca a `SceneMonster` y validaciones basicas.
 
+## Biblioteca Persistente de NPCs
+
+### Objetivo
+
+Extender el sistema de entidades para que los NPCs tambien vivan en la base de datos local y puedan reutilizarse entre escenas. El flujo debe ser equivalente al de monstruos: el DM abre una biblioteca, selecciona un NPC existente o crea uno nuevo, y el NPC queda insertado en la escena actual.
+
+### Alcance
+
+- Crear una biblioteca local persistente de NPCs respaldada por SQLite.
+- Al hacer `+ Agregar NPC`, abrir un modal tipo grilla/listado con buscador.
+- Mostrar todos los NPCs guardados en DB con una card compacta.
+- Permitir seleccionar un NPC existente y agregarlo a la escena.
+- Incluir accion `Nuevo NPC` dentro del modal.
+- Al guardar un nuevo NPC:
+  - persistirlo primero en la DB;
+  - agregarlo automaticamente a la escena actual;
+  - dejarlo disponible para futuras escenas.
+- Mantener la escena portable: la instancia de escena guarda una copia de los datos del NPC, no solo una referencia a DB.
+
+### Modelo de datos
+
+La entrada persistente de biblioteca debe compartir el patron de monstruos, pero modelada como NPC:
+
+```ts
+type NpcLibraryEntry = {
+  id: string;
+  name: string;
+  imagePath: string | null;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+La instancia de escena debe mantenerse independiente de la DB:
+
+```ts
+type SceneNpc = {
+  id: string;
+  name: string;
+  imagePath: string | null;
+  visibleToPlayer: boolean;
+  notes: string;
+};
+```
+
+### UI / UX
+
+- `+ Agregar NPC` abre la biblioteca de NPCs.
+- El modal usa una experiencia visual equivalente a la biblioteca de monstruos:
+  - buscador visible;
+  - grilla/listado;
+  - card con imagen o placeholder;
+  - nombre;
+  - accion `Agregar a escena`;
+  - accion principal `Nuevo NPC`.
+- El formulario de nuevo NPC debe reutilizar el estilo actual del aside DM y mantener el flujo de imagen existente mediante preload/IPC.
+
+### Criterios de aceptacion
+
+- `+ Agregar NPC` abre un modal de biblioteca, no un formulario directo.
+- El modal lista NPCs persistidos en DB y permite buscarlos.
+- El usuario puede agregar un NPC existente a la escena.
+- El usuario puede crear un NPC nuevo desde el modal.
+- Al guardar un NPC nuevo, se persiste en DB y se agrega inmediatamente a la escena.
+- Guardar/cargar `.ttrpgscene` mantiene los NPCs de escena aunque la DB local no exista.
+- El renderer no accede directamente a SQLite ni filesystem.
+- La carga de imagen de NPC usa el protocolo/API de preload existente.
+
+## Personajes Jugadores
+
+### Objetivo
+
+Agregar Personajes Jugadores como un nuevo tipo de entidad de campaña/escena para que el DM tenga a mano la informacion visual y tactica clave de cada jugador. Estos personajes deben persistirse en la DB local, poder agregarse a escenas y mostrarse en el panel del DM con una vista de detalle compacta inspirada en una ficha/carta fisica.
+
+### Alcance
+
+- Crear una biblioteca persistente de Personajes Jugadores respaldada por SQLite.
+- Agregar una nueva seccion de entidades para Personajes Jugadores en el panel del DM.
+- Permitir crear, listar, buscar y agregar Personajes Jugadores a la escena.
+- Cada Personaje Jugador tiene una imagen del personaje/jugador.
+- La informacion guardada debe ser suficiente para que el DM pueda consultar rapidamente estadisticas clave sin abrir una hoja completa.
+- La escena guarda una copia portable de cada Personaje Jugador agregado.
+- Antes de agregar un Personaje Jugador a la escena, el listado de biblioteca permite abrir un preview, editarlo y guardar los cambios en la DB.
+
+### Campos de captura
+
+En los formularios de captura/edicion se muestran nombres completos para las caracteristicas:
+
+- Nombre del Personaje.
+- Nivel.
+- Especie.
+- Clase(s).
+- Fuerza.
+- Constitucion.
+- Destreza.
+- Inteligencia.
+- Sabiduria.
+- Carisma.
+- Las caracteristicas se capturan como texto libre para permitir modificadores o valores flexibles como `+2`, `+4`, `-1` o `10`.
+- Iniciativa.
+- CA, como numero o dos numeros separados por slash (`d` o `d/d`).
+- Percepcion Pasiva.
+- Puntos de golpe.
+- CD Salvacion de hechizos.
+- Velocidad(es).
+- Nombre del Jugador.
+- Imagen del personaje/jugador.
+- Notas en Markdown, con captura equivalente a monstruos/NPCs y renderizado Markdown en la vista de detalle.
+
+### Vista de detalle para el DM
+
+En la vista de detalle, los campos se compactan para lectura rapida:
+
+- Caracteristicas abreviadas:
+  - `Fue`
+  - `Con`
+  - `Des`
+  - `Int`
+  - `Sab`
+  - `Car`
+- `CD Salvacion de hechizos` se muestra como `CD`.
+- `CA`, `PG`, `Iniciativa`, `Percepcion Pasiva`, `Velocidad(es)`, `Nivel`, `Especie`, `Clase(s)` y `Nombre del Jugador` deben mostrarse como bloques escaneables.
+- Las notas del personaje se renderizan como Markdown en el detalle, incluyendo tablas cuando el contenido use sintaxis GFM.
+
+La UI debe inspirarse en las referencias visuales provistas:
+
+- Estilo de ficha/carta fisica con bordes ornamentales discretos.
+- Imagen grande del personaje como foco visual.
+- Nombre en una banda o marco destacado.
+- Bloques de datos con labels compactos y jerarquia clara.
+- La card de preview/detalle debe ocupar aproximadamente la mitad del viewport disponible y quedar centrada en el modal.
+- El preview de biblioteca incluye una accion `Editar` para modificar el personaje antes de agregarlo a escena.
+- Apariencia legible en tema oscuro de la app, sin copiar literalmente el material fotografiado.
+
+### Modelo de datos
+
+```ts
+type PlayerCharacterLibraryEntry = {
+  id: string;
+  characterName: string;
+  playerName: string;
+  level: string;
+  species: string;
+  classes: string;
+  imagePath: string | null;
+  stats: {
+    strength: string;
+    constitution: string;
+    dexterity: string;
+    intelligence: string;
+    wisdom: string;
+    charisma: string;
+  };
+  initiative: string;
+  armorClass: string;
+  passivePerception: string;
+  hitPoints: string;
+  spellSaveDc: string;
+  speeds: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+La instancia de escena debe copiar estos datos y tener id unico dentro de la escena.
+
+### Validacion
+
+- `characterName` requerido.
+- `armorClass` acepta un numero o formato `numero/numero`.
+- Las caracteristicas aceptan texto libre para soportar modificadores, numeros o valores vacios.
+- Campos tacticos como iniciativa, velocidad y PG se guardan como string para permitir notacion flexible.
+- La imagen es opcional, pero si existe se carga mediante el protocolo/API de preload existente.
+
+### Criterios de aceptacion
+
+- Existe una seccion de Personajes Jugadores en el panel de entidades del DM.
+- El DM puede abrir una biblioteca/listado de Personajes Jugadores con buscador.
+- El DM puede previsualizar y editar un Personaje Jugador existente antes de agregarlo a la escena.
+- El DM puede agregar un Personaje Jugador existente a la escena desde el preview o desde la card de biblioteca.
+- El DM puede crear un Personaje Jugador nuevo, guardarlo en DB y agregarlo automaticamente a la escena.
+- La vista de detalle usa labels abreviados para caracteristicas y `CD`.
+- El preview de biblioteca ocupa aproximadamente la mitad del viewport y permite editar el personaje antes de agregarlo.
+- El formulario usa nombres completos para captura.
+- La imagen se muestra en el detalle como foco visual.
+- Las notas del personaje se pueden escribir como Markdown y se renderizan en el detalle igual que monstruos/NPCs.
+- Guardar/cargar `.ttrpgscene` preserva Personajes Jugadores de escena.
+- La DB vive en `main`/infraestructura y el renderer consume solo preload/IPC tipado.
+
 ## Panel lateral izquierdo del DM: Monstruos, NPCs y Notas
 
 ### Estado

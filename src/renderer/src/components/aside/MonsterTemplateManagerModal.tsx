@@ -6,6 +6,7 @@ import {
   scopeMonsterTemplateCss
 } from "../../../../domain/monster-templates/monster-template";
 import { ensureUniqueSlug, slugify } from "../../../../domain/sessions/scene-aside";
+import { FeedbackAlert, type Feedback } from "./FeedbackAlert";
 import { ModalBackdrop } from "./ModalBackdrop";
 import { renderMarkdown } from "./markdown";
 
@@ -26,7 +27,7 @@ export function MonsterTemplateManagerModal({
   const selectedTemplate = templates.find((template) => template.id === selectedId) ?? templates[0] ?? null;
   const [draft, setDraft] = useState<MonsterTemplate | null>(selectedTemplate);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
 
   const html = useMemo(() => renderMarkdown(draft?.markdown ?? ""), [draft?.markdown]);
   const scopeClass = draft !== null ? `monster-template-manager-${toCssSafeId(draft.id)}` : "";
@@ -39,7 +40,7 @@ export function MonsterTemplateManagerModal({
   function selectTemplate(template: MonsterTemplate): void {
     setSelectedId(template.id);
     setDraft(template);
-    setFeedback("");
+    setFeedback(null);
   }
 
   function createTemplate(): void {
@@ -51,7 +52,7 @@ export function MonsterTemplateManagerModal({
     setSelectedId(template.id);
     setDraft(template);
     setIsPreviewMode(false);
-    setFeedback("Nuevo template sin guardar.");
+    setFeedback({ message: "Nuevo template sin guardar.", kind: "info" });
   }
 
   function duplicateTemplate(): void {
@@ -68,14 +69,14 @@ export function MonsterTemplateManagerModal({
     setSelectedId(next.id);
     setDraft(next);
     setIsPreviewMode(false);
-    setFeedback("Copia sin guardar.");
+    setFeedback({ message: "Copia sin guardar.", kind: "info" });
   }
 
   async function saveTemplate(): Promise<void> {
     if (draft === null) return;
     await onSave(draft);
     setSelectedId(draft.id);
-    setFeedback("Template guardado.");
+    setFeedback({ message: "Template guardado.", kind: "success" });
   }
 
   async function deleteTemplate(): Promise<void> {
@@ -85,7 +86,7 @@ export function MonsterTemplateManagerModal({
     const next = templates.find((template) => template.id !== draft.id) ?? null;
     setSelectedId(next?.id ?? null);
     setDraft(next);
-    setFeedback("Template eliminado.");
+    setFeedback({ message: "Template eliminado.", kind: "success" });
   }
 
   return (
@@ -148,7 +149,7 @@ export function MonsterTemplateManagerModal({
                 </button>
               </div>
 
-              {feedback !== "" ? <p className="monster-template-manager__feedback">{feedback}</p> : null}
+              {feedback !== null ? <FeedbackAlert feedback={feedback} /> : null}
 
               {isPreviewMode ? (
                 <div className="monster-template-manager__preview">

@@ -6,6 +6,7 @@ import {
   type MonsterLibraryEntry
 } from "../../../../domain/monster-library/monster-library";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
+import { FeedbackAlert, type Feedback } from "./FeedbackAlert";
 import { ImagePicker } from "./ImagePicker";
 import { ModalBackdrop } from "./ModalBackdrop";
 
@@ -35,13 +36,13 @@ export function MonsterLibraryModal({
   const [entries, setEntries] = useState<readonly MonsterLibraryEntry[]>([]);
   const [imageUrls, setImageUrls] = useState<ReadonlyMap<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<NewMonsterDraft>(() => createEmptyDraft(templates));
 
   const refresh = useCallback(async (text: string): Promise<void> => {
     if (window.ttrpg === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
       return;
     }
 
@@ -50,7 +51,7 @@ export function MonsterLibraryModal({
       const result = await window.ttrpg.searchMonsterLibrary({ text, limit: 60 });
       if (result.ok) {
         setEntries(result.entries);
-        setFeedback("");
+        setFeedback(null);
         const resolved = await Promise.all(
           result.entries
             .filter((e) => e.imagePath !== null)
@@ -61,7 +62,7 @@ export function MonsterLibraryModal({
         );
         setImageUrls(new Map(resolved.filter((pair): pair is [string, string] => typeof pair[1] === "string")));
       } else {
-        setFeedback(result.error);
+        setFeedback({ message: result.error, kind: "error" });
       }
     } finally {
       setIsLoading(false);
@@ -103,12 +104,12 @@ export function MonsterLibraryModal({
 
   async function saveNewMonster(): Promise<void> {
     if (window.ttrpg === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
       return;
     }
 
     if (draft.name.trim() === "") {
-      setFeedback("El nombre del monstruo es requerido.");
+      setFeedback({ message: "El nombre del monstruo es requerido.", kind: "error" });
       return;
     }
 
@@ -121,7 +122,7 @@ export function MonsterLibraryModal({
     });
 
     if (!result.ok) {
-      setFeedback(result.error);
+      setFeedback({ message: result.error, kind: "error" });
       return;
     }
 
@@ -154,7 +155,7 @@ export function MonsterLibraryModal({
               </button>
             </div>
 
-            {feedback !== "" ? <p className="monster-library-modal__feedback">{feedback}</p> : null}
+            {feedback !== null ? <FeedbackAlert feedback={feedback} /> : null}
 
             <div className="monster-library-modal__grid" aria-busy={isLoading}>
               {entries.length === 0 ? (
@@ -228,7 +229,7 @@ export function MonsterLibraryModal({
                 spellCheck={false}
               />
             </label>
-            {feedback !== "" ? <p className="monster-library-modal__feedback">{feedback}</p> : null}
+            {feedback !== null ? <FeedbackAlert feedback={feedback} /> : null}
             <div className="monster-library-modal__footer">
               <button type="button" onClick={() => setIsCreating(false)}>Volver</button>
               <button type="button" onClick={() => void saveNewMonster()}>Guardar y agregar</button>

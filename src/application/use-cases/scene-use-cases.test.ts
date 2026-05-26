@@ -229,7 +229,7 @@ describe("scene use cases", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // Scene still loads correctly with defaults
-    expect(result.scene.sceneAside).toEqual({ monsters: [], npcs: [], notes: [] });
+    expect(result.scene.sceneAside).toEqual({ monsters: [], npcs: [], playerCharacters: [], notes: [] });
     // And emits the resave warning
     expect(result.warnings).toMatchObject([{ code: "scene-format-outdated" }]);
   });
@@ -249,6 +249,28 @@ describe("scene use cases", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.warnings.some((w) => w.code === "scene-format-outdated")).toBe(false);
+  });
+
+  it("reports a scene-format-outdated warning when playerCharacters is absent from sceneAside", async () => {
+    const parsed = JSON.parse(serializeSceneDocument(createDefaultScene())) as Record<string, unknown>;
+    const aside = parsed["sceneAside"] as Record<string, unknown>;
+    delete aside["playerCharacters"];
+
+    const storage: SceneFileStorage = {
+      saveSceneJson: async () => null,
+      loadSceneJson: async () => ({
+        filePath: "/tmp/old-aside.ttrpgscene",
+        json: JSON.stringify(parsed)
+      }),
+      fileExists: async () => true
+    };
+
+    const result = await loadSceneUseCase(storage);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.scene.sceneAside?.playerCharacters).toEqual([]);
+    expect(result.warnings).toMatchObject([{ code: "scene-format-outdated" }]);
   });
 
   it("returns a recoverable error for invalid scene JSON", async () => {

@@ -185,6 +185,204 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] `node:sqlite` (built-in) usado como alternativa sin dependencias nativas a `better-sqlite3`.
 
+## Bibliotecas de NPCs y Personajes Jugadores
+
+### 1. Resumen
+
+- **Objetivo:** Extender el sistema de entidades para que NPCs y Personajes Jugadores se puedan persistir en SQLite, buscar desde modales tipo biblioteca y agregar a escenas como copias portables.
+- **Estado:** Implementado
+- **Prioridad:** Alta
+- **Dependencias:** biblioteca persistente de monstruos, panel de entidades del DM, preload/IPC de imagenes del aside y schema `.ttrpgscene`.
+
+### 2. Alcance
+
+#### Incluido
+
+- Biblioteca persistente de NPCs.
+- Biblioteca persistente de Personajes Jugadores.
+- Modal tipo grilla/listado con buscador para `+ Agregar NPC`.
+- Modal tipo grilla/listado con buscador para Personajes Jugadores.
+- Accion `Nuevo NPC` que guarda en DB y agrega automaticamente a escena.
+- Accion `Nuevo Personaje Jugador` que guarda en DB y agrega automaticamente a escena.
+- Nueva seccion de Personajes Jugadores en el panel de entidades del DM.
+- Vista de detalle de Personaje Jugador inspirada en ficha/carta fisica con imagen grande y bloques compactos de estadisticas.
+- Persistencia portable de NPCs y Personajes Jugadores dentro de `.ttrpgscene`.
+
+#### Fuera de alcance
+
+- Reglas completas de hoja de personaje.
+- Automatizacion de combate, iniciativa o modificadores derivados.
+- Sincronizacion cloud o multiusuario.
+- Importacion masiva de NPCs/personajes.
+- Relacion directa entre Personajes Jugadores y tokens del canvas.
+
+### 3. Decisiones tecnicas
+
+- **Arquitectura:** Reutilizar el patron de monstruos: dominio + casos de uso + repositorios SQLite + IPC/preload tipado + UI React.
+- **Persistencia:** Mantener DB local en `app.getPath("userData")/ttrpg-effects.sqlite`. Las escenas siguen guardando copia completa de cada entidad insertada.
+- **IPC / Electron:** Crear canales especificos por tipo de entidad; no exponer APIs genericas.
+- **Imagenes:** Usar el mismo flujo `aside:open-image` / `aside:resolve-url` y protocolo seguro ya existente.
+- **Versionado de escena:** Agregar campos opcionales/default para preservar compatibilidad con escenas anteriores.
+- **UI:** Reutilizar estilos de biblioteca de monstruos para listados; crear una card de detalle dedicada para Personajes Jugadores.
+
+### 4. Diseno de dominio
+
+#### NPCs
+
+- Agregar tipos:
+  - `NpcLibraryEntry`
+  - `NpcLibrarySearchQuery`
+  - `NpcLibrarySaveInput`
+- Agregar helpers:
+  - normalizacion/validacion;
+  - conversion de biblioteca a `SceneNpc`;
+  - generacion de id unico dentro de escena.
+
+#### Personajes Jugadores
+
+- Agregar tipos:
+  - `PlayerCharacterLibraryEntry`
+  - `PlayerCharacterLibrarySearchQuery`
+  - `PlayerCharacterSaveInput`
+  - `ScenePlayerCharacter`
+- Agregar helpers:
+  - normalizacion de campos tacticos string;
+  - validacion de `armorClass` con formato `d` o `d/d`;
+  - captura separada de `species` y `classes`;
+  - normalizacion de caracteristicas como texto libre;
+  - conversion de biblioteca a instancia de escena;
+  - labels abreviados para detalle (`Fue`, `Con`, `Des`, `Int`, `Sab`, `Car`, `CD`).
+
+### 5. Cambios por capa
+
+#### `domain`
+
+- Extender o crear modulo de entidades para NPCs y Personajes Jugadores.
+- Agregar tests unitarios de validacion y conversion a instancia de escena.
+- Mantener funciones puras sin React/Electron/PixiJS.
+
+#### `application`
+
+- Crear interfaces de repositorio para NPCs y Personajes Jugadores.
+- Crear casos de uso:
+  - buscar/listar;
+  - obtener por id;
+  - guardar;
+  - convertir a instancia de escena.
+
+#### `infrastructure`
+
+- Agregar migraciones SQLite versionadas:
+  - `npc_library_entries`;
+  - `player_character_library_entries`.
+- Usar queries parametrizadas.
+- Mantener compatibilidad con la migracion existente de monstruos.
+
+#### `main`
+
+- Registrar IPC para NPCs:
+  - `npc-library:search`
+  - `npc-library:get`
+  - `npc-library:save`
+- Registrar IPC para Personajes Jugadores:
+  - `player-character-library:search`
+  - `player-character-library:get`
+  - `player-character-library:save`
+- Validar payloads en `main`.
+
+#### `preload`
+
+- Exponer funciones especificas para las nuevas bibliotecas.
+- Actualizar `src/preload/ttrpg-api.d.ts`.
+- No exponer SQLite, filesystem ni canales genericos.
+
+#### `renderer`
+
+- Cambiar `+ Agregar NPC` para abrir biblioteca de NPCs.
+- Crear modal de biblioteca de NPCs con buscador, cards y `Nuevo NPC`.
+- Crear formulario/modal de nuevo NPC conectado a DB.
+- Agregar seccion de Personajes Jugadores al panel del DM.
+- Crear modal de biblioteca de Personajes Jugadores con buscador y `Nuevo Personaje`.
+- Crear formulario de captura con nombres completos de caracteristicas.
+- Crear vista de detalle con labels abreviados e imagen destacada.
+- Ajustar el preview de biblioteca para ocupar aproximadamente la mitad del viewport, permitir edicion previa y agregar a escena desde alli.
+- Reutilizar el editor/render Markdown de monstruos/NPCs para las notas de Personajes Jugadores.
+- Inspirar el detalle en las referencias visuales: carta/ficha con marco, imagen dominante, nombre destacado y bloques compactos.
+- Agregar estados de carga, vacio y error.
+
+#### `render`
+
+- Sin cambios esperados en PixiJS, salvo que futuros tokens/personajes se vinculen al canvas en otra spec.
+
+### 6. Plan de trabajo
+
+1. Revisar tipos actuales de `SceneNpc` y `sceneAside`.
+2. Agregar tipos de dominio para bibliotecas de NPCs y Personajes Jugadores.
+3. Extender schema de escena con `playerCharacters` opcional/default.
+4. Crear migraciones SQLite nuevas.
+5. Implementar repositorios SQLite y tests de integracion.
+6. Implementar casos de uso y tests unitarios.
+7. Registrar IPC/preload tipado.
+8. Implementar biblioteca de NPCs y conectar `+ Agregar NPC`.
+9. Implementar biblioteca y formulario de Personajes Jugadores.
+10. Implementar detalle visual de Personaje Jugador.
+11. Verificar guardado/carga `.ttrpgscene`.
+12. Ejecutar `pnpm typecheck`, tests relevantes y smoke manual.
+
+### 7. Testing y verificacion
+
+- Tests unitarios de validacion:
+  - nombre requerido;
+  - `armorClass` valido;
+  - caracteristicas como texto libre (`+2`, `-1`, `10` o vacio);
+  - conversion a instancia de escena con id unico.
+- Tests de repositorio SQLite:
+  - migracion;
+  - save/get/search de NPC;
+  - save/get/search de Personaje Jugador.
+- Typecheck: `pnpm typecheck`.
+- Smoke manual:
+  - crear NPC nuevo y confirmar que aparece en biblioteca;
+  - agregar NPC existente a escena;
+  - crear Personaje Jugador con imagen y verlo en detalle;
+  - guardar/cargar escena y validar persistencia portable.
+
+### 8. Riesgos y mitigaciones
+
+- **Riesgo:** Duplicar demasiado codigo de bibliotecas.
+  **Mitigacion:** Extraer componentes/helpers compartidos solo si reduce duplicacion real sin oscurecer el flujo.
+- **Riesgo:** El detalle de Personaje Jugador se vuelve demasiado decorativo y poco legible.
+  **Mitigacion:** Usar la referencia como guia de estructura, mantener contraste y densidad acorde al tema oscuro.
+- **Riesgo:** Migraciones SQLite rompen datos existentes.
+  **Mitigacion:** Migraciones aditivas, tablas nuevas y campos de escena opcionales/default.
+- **Riesgo:** Escenas quedan acopladas a DB.
+  **Mitigacion:** Guardar copias completas en `.ttrpgscene`.
+
+### 9. Criterios de aceptacion
+
+- [x] `+ Agregar NPC` abre una biblioteca persistente con buscador.
+- [x] El usuario puede crear un NPC nuevo y este se guarda en DB y escena.
+- [x] El usuario puede agregar NPCs existentes desde DB a escena.
+- [x] Existe seccion de Personajes Jugadores en el panel DM.
+- [x] El usuario puede crear y guardar Personajes Jugadores en DB.
+- [x] El usuario puede previsualizar y editar Personajes Jugadores existentes antes de agregarlos a escena.
+- [x] El usuario puede agregar Personajes Jugadores existentes a escena desde la card o desde el preview.
+- [x] La captura muestra nombres completos de caracteristicas.
+- [x] Las caracteristicas se capturan como texto libre, no como campos numericos.
+- [x] Especie y Clase(s) son campos separados.
+- [x] El preview de biblioteca queda centrado, ocupa cerca de media pantalla y permite editar el personaje antes de agregarlo.
+- [x] Las notas de Personajes Jugadores se capturan como Markdown y se renderizan en el detalle.
+- [x] El detalle muestra abreviaturas `Fue`, `Con`, `Des`, `Int`, `Sab`, `Car` y `CD`.
+- [x] La imagen del personaje se muestra como foco visual en el detalle.
+- [x] Guardar/cargar `.ttrpgscene` preserva NPCs y Personajes Jugadores.
+- [x] El renderer consume solo preload/IPC tipado.
+
+### 10. Documentacion afectada
+
+- `./specs/16-entities/spec.md`
+- `./specs/16-entities/plan.md`
+- `CHANGELOG.md`
+
 ## Panel lateral izquierdo del DM: Monstruos, NPCs y Notas
 
 ### 1. Resumen

@@ -298,6 +298,32 @@ export const sceneDocumentV1Schema = z.object({
           notes: z.string().default("")
         })
       ),
+      playerCharacters: z.array(
+        z.object({
+          id: z.string().min(1),
+          characterName: z.string().min(1),
+          playerName: z.string().default(""),
+          level: z.string().default(""),
+          species: z.string().default(""),
+          classes: z.string().default(""),
+          imagePath: z.string().nullable(),
+          stats: z.object({
+            strength: z.union([z.string(), z.number().int(), z.null()]).default("").transform(stringifyAbilityScore),
+            constitution: z.union([z.string(), z.number().int(), z.null()]).default("").transform(stringifyAbilityScore),
+            dexterity: z.union([z.string(), z.number().int(), z.null()]).default("").transform(stringifyAbilityScore),
+            intelligence: z.union([z.string(), z.number().int(), z.null()]).default("").transform(stringifyAbilityScore),
+            wisdom: z.union([z.string(), z.number().int(), z.null()]).default("").transform(stringifyAbilityScore),
+            charisma: z.union([z.string(), z.number().int(), z.null()]).default("").transform(stringifyAbilityScore)
+          }),
+          initiative: z.string().default(""),
+          armorClass: z.string().default(""),
+          passivePerception: z.string().default(""),
+          hitPoints: z.string().default(""),
+          spellSaveDc: z.string().default(""),
+          speeds: z.string().default(""),
+          notes: z.string().default("")
+        })
+      ).default([]),
       notes: z.array(
         z.object({
           id: z.string().min(1),
@@ -308,8 +334,13 @@ export const sceneDocumentV1Schema = z.object({
       )
     })
     .optional()
-    .default(() => ({ monsters: [], npcs: [], notes: [] }))
+    .default(() => ({ monsters: [], npcs: [], playerCharacters: [], notes: [] }))
 });
+
+function stringifyAbilityScore(value: string | number | null): string {
+  if (value === null) return "";
+  return String(value).trim();
+}
 
 export function parseSceneDocument(input: unknown): SceneDocument {
   return sceneDocumentV1Schema.parse(input);
@@ -331,6 +362,16 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
   const missing: string[] = [];
   // Added in spec 26 (DM aside panel)
   if (!("sceneAside" in obj)) missing.push("sceneAside");
+  else {
+    const sceneAside = obj["sceneAside"];
+    if (
+      typeof sceneAside === "object" &&
+      sceneAside !== null &&
+      !("playerCharacters" in sceneAside)
+    ) {
+      missing.push("sceneAside.playerCharacters");
+    }
+  }
   // Added in spec 28 (DM-only map labels)
   if (!("labels" in obj)) missing.push("labels");
   return missing;

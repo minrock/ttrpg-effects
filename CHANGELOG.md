@@ -10,6 +10,14 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.1.0] - 2026-05-25
+
+### Added
+
+- Persistencia de NPCs en SQLite y flujo para agregarlos a escenas desde una biblioteca con buscador.
+- Personajes Jugadores como nuevo tipo de entidad persistente con imagen, especie y clase(s) separadas, caracteristicas de texto libre, notas Markdown renderizadas, preview editable antes de agregar a escena y detalle visual inspirado en ficha/carta.
+- Plan tecnico y specs actualizados para extender el sistema de entidades sin romper la portabilidad de `.ttrpgscene`.
+
 ## [1.0.0] - 2026-05-25
 
 ### Added

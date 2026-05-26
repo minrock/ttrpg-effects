@@ -12,6 +12,13 @@ import type {
   MonsterLibrarySaveInput,
   MonsterLibrarySearchQuery
 } from "../domain/monster-library/monster-library";
+import type {
+  EntityLibrarySearchQuery,
+  NpcLibraryEntry,
+  NpcLibrarySaveInput,
+  PlayerCharacterLibraryEntry,
+  PlayerCharacterLibrarySaveInput
+} from "../domain/entity-library/entity-library";
 
 export interface TtrpgAppInfo {
   name: "TTRPG Effects";
@@ -34,6 +41,12 @@ export interface TtrpgApi {
   searchMonsterLibrary: (query: MonsterLibrarySearchQuery) => Promise<MonsterLibrarySearchResult>;
   getMonsterLibraryEntry: (id: string) => Promise<MonsterLibraryGetResult>;
   saveMonsterLibraryEntry: (entry: MonsterLibrarySaveInput) => Promise<MonsterLibrarySaveResult>;
+  searchNpcLibrary: (query: EntityLibrarySearchQuery) => Promise<NpcLibrarySearchResult>;
+  getNpcLibraryEntry: (id: string) => Promise<NpcLibraryGetResult>;
+  saveNpcLibraryEntry: (entry: NpcLibrarySaveInput) => Promise<NpcLibrarySaveResult>;
+  searchPlayerCharacterLibrary: (query: EntityLibrarySearchQuery) => Promise<PlayerCharacterLibrarySearchResult>;
+  getPlayerCharacterLibraryEntry: (id: string) => Promise<PlayerCharacterLibraryGetResult>;
+  savePlayerCharacterLibraryEntry: (entry: PlayerCharacterLibrarySaveInput) => Promise<PlayerCharacterLibrarySaveResult>;
   openMapImage: () => Promise<MapOpenResult>;
   resolveMapUrl: (imagePath: string) => Promise<string | null>;
   openTokenImage: () => Promise<TokenOpenResult>;
@@ -89,6 +102,66 @@ export type MonsterLibrarySaveResult =
   | {
       readonly ok: true;
       readonly entry: MonsterLibraryEntry;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type NpcLibrarySearchResult =
+  | {
+      readonly ok: true;
+      readonly entries: readonly NpcLibraryEntry[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type NpcLibraryGetResult =
+  | {
+      readonly ok: true;
+      readonly entry: NpcLibraryEntry | null;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type NpcLibrarySaveResult =
+  | {
+      readonly ok: true;
+      readonly entry: NpcLibraryEntry;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type PlayerCharacterLibrarySearchResult =
+  | {
+      readonly ok: true;
+      readonly entries: readonly PlayerCharacterLibraryEntry[];
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type PlayerCharacterLibraryGetResult =
+  | {
+      readonly ok: true;
+      readonly entry: PlayerCharacterLibraryEntry | null;
+    }
+  | {
+      readonly ok: false;
+      readonly error: string;
+    };
+
+export type PlayerCharacterLibrarySaveResult =
+  | {
+      readonly ok: true;
+      readonly entry: PlayerCharacterLibraryEntry;
     }
   | {
       readonly ok: false;
