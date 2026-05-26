@@ -7,6 +7,7 @@ import type { MapImageState } from "../../domain/map/map-image";
 import { MapViewport } from "./components/MapViewport";
 import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
+import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 
 export function PlayerApp(): JSX.Element {
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -183,6 +184,9 @@ export function PlayerApp(): JSX.Element {
       {isHydrated && (
         <PlayerAsideOverlay aside={scene.sceneAside ?? createDefaultSceneAside()} />
       )}
+      {isHydrated ? (
+        <CombatTurnBar tracker={scene.combatTracker} viewRole="player" />
+      ) : null}
       {!isViewportReady && (
         <div className="player-loading" role="status" aria-live="polite">
           <div className="player-loading__mark" aria-hidden="true" />

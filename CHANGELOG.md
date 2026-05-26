@@ -10,6 +10,15 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.2.0] - 2026-05-25
+
+### Added
+
+- Turnero de combate persistido en `.ttrpgscene`, con configuracion desde monstruos, NPCs y personajes jugadores de la escena.
+- Modal para armar el orden de combate con iniciativas manuales, reordenamiento, participantes tardios y rondas.
+- Barra de turnos sincronizada entre DM y ventana de jugador, con retratos verticales, badge de iniciativa, tooltip de nombre, turno actual destacado y siguiente turno con halo.
+- Controles de DM para avanzar turno, editar batalla, eliminar/reincorporar participantes y finalizar batalla con reset completo del estado de combate.
+
 ## [1.1.0] - 2026-05-25
 
 ### Added

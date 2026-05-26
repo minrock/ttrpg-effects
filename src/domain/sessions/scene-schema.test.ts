@@ -42,6 +42,19 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(legacyScene).darkness.darkvisionEnabled).toBe(false);
   });
 
+  it("adds an inactive combat tracker to older v1 scenes", () => {
+    const legacyScene = Object.fromEntries(
+      Object.entries(createDefaultScene()).filter(([key]) => key !== "combatTracker")
+    );
+
+    expect(parseSceneDocument(legacyScene).combatTracker).toEqual({
+      active: false,
+      participants: [],
+      currentParticipantId: null,
+      round: 0
+    });
+  });
+
   it("preserves enabled darkvision in scene darkness", () => {
     const scene = {
       ...createDefaultScene(),
