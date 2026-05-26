@@ -19,6 +19,33 @@ export interface SceneNpc {
   readonly notes: string;
 }
 
+export interface AbilityScores {
+  readonly strength: string;
+  readonly constitution: string;
+  readonly dexterity: string;
+  readonly intelligence: string;
+  readonly wisdom: string;
+  readonly charisma: string;
+}
+
+export interface ScenePlayerCharacter {
+  readonly id: string;
+  readonly characterName: string;
+  readonly playerName: string;
+  readonly level: string;
+  readonly species: string;
+  readonly classes: string;
+  readonly imagePath: string | null;
+  readonly stats: AbilityScores;
+  readonly initiative: string;
+  readonly armorClass: string;
+  readonly passivePerception: string;
+  readonly hitPoints: string;
+  readonly spellSaveDc: string;
+  readonly speeds: string;
+  readonly notes: string;
+}
+
 export interface SceneNote {
   readonly id: string;
   readonly parentId: string | null;
@@ -29,6 +56,7 @@ export interface SceneNote {
 export interface SceneAside {
   readonly monsters: readonly SceneMonster[];
   readonly npcs: readonly SceneNpc[];
+  readonly playerCharacters: readonly ScenePlayerCharacter[];
   readonly notes: readonly SceneNote[];
 }
 
@@ -37,7 +65,7 @@ export interface SceneAside {
 // -----------------------------------------------------------------------------
 
 export function createDefaultSceneAside(): SceneAside {
-  return { monsters: [], npcs: [], notes: [] };
+  return { monsters: [], npcs: [], playerCharacters: [], notes: [] };
 }
 
 // -----------------------------------------------------------------------------
@@ -101,6 +129,30 @@ export function updateNpc(aside: SceneAside, updated: SceneNpc): SceneAside {
 
 export function removeNpc(aside: SceneAside, id: string): SceneAside {
   return { ...aside, npcs: aside.npcs.filter((n) => n.id !== id) };
+}
+
+// -----------------------------------------------------------------------------
+// Personajes jugadores
+// -----------------------------------------------------------------------------
+
+export function addPlayerCharacter(aside: SceneAside, character: ScenePlayerCharacter): SceneAside {
+  return { ...aside, playerCharacters: [...aside.playerCharacters, character] };
+}
+
+export function updatePlayerCharacter(aside: SceneAside, updated: ScenePlayerCharacter): SceneAside {
+  return {
+    ...aside,
+    playerCharacters: aside.playerCharacters.map((character) => (
+      character.id === updated.id ? updated : character
+    ))
+  };
+}
+
+export function removePlayerCharacter(aside: SceneAside, id: string): SceneAside {
+  return {
+    ...aside,
+    playerCharacters: aside.playerCharacters.filter((character) => character.id !== id)
+  };
 }
 
 // -----------------------------------------------------------------------------

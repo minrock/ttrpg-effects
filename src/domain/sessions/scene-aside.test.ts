@@ -267,6 +267,7 @@ describe("getPlayerVisibleMonsters", () => {
         { id: "c", name: "C", imagePath: "/img/c.png", visibleToPlayer: false, notes: "" }
       ],
       npcs: [],
+      playerCharacters: [],
       notes: []
     };
     const result = getPlayerVisibleMonsters(aside);
@@ -283,6 +284,7 @@ describe("getPlayerVisibleNpcs", () => {
         { id: "x", name: "X", imagePath: null, visibleToPlayer: true, notes: "" },
         { id: "y", name: "Y", imagePath: "/img/y.png", visibleToPlayer: false, notes: "" }
       ],
+      playerCharacters: [],
       notes: []
     };
     const result = getPlayerVisibleNpcs(aside);

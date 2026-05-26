@@ -3,9 +3,11 @@ import { join } from "node:path";
 import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron-scene-file-storage";
 import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
 import { ElectronMonsterTemplateRepository } from "../infrastructure/file-system/electron-monster-template-repository";
+import { SqliteEntityLibraryRepository } from "../infrastructure/database/sqlite-entity-library-repository";
 import { SqliteMonsterLibraryRepository } from "../infrastructure/database/sqlite-monster-library-repository";
 import { registerAsideIpc } from "./ipc/aside-ipc";
 import { getRecentScenesStoragePath, installAppMenu, rebuildAppMenu, registerRecentScene } from "./app-menu";
+import { registerEntityLibraryIpc } from "./ipc/entity-library-ipc";
 import { registerMapIpc } from "./ipc/map-ipc";
 import { registerMonsterLibraryIpc } from "./ipc/monster-library-ipc";
 import { registerMonsterTemplateIpc } from "./ipc/monster-template-ipc";
@@ -69,6 +71,7 @@ app.whenReady().then(async () => {
   const sceneFileStorage = new ElectronSceneFileStorage(() => mainWindow);
   const monsterTemplateRepository = new ElectronMonsterTemplateRepository(getMonsterTemplatesStoragePath());
   const monsterLibraryRepository = new SqliteMonsterLibraryRepository(getLocalDatabasePath());
+  const entityLibraryRepository = new SqliteEntityLibraryRepository(getLocalDatabasePath());
   const recentScenes = new RecentScenesStore(getRecentScenesStoragePath());
   const menuOptions = {
     storage: sceneFileStorage,
@@ -86,6 +89,18 @@ app.whenReady().then(async () => {
   registerAsideIpc(mapImageStorage);
   registerMonsterTemplateIpc(monsterTemplateRepository);
   registerMonsterLibraryIpc(monsterLibraryRepository);
+  registerEntityLibraryIpc({
+    npcRepository: {
+      search: (query) => entityLibraryRepository.searchNpcs(query),
+      findById: (id) => entityLibraryRepository.findNpcById(id),
+      save: (entry) => entityLibraryRepository.saveNpc(entry)
+    },
+    playerCharacterRepository: {
+      search: (query) => entityLibraryRepository.searchPlayerCharacters(query),
+      findById: (id) => entityLibraryRepository.findPlayerCharacterById(id),
+      save: (entry) => entityLibraryRepository.savePlayerCharacter(entry)
+    }
+  });
   const playerWindowOptions = {
     isDevelopment,
     rendererUrl: process.env.ELECTRON_RENDERER_URL,

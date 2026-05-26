@@ -1,10 +1,12 @@
 import { useCallback, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
-import type { SceneAside, SceneMonster, SceneNpc, SceneNote } from "../../../../domain/sessions/scene-aside";
+import type { SceneAside, SceneMonster, SceneNpc, SceneNote, ScenePlayerCharacter } from "../../../../domain/sessions/scene-aside";
 import {
+  addPlayerCharacter,
   addMonster,
   addNote,
   addNpc,
+  removePlayerCharacter,
   removeMonster,
   removeNote,
   removeNpc,
@@ -15,6 +17,7 @@ import {
 import { MonsterSection } from "./MonsterSection";
 import { NpcSection } from "./NpcSection";
 import { NotesSection } from "./NotesSection";
+import { PlayerCharacterSection } from "./PlayerCharacterSection";
 
 interface DmAsidePanelProps {
   readonly aside: SceneAside;
@@ -23,11 +26,11 @@ interface DmAsidePanelProps {
   readonly hidden?: boolean;
 }
 
-type SectionKey = "monsters" | "npcs" | "notes";
+type SectionKey = "monsters" | "npcs" | "playerCharacters" | "notes";
 
 export function DmAsidePanel({ aside, monsterTemplates, onChange, hidden }: DmAsidePanelProps): JSX.Element {
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
-    new Set<SectionKey>(["monsters", "npcs", "notes"])
+    new Set<SectionKey>(["monsters", "npcs", "playerCharacters", "notes"])
   );
 
   const toggleSection = useCallback((key: SectionKey) => {
@@ -62,6 +65,15 @@ export function DmAsidePanel({ aside, monsterTemplates, onChange, hidden }: DmAs
       if (n === undefined) return;
       onChange(updateNpc(aside, { ...n, visibleToPlayer: !n.visibleToPlayer }));
     },
+    [aside, onChange]
+  );
+
+  const handleAddPlayerCharacter = useCallback(
+    (character: ScenePlayerCharacter) => onChange(addPlayerCharacter(aside, character)),
+    [aside, onChange]
+  );
+  const handleRemovePlayerCharacter = useCallback(
+    (id: string) => onChange(removePlayerCharacter(aside, id)),
     [aside, onChange]
   );
 
@@ -107,6 +119,20 @@ export function DmAsidePanel({ aside, monsterTemplates, onChange, hidden }: DmAs
             onUpdate={handleUpdateNpc}
             onRemove={handleRemoveNpc}
             onToggleVisibility={handleToggleNpcVisibility}
+          />
+        </AccordionSection>
+
+        <AccordionSection
+          title="🧙 Personajes"
+          sectionKey="playerCharacters"
+          open={openSections.has("playerCharacters")}
+          badge={aside.playerCharacters.length}
+          onToggle={toggleSection}
+        >
+          <PlayerCharacterSection
+            characters={aside.playerCharacters}
+            onAdd={handleAddPlayerCharacter}
+            onRemove={handleRemovePlayerCharacter}
           />
         </AccordionSection>
 

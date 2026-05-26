@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type JSX } from "react";
 import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { NpcDetailModal } from "./NpcDetailModal";
+import { NpcLibraryModal } from "./NpcLibraryModal";
 import { NpcModal } from "./NpcModal";
 
 interface NpcSectionProps {
@@ -20,6 +21,7 @@ export function NpcSection({
 }: NpcSectionProps): JSX.Element {
   const [detailNpc, setDetailNpc] = useState<SceneNpc | null>(null);
   const [editingNpc, setEditingNpc] = useState<SceneNpc | null | "new">(null);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const handleSave = useCallback(
@@ -63,7 +65,7 @@ export function NpcSection({
         />
       ))}
 
-      <button onClick={() => setEditingNpc("new")} style={addBtnStyle}>
+      <button onClick={() => setIsLibraryOpen(true)} style={addBtnStyle}>
         + Agregar NPC
       </button>
 
@@ -86,6 +88,17 @@ export function NpcSection({
           onClose={() => setEditingNpc(null)}
         />
       )}
+
+      {isLibraryOpen ? (
+        <NpcLibraryModal
+          existingIds={existingIds}
+          onAddNpc={(npc) => {
+            onAdd(npc);
+            setIsLibraryOpen(false);
+          }}
+          onClose={() => setIsLibraryOpen(false)}
+        />
+      ) : null}
 
       {/* Delete confirm */}
       {confirmDeleteId !== null && (
