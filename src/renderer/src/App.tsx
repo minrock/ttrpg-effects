@@ -117,6 +117,14 @@ import { DmDarknessStatusBadge } from "./components/DmDarknessStatusBadge";
 import type { SceneAside } from "../../domain/sessions/scene-aside";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { MonsterTemplateManagerModal } from "./components/aside/MonsterTemplateManagerModal";
+import {
+  advanceTurn,
+  createDefaultCombatTracker,
+  markParticipantDefeated,
+  type CombatTracker
+} from "../../domain/combat/combat-tracker";
+import { CombatSetupModal } from "./components/combat/CombatSetupModal";
+import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 
 const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
@@ -176,6 +184,7 @@ export function App(): JSX.Element {
   );
   const [monsterTemplates, setMonsterTemplates] = useState<readonly MonsterTemplate[]>([]);
   const [isMonsterTemplateManagerOpen, setIsMonsterTemplateManagerOpen] = useState(false);
+  const [isCombatSetupOpen, setIsCombatSetupOpen] = useState(false);
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
@@ -1566,6 +1575,30 @@ export function App(): JSX.Element {
     setFeedback("Ventana de jugador lista.");
   }
 
+  const handleSetCombatTracker = useCallback((combatTracker: CombatTracker): void => {
+    setScene((current) => ({ ...current, combatTracker }));
+  }, [setScene]);
+
+  const handleNextCombatTurn = useCallback((): void => {
+    setScene((current) => ({ ...current, combatTracker: advanceTurn(current.combatTracker) }));
+  }, [setScene]);
+
+  const handleToggleCombatParticipantDefeated = useCallback(
+    (participantId: string, defeated: boolean): void => {
+      setScene((current) => ({
+        ...current,
+        combatTracker: markParticipantDefeated(current.combatTracker, participantId, defeated)
+      }));
+    },
+    [setScene]
+  );
+
+  const handleEndCombat = useCallback((): void => {
+    setScene((current) => ({ ...current, combatTracker: createDefaultCombatTracker() }));
+    setIsCombatSetupOpen(false);
+    setFeedback("Batalla finalizada. Turnero listo para una nueva batalla.");
+  }, [setScene]);
+
   function handleCreateToken(): void {
     if (interaction.contextMenu === null) {
       return;
@@ -2033,6 +2066,14 @@ export function App(): JSX.Element {
           <button type="button" onClick={() => void handleOpenPlayerWindow()} disabled={isBusy}>
             Ventana de jugador
           </button>
+          <button
+            type="button"
+            className={scene.combatTracker.active ? "is-active" : ""}
+            onClick={() => setIsCombatSetupOpen(true)}
+            disabled={isBusy}
+          >
+            {scene.combatTracker.active ? "Batalla activa" : "Iniciar batalla"}
+          </button>
           {canCreateNewScene ? (
             <button type="button" onClick={handleRequestNewScene} disabled={isBusy}>
               Nueva escena
@@ -2170,6 +2211,14 @@ export function App(): JSX.Element {
           onCameraChange={handleCameraChange}
           onArcanePointerTrigger={handleArcanePointerTrigger}
           overlay={<DmDarknessStatusBadge darkness={scene.darkness} />}
+        />
+        <CombatTurnBar
+          tracker={scene.combatTracker}
+          viewRole="dm"
+          onNextTurn={handleNextCombatTurn}
+          onEditCombat={() => setIsCombatSetupOpen(true)}
+          onEndCombat={handleEndCombat}
+          onToggleDefeated={handleToggleCombatParticipantDefeated}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
           {hasSelectedObject ? (
@@ -3207,6 +3256,15 @@ export function App(): JSX.Element {
           onSave={handleSaveMonsterTemplate}
           onDelete={handleDeleteMonsterTemplate}
           onClose={() => setIsMonsterTemplateManagerOpen(false)}
+        />
+      ) : null}
+      {isCombatSetupOpen ? (
+        <CombatSetupModal
+          aside={sceneAside}
+          tracker={scene.combatTracker}
+          onStart={handleSetCombatTracker}
+          onUpdate={handleSetCombatTracker}
+          onClose={() => setIsCombatSetupOpen(false)}
         />
       ) : null}
     </main>

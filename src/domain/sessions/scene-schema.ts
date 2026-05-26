@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
+import { createDefaultCombatTracker } from "../combat/combat-tracker";
 
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
@@ -209,6 +210,27 @@ const labelSchema = z.object({
     .default(() => ({ ...defaultSceneLabelStyle.shadow }))
 });
 
+const combatParticipantTypeSchema = z.enum(["monster", "npc", "playerCharacter"]);
+
+const combatParticipantSchema = z.object({
+  id: z.string().min(1),
+  entityType: combatParticipantTypeSchema,
+  entityId: z.string().min(1),
+  name: z.string().trim().min(1),
+  imagePath: z.string().min(1).nullable(),
+  initiative: finiteNumber,
+  defeated: z.boolean(),
+  enteredRound: z.number().int().min(0),
+  activeFromRound: z.number().int().min(0)
+});
+
+const combatTrackerSchema = z.object({
+  active: z.boolean(),
+  participants: z.array(combatParticipantSchema),
+  currentParticipantId: z.string().min(1).nullable(),
+  round: z.number().int().min(0)
+});
+
 export const sceneDocumentV1Schema = z.object({
   version: z.literal(SCENE_DOCUMENT_VERSION),
   map: z.object({
@@ -334,7 +356,11 @@ export const sceneDocumentV1Schema = z.object({
       )
     })
     .optional()
-    .default(() => ({ monsters: [], npcs: [], playerCharacters: [], notes: [] }))
+    .default(() => ({ monsters: [], npcs: [], playerCharacters: [], notes: [] })),
+  combatTracker: combatTrackerSchema.default(() => ({
+    ...createDefaultCombatTracker(),
+    participants: []
+  }))
 });
 
 function stringifyAbilityScore(value: string | number | null): string {
@@ -374,6 +400,8 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
   }
   // Added in spec 28 (DM-only map labels)
   if (!("labels" in obj)) missing.push("labels");
+  // Added in spec 20 (combat turn tracker)
+  if (!("combatTracker" in obj)) missing.push("combatTracker");
   return missing;
 }
 

@@ -46,6 +46,17 @@ describe("scene content detection", () => {
     expect(
       hasSceneContent({
         ...createDefaultScene(),
+        combatTracker: {
+          active: true,
+          participants: [],
+          currentParticipantId: null,
+          round: 0
+        }
+      })
+    ).toBe(true);
+    expect(
+      hasSceneContent({
+        ...createDefaultScene(),
         shapes: [
           {
             id: "shape-1",

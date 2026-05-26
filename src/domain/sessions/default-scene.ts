@@ -1,6 +1,7 @@
 import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { createDefaultSceneAside } from "./scene-aside";
+import { createDefaultCombatTracker } from "../combat/combat-tracker";
 
 export function createDefaultScene(): SceneDocument {
   return {
@@ -40,6 +41,7 @@ export function createDefaultScene(): SceneDocument {
     shapes: [],
     tokens: [],
     labels: [],
-    sceneAside: createDefaultSceneAside()
+    sceneAside: createDefaultSceneAside(),
+    combatTracker: createDefaultCombatTracker()
   };
 }

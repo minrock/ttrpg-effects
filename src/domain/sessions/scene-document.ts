@@ -1,4 +1,5 @@
 import type { SceneAside } from "./scene-aside";
+import type { CombatTracker } from "../combat/combat-tracker";
 
 export const SCENE_DOCUMENT_VERSION = 1;
 
@@ -249,6 +250,7 @@ export interface SceneDocumentV1 {
   readonly tokens: readonly SceneToken[];
   readonly labels: readonly SceneLabel[];
   readonly sceneAside?: SceneAside;
+  readonly combatTracker: CombatTracker;
 }
 
 export type SceneDocument = SceneDocumentV1;
