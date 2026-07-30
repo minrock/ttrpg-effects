@@ -10,6 +10,15 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.3.0] - 2026-07-29
+
+### Added
+
+- Control `Escala mapa` en la seccion Grilla para agrandar o reducir la imagen del mapa sin modificar el zoom de camara.
+- Persistencia y normalizacion de `map.scale` en escenas `.ttrpgscene`.
+- Tests de dominio/schema para escala visual del mapa.
+- Specs y planes actualizados para reproducir el ajuste fisico del mapa en futuras implementaciones.
+
 ## [1.2.0] - 2026-05-25
 
 ### Added

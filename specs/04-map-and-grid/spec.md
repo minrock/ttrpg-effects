@@ -17,6 +17,7 @@ Permitir cargar una imagen de mapa, mostrarla en el lienzo, superponer una grill
 - Activar un modo `Ajustar grilla` desde el sidebar derecho o con shortcut `Cmd+G` en macOS / `Ctrl+G` en Windows/Linux.
 - Calibrar por arrastre solo cuando `Ajustar grilla` esta activo.
 - Calibrar por valor numerico solo cuando `Ajustar grilla` esta activo.
+- Ajustar la escala visual de la imagen del mapa con un control porcentual independiente de `camera.zoom`.
 - Bloquear zoom/escala para proteger la calibracion.
 
 ### Flujo esperado
@@ -25,11 +26,12 @@ Permitir cargar una imagen de mapa, mostrarla en el lienzo, superponer una grill
 2. La app muestra el mapa centrado.
 3. El usuario activa la grilla.
 4. El usuario activa `Ajustar grilla` desde el sidebar o con `Cmd/Ctrl+G`.
-5. El usuario arrastra un control de calibracion hasta que una casilla mida correctamente en la superficie proyectada.
-6. Opcionalmente ajusta valores numericos mientras el modo esta activo.
-7. El usuario desactiva `Ajustar grilla`.
-8. El usuario bloquea la escala.
-9. La sesion entra en modo de uso normal.
+5. Si el mapa no ocupa suficiente superficie proyectada, ajusta `Escala mapa` para agrandar/reducir la imagen sin usar zoom de camara.
+6. El usuario arrastra un control de calibracion hasta que una casilla mida correctamente en la superficie proyectada.
+7. Opcionalmente ajusta valores numericos mientras el modo esta activo.
+8. El usuario desactiva `Ajustar grilla`.
+9. El usuario bloquea la escala.
+10. La sesion entra en modo de uso normal.
 
 ### Formatos de imagen
 
@@ -60,6 +62,9 @@ Presets iniciales:
 - El usuario puede activar/desactivar `Ajustar grilla` con `Cmd+G` en macOS y `Ctrl+G` en Windows/Linux.
 - El usuario puede calibrar por arrastre solo cuando `Ajustar grilla` esta activo.
 - El usuario puede calibrar numericamente solo cuando `Ajustar grilla` esta activo.
+- El usuario puede cambiar `Escala mapa` en porcentaje cuando hay un mapa cargado.
+- `Escala mapa` modifica `scene.map.scale`, no `camera.zoom`.
+- `Escala mapa` permite resetear la imagen a 100%.
 - El control visual de calibracion queda por encima de niebla/oscuridad y herramientas para poder usarse durante la sesion.
 - Al bloquear escala, la rueda del mouse no rompe el tamano fisico de la grilla.
 - La configuracion de mapa y grilla se puede guardar en el formato de sesion.
@@ -73,6 +78,7 @@ Presets iniciales:
 ### Notas de implementacion
 
 - Modelar por separado escala del mapa, escala de camara y tamano de celda.
+- Normalizar `map.scale` a un rango seguro para evitar mapas invisibles o gigantes.
 - El margen externo debe permitir centrar esquinas o zonas fuera de la imagen.
 - La grilla del MVP es cuadrada, sin hexagonos.
 
@@ -117,7 +123,9 @@ Permitir mover la imagen del mapa sobre los ejes X e Y dentro del lienzo cuando 
 
 La posicion del mapa se almacena en `scene.map.position` como coordenadas mundo (`x`, `y`). Este campo ya existe en `SceneMap` y se serializa en el archivo `.ttrpgscene`. No se requiere migracion de version de schema.
 
-Al cargar una imagen nueva, la posicion se resetea a `{ x: 0, y: 0 }`.
+La escala visual de la imagen se almacena en `scene.map.scale` como factor decimal (`1` = 100%). Se normaliza a un rango seguro y se conserva al guardar/cargar.
+
+Al cargar una imagen nueva, la posicion se resetea a `{ x: 0, y: 0 }` y la escala a `1`.
 
 ### Criterios de aceptacion
 
@@ -127,6 +135,7 @@ Al cargar una imagen nueva, la posicion se resetea a `{ x: 0, y: 0 }`.
 - La grilla y el overlay se siguen visualmente mientras se arrastra.
 - Al guardar y recargar la sesion, el mapa aparece en la misma posicion.
 - Cargar un nuevo mapa resetea la posicion a cero.
+- Cargar un nuevo mapa resetea la escala a 100%.
 
 ### Riesgos
 
@@ -142,6 +151,38 @@ Al cargar una imagen nueva, la posicion se resetea a `{ x: 0, y: 0 }`.
 - En `App.tsx`, el callback actualiza `scene.map.position` via `setScene`.
 - `MapViewport` recibe `isMapAdjustMode` como prop y llama `viewport.setMapAdjustMode(flag)`.
 - No se requieren cambios en IPC, preload, ni infraestructura de archivos.
+
+## Ajuste de Escala Visual del Mapa
+
+### Objetivo
+
+Permitir agrandar o reducir la imagen cargada en coordenadas de mundo sin cambiar el zoom de camara, para que el DM pueda ajustar la ocupacion del mapa sobre el canvas/proyeccion y lograr que las casillas lleguen a 2.5 cm / 1 pulgada en la mesa fisica.
+
+### Alcance
+
+- Control `Escala mapa` dentro de la seccion Grilla del sidebar derecho.
+- Visible solo cuando hay un mapa cargado.
+- Slider porcentual, input numerico y accion de reset a 100%.
+- Rango inicial seguro de 25% a 400%.
+- El cambio actualiza `scene.map.scale`.
+- El cambio recalcula grilla, oscuridad, fog, darkvision y bounds dependientes del mapa.
+- Player View recibe la misma escala mediante el snapshot de escena.
+
+### Fuera de alcance
+
+- Cambiar `camera.zoom`.
+- Escalado no uniforme por eje.
+- Correccion de perspectiva.
+- Calibracion automatica por deteccion de grilla impresa en la imagen.
+
+### Criterios de aceptacion
+
+- El usuario puede agrandar/reducir el mapa cargado desde Grilla.
+- El control no aparece sin mapa cargado.
+- El mapa escala desde un ancla estable sin desplazar accidentalmente la camara.
+- El zoom bloqueado no impide cambiar la escala visual del mapa.
+- Guardar/cargar conserva la escala.
+- La grilla sigue alineable luego de cambiar escala.
 
 ## D&D 5e Alternating Diagonals
 

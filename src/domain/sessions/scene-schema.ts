@@ -3,6 +3,7 @@ import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
+import { sanitizeMapScale } from "../map/map-image";
 
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
@@ -236,7 +237,7 @@ export const sceneDocumentV1Schema = z.object({
   map: z.object({
     imagePath: z.string().min(1).nullable(),
     position: worldPointSchema,
-    scale: positiveNumber
+    scale: positiveNumber.transform(sanitizeMapScale)
   }),
   camera: z.object({
     x: finiteNumber,

@@ -28,6 +28,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Exponer `Valor por casilla` dentro de Figuras.
 - Exponer `Ajustar grilla` como switch dentro de Grilla y mostrar `Celda` solo cuando ese modo este activo.
 - Exponer `Ajustar mapa` dentro de Grilla.
+- Exponer `Escala mapa` dentro de Grilla cuando hay mapa cargado, con slider, input porcentual y reset a 100%.
 - Exponer `Modo niebla` dentro de Niebla.
 - Retirar acciones redundantes de la toolbar superior: `Pintar fuego`, `Borrar seleccionado`, `Ajustar mapa` y `Modo niebla`.
 - Ajustar el canvas para ocupar el espacio restante sin quedar cubierto.
@@ -45,7 +46,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 ### 3. Decisiones tecnicas
 
 - **Arquitectura:** El cambio vive en `renderer`; no se tocan `domain`, `application`, `main`, `preload`, `infrastructure` ni `render`.
-- **Persistencia:** No se agregan campos a `.ttrpgscene`; los controles siguen modificando `grid`, `settings`, `darkness` y `fogOfWar`. La visibilidad del sidebar es estado local de UI.
+- **Persistencia:** El sidebar no agrega persistencia propia. Los controles siguen modificando `grid`, `settings`, `darkness`, `fogOfWar` y el `map.scale` existente en la escena. La visibilidad del sidebar es estado local de UI.
 - **IPC / Electron:** Sin cambios. No se agregan canales IPC ni preload API.
 - **Render / PixiJS:** Sin cambios en adapters Pixi; solo cambia el layout React/CSS alrededor del canvas.
 - **Validacion:** Mantener los mismos límites actuales de inputs. Para `Valor por casilla`, editar `distancePerCell` cuando la unidad sea `ft` y `metricDistancePerCell` cuando la unidad sea `m`.
@@ -92,6 +93,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
   - Crear una estructura de secciones clara para Grilla, Figuras, Oscuridad y Niebla.
   - Agregar switch `Ajustar grilla` dentro de Grilla.
   - Mover `Ajustar mapa` a Grilla.
+  - Agregar `Escala mapa` a Grilla, visible solo con mapa cargado.
   - Mostrar/ocultar el input `Celda` segun `Ajustar grilla`.
   - Agregar handler para `Valor por casilla`.
   - Mover `Modo niebla` a Niebla.
@@ -118,17 +120,18 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 5. Mover controles de Grilla al accordion Grilla.
 6. Agregar switch `Ajustar grilla` y dejar `Celda` visible solo cuando el switch este activo.
 7. Mover `Ajustar mapa` al accordion Grilla.
-8. Mover Snap, Diagonal y `Valor por casilla` al accordion Figuras.
-9. Mover controles de Oscuridad al accordion Oscuridad.
-10. Mover controles de Niebla al accordion Niebla.
-11. Mover `Modo niebla` al accordion Niebla.
-12. Implementar handler de `Valor por casilla` respetando unidad activa.
-13. Agregar botón visible para ocultar/mostrar el sidebar.
-14. Ajustar CSS para layout lateral derecho, modo colapsado y canvas con espacio restante.
-15. Ajustar estilos de headers, iconos, indicadores, controles internos y scroll.
-16. Verificar que toolbar principal, status, propiedades y canvas no se solapen.
-17. Ejecutar validaciones automáticas.
-18. Realizar smoke manual en `pnpm dev`.
+8. Agregar `Escala mapa` al accordion Grilla con slider, input porcentual y reset 100%, conectado a `scene.map.scale`.
+9. Mover Snap, Diagonal y `Valor por casilla` al accordion Figuras.
+10. Mover controles de Oscuridad al accordion Oscuridad.
+11. Mover controles de Niebla al accordion Niebla.
+12. Mover `Modo niebla` al accordion Niebla.
+13. Implementar handler de `Valor por casilla` respetando unidad activa.
+14. Agregar botón visible para ocultar/mostrar el sidebar.
+15. Ajustar CSS para layout lateral derecho, modo colapsado y canvas con espacio restante.
+16. Ajustar estilos de headers, iconos, indicadores, controles internos y scroll.
+17. Verificar que toolbar principal, status, propiedades y canvas no se solapen.
+18. Ejecutar validaciones automáticas.
+19. Realizar smoke manual en `pnpm dev`.
 
 ### 7. Testing y verificacion
 
@@ -160,6 +163,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Los headers usan tamaño de fuente aproximado entre `1.5rem` y `2rem`.
 - Los controles internos se ven más pequeños que los headers.
 - Grilla contiene toggle, opacidad, `Ajustar mapa`, switch `Ajustar grilla`, celda condicional, unidad y preset.
+- Grilla contiene `Escala mapa` con slider, input porcentual y reset a 100% cuando hay mapa cargado.
 - Figuras contiene Snap, Diagonal y Valor por casilla.
 - Oscuridad contiene toggle y overlay.
 - Niebla contiene toggle, `Modo niebla`, fog/opacity, color, reveal y reset.
@@ -178,6 +182,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 ### 11. Checklist de cierre
 
 - [x] Implementacion completada dentro del alcance.
+- [x] Control `Escala mapa` agregado a Grilla con slider, input porcentual y reset.
 - [x] Tests relevantes agregados o actualizados.
 - [x] `pnpm typecheck` ejecutado.
 - [x] `pnpm lint` ejecutado.
