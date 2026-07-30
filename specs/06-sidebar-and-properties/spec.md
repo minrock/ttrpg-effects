@@ -39,6 +39,7 @@ Sección para controles directamente relacionados con la grilla visual:
 - Activar/desactivar grilla.
 - Opacidad de grilla.
 - Ajustar mapa.
+- Ajustar escala visual del mapa en porcentaje (`Escala mapa`) cuando hay mapa cargado.
 - Switch `Ajustar grilla`.
 - Tamaño de celda, visible solo cuando `Ajustar grilla` esta activo.
 - Unidad.
@@ -96,6 +97,7 @@ Icono sugerido: nube, ojo cubierto o niebla.
 - Debe existir un control visible para ocultar o mostrar el panel lateral completo.
 - Al ocultar el panel, el viewport del mapa debe expandirse para ocupar el espacio liberado.
 - Los controles internos deben conservar los mismos handlers y efectos que hoy tienen en la barra horizontal.
+- `Escala mapa` debe cambiar `scene.map.scale`, no `camera.zoom`, y debe tener una accion para volver a 100%.
 - El panel no debe interferir con click derecho, selección, pan, zoom, pintado de fuego, niebla o herramientas tácticas sobre el canvas.
 
 ### Layout y estilo
@@ -150,6 +152,7 @@ La spec es de presentación e interacción de UI. Los valores editados por el pa
 - Los valores internos son visualmente más pequeños que los headers.
 - La sección Grilla contiene los controles de grilla actuales.
 - La sección Grilla contiene `Ajustar mapa`.
+- La sección Grilla contiene `Escala mapa` con slider, input porcentual y reset a 100% cuando hay mapa cargado.
 - La sección Grilla permite activar `Ajustar grilla` con switch, no checkbox.
 - El tamaño de celda se oculta mientras `Ajustar grilla` esta inactivo.
 - La sección Figuras contiene Snap, Diagonal y Valor por casilla.

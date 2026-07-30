@@ -28,6 +28,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Activar/desactivar `Ajustar grilla` con shortcut `Cmd+G` en macOS y `Ctrl+G` en Windows/Linux.
 - Mostrar el input numerico de `cellSizeWorld` solo mientras `Ajustar grilla` esta activo.
 - Renderizar el handle de calibracion en una capa superior a niebla/oscuridad para que siempre sea usable.
+- Ajustar `map.scale` desde un control porcentual `Escala mapa` visible solo con mapa cargado.
 - Aplicar presets iniciales: 1 inch, 2.5 cm, 5 ft, 1.5 m por casilla.
 - Bloquear escala/zoom desde UI para proteger la calibracion.
 - Guardar/cargar mapa y grilla en `.ttrpgscene`.
@@ -46,7 +47,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 ### 3. Decisiones tecnicas
 
 - **Arquitectura:** El dominio define tipos/reglas de mapa y grilla. La aplicacion orquesta seleccion de imagen y actualizacion de escena. Infraestructura/main accede al filesystem y dialogos. PixiJS solo renderiza mapa/grilla a partir de estado serializable.
-- **Persistencia:** Se reutiliza `SceneDocumentV1`. El mapa guarda ruta local sin copiar archivo. La grilla guarda valores ya existentes del schema: `enabled`, `locked`, `cellSizeWorld`, `opacity`, `unit`, `distancePerCell`, `metricDistancePerCell`.
+- **Persistencia:** Se reutiliza `SceneDocumentV1`. El mapa guarda ruta local sin copiar archivo y conserva `map.position` + `map.scale`. La grilla guarda valores ya existentes del schema: `enabled`, `locked`, `cellSizeWorld`, `opacity`, `unit`, `distancePerCell`, `metricDistancePerCell`.
 - **IPC / Electron:** Agregar una API especifica `map:open-image` en main/preload. No exponer filesystem ni dialogos genericos. La URL de imagen se resuelve via protocolo custom `map-asset://` registrado en el proceso principal (ver decision tecnica resuelta mas abajo).
 - **Render / PixiJS:** Extender `PixiViewport` para cargar textura usando `Assets.load(url)` de PixiJS v8 (API canonica). Renderizar mapa en capa `map` y grilla en capa `grid`. Mantener conversion pantalla <-> mundo centralizada. El handle de calibracion se dibuja en la capa superior de seleccion solo durante `Ajustar grilla`, para no quedar debajo de fog/darkness. El CSP del renderer debe incluir `unsafe-eval` para la compilacion de shaders de PixiJS v8.
 - **Validacion:** Validar extension, existencia de archivo y soporte de carga. HEIC debe intentar cargarse si Chromium/sistema lo permite; si falla, mostrar mensaje claro y recuperable.
@@ -71,7 +72,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 ### 4. Diseno de dominio
 
 - **Entidades / tipos:** Crear/reforzar `MapImageState`, `GridState`, `GridCalibrationState`, `GridPreset`, `MapLoadResult`.
-- **Reglas puras:** Calcular lineas de grilla visibles, aplicar presets, cambiar opacidad con clamp `0..1`, actualizar `cellSizeWorld`, bloquear/desbloquear escala, validar tamanos positivos.
+- **Reglas puras:** Calcular lineas de grilla visibles, aplicar presets, cambiar opacidad con clamp `0..1`, actualizar `cellSizeWorld`, normalizar `map.scale`, bloquear/desbloquear escala, validar tamanos positivos.
 - **Coordenadas / unidades:** Separar `map.scale`, `camera.zoom` y `grid.cellSizeWorld`. La calibracion modifica tamano de celda/grilla, no posicion de camara. El mapa y la grilla viven en coordenadas de mundo.
 - **Errores de dominio:** Extension no soportada, imagen inexistente, imagen no decodificable, `cellSizeWorld <= 0`, opacidad fuera de rango.
 
@@ -80,6 +81,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 #### `domain`
 
 - Crear `src/domain/map/map-image.ts` para estado/tipos de imagen de mapa.
+- Agregar sanitizacion de escala visual del mapa (`25%..400%`) y tests.
 - Crear o ampliar `src/domain/grid/grid.ts` para estado, presets, opacidad, calibracion y validaciones.
 - Agregar tests unitarios para presets, clamp de opacidad, cambio numerico de celda y bloqueo de escala.
 - Mantener compatibilidad con `SceneDocumentV1`.
@@ -116,7 +118,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 #### `renderer`
 
 - Agregar boton `Cargar mapa`.
-- Agregar controles compactos de grilla: visible, opacidad, switch `Ajustar grilla`, tamano de celda visible solo en ese modo, presets, bloqueo de escala.
+- Agregar controles compactos de grilla: visible, opacidad, switch `Ajustar grilla`, tamano de celda visible solo en ese modo, `Escala mapa`, presets, bloqueo de escala.
 - Mostrar estado visible de mapa cargado o error recuperable.
 - Actualizar escena en memoria al cargar mapa o cambiar grilla.
 - Guardar/cargar `.ttrpgscene` con mapa/grilla actualizados.
@@ -132,6 +134,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Implementar handle/overlay de calibracion por arrastre visible/interactivo solo en modo `Ajustar grilla`.
 - Dibujar el handle de calibracion en la capa de seleccion para quedar por encima de niebla/oscuridad.
 - Respetar bloqueo de zoom/escala en rueda.
+- Al cambiar `map.scale`, actualizar sprites de mapa y color-map, recalcular grilla, darkvision, oscuridad y fog sin modificar `camera.zoom`.
 - Llamar `drawDarknessLayer()` dentro de `drawMapImage()` tras asignar el sprite, para que los bounds del overlay sean correctos.
 - Mantener interacciones existentes de interaccion y navegacion.
 
@@ -157,10 +160,11 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 12. (Resuelto en debug) Reemplazar `loadImageElement + Sprite.from` por `Assets.load + new Sprite` para carga correcta de texturas en PixiJS v8.
 13. (Resuelto en debug) Corregir bounds del overlay de oscuridad llamando `drawDarknessLayer()` tras la carga asincrona del mapa.
 14. (Resuelto en iteracion posterior) Mover activacion de calibracion a un switch del sidebar y shortcut `Cmd/Ctrl+G`; ocultar input/handle fuera del modo y renderizar handle por encima de fog.
+15. (Resuelto en iteracion posterior) Agregar control `Escala mapa` con slider, input porcentual y reset 100%, modificando `scene.map.scale` y normalizando el valor.
 
 ### 7. Testing y verificacion
 
-- **Unit tests:** Presets de grilla, validacion de opacidad, validacion de `cellSizeWorld`, conversion de estado a escena, bloqueo de escala.
+- **Unit tests:** Presets de grilla, validacion de opacidad, validacion de `cellSizeWorld`, sanitizacion de `map.scale`, conversion de estado a escena, bloqueo de escala.
 - **Integration tests:** Casos de uso de carga de mapa con infraestructura fake.
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
@@ -201,6 +205,9 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - El usuario puede calibrar por valor numerico solo con `Ajustar grilla` activo.
 - El handle de calibracion queda visible por encima de niebla/oscuridad.
 - Los presets iniciales actualizan la configuracion de grilla.
+- El usuario puede cambiar `Escala mapa` desde Grilla cuando hay mapa cargado.
+- `Escala mapa` modifica `map.scale` y no `camera.zoom`.
+- El usuario puede resetear la escala del mapa a 100%.
 - Al bloquear escala, la rueda no rompe el tamano fisico de la grilla.
 - Mapa y grilla se guardan y cargan en `.ttrpgscene`.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
@@ -229,6 +236,8 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - [x] Input numerico y handle ocultos fuera de `Ajustar grilla`.
 - [x] Handle de calibracion renderizado por encima de fog/darkness.
 - [x] Presets iniciales implementados.
+- [x] Control `Escala mapa` implementado con slider, input y reset.
+- [x] Sanitizacion de `map.scale` implementada y testeada.
 - [x] Bloqueo de escala respeta rueda/zoom.
 - [x] Guardar/cargar escena conserva mapa y grilla.
 - [x] HEIC documentado segun soporte real.

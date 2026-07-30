@@ -12,6 +12,7 @@ Definir el formato de guardado y carga de una escena local, incluyendo mapa, cam
 
 - Crear un formato JSON versionado.
 - Guardar ruta local de imagen.
+- Guardar posicion y escala visual del mapa.
 - Guardar configuracion de camara.
 - Guardar configuracion de grilla.
 - Guardar oscuridad global.
@@ -81,6 +82,8 @@ El contenido sera JSON.
 - Si la imagen local no existe, la app muestra un error recuperable.
 - El formato incluye version para migraciones futuras.
 - El guardado conserva rutas locales sin copiar la imagen.
+- El guardado conserva `map.position` y `map.scale`; `map.scale` representa la escala visual de la imagen del mapa y es independiente de `camera.zoom`.
+- Al cargar una escena, `map.scale` se normaliza a un rango seguro para evitar mapas invisibles o dimensiones extremas.
 
 ### Riesgos
 
@@ -94,3 +97,4 @@ El contenido sera JSON.
 - Considerar Zod o una validacion equivalente.
 - El renderer puede enviar la ruta actual como sugerencia tipada de guardado, pero no debe escribir directamente en filesystem; main/infrastructure siguen controlando el dialogo y la escritura.
 - No bloquear el render si falla la carga de un asset.
+- Tratar `map.scale` como un factor decimal (`1` = 100%) de la imagen del mapa; no usarlo como zoom de camara ni como tamano de celda.

@@ -25,6 +25,10 @@ export interface MapOpenFailure {
 
 export type MapOpenResult = MapOpenSuccess | MapOpenFailure;
 
+export const MAP_SCALE_MIN = 0.25;
+export const MAP_SCALE_MAX = 4;
+export const MAP_SCALE_DEFAULT = 1;
+
 export function isSupportedMapImageExtension(extension: string): extension is SupportedMapImageExtension {
   return supportedMapImageExtensions.includes(extension.toLowerCase() as SupportedMapImageExtension);
 }
@@ -34,6 +38,14 @@ export function createMapImageState(imagePath: string, imageUrl: string): MapIma
     imagePath,
     imageUrl,
     position: { x: 0, y: 0 },
-    scale: 1
+    scale: MAP_SCALE_DEFAULT
   };
+}
+
+export function sanitizeMapScale(scale: number): number {
+  if (!Number.isFinite(scale) || scale <= 0) {
+    return MAP_SCALE_DEFAULT;
+  }
+
+  return Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, Math.round(scale * 100) / 100));
 }

@@ -56,7 +56,14 @@ import {
   type LightKind,
   type LightPatch
 } from "../../domain/lighting/lights";
-import { createMapImageState, type MapImageState } from "../../domain/map/map-image";
+import {
+  MAP_SCALE_DEFAULT,
+  MAP_SCALE_MAX,
+  MAP_SCALE_MIN,
+  createMapImageState,
+  sanitizeMapScale,
+  type MapImageState
+} from "../../domain/map/map-image";
 import { formatDistance, measureDistance, measurePathDistance } from "../../domain/measurement/measurement";
 import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
@@ -1233,6 +1240,16 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       map: { ...current.map, position: { x, y } }
+    }));
+  }, []);
+
+  const handleMapScaleChange = useCallback((scale: number): void => {
+    setScene((current) => ({
+      ...current,
+      map: {
+        ...current.map,
+        scale: sanitizeMapScale(scale)
+      }
     }));
   }, []);
 
@@ -2759,6 +2776,35 @@ export function App(): JSX.Element {
                     }}
                   />
                 </label>
+              </div>
+            ) : null}
+            {mapState !== null ? (
+              <div className="map-adjust-fields" aria-label="Escala visual del mapa">
+                <label>
+                  Escala mapa
+                  <input
+                    type="range"
+                    min={MAP_SCALE_MIN * 100}
+                    max={MAP_SCALE_MAX * 100}
+                    step="5"
+                    value={Math.round(scene.map.scale * 100)}
+                    onChange={(event) => handleMapScaleChange(event.currentTarget.valueAsNumber / 100)}
+                  />
+                </label>
+                <label>
+                  %
+                  <input
+                    type="number"
+                    min={MAP_SCALE_MIN * 100}
+                    max={MAP_SCALE_MAX * 100}
+                    step="5"
+                    value={Math.round(scene.map.scale * 100)}
+                    onChange={(event) => handleMapScaleChange(event.currentTarget.valueAsNumber / 100)}
+                  />
+                </label>
+                <button type="button" onClick={() => handleMapScaleChange(MAP_SCALE_DEFAULT)}>
+                  Reset 100%
+                </button>
               </div>
             ) : null}
             <label>

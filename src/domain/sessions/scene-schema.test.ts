@@ -29,6 +29,18 @@ describe("scene document schema", () => {
     expect(() => parseSceneDocument(scene)).toThrow();
   });
 
+  it("normalizes map scale when loading scenes", () => {
+    const scene = {
+      ...createDefaultScene(),
+      map: {
+        ...createDefaultScene().map,
+        scale: 12
+      }
+    };
+
+    expect(parseSceneDocument(scene).map.scale).toBe(4);
+  });
+
   it("adds darkvision disabled to older v1 scenes", () => {
     const legacyScene = {
       ...createDefaultScene(),

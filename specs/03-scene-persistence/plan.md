@@ -18,6 +18,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Definir el modelo versionado `SceneDocument` version `1`.
 - Serializar y validar escenas `.ttrpgscene` como JSON.
 - Guardar camara, mapa, grilla, oscuridad, settings, luces, efectos y formas.
+- Guardar `map.position` y `map.scale` como parte del estado portable del mapa.
 - Mantener coordenadas y posiciones en espacio de mundo.
 - Implementar IPC seguro para guardar y cargar escenas.
 - Exponer funciones especificas en preload: `saveScene` y `loadScene`.
@@ -38,7 +39,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 ### 3. Decisiones tecnicas
 
 - **Arquitectura:** El formato y validacion viven en `domain/sessions`; los casos de uso en `application/use-cases`; lectura/escritura de disco en `infrastructure/file-system`; IPC en `main/ipc`; React solo invoca preload y muestra resultado.
-- **Persistencia:** Usar archivos JSON `.ttrpgscene` en disco. SQLite queda fuera. Las rutas de imagen se guardan como rutas locales sin copiar assets.
+- **Persistencia:** Usar archivos JSON `.ttrpgscene` en disco. SQLite queda fuera. Las rutas de imagen se guardan como rutas locales sin copiar assets. `map.scale` se guarda como factor decimal independiente de `camera.zoom`.
 - **IPC / Electron:** Crear canales especificos `scene:save` y `scene:load` con `ipcMain.handle` + `ipcRenderer.invoke`. `scene:save` puede recibir una sugerencia tipada de ruta actual para configurar `defaultPath` del dialogo, pero main/infrastructure siguen controlando el dialogo y la escritura. No exponer `ipcRenderer`, `fs`, `path` ni canales genericos.
 - **Render / PixiJS:** No acoplar el formato a PixiJS. La camara del viewport debe poder convertirse desde/hacia el `SceneDocument`, pero esta spec puede guardar una escena default si todavia no existe estado editable completo.
 - **Validacion:** Usar un esquema compartido para validar datos externos cargados desde disco e inputs enviados por IPC. Devolver errores serializables y amigables.
@@ -47,8 +48,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 ### 4. Diseno de dominio
 
 - **Entidades / tipos:** Crear `SceneDocumentV1`, `SceneMap`, `SceneCamera`, `SceneGrid`, `SceneDarkness`, `SceneSettings`, `SceneLight`, `SceneEffect`, `SceneShape` y `SceneValidationResult`.
-- **Reglas puras:** Validar version, estructura JSON, rangos numericos, opacity `0..1`, zoom positivo, colores hex y arrays de entidades.
-- **Coordenadas / unidades:** Guardar `map.position`, `camera.x`, `camera.y`, luces, efectos y formas en coordenadas de mundo. No guardar coordenadas dependientes de pantalla.
+- **Reglas puras:** Validar version, estructura JSON, rangos numericos, opacity `0..1`, zoom positivo, escala visual de mapa en rango seguro, colores hex y arrays de entidades.
+- **Coordenadas / unidades:** Guardar `map.position`, `map.scale`, `camera.x`, `camera.y`, luces, efectos y formas en coordenadas de mundo. No guardar coordenadas dependientes de pantalla. `map.scale` cambia el tamano de la imagen del mapa; `camera.zoom` cambia solo la navegacion.
 - **Errores de dominio:** Version incompatible, JSON invalido, schema invalido, ruta de imagen rota, operacion cancelada por usuario y error de filesystem.
 
 ### 5. Cambios por capa
@@ -58,7 +59,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Crear `src/domain/sessions/scene-document.ts` con tipos centrales del formato.
 - Crear `src/domain/sessions/scene-schema.ts` con schema Zod o validacion equivalente.
 - Crear `src/domain/sessions/default-scene.ts` para una escena inicial versionada.
-- Agregar tests unitarios para escena valida, JSON invalido/schema invalido, rangos y versiones incompatibles.
+- Agregar tests unitarios para escena valida, JSON invalido/schema invalido, rangos, normalizacion de `map.scale` y versiones incompatibles.
 
 #### `application`
 
@@ -116,7 +117,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 
 ### 7. Testing y verificacion
 
-- **Unit tests:** Schema de escena, default scene valida, rechazo de version incompatible, rangos invalidos, serializacion JSON.
+- **Unit tests:** Schema de escena, default scene valida, rechazo de version incompatible, rangos invalidos, normalizacion de `map.scale`, serializacion JSON.
 - **Integration tests:** Casos de uso con storage fake para guardar/cargar sin tocar filesystem real, incluyendo que el guardado reenvia `suggestedFilePath` al puerto de filesystem.
 - **Typecheck:** `pnpm typecheck`
 - **Lint:** `pnpm lint`
@@ -142,6 +143,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Se puede cargar una escena `.ttrpgscene` desde disco.
 - Si se carga o guarda una escena existente, un guardado posterior abre el dialogo en la misma ruta/nombre para sobrescribir con confirmacion.
 - El archivo guardado es JSON versionado con `version: 1`.
+- El archivo guardado conserva `map.scale` como factor decimal y lo restaura al cargar.
 - Una escena cargada invalida muestra un error recuperable.
 - Una ruta local de imagen rota muestra warning recuperable sin bloquear la app.
 - El renderer no accede directamente a Node.js, filesystem, SQLite ni Electron internals.
@@ -160,6 +162,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Schema versionado `SceneDocumentV1` creado.
 - [x] Escena default versionada creada.
 - [x] Tests de validacion/serializacion agregados.
+- [x] `map.scale` persistido y normalizado al cargar escenas.
 - [x] Casos de uso `saveScene` y `loadScene` creados.
 - [x] IPC especifico `scene:save` y `scene:load` registrado.
 - [x] Preload expone solo funciones especificas de escena.
