@@ -1,4 +1,5 @@
 import type { SceneDocument, SceneOperationResult } from "../domain/sessions/scene-document";
+import type { InformationAreaHighlightBroadcast } from "../domain/annotations/map-annotations";
 import type { MapOpenResult } from "../domain/map/map-image";
 import type { TokenOpenResult } from "../domain/tokens/token-image";
 import type {
@@ -61,10 +62,12 @@ export interface TtrpgApi {
   publishPlayerScene: (snapshot: PlayerWindowSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerCamera: (camera: ViewportCameraSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerPointer: (pointer: ArcanePointerBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  publishPlayerInformationAreaHighlight: (highlight: InformationAreaHighlightBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   notifyPlayerContentReady: () => Promise<{ readonly ok: boolean; readonly error?: string }>;
   onPlayerScene: (handler: (snapshot: PlayerWindowSnapshot) => void) => () => void;
   onPlayerCamera: (handler: (camera: ViewportCameraSnapshot) => void) => () => void;
   onPlayerPointer: (handler: (pointer: ArcanePointerBroadcast) => void) => () => void;
+  onPlayerInformationAreaHighlight: (handler: (highlight: InformationAreaHighlightBroadcast) => void) => () => void;
   onPlayerWindowClosed: (handler: () => void) => () => void;
 }
 

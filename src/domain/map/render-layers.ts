@@ -8,9 +8,11 @@ export const renderLayerNames = [
   "effects",
   "magicalDarkness",
   "fogOfWar",
+  "mapAnnotations",
   "walls",
   "shapesAndMeasurements",
   "labels",
+  "informationAreaHighlights",
   "selection",
   "pointer"
 ] as const;

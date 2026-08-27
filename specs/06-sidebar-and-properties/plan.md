@@ -352,3 +352,9 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+## Extension: indice de anotaciones
+
+- Crear un accordion de herramientas a la derecha y un arbol jerarquico de anotaciones dentro del panel izquierdo.
+- Mantener busqueda y visibilidad como estado UI; persistir solo datos y bloqueo por anotacion.
+- Reutilizar el switch Radix y el patron vigente de propiedades seleccionadas.
+- Agrupar el arbol en habitaciones, terrenos y trampas; exponer highlight de 5 segundos en las hojas de area.

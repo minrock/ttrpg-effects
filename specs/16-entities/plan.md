@@ -1078,3 +1078,8 @@ No hay cambios en PixiJS. El aside es completamente HTML/React.
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+## Extension: sanitizacion compartida
+
+- Mantener `marked` para GFM y tablas.
+- Sanitizar centralmente el HTML generado con DOMPurify antes de entregarlo a cualquier detalle o preview.
+- Cubrir tablas, HTML crudo, atributos de evento y enlaces inseguros con pruebas DOM.

@@ -1,11 +1,22 @@
-import { marked } from "marked";
+import { marked, Renderer } from "marked";
+import DOMPurify from "dompurify";
+
+const safeRenderer = new Renderer();
+safeRenderer.html = (): string => "";
 
 export function renderMarkdown(markdown: string): string {
-  return marked.parse(normalizeLooseMarkdownTables(markdown), {
+  const html = marked.parse(normalizeLooseMarkdownTables(markdown), {
     async: false,
     breaks: false,
-    gfm: true
+    gfm: true,
+    renderer: safeRenderer
   }) as string;
+
+  return DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ["style", "iframe", "object", "embed", "form"],
+    FORBID_ATTR: ["style"]
+  });
 }
 
 function normalizeLooseMarkdownTables(markdown: string): string {

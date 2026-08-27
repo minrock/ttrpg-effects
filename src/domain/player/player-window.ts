@@ -2,6 +2,7 @@ import { clampZoom, type CameraState } from "../map/camera";
 import type { SceneDocument, SceneToken } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import type { ArcanePointerCreatureSize } from "../pointer/arcane-pointer";
+import { stripPrivateMapAnnotationsForPlayer } from "../annotations/map-annotations";
 
 export type ViewportViewRole = "dm" | "player";
 export type FogPresentation = "dm-hidden" | "dm-preview" | "player-blocking";
@@ -26,6 +27,7 @@ export interface PlayerWindowSnapshot {
   readonly camera: ViewportCameraSnapshot;
   readonly cameraSyncKey?: number;
   readonly showDmFogOverlay: boolean;
+  readonly informationAreaHighlightResetKey?: number;
 }
 
 export function normalizeCameraSnapshot(camera: ViewportCameraSnapshot | null | undefined): ViewportCameraSnapshot {
@@ -66,4 +68,11 @@ export function getTokensForRole(
   role: ViewportViewRole
 ): readonly SceneToken[] {
   return role === "player" ? tokens.filter((token) => token.visible) : tokens;
+}
+
+export function createPlayerSceneSnapshot(scene: SceneDocument): SceneDocument {
+  return {
+    ...stripPrivateMapAnnotationsForPlayer(scene),
+    labels: []
+  };
 }

@@ -330,3 +330,9 @@ Requisitos:
 - Eliminar o dejar sin uso la clase `.properties-panel` solo cuando no rompa otros estilos.
 - Considerar un id estable para el accordion contextual, por ejemplo `selected-object-properties-panel`.
 - La lógica `setIsSidebarVisible(true)` debe ocurrir cuando `interaction.selectedElementId` cambia de `null` a un id válido.
+## Accordion de anotaciones
+
+- El sidebar derecho incluye `Anotaciones` con visibilidad global local y acciones de creacion.
+- El panel lateral izquierdo incluye el arbol de anotaciones con buscador, grupos por tipo, seleccion, edicion, bloqueo, `Ir a` y accion de highlight para areas.
+- Al seleccionar un pin o area se abre el sidebar y aparecen sus acciones contextuales.
+- Ocultar la capa no elimina datos ni oculta el arbol izquierdo.

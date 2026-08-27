@@ -49,6 +49,18 @@ import {
   type ViewportCameraSnapshot,
   type ViewportViewRole
 } from "../../domain/player/player-window";
+import {
+  getInformationAreaColor,
+  getMapAnnotationCenter,
+  rasterizeInformationAreaStroke,
+  type InformationAreaCell,
+  type InformationAreaHighlightBroadcast,
+  type MapAnnotation,
+  type MapAnnotations
+} from "../../domain/annotations/map-annotations";
+
+const MAP_INFORMATION_PIN_RADIUS = 32;
+const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
 
 export type RenderSceneToken = SceneToken & {
   readonly imageUrl: string | null;
@@ -58,6 +70,11 @@ interface ArcanePointerAnimation {
   readonly container: Container;
   readonly startedAt: number;
   readonly durationMs: number;
+}
+
+interface InformationAreaHighlightAnimation {
+  readonly container: Container;
+  readonly timeoutId: number;
 }
 
 interface PointerDragState {
@@ -82,6 +99,7 @@ interface PointerDragState {
     | "path-point-move"
     | "path-move"
     | "fog-reveal"
+    | "information-area-paint"
     | "fire-paint"
     | "fire-zone-resize"
     | "fire-light-resize"
@@ -132,6 +150,10 @@ export interface PixiViewportOptions {
   readonly onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
   readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
   readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
+  readonly onRoomPinPlace?: (position: WorldPoint) => void;
+  readonly onInformationAreaPaint?: (cells: readonly InformationAreaCell[]) => void;
+  readonly onInformationAreaHighlight?: (areaId: string) => void;
+  readonly onMapAnnotationPreview?: (annotationId: string) => void;
 }
 
 export class PixiViewport {
@@ -164,6 +186,8 @@ export class PixiViewport {
   private effects: readonly SceneEffect[] = [];
   private tokens: readonly RenderSceneToken[] = [];
   private labels: readonly SceneLabel[] = [];
+  private mapAnnotations: MapAnnotations = { pins: [], areas: [] };
+  private showMapAnnotations = true;
   private selectedElementId: string | null = null;
   private isZoomLocked = false;
   private isMapAdjustMode = false;
@@ -176,6 +200,8 @@ export class PixiViewport {
   private isPathDrawingMode = false;
   private isWaterDrawingMode = false;
   private isArcanePointerMode = false;
+  private isRoomPinMode = false;
+  private isInformationAreaMode = false;
   private arcanePointerCreatureSize: ArcanePointerCreatureSize = "medium";
   private viewRole: ViewportViewRole = "dm";
   private isReadOnly = false;
@@ -187,6 +213,7 @@ export class PixiViewport {
   private waterPreviewHoverPoint: WorldPoint | null = null;
   private pathHoverZone: "point" | "circle" | null = null;
   private fogRevealStrokePoints: WorldPoint[] = [];
+  private informationAreaStrokePoints: WorldPoint[] = [];
   private dragState: PointerDragState | null = null;
   private transientMovePreview:
     | {
@@ -208,6 +235,7 @@ export class PixiViewport {
   private readonly tokenTextureCache = new Map<string, Texture>();
   private tokenLayerSignature: string | null = null;
   private readonly arcanePointers = new Map<string, ArcanePointerAnimation>();
+  private readonly informationAreaHighlights = new Map<string, InformationAreaHighlightAnimation>();
   private nextArcanePointerId = 1;
   private readonly effectRenderCache = new Map<
     string,
@@ -306,6 +334,18 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  setMapAnnotations(mapAnnotations: MapAnnotations): void {
+    this.mapAnnotations = mapAnnotations;
+    this.drawMapAnnotationsLayer();
+    this.drawSelectionLayer();
+  }
+
+  setShowMapAnnotations(showMapAnnotations: boolean): void {
+    this.showMapAnnotations = showMapAnnotations;
+    this.drawMapAnnotationsLayer();
+    this.drawSelectionLayer();
+  }
+
   setSelectedElementId(selectedElementId: string | null): void {
     this.selectedElementId = selectedElementId;
     this.pathHoverZone = null;
@@ -366,6 +406,20 @@ export class PixiViewport {
     this.updateCursor();
   }
 
+  setRoomPinMode(isRoomPinMode: boolean): void {
+    this.isRoomPinMode = isRoomPinMode;
+    this.updateCursor();
+  }
+
+  setInformationAreaMode(isInformationAreaMode: boolean): void {
+    this.isInformationAreaMode = isInformationAreaMode;
+    if (!isInformationAreaMode) {
+      this.informationAreaStrokePoints = [];
+      this.drawSelectionLayer();
+    }
+    this.updateCursor();
+  }
+
   setArcanePointerCreatureSize(arcanePointerCreatureSize: ArcanePointerCreatureSize): void {
     this.arcanePointerCreatureSize = arcanePointerCreatureSize;
   }
@@ -378,6 +432,7 @@ export class PixiViewport {
     this.scheduleDarknessRedraw();
     this.drawDarkvisionLayer();
     this.drawLabelsLayer();
+    this.drawMapAnnotationsLayer();
   }
 
   setReadOnly(isReadOnly: boolean): void {
@@ -403,6 +458,43 @@ export class PixiViewport {
 
   showArcanePointer(pointer: ArcanePointerBroadcast): void {
     this.spawnArcanePointer(pointer);
+  }
+
+  showInformationAreaHighlight(highlight: InformationAreaHighlightBroadcast): void {
+    const existing = this.informationAreaHighlights.get(highlight.id);
+    if (existing !== undefined) {
+      window.clearTimeout(existing.timeoutId);
+      destroyDisplayObject(existing.container);
+    }
+
+    const container = drawInformationAreaCells(
+      highlight.cells,
+      getInformationAreaColor(highlight.areaType),
+      0.5,
+      4
+    );
+    container.label = highlight.id;
+    this.getLayer("informationAreaHighlights").addChild(container);
+    const timeoutId = window.setTimeout(() => {
+      const current = this.informationAreaHighlights.get(highlight.id);
+      if (current === undefined) return;
+      destroyDisplayObject(current.container);
+      this.informationAreaHighlights.delete(highlight.id);
+    }, highlight.durationMs);
+    this.informationAreaHighlights.set(highlight.id, { container, timeoutId });
+  }
+
+  clearInformationAreaHighlights(): void {
+    for (const highlight of this.informationAreaHighlights.values()) {
+      window.clearTimeout(highlight.timeoutId);
+      destroyDisplayObject(highlight.container);
+    }
+    this.informationAreaHighlights.clear();
+  }
+
+  centerOnWorldPoint(point: WorldPoint): void {
+    this.camera = { ...this.camera, center: point };
+    this.applyCamera();
   }
 
   clearArcanePointers(): void {
@@ -525,6 +617,7 @@ export class PixiViewport {
     fireCellRingCache.clear();
     this.app.ticker.remove(this.updateArcanePointers);
     this.clearArcanePointers();
+    this.clearInformationAreaHighlights();
     for (const cached of this.effectRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
@@ -802,6 +895,7 @@ export class PixiViewport {
     canvas.addEventListener("pointermove", this.handlePointerMove);
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
+    canvas.addEventListener("dblclick", this.handleDoubleClick);
     canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     window.addEventListener("keydown", this.handleKeyDown, true);
     window.addEventListener("keyup", this.handleKeyUp, true);
@@ -817,6 +911,7 @@ export class PixiViewport {
     canvas.removeEventListener("pointermove", this.handlePointerMove);
     canvas.removeEventListener("pointerup", this.handlePointerUp);
     canvas.removeEventListener("pointercancel", this.handlePointerUp);
+    canvas.removeEventListener("dblclick", this.handleDoubleClick);
     canvas.removeEventListener("wheel", this.handleWheel);
     window.removeEventListener("keydown", this.handleKeyDown, true);
     window.removeEventListener("keyup", this.handleKeyUp, true);
@@ -827,6 +922,33 @@ export class PixiViewport {
 
   private readonly handleNativeContextMenu = (event: MouseEvent): void => {
     event.preventDefault();
+  };
+
+  private readonly handleDoubleClick = (event: MouseEvent): void => {
+    if (this.viewRole !== "dm" || !this.showMapAnnotations || event.button !== 0) return;
+    const screenPoint = this.eventToScreenPoint(event);
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const area = [...this.mapAnnotations.areas]
+      .reverse()
+      .find((candidate) => hitTestInformationArea(candidate.cells, worldPoint));
+
+    if (area !== undefined) {
+      event.preventDefault();
+      this.options.onInformationAreaHighlight?.(area.id);
+      return;
+    }
+
+    const pin = [...this.mapAnnotations.pins]
+      .reverse()
+      .find(
+        (candidate) =>
+          Math.hypot(worldPoint.x - candidate.position.x, worldPoint.y - candidate.position.y) <=
+          MAP_INFORMATION_PIN_HIT_RADIUS
+      );
+    if (pin !== undefined) {
+      event.preventDefault();
+      this.options.onMapAnnotationPreview?.(pin.id);
+    }
   };
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
@@ -854,7 +976,11 @@ export class PixiViewport {
       } else if (this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
-      } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode) {
+      } else if (this.isInformationAreaMode) {
+        mode = "information-area-paint";
+        this.informationAreaStrokePoints = [screenToWorld(point, this.camera, this.getViewportSize())];
+        this.drawSelectionLayer();
+      } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode) {
         mode = "idle";
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
@@ -954,7 +1080,8 @@ export class PixiViewport {
         } else if (hitElementId !== null) {
           const hitIsPath = this.shapes.some((s) => s.id === hitElementId && s.type === "path");
           const selectedElementPosition = this.findSelectableElement(hitElementId)?.position;
-          mode = hitIsPath ? "idle" : "element-move";
+          const annotation = this.findMapAnnotation(hitElementId);
+          mode = hitIsPath || annotation?.locked === true ? "idle" : "element-move";
           elementId = hitElementId;
           moveStartPosition = selectedElementPosition;
           if (selectedElementPosition !== undefined) {
@@ -1051,6 +1178,13 @@ export class PixiViewport {
       this.appendFogRevealStrokePoint(nextPoint);
     } else if (this.dragState.mode === "fire-paint") {
       this.paintFireAtScreenPoint(nextPoint);
+    } else if (this.dragState.mode === "information-area-paint") {
+      const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const previous = this.informationAreaStrokePoints[this.informationAreaStrokePoints.length - 1];
+      if (previous === undefined || Math.hypot(worldPoint.x - previous.x, worldPoint.y - previous.y) >= 4 / this.camera.zoom) {
+        this.informationAreaStrokePoints.push(worldPoint);
+        this.drawSelectionLayer();
+      }
     } else if (this.dragState.mode === "fire-zone-resize" && this.dragState.elementId !== undefined) {
       this.updateFireZoneRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "fire-light-resize" && this.dragState.elementId !== undefined) {
@@ -1138,6 +1272,18 @@ export class PixiViewport {
       this.flushPendingFirePaint();
     }
 
+    if (this.dragState.mode === "information-area-paint") {
+      const worldPoint = screenToWorld(releasePoint, this.camera, this.getViewportSize());
+      this.informationAreaStrokePoints.push(worldPoint);
+      const cells = rasterizeInformationAreaStroke(
+        this.informationAreaStrokePoints,
+        this.grid?.cellSizeWorld ?? 100
+      );
+      this.informationAreaStrokePoints = [];
+      this.drawSelectionLayer();
+      if (cells.length > 0) this.options.onInformationAreaPaint?.(cells);
+    }
+
     if (this.dragState.mode === "map-move" && this.mapSprite !== null) {
       this.drawGrid();
       this.drawDarkvisionLayer();
@@ -1172,6 +1318,10 @@ export class PixiViewport {
         const pointer = createArcanePointerBroadcast(position, this.arcanePointerCreatureSize);
         this.spawnArcanePointer(pointer);
         this.options.onArcanePointerTrigger?.(pointer);
+      } else if (this.isRoomPinMode) {
+        this.options.onRoomPinPlace?.(
+          screenToWorld(releasePoint, this.camera, this.getViewportSize())
+        );
       } else {
         this.options.onElementSelect?.(this.hitTestElement(releasePoint));
       }
@@ -1221,6 +1371,7 @@ export class PixiViewport {
       "magicalDarkness",
       "tokens",
       "labels",
+      "mapAnnotations",
       "selection"
     ];
 
@@ -1362,9 +1513,9 @@ export class PixiViewport {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
-    } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode) {
+    } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode) {
       this.app.canvas.style.cursor = "crosshair";
-    } else if (this.isFogRevealMode || this.isFirePaintMode) {
+    } else if (this.isFogRevealMode || this.isFirePaintMode || this.isInformationAreaMode) {
       this.app.canvas.style.cursor = "cell";
     } else if (this.pathHoverZone === "circle") {
       this.app.canvas.style.cursor = "grab";
@@ -1442,6 +1593,7 @@ export class PixiViewport {
       viewport.width / 2 - this.camera.center.x * this.camera.zoom,
       viewport.height / 2 - this.camera.center.y * this.camera.zoom
     );
+    this.updateMapInformationPinLabelScale();
     if (emit && this.viewRole === "dm") {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
@@ -1457,7 +1609,7 @@ export class PixiViewport {
     };
   }
 
-  private eventToScreenPoint(event: PointerEvent | WheelEvent): ScreenPoint {
+  private eventToScreenPoint(event: MouseEvent | PointerEvent | WheelEvent): ScreenPoint {
     const bounds = this.app.canvas.getBoundingClientRect();
     return {
       x: event.clientX - bounds.left,
@@ -1488,6 +1640,7 @@ export class PixiViewport {
     this.drawEffectsLayer();
     this.drawMagicalDarknessLayer();
     this.drawLabelsLayer();
+    this.drawMapAnnotationsLayer();
     this.drawSelectionLayer();
   }
 
@@ -1722,7 +1875,11 @@ export class PixiViewport {
       const selectedElement = this.findSelectableElement(this.selectedElementId);
 
       if (selectedElement !== undefined) {
-        const child = drawSelection(selectedElement);
+        const selectedAnnotation = this.findMapAnnotation(selectedElement.id);
+        const child =
+          selectedAnnotation?.kind === "information-area"
+            ? drawInformationAreaCells(selectedAnnotation.cells, "#fff0a8", 0.08, 4)
+            : drawSelection(selectedElement);
         child.label = selectedElement.id;
         selectionLayer.addChild(child);
       }
@@ -1829,6 +1986,48 @@ export class PixiViewport {
           this.grid.cellSizeWorld
         )
       );
+    }
+
+    if (this.isInformationAreaMode && this.informationAreaStrokePoints.length > 0) {
+      const cells = rasterizeInformationAreaStroke(
+        this.informationAreaStrokePoints,
+        this.grid?.cellSizeWorld ?? 100
+      );
+      selectionLayer.addChild(drawInformationAreaCells(cells, "#fff0a8", 0.28, 2));
+    }
+  }
+
+  private drawMapAnnotationsLayer(): void {
+    const layer = this.getLayer("mapAnnotations");
+    clearContainerChildren(layer);
+
+    if (this.viewRole !== "dm" || !this.showMapAnnotations) return;
+
+    for (const area of this.mapAnnotations.areas) {
+      const color = getInformationAreaColor(area.areaType);
+      const container = drawInformationAreaCells(area.cells, color, 0.22, 2);
+      container.label = area.id;
+      layer.addChild(container);
+    }
+
+    for (const pin of this.mapAnnotations.pins) {
+      const container = drawMapInformationPin(pin.position, pin.title, pin.locked);
+      container.label = pin.id;
+      layer.addChild(container);
+    }
+
+    this.updateMapInformationPinLabelScale();
+  }
+
+  private updateMapInformationPinLabelScale(): void {
+    const inverseZoom = 1 / Math.max(this.camera.zoom, 0.001);
+    const layer = this.getLayer("mapAnnotations");
+
+    for (const annotationContainer of layer.children) {
+      const label = annotationContainer.getChildByLabel("room-pin-name");
+      if (label instanceof Text) {
+        label.scale.set(inverseZoom);
+      }
     }
   }
 
@@ -2297,6 +2496,14 @@ export class PixiViewport {
           (effect): effect is SceneWaterEffect => effect.id === element.id && effect.kind === "water"
         );
         if (water !== undefined && hitTestWaterEffect(water, worldPoint, 18 / this.camera.zoom)) {
+          return element.id;
+        }
+        continue;
+      }
+
+      if (element.kind === "information-area") {
+        const area = this.mapAnnotations.areas.find((candidate) => candidate.id === element.id);
+        if (area !== undefined && hitTestInformationArea(area.cells, worldPoint)) {
           return element.id;
         }
         continue;
@@ -2907,6 +3114,24 @@ export class PixiViewport {
   private getSelectableElements(): readonly SelectableRenderElement[] {
     return [
       ...this.elements,
+      ...(this.viewRole === "dm" && this.showMapAnnotations
+        ? [
+            ...this.mapAnnotations.pins.map((pin) => ({
+              id: pin.id,
+              kind: "room-pin" as const,
+              position: pin.position,
+              hitRadius: MAP_INFORMATION_PIN_HIT_RADIUS,
+              selectionColor: "#fff0a8"
+            })),
+            ...this.mapAnnotations.areas.map((area) => ({
+              id: area.id,
+              kind: "information-area" as const,
+              position: getMapAnnotationCenter(area),
+              hitRadius: 32,
+              selectionColor: getInformationAreaColor(area.areaType)
+            }))
+          ]
+        : []),
       ...this.getRenderableShapes().map((shape) => ({
         id: shape.id,
         kind: shape.type,
@@ -2942,6 +3167,13 @@ export class PixiViewport {
           }))
         : [])
     ];
+  }
+
+  private findMapAnnotation(elementId: string): MapAnnotation | undefined {
+    return (
+      this.mapAnnotations.pins.find((pin) => pin.id === elementId) ??
+      this.mapAnnotations.areas.find((area) => area.id === elementId)
+    );
   }
 
   private findSelectableElement(elementId: string): SelectableRenderElement | undefined {
@@ -3164,7 +3396,7 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water" | "label";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water" | "label" | "room-pin" | "information-area";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
   readonly selectionColor?: string;
@@ -5093,6 +5325,80 @@ function drawSceneLabel(label: SceneLabel): Container {
   return container;
 }
 
+function drawInformationAreaCells(
+  cells: readonly InformationAreaCell[],
+  color: string,
+  fillAlpha: number,
+  strokeWidth: number
+): Container {
+  const container = new Container();
+  const fill = new Graphics();
+  const outline = new Graphics();
+  const parsedColor = parseHexColor(color);
+  const keys = new Set(cells.map((cell) => `${cell.x}:${cell.y}:${cell.size}`));
+
+  for (const cell of cells) {
+    fill.rect(cell.x, cell.y, cell.size, cell.size).fill({ color: parsedColor, alpha: fillAlpha });
+    const left = cell.x;
+    const right = cell.x + cell.size;
+    const top = cell.y;
+    const bottom = cell.y + cell.size;
+
+    if (!keys.has(`${cell.x}:${cell.y - cell.size}:${cell.size}`)) {
+      outline.moveTo(left, top).lineTo(right, top);
+    }
+    if (!keys.has(`${cell.x + cell.size}:${cell.y}:${cell.size}`)) {
+      outline.moveTo(right, top).lineTo(right, bottom);
+    }
+    if (!keys.has(`${cell.x}:${cell.y + cell.size}:${cell.size}`)) {
+      outline.moveTo(right, bottom).lineTo(left, bottom);
+    }
+    if (!keys.has(`${cell.x - cell.size}:${cell.y}:${cell.size}`)) {
+      outline.moveTo(left, bottom).lineTo(left, top);
+    }
+  }
+
+  if (strokeWidth > 0 && cells.length > 0) {
+    outline.stroke({ color: parsedColor, width: strokeWidth, alpha: 0.9 });
+  }
+
+  container.addChild(fill, outline);
+  return container;
+}
+
+function drawMapInformationPin(position: WorldPoint, title: string, locked: boolean): Container {
+  const container = new Container();
+  const diamondRadius = 17;
+  const pin = new Graphics()
+    .circle(position.x, position.y, MAP_INFORMATION_PIN_RADIUS)
+    .fill({ color: 0x171a1c, alpha: 0.92 })
+    .circle(position.x, position.y, MAP_INFORMATION_PIN_RADIUS)
+    .stroke({ color: 0xffd28a, width: 4, alpha: 0.95 })
+    .poly([
+      position.x, position.y - diamondRadius,
+      position.x + diamondRadius, position.y,
+      position.x, position.y + diamondRadius,
+      position.x - diamondRadius, position.y
+    ])
+    .fill({ color: locked ? 0x8f8879 : 0xffd28a, alpha: 0.95 });
+  const label = new Text({
+    text: title,
+    style: {
+      fill: 0xf4f1e8,
+      fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontSize: 24,
+      fontWeight: "600",
+      stroke: { color: 0x101315, width: 5 }
+    }
+  });
+  label.anchor.set(0, 0.5);
+  label.position.set(position.x + MAP_INFORMATION_PIN_RADIUS + 10, position.y);
+  label.alpha = 0.92;
+  label.label = "room-pin-name";
+  container.addChild(pin, label);
+  return container;
+}
+
 function drawSelection(element: SelectableRenderElement): Graphics {
   const { x, y } = element.position;
   const radius = (element.hitRadius ?? getHitRadius(element.kind)) + 8;
@@ -5477,7 +5783,21 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
       return 50;
     case "label":
       return 72;
+    case "room-pin":
+      return MAP_INFORMATION_PIN_HIT_RADIUS;
+    case "information-area":
+      return 32;
   }
+}
+
+function hitTestInformationArea(cells: readonly InformationAreaCell[], point: WorldPoint): boolean {
+  return cells.some(
+    (cell) =>
+      point.x >= cell.x &&
+      point.x <= cell.x + cell.size &&
+      point.y >= cell.y &&
+      point.y <= cell.y + cell.size
+  );
 }
 
 function getLabelHitRadius(label: SceneLabel): number {

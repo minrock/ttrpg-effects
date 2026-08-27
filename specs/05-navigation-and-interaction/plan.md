@@ -368,3 +368,8 @@ Cambiar a:
 - [ ] `pnpm lint` ejecutado.
 - [ ] `pnpm build` ejecutado.
 - [ ] Smoke/manual test realizado.
+## Extension: herramientas de anotacion
+
+- Integrar `room-pin` e `information-area` como herramientas exclusivas en la maquina de interaccion.
+- Resolver hit testing, drag y doble click en Pixi usando coordenadas de mundo.
+- Exponer `centerOnWorldPoint` desde el viewport para navegacion del indice lateral.

@@ -18,19 +18,40 @@ import { MonsterSection } from "./MonsterSection";
 import { NpcSection } from "./NpcSection";
 import { NotesSection } from "./NotesSection";
 import { PlayerCharacterSection } from "./PlayerCharacterSection";
+import type { MapAnnotation, MapAnnotations } from "../../../../domain/annotations/map-annotations";
+import { MapAnnotationsTree } from "../annotations/MapAnnotationsTree";
 
 interface DmAsidePanelProps {
   readonly aside: SceneAside;
   readonly monsterTemplates: readonly MonsterTemplate[];
+  readonly annotations: MapAnnotations;
+  readonly selectedElementId: string | null;
   readonly onChange: (aside: SceneAside) => void;
+  readonly onSelectAnnotation: (annotation: MapAnnotation) => void;
+  readonly onGoToAnnotation: (annotation: MapAnnotation) => void;
+  readonly onEditAnnotation: (annotation: MapAnnotation) => void;
+  readonly onToggleAnnotationLock: (annotation: MapAnnotation) => void;
+  readonly onHighlightInformationArea: (areaId: string) => void;
   readonly hidden?: boolean;
 }
 
-type SectionKey = "monsters" | "npcs" | "playerCharacters" | "notes";
+type SectionKey = "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
 
-export function DmAsidePanel({ aside, monsterTemplates, onChange, hidden }: DmAsidePanelProps): JSX.Element {
+export function DmAsidePanel({
+  aside,
+  monsterTemplates,
+  annotations,
+  selectedElementId,
+  onChange,
+  onSelectAnnotation,
+  onGoToAnnotation,
+  onEditAnnotation,
+  onToggleAnnotationLock,
+  onHighlightInformationArea,
+  hidden
+}: DmAsidePanelProps): JSX.Element {
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
-    new Set<SectionKey>(["monsters", "npcs", "playerCharacters", "notes"])
+    new Set<SectionKey>(["annotations", "monsters", "npcs", "playerCharacters", "notes"])
   );
 
   const toggleSection = useCallback((key: SectionKey) => {
@@ -89,6 +110,24 @@ export function DmAsidePanel({ aside, monsterTemplates, onChange, hidden }: DmAs
       </div>
 
       <div className="dm-aside-content">
+        <AccordionSection
+          title="◆ Anotaciones"
+          sectionKey="annotations"
+          open={openSections.has("annotations")}
+          badge={annotations.pins.length + annotations.areas.length}
+          onToggle={toggleSection}
+        >
+          <MapAnnotationsTree
+            annotations={annotations}
+            selectedElementId={selectedElementId}
+            onSelect={onSelectAnnotation}
+            onGoTo={onGoToAnnotation}
+            onEdit={onEditAnnotation}
+            onToggleLock={onToggleAnnotationLock}
+            onHighlightArea={onHighlightInformationArea}
+          />
+        </AccordionSection>
+
         <AccordionSection
           title="🐉 Monstruos"
           sectionKey="monsters"

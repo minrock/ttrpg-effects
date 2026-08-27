@@ -211,6 +211,31 @@ const labelSchema = z.object({
     .default(() => ({ ...defaultSceneLabelStyle.shadow }))
 });
 
+const informationAreaCellSchema = z.object({
+  x: finiteNumber,
+  y: finiteNumber,
+  size: positiveNumber
+});
+
+const mapInformationPinSchema = z.object({
+  id: z.string().trim().min(1),
+  kind: z.literal("room-pin"),
+  position: worldPointSchema,
+  title: z.string().trim().min(1).max(120),
+  content: z.string().max(100_000),
+  locked: z.boolean().default(false)
+});
+
+const mapInformationAreaSchema = z.object({
+  id: z.string().trim().min(1),
+  kind: z.literal("information-area"),
+  areaType: z.enum(["terrain", "trap"]),
+  name: z.string().trim().max(120),
+  description: z.string().max(100_000),
+  cells: z.array(informationAreaCellSchema).min(1),
+  locked: z.boolean().default(false)
+});
+
 const combatParticipantTypeSchema = z.enum(["monster", "npc", "playerCharacter"]);
 
 const combatParticipantSchema = z.object({
@@ -300,6 +325,12 @@ export const sceneDocumentV1Schema = z.object({
     .transform((arr) => arr.filter((s): s is NonNullable<typeof s> => s !== null)),
   tokens: z.array(tokenSchema).default([]),
   labels: z.array(labelSchema).default([]),
+  mapAnnotations: z
+    .object({
+      pins: z.array(mapInformationPinSchema),
+      areas: z.array(mapInformationAreaSchema)
+    })
+    .default(() => ({ pins: [], areas: [] })),
   sceneAside: z
     .object({
       monsters: z.array(
@@ -403,6 +434,8 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
   if (!("labels" in obj)) missing.push("labels");
   // Added in spec 20 (combat turn tracker)
   if (!("combatTracker" in obj)) missing.push("combatTracker");
+  // Added in spec 22 (map information pins and areas)
+  if (!("mapAnnotations" in obj)) missing.push("mapAnnotations");
   return missing;
 }
 

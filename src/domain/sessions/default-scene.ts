@@ -2,6 +2,7 @@ import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { createDefaultSceneAside } from "./scene-aside";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
+import { createDefaultMapAnnotations } from "../annotations/map-annotations";
 
 export function createDefaultScene(): SceneDocument {
   return {
@@ -41,6 +42,7 @@ export function createDefaultScene(): SceneDocument {
     shapes: [],
     tokens: [],
     labels: [],
+    mapAnnotations: createDefaultMapAnnotations(),
     sceneAside: createDefaultSceneAside(),
     combatTracker: createDefaultCombatTracker()
   };

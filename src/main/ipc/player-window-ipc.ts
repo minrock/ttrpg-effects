@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
+import { sanitizeInformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 
 interface PlayerWindowIpcOptions {
   readonly isDevelopment: boolean;
@@ -78,6 +79,22 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
     }
 
     sendToPlayerWindow("player-window:pointer", pointer);
+    return { ok: true };
+  });
+
+  ipcMain.handle("player-window:publish-information-area-highlight", (event: IpcMainInvokeEvent, payload: unknown) => {
+    if (!isFromDmWindow(event)) {
+      return { ok: false, error: "Solo la ventana del DM puede publicar areas." };
+    }
+
+    const highlight = sanitizeInformationAreaHighlightBroadcast(payload);
+    if (highlight === null) {
+      return { ok: false, error: "El highlight de area no es valido." };
+    }
+
+    if (playerWindow !== null && !playerWindow.isDestroyed()) {
+      sendToPlayerWindow("player-window:information-area-highlight", highlight);
+    }
     return { ok: true };
   });
 
