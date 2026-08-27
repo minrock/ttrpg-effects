@@ -26,11 +26,17 @@ import type {
   ViewportCameraSnapshot,
   ViewportViewRole
 } from "../../../domain/player/player-window";
+import type {
+  InformationAreaCell,
+  InformationAreaHighlightBroadcast,
+  MapAnnotations
+} from "../../../domain/annotations/map-annotations";
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
   setPathHoverPoint: (point: { readonly x: number; readonly y: number } | null) => void;
   setWaterHoverPoint: (point: { readonly x: number; readonly y: number } | null) => void;
+  centerOnWorldPoint: (point: { readonly x: number; readonly y: number }) => void;
 }
 
 interface MapViewportProps {
@@ -45,6 +51,8 @@ interface MapViewportProps {
   readonly effects: readonly SceneEffect[];
   readonly tokens: readonly RenderSceneToken[];
   readonly labels: readonly SceneLabel[];
+  readonly mapAnnotations: MapAnnotations;
+  readonly showMapAnnotations: boolean;
   readonly selectedElementId: string | null;
   readonly isZoomLocked: boolean;
   readonly isMapAdjustMode: boolean;
@@ -61,9 +69,13 @@ interface MapViewportProps {
   readonly isPathDrawingMode: boolean;
   readonly isWaterDrawingMode: boolean;
   readonly isArcanePointerMode: boolean;
+  readonly isRoomPinMode: boolean;
+  readonly isInformationAreaMode: boolean;
   readonly arcanePointerCreatureSize: ArcanePointerCreatureSize;
   readonly arcanePointerResetKey: number;
   readonly arcanePointerEvent?: ArcanePointerBroadcast | null;
+  readonly informationAreaHighlightEvent?: InformationAreaHighlightBroadcast | null;
+  readonly informationAreaHighlightResetKey: number;
   readonly pathPreviewPoints: readonly { readonly x: number; readonly y: number }[];
   readonly pathPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
   readonly waterPreviewPoints: readonly { readonly x: number; readonly y: number }[];
@@ -96,6 +108,10 @@ interface MapViewportProps {
   readonly onWaterPatternRotationChange: (elementId: string, rotation: number) => void;
   readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
   readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
+  readonly onRoomPinPlace: (position: { readonly x: number; readonly y: number }) => void;
+  readonly onInformationAreaPaint: (cells: readonly InformationAreaCell[]) => void;
+  readonly onInformationAreaHighlight: (areaId: string) => void;
+  readonly onMapAnnotationPreview: (annotationId: string) => void;
   /** Optional node rendered as a floating overlay inside the viewport (DM-only status badges, etc.). */
   readonly overlay?: ReactNode;
 }
@@ -112,6 +128,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   effects,
   tokens,
   labels,
+  mapAnnotations,
+  showMapAnnotations,
   selectedElementId,
   isZoomLocked,
   isMapAdjustMode,
@@ -128,9 +146,13 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isPathDrawingMode,
   isWaterDrawingMode,
   isArcanePointerMode,
+  isRoomPinMode,
+  isInformationAreaMode,
   arcanePointerCreatureSize,
   arcanePointerResetKey,
   arcanePointerEvent = null,
+  informationAreaHighlightEvent = null,
+  informationAreaHighlightResetKey,
   pathPreviewPoints,
   pathPreviewHoverPoint,
   waterPreviewPoints,
@@ -163,6 +185,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onWaterPatternRotationChange,
   onCameraChange,
   onArcanePointerTrigger,
+  onRoomPinPlace,
+  onInformationAreaPaint,
+  onInformationAreaHighlight,
+  onMapAnnotationPreview,
   overlay
 }: MapViewportProps, ref): JSX.Element {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -173,7 +199,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useImperativeHandle(ref, () => ({
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
     setPathHoverPoint: (point) => viewportRef.current?.setPathHoverPoint(point),
-    setWaterHoverPoint: (point) => viewportRef.current?.setWaterHoverPoint(point)
+    setWaterHoverPoint: (point) => viewportRef.current?.setWaterHoverPoint(point),
+    centerOnWorldPoint: (point) => viewportRef.current?.centerOnWorldPoint(point)
   }), []);
 
   useEffect(() => {
@@ -213,7 +240,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onWaterLineRotationChange,
       onWaterPatternRotationChange,
       onCameraChange,
-      onArcanePointerTrigger
+      onArcanePointerTrigger,
+      onRoomPinPlace,
+      onInformationAreaPaint,
+      onInformationAreaHighlight,
+      onMapAnnotationPreview
     }).then((createdViewport) => {
       if (cancelled) {
         createdViewport.destroy();
@@ -233,6 +264,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setEffects(effects);
       createdViewport.setTokens(tokens);
       createdViewport.setLabels(labels);
+      createdViewport.setMapAnnotations(mapAnnotations);
+      createdViewport.setShowMapAnnotations(showMapAnnotations);
       createdViewport.setSelectedElementId(selectedElementId);
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setViewRole(viewRole);
@@ -252,6 +285,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setWaterDrawingMode(isWaterDrawingMode);
       createdViewport.setWaterPreview(waterPreviewPoints, waterPreviewHoverPoint);
       createdViewport.setArcanePointerMode(isArcanePointerMode);
+      createdViewport.setRoomPinMode(isRoomPinMode);
+      createdViewport.setInformationAreaMode(isInformationAreaMode);
       createdViewport.setArcanePointerCreatureSize(arcanePointerCreatureSize);
       if (arcanePointerResetKey > 0) {
         createdViewport.clearArcanePointers();
@@ -263,7 +298,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onArcanePointerTrigger]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onArcanePointerTrigger, onRoomPinPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -308,6 +343,14 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setLabels(labels);
   }, [labels]);
+
+  useEffect(() => {
+    viewportRef.current?.setMapAnnotations(mapAnnotations);
+  }, [mapAnnotations]);
+
+  useEffect(() => {
+    viewportRef.current?.setShowMapAnnotations(showMapAnnotations);
+  }, [showMapAnnotations]);
 
   useEffect(() => {
     viewportRef.current?.setSelectedElementId(selectedElementId);
@@ -384,6 +427,14 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   }, [isArcanePointerMode]);
 
   useEffect(() => {
+    viewportRef.current?.setRoomPinMode(isRoomPinMode);
+  }, [isRoomPinMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setInformationAreaMode(isInformationAreaMode);
+  }, [isInformationAreaMode]);
+
+  useEffect(() => {
     viewportRef.current?.setArcanePointerCreatureSize(arcanePointerCreatureSize);
   }, [arcanePointerCreatureSize]);
 
@@ -396,6 +447,16 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current?.showArcanePointer(arcanePointerEvent);
     }
   }, [arcanePointerEvent]);
+
+  useEffect(() => {
+    if (informationAreaHighlightEvent !== null) {
+      viewportRef.current?.showInformationAreaHighlight(informationAreaHighlightEvent);
+    }
+  }, [informationAreaHighlightEvent]);
+
+  useEffect(() => {
+    viewportRef.current?.clearInformationAreaHighlights();
+  }, [informationAreaHighlightResetKey]);
 
   return (
     <div

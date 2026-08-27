@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   deriveFogPresentation,
   deriveHiddenTokenPolicy,
+  createPlayerSceneSnapshot,
   getTokensForRole,
   normalizeCameraSnapshot
 } from "./player-window";
 import type { SceneToken } from "../sessions/scene-document";
+import { createDefaultScene } from "../sessions/default-scene";
+import { createSceneLabel } from "../labels/labels";
 
 const token: SceneToken = {
   id: "token-1",
@@ -46,5 +49,39 @@ describe("player window view rules", () => {
       center: { x: 0, y: 0 },
       zoom: 1
     });
+  });
+
+  it("removes DM-only labels and map annotations from the player snapshot", () => {
+    const scene = createDefaultScene();
+    const snapshot = createPlayerSceneSnapshot({
+      ...scene,
+      labels: [createSceneLabel("label-1", { x: 10, y: 20 })],
+      mapAnnotations: {
+        pins: [
+          {
+            id: "pin-1",
+            kind: "room-pin",
+            title: "Sala secreta",
+            content: "Solo para el DM",
+            position: { x: 10, y: 20 },
+            locked: false
+          }
+        ],
+        areas: [
+          {
+            id: "area-1",
+            kind: "information-area",
+            areaType: "trap",
+            name: "Trampa",
+            description: "Pozo oculto",
+            cells: [{ x: 0, y: 0, size: 100 }],
+            locked: false
+          }
+        ]
+      }
+    });
+
+    expect(snapshot.labels).toEqual([]);
+    expect(snapshot.mapAnnotations).toEqual({ pins: [], areas: [] });
   });
 });

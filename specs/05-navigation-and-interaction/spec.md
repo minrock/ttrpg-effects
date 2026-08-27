@@ -147,3 +147,9 @@ Cada icono de mouse muestra:
 - El pill no desaparece ni se mueve al hacer pan o zoom sobre el mapa.
 - El pill no interfiere con el menu contextual ni con ningun otro control.
 - El estilo es consistente con el resto de la UI (fondo oscuro, texto claro).
+## Integracion con anotaciones del mapa
+
+- `Pin de habitacion` coloca una coordenada de mundo exacta con click normal.
+- `Area de informacion` pinta por celdas con feedback incremental y consolida una sola geometria al soltar.
+- Space conserva prioridad para pan; Escape cancela drafts; las anotaciones bloqueadas no se mueven ni se eliminan.
+- `Ir a` centra la camara sin modificar zoom, escala del mapa ni calibracion.

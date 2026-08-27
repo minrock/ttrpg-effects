@@ -98,3 +98,8 @@ El contenido sera JSON.
 - El renderer puede enviar la ruta actual como sugerencia tipada de guardado, pero no debe escribir directamente en filesystem; main/infrastructure siguen controlando el dialogo y la escritura.
 - No bloquear el render si falla la carga de un asset.
 - Tratar `map.scale` como un factor decimal (`1` = 100%) de la imagen del mapa; no usarlo como zoom de camara ni como tamano de celda.
+## Integracion con anotaciones del mapa
+
+- La escena persiste `mapAnnotations.pins` y `mapAnnotations.areas`, incluyendo coordenadas de mundo, Markdown, tipo, geometria y bloqueo.
+- Escenas V1 anteriores cargan con ambas listas vacias y se marcan para re-guardado compatible.
+- Los highlights temporales de areas no forman parte del archivo `.ttrpgscene`.

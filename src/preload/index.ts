@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld("ttrpg", {
   publishPlayerScene: (snapshot: unknown) => ipcRenderer.invoke("player-window:publish-scene", snapshot),
   publishPlayerCamera: (camera: unknown) => ipcRenderer.invoke("player-window:publish-camera", camera),
   publishPlayerPointer: (pointer: unknown) => ipcRenderer.invoke("player-window:publish-pointer", pointer),
+  publishPlayerInformationAreaHighlight: (highlight: unknown) =>
+    ipcRenderer.invoke("player-window:publish-information-area-highlight", highlight),
   notifyPlayerContentReady: () => ipcRenderer.invoke("player-window:content-ready"),
   onPlayerScene: (handler: (snapshot: unknown) => void) => {
     const listener = (_event: IpcRendererEvent, snapshot: unknown): void => handler(snapshot);
@@ -60,6 +62,11 @@ contextBridge.exposeInMainWorld("ttrpg", {
     const listener = (_event: IpcRendererEvent, pointer: unknown): void => handler(pointer);
     ipcRenderer.on("player-window:pointer", listener);
     return () => ipcRenderer.removeListener("player-window:pointer", listener);
+  },
+  onPlayerInformationAreaHighlight: (handler: (highlight: unknown) => void) => {
+    const listener = (_event: IpcRendererEvent, highlight: unknown): void => handler(highlight);
+    ipcRenderer.on("player-window:information-area-highlight", listener);
+    return () => ipcRenderer.removeListener("player-window:information-area-highlight", listener);
   },
   onPlayerWindowClosed: (handler: () => void) => {
     const listener = (): void => handler();

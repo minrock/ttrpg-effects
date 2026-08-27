@@ -89,6 +89,23 @@ describe("scene content detection", () => {
         ]
       })
     ).toBe(true);
+
+    expect(
+      hasSceneContent({
+        ...createDefaultScene(),
+        mapAnnotations: {
+          pins: [{
+            id: "room-pin-1",
+            kind: "room-pin",
+            position: { x: 0, y: 0 },
+            title: "Altar",
+            content: "Informacion privada",
+            locked: false
+          }],
+          areas: []
+        }
+      })
+    ).toBe(true);
   });
 
   it("detects legacy tactical elements outside the scene document", () => {

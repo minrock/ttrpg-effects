@@ -91,6 +91,7 @@ import {
   type ArcanePointerCreatureSize
 } from "../../domain/pointer/arcane-pointer";
 import {
+  createPlayerSceneSnapshot,
   deriveFogPresentation,
   deriveHiddenTokenPolicy,
   normalizeCameraSnapshot,
@@ -132,6 +133,21 @@ import {
 } from "../../domain/combat/combat-tracker";
 import { CombatSetupModal } from "./components/combat/CombatSetupModal";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
+import {
+  canDeleteMapAnnotation,
+  createInformationAreaHighlightBroadcast,
+  getMapAnnotationCenter,
+  translateInformationArea,
+  type InformationAreaCell,
+  type MapAnnotation,
+  type MapInformationArea,
+  type MapInformationPin
+} from "../../domain/annotations/map-annotations";
+import {
+  MapAnnotationModal,
+  type MapAnnotationModalDraft
+} from "./components/annotations/MapAnnotationModal";
+import { MapAnnotationsSection } from "./components/annotations/MapAnnotationsSection";
 
 const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
@@ -139,7 +155,7 @@ const fallbackAppInfo = {
   version: "0.0.0"
 } as const;
 
-type SidebarSectionId = "grid" | "figures" | "effects" | "tokens" | "darkness" | "fog";
+type SidebarSectionId = "grid" | "figures" | "effects" | "tokens" | "darkness" | "fog" | "annotations";
 
 type SidebarOpenState = Record<SidebarSectionId, boolean>;
 
@@ -208,7 +224,10 @@ export function App(): JSX.Element {
   const [arcanePointerCreatureSize, setArcanePointerCreatureSize] =
     useState<ArcanePointerCreatureSize>("medium");
   const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
+  const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
+  const [showMapAnnotations, setShowMapAnnotations] = useState(true);
+  const [mapAnnotationModal, setMapAnnotationModal] = useState<MapAnnotationModalDraft | null>(null);
   const [isPlayerWindowOpen, setIsPlayerWindowOpen] = useState(false);
   const isPlayerWindowOpenRef = useRef(isPlayerWindowOpen);
   isPlayerWindowOpenRef.current = isPlayerWindowOpen;
@@ -234,7 +253,8 @@ export function App(): JSX.Element {
     effects: false,
     tokens: false,
     darkness: false,
-    fog: false
+    fog: false,
+    annotations: false
   });
   const nextShapeId = useRef(1);
   const nextLightId = useRef(1);
@@ -242,6 +262,8 @@ export function App(): JSX.Element {
   const nextTokenId = useRef(1);
   const nextLabelId = useRef(1);
   const nextRevealId = useRef(1);
+  const nextPinId = useRef(1);
+  const nextInformationAreaId = useRef(1);
   const syncSceneEntityCounters = useCallback((targetScene: SceneDocument): void => {
     nextShapeId.current = getNextNumericIdForPrefixes(
       targetScene.shapes.map((shape) => shape.id),
@@ -258,6 +280,11 @@ export function App(): JSX.Element {
     nextTokenId.current = getNextNumericId(targetScene.tokens.map((token) => token.id), "token-");
     nextLabelId.current = getNextNumericId(targetScene.labels.map((label) => label.id), "label-");
     nextRevealId.current = getNextNumericId(targetScene.fogOfWar.revealedAreas.map((area) => area.id), "reveal-");
+    nextPinId.current = getNextNumericId(targetScene.mapAnnotations.pins.map((pin) => pin.id), "room-pin-");
+    nextInformationAreaId.current = getNextNumericId(
+      targetScene.mapAnnotations.areas.map((area) => area.id),
+      "information-area-"
+    );
   }, []);
   const viewportHandleRef = useRef<MapViewportHandle | null>(null);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
@@ -356,6 +383,28 @@ export function App(): JSX.Element {
     }
   }, []);
 
+  const handleRoomPinPlace = useCallback((position: WorldPoint): void => {
+    const id = getNextAvailableSceneId(sceneRef.current, ["room-pin-"], nextPinId);
+    setMapAnnotationModal({ kind: "room-pin", id, position });
+    setInteraction((current) => setActiveTool(current, "select"));
+  }, []);
+
+  const handleInformationAreaPaint = useCallback((cells: readonly InformationAreaCell[]): void => {
+    if (cells.length === 0) return;
+    const id = getNextAvailableSceneId(sceneRef.current, ["information-area-"], nextInformationAreaId);
+    setMapAnnotationModal({ kind: "information-area", id, cells });
+    setInteraction((current) => setActiveTool(current, "select"));
+  }, []);
+
+  const handleInformationAreaHighlight = useCallback((areaId: string): void => {
+    const area = sceneRef.current.mapAnnotations.areas.find((candidate) => candidate.id === areaId);
+    if (area === undefined) return;
+    void window.ttrpg?.publishPlayerInformationAreaHighlight(
+      createInformationAreaHighlightBroadcast(area)
+    );
+    setFeedback(`Area resaltada para jugadores durante 5 segundos.`);
+  }, []);
+
   const setGridAdjustMode = useCallback((enabled: boolean): void => {
     setIsGridAdjustMode(enabled);
 
@@ -390,6 +439,91 @@ export function App(): JSX.Element {
     setOpenSidebarSections((current) => ({ ...current, effects: true }));
     setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "water"), null));
   };
+
+  const handleStartRoomPin = useCallback((): void => {
+    setMapAnnotationModal(null);
+    setIsSidebarVisible(true);
+    setOpenSidebarSections((current) => ({ ...current, annotations: true }));
+    setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "room-pin"), null));
+  }, []);
+
+  const handleStartInformationArea = useCallback((): void => {
+    setMapAnnotationModal(null);
+    setIsSidebarVisible(true);
+    setOpenSidebarSections((current) => ({ ...current, annotations: true }));
+    setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "information-area"), null));
+  }, []);
+
+  const handleSaveMapInformationPin = useCallback((pin: MapInformationPin): void => {
+    setScene((current) => ({
+      ...current,
+      mapAnnotations: {
+        ...current.mapAnnotations,
+        pins: current.mapAnnotations.pins.some((candidate) => candidate.id === pin.id)
+          ? current.mapAnnotations.pins.map((candidate) => candidate.id === pin.id ? pin : candidate)
+          : [...current.mapAnnotations.pins, pin]
+      }
+    }));
+    setMapAnnotationModal(null);
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), pin.id));
+  }, []);
+
+  const handleSaveMapInformationArea = useCallback((area: MapInformationArea): void => {
+    setScene((current) => ({
+      ...current,
+      mapAnnotations: {
+        ...current.mapAnnotations,
+        areas: current.mapAnnotations.areas.some((candidate) => candidate.id === area.id)
+          ? current.mapAnnotations.areas.map((candidate) => candidate.id === area.id ? area : candidate)
+          : [...current.mapAnnotations.areas, area]
+      }
+    }));
+    setMapAnnotationModal(null);
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), area.id));
+  }, []);
+
+  const handleEditMapAnnotation = useCallback((annotation: MapAnnotation): void => {
+    setMapAnnotationModal(
+      annotation.kind === "room-pin"
+        ? { kind: "room-pin", id: annotation.id, position: annotation.position, initial: annotation, initialMode: "edit" }
+        : { kind: "information-area", id: annotation.id, cells: annotation.cells, initial: annotation, initialMode: "edit" }
+    );
+  }, []);
+
+  const handleMapAnnotationPreviewById = useCallback((annotationId: string): void => {
+    const pin = sceneRef.current.mapAnnotations.pins.find((candidate) => candidate.id === annotationId);
+    if (pin === undefined) return;
+    setMapAnnotationModal({
+      kind: "room-pin",
+      id: pin.id,
+      position: pin.position,
+      initial: pin,
+      initialMode: "preview"
+    });
+  }, []);
+
+  const handleToggleMapAnnotationLock = useCallback((annotation: MapAnnotation): void => {
+    setScene((current) => ({
+      ...current,
+      mapAnnotations: {
+        pins: current.mapAnnotations.pins.map((pin) =>
+          pin.id === annotation.id ? { ...pin, locked: !pin.locked } : pin
+        ),
+        areas: current.mapAnnotations.areas.map((area) =>
+          area.id === annotation.id ? { ...area, locked: !area.locked } : area
+        )
+      }
+    }));
+  }, []);
+
+  const handleSelectMapAnnotation = useCallback((annotation: MapAnnotation): void => {
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), annotation.id));
+  }, []);
+
+  const handleGoToMapAnnotation = useCallback((annotation: MapAnnotation): void => {
+    viewportHandleRef.current?.centerOnWorldPoint(getMapAnnotationCenter(annotation));
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), annotation.id));
+  }, []);
 
   const handleCreateShape = (kind: TacticalShapeKind): void => {
     if (interaction.contextMenu === null) {
@@ -474,6 +608,15 @@ export function App(): JSX.Element {
   };
 
   const handleDeleteSelectedElement = useCallback(() => {
+    const selectedId = selectedElementIdRef.current;
+    const selectedAnnotation =
+      sceneRef.current.mapAnnotations.pins.find((pin) => pin.id === selectedId) ??
+      sceneRef.current.mapAnnotations.areas.find((area) => area.id === selectedId);
+    if (selectedAnnotation !== undefined && !canDeleteMapAnnotation(selectedAnnotation)) {
+      setFeedback("Desbloquea la anotacion antes de eliminarla.");
+      return;
+    }
+
     setScene((current) => {
       if (interaction.selectedElementId === null) {
         return current;
@@ -485,7 +628,11 @@ export function App(): JSX.Element {
         effects: current.effects.filter((effect) => effect.id !== interaction.selectedElementId),
         shapes: current.shapes.filter((shape) => shape.id !== interaction.selectedElementId),
         tokens: current.tokens.filter((token) => token.id !== interaction.selectedElementId),
-        labels: current.labels.filter((label) => label.id !== interaction.selectedElementId)
+        labels: current.labels.filter((label) => label.id !== interaction.selectedElementId),
+        mapAnnotations: {
+          pins: current.mapAnnotations.pins.filter((pin) => pin.id !== interaction.selectedElementId),
+          areas: current.mapAnnotations.areas.filter((area) => area.id !== interaction.selectedElementId)
+        }
       };
     });
     setTokenImageUrls((current) => {
@@ -534,7 +681,7 @@ export function App(): JSX.Element {
   );
 
   const sceneWithAside = useMemo(() => ({ ...scene, sceneAside }), [scene, sceneAside]);
-  const playerSceneSnapshot = useMemo(() => ({ ...sceneWithAside, labels: [] }), [sceneWithAside]);
+  const playerSceneSnapshot = useMemo(() => createPlayerSceneSnapshot(sceneWithAside), [sceneWithAside]);
 
   const playerWindowSnapshot = useMemo<PlayerWindowSnapshot>(
     () => ({
@@ -543,9 +690,10 @@ export function App(): JSX.Element {
       tokenImageUrls,
       camera: playerCameraRef.current,
       cameraSyncKey: playerCameraSyncKey,
-      showDmFogOverlay
+      showDmFogOverlay,
+      informationAreaHighlightResetKey
     }),
-    [playerSceneSnapshot, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay]
+    [playerSceneSnapshot, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay, informationAreaHighlightResetKey]
   );
 
   useEffect(() => {
@@ -633,9 +781,11 @@ export function App(): JSX.Element {
     setInteraction(createInitialInteractionState());
     setPathDraft({ points: [], hoverPoint: null });
     setWaterDraft({ points: [], hoverPoint: null });
+    setMapAnnotationModal(null);
     setIsSpaceDragActive(false);
     setGridAdjustMode(false);
     setArcanePointerResetKey((current) => current + 1);
+    setInformationAreaHighlightResetKey((current) => current + 1);
     setIsSelectedPropertiesOpen(true);
     nextShapeId.current = 1;
     nextLightId.current = 1;
@@ -643,6 +793,8 @@ export function App(): JSX.Element {
     nextTokenId.current = 1;
     nextLabelId.current = 1;
     nextRevealId.current = 1;
+    nextPinId.current = 1;
+    nextInformationAreaId.current = 1;
   }, [setGridAdjustMode]);
 
   const handleRequestNewScene = useCallback((): void => {
@@ -802,6 +954,7 @@ export function App(): JSX.Element {
     const resetToSelection = (): void => {
       setPathDraft({ points: [], hoverPoint: null });
       setWaterDraft({ points: [], hoverPoint: null });
+      setMapAnnotationModal(null);
       setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
     };
 
@@ -818,6 +971,7 @@ export function App(): JSX.Element {
         // Solo permitir Escape para cerrar modales; el resto lo maneja el editor/input
         if (event.key === "Escape") {
           event.preventDefault();
+          setMapAnnotationModal(null);
           setInteraction((current) => cancelInteraction(current));
         }
         return;
@@ -903,6 +1057,7 @@ export function App(): JSX.Element {
 
       if (event.key === "Escape") {
         event.preventDefault();
+        setMapAnnotationModal(null);
         setInteraction((current) => cancelInteraction(current));
       }
     };
@@ -1013,11 +1168,7 @@ export function App(): JSX.Element {
     }
 
     void window.ttrpg.publishPlayerScene({
-      scene: {
-        ...loadedScene,
-        sceneAside: loadedSceneAside,
-        labels: []
-      },
+      scene: createPlayerSceneSnapshot({ ...loadedScene, sceneAside: loadedSceneAside }),
       mapImageUrl: loadedMapImageUrl,
       tokenImageUrls: loadedTokenImageUrls,
       camera,
@@ -1044,6 +1195,7 @@ export function App(): JSX.Element {
       }
 
       setScene(result.scene);
+      setMapAnnotationModal(null);
       const loadedSceneAside = result.scene.sceneAside ?? createDefaultSceneAside();
       setSceneAside(loadedSceneAside);
       if (actionLabel === "cargada") {
@@ -1059,6 +1211,7 @@ export function App(): JSX.Element {
         setTokenImageUrls(result.tokenImageUrls ?? {});
         setInteraction((current) => setZoomLocked(current, result.scene.grid.locked));
         setArcanePointerResetKey((current) => current + 1);
+        setInformationAreaHighlightResetKey((current) => current + 1);
         syncSceneEntityCounters(result.scene);
         publishLoadedPlayerScene({
           scene: result.scene,
@@ -1254,7 +1407,8 @@ export function App(): JSX.Element {
   }, []);
 
   const handleElementMove = useCallback((elementId: string, x: number, y: number): void => {
-    setScene((current) => ({
+    setScene((current) => {
+      return {
       ...current,
       lights: current.lights.map((light) =>
         light.id === elementId ? moveLightSource(light, { x, y }) : light
@@ -1287,8 +1441,24 @@ export function App(): JSX.Element {
       ),
       labels: current.labels.map((label) =>
         label.id === elementId ? updateSceneLabel(label, { position: { x, y } }) : label
-      )
-    }));
+      ),
+      mapAnnotations: {
+        pins: current.mapAnnotations.pins.map((candidate) =>
+          candidate.id === elementId && !candidate.locked
+            ? { ...candidate, position: { x, y } }
+            : candidate
+        ),
+        areas: current.mapAnnotations.areas.map((candidate) =>
+          candidate.id === elementId && !candidate.locked
+            ? translateInformationArea(candidate, {
+                x: x - getMapAnnotationCenter(candidate).x,
+                y: y - getMapAnnotationCenter(candidate).y
+              })
+            : candidate
+        )
+      }
+    };
+    });
   }, []);
 
   const handleLightDirectionChange = useCallback((elementId: string, direction: number): void => {
@@ -1775,6 +1945,11 @@ export function App(): JSX.Element {
     interaction.selectedElementId === null
       ? undefined
       : scene.labels.find((label) => label.id === interaction.selectedElementId);
+  const selectedMapAnnotation =
+    interaction.selectedElementId === null
+      ? undefined
+      : scene.mapAnnotations.pins.find((pin) => pin.id === interaction.selectedElementId) ??
+        scene.mapAnnotations.areas.find((area) => area.id === interaction.selectedElementId);
   const selectedMeasurement =
     selectedShape?.type === "measurement"
       ? measureDistance(selectedShape.points[0], selectedShape.points[1], {
@@ -1794,7 +1969,8 @@ export function App(): JSX.Element {
     selectedEffect !== undefined ||
     selectedShape !== undefined ||
     selectedToken !== undefined ||
-    selectedLabel !== undefined;
+    selectedLabel !== undefined ||
+    selectedMapAnnotation !== undefined;
 
   useEffect(() => {
     if (!hasSelectedObject) {
@@ -1803,7 +1979,10 @@ export function App(): JSX.Element {
 
     setIsSidebarVisible(true);
     setIsSelectedPropertiesOpen(true);
-  }, [hasSelectedObject, interaction.selectedElementId]);
+    if (selectedMapAnnotation !== undefined) {
+      setOpenSidebarSections((current) => ({ ...current, annotations: true }));
+    }
+  }, [hasSelectedObject, interaction.selectedElementId, selectedMapAnnotation]);
 
   function updateSelectedLight(patch: LightPatch): void {
     if (selectedLight === undefined) {
@@ -1982,7 +2161,11 @@ export function App(): JSX.Element {
   }
 
   const selectedPropertiesTitle =
-    selectedLight !== undefined
+    selectedMapAnnotation !== undefined
+      ? selectedMapAnnotation.kind === "room-pin"
+        ? "Pin de habitacion"
+        : selectedMapAnnotation.areaType === "terrain" ? "Area de terreno" : "Area de trampa"
+      : selectedLight !== undefined
       ? selectedLight.kind === "point"
         ? "Luz puntual"
         : "Luz conica"
@@ -2008,7 +2191,9 @@ export function App(): JSX.Element {
                           ? "Rectangulo"
                           : "Propiedades";
   const selectedPropertiesIcon =
-    selectedLight !== undefined
+    selectedMapAnnotation !== undefined
+      ? selectedMapAnnotation.kind === "room-pin" ? "◆" : selectedMapAnnotation.areaType === "terrain" ? "▧" : "▲"
+      : selectedLight !== undefined
       ? selectedLight.kind === "point"
         ? "●"
         : "◖"
@@ -2137,6 +2322,8 @@ export function App(): JSX.Element {
             scene.effects.length +
             scene.tokens.length +
             scene.labels.length +
+            scene.mapAnnotations.pins.length +
+            scene.mapAnnotations.areas.length +
             interaction.elements.length} elementos
         </span>
         <span>
@@ -2153,7 +2340,14 @@ export function App(): JSX.Element {
         <DmAsidePanel
           aside={sceneAside}
           monsterTemplates={monsterTemplates}
+          annotations={scene.mapAnnotations}
+          selectedElementId={interaction.selectedElementId}
           onChange={setSceneAside}
+          onSelectAnnotation={handleSelectMapAnnotation}
+          onGoToAnnotation={handleGoToMapAnnotation}
+          onEditAnnotation={handleEditMapAnnotation}
+          onToggleAnnotationLock={handleToggleMapAnnotationLock}
+          onHighlightInformationArea={handleInformationAreaHighlight}
           hidden={!isAsidePanelVisible}
         />
         <button
@@ -2178,6 +2372,8 @@ export function App(): JSX.Element {
           effects={scene.effects}
           tokens={renderedTokens}
           labels={scene.labels}
+          mapAnnotations={scene.mapAnnotations}
+          showMapAnnotations={showMapAnnotations}
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
@@ -2193,8 +2389,11 @@ export function App(): JSX.Element {
           isPathDrawingMode={interaction.activeTool === "path"}
           isWaterDrawingMode={interaction.activeTool === "water"}
           isArcanePointerMode={interaction.activeTool === "arcane-pointer"}
+          isRoomPinMode={interaction.activeTool === "room-pin"}
+          isInformationAreaMode={interaction.activeTool === "information-area"}
           arcanePointerCreatureSize={arcanePointerCreatureSize}
           arcanePointerResetKey={arcanePointerResetKey}
+          informationAreaHighlightResetKey={informationAreaHighlightResetKey}
           pathPreviewPoints={pathDraft.points}
           pathPreviewHoverPoint={pathDraft.hoverPoint}
           waterPreviewPoints={waterDraft.points}
@@ -2227,6 +2426,10 @@ export function App(): JSX.Element {
           onWaterPatternRotationChange={handleWaterPatternRotationChange}
           onCameraChange={handleCameraChange}
           onArcanePointerTrigger={handleArcanePointerTrigger}
+          onRoomPinPlace={handleRoomPinPlace}
+          onInformationAreaPaint={handleInformationAreaPaint}
+          onInformationAreaHighlight={handleInformationAreaHighlight}
+          onMapAnnotationPreview={handleMapAnnotationPreviewById}
           overlay={<DmDarknessStatusBadge darkness={scene.darkness} />}
         />
         <CombatTurnBar
@@ -2246,6 +2449,26 @@ export function App(): JSX.Element {
               isOpen={isSelectedPropertiesOpen}
               onToggle={() => setIsSelectedPropertiesOpen((current) => !current)}
             >
+              {selectedMapAnnotation !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de anotacion">
+                  <strong>
+                    {selectedMapAnnotation.kind === "room-pin"
+                      ? selectedMapAnnotation.title
+                      : selectedMapAnnotation.name || (selectedMapAnnotation.areaType === "terrain" ? "Terreno" : "Trampa")}
+                  </strong>
+                  <button type="button" onClick={() => handleEditMapAnnotation(selectedMapAnnotation)}>
+                    Ver / editar
+                  </button>
+                  <button type="button" onClick={() => handleToggleMapAnnotationLock(selectedMapAnnotation)}>
+                    {selectedMapAnnotation.locked ? "Desbloquear" : "Bloquear"}
+                  </button>
+                  {selectedMapAnnotation.kind === "information-area" ? (
+                    <button type="button" onClick={() => handleInformationAreaHighlight(selectedMapAnnotation.id)}>
+                      Resaltar para jugadores
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {selectedLight !== undefined ? (
                 <div className="selected-properties-content" aria-label="Propiedades de luz">
                   <label>
@@ -3003,6 +3226,22 @@ export function App(): JSX.Element {
           </SidebarAccordion>
 
           <SidebarAccordion
+            id="annotations-controls-panel"
+            icon="◆"
+            title="Anotaciones"
+            isOpen={openSidebarSections.annotations}
+            onToggle={() => toggleSidebarSection("annotations")}
+          >
+            <MapAnnotationsSection
+              visible={showMapAnnotations}
+              activeTool={interaction.activeTool}
+              onVisibleChange={setShowMapAnnotations}
+              onStartPin={handleStartRoomPin}
+              onStartArea={handleStartInformationArea}
+            />
+          </SidebarAccordion>
+
+          <SidebarAccordion
             id="darkness-controls-panel"
             icon="●"
             title="Oscuridad"
@@ -3231,6 +3470,15 @@ export function App(): JSX.Element {
           </section>
         </div>
       ) : null}
+      {mapAnnotationModal !== null ? (
+        <MapAnnotationModal
+          key={`${mapAnnotationModal.kind}:${mapAnnotationModal.id}`}
+          draft={mapAnnotationModal}
+          onCancel={() => setMapAnnotationModal(null)}
+          onSavePin={handleSaveMapInformationPin}
+          onSaveArea={handleSaveMapInformationArea}
+        />
+      ) : null}
       {interaction.contextMenu !== null ? (
         <div
           className="context-menu-backdrop"
@@ -3264,6 +3512,13 @@ export function App(): JSX.Element {
             <button type="button" onClick={handleCreateLabel}>
               Crear label DM
             </button>
+            <li className="has-submenu">
+              <button type="button">Anotaciones ▶</button>
+              <menu className="context-submenu">
+                <button type="button" onClick={handleStartRoomPin}>Pin de habitacion</button>
+                <button type="button" onClick={handleStartInformationArea}>Area de informacion</button>
+              </menu>
+            </li>
             <li className="has-submenu">
               <button type="button">Herramientas de área ▶</button>
               <menu className="context-submenu">
@@ -3416,6 +3671,8 @@ function getSceneObjectIds(scene: SceneDocument): readonly string[] {
     ...scene.effects.map((effect) => effect.id),
     ...scene.tokens.map((token) => token.id),
     ...scene.labels.map((label) => label.id),
+    ...scene.mapAnnotations.pins.map((pin) => pin.id),
+    ...scene.mapAnnotations.areas.map((area) => area.id),
     ...scene.fogOfWar.revealedAreas.map((area) => area.id),
     ...scene.fogOfWar.obstacles.map((obstacle) => obstacle.id)
   ];

@@ -177,3 +177,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Documentacion actualizada.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+## Extension: anotaciones del mapa
+
+- Validar `mapAnnotations` con Zod y defaults vacios para escenas anteriores.
+- Incluir pines y areas en deteccion de contenido y serializacion normal de escena.
+- Mantener highlights y preferencias de visibilidad fuera del documento persistido.

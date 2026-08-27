@@ -999,6 +999,209 @@ body {
   line-height: 1.4;
 }
 
+.sidebar-switch-row,
+.annotation-tool-buttons,
+.annotation-index__actions,
+.annotation-modal__header,
+.annotation-modal__tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar-switch-row,
+.annotation-modal__header {
+  justify-content: space-between;
+}
+
+.annotation-tool-buttons > button {
+  flex: 1 1 0;
+}
+
+.annotations-section,
+.annotation-modal {
+  display: grid;
+  gap: 10px;
+}
+
+.annotation-tree-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.annotation-tree-panel > input {
+  width: 100%;
+  min-width: 0;
+}
+
+.annotation-tree,
+.annotation-tree ul {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.annotation-tree ul {
+  position: relative;
+  margin-left: 9px;
+  padding-left: 11px;
+  border-left: 1px solid rgb(255 210 138 / 24%);
+}
+
+.annotation-tree__branch.is-nested {
+  margin-top: 2px;
+}
+
+.annotation-tree__branch-label {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 26px;
+  color: #d7ddd8;
+  font-size: 0.76rem;
+}
+
+.annotation-tree__branch-label > span {
+  color: #d9b66f;
+  text-align: center;
+}
+
+.annotation-tree__branch-label strong,
+.annotation-tree__leaf-main > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-tree__branch-label small {
+  min-width: 18px;
+  border-radius: 999px;
+  padding: 1px 5px;
+  color: #9ea8a2;
+  text-align: center;
+  background: rgb(255 255 255 / 5%);
+}
+
+.annotation-tree__leaf {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 2px;
+}
+
+.annotation-tree__leaf::before {
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  width: 10px;
+  border-top: 1px solid rgb(255 210 138 / 24%);
+  content: "";
+}
+
+.annotation-tree__leaf:hover {
+  background: rgb(255 255 255 / 3%);
+}
+
+.annotation-tree__leaf.is-selected {
+  border-color: rgb(255 210 138 / 62%);
+  background: rgb(255 210 138 / 8%);
+}
+
+.annotation-tree__leaf-main {
+  display: grid;
+  grid-template-columns: 15px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 25px;
+  border: 0;
+  padding: 2px;
+  color: #d7ddd8;
+  text-align: left;
+  background: transparent;
+}
+
+.annotation-tree__actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.annotation-tree__actions button {
+  width: 23px;
+  min-width: 23px;
+  min-height: 23px;
+  padding: 0;
+  border-radius: 4px;
+  font-size: 0.72rem;
+}
+
+.annotation-modal h2,
+.annotation-modal p {
+  margin: 0;
+}
+
+.annotation-modal p {
+  margin-top: 3px;
+  color: #aeb8b2;
+  font-size: 0.8rem;
+}
+
+.annotation-modal label {
+  display: grid;
+  gap: 6px;
+  color: #d7ddd8;
+  font-size: 0.86rem;
+}
+
+.annotation-modal input,
+.annotation-modal select,
+.annotation-modal textarea {
+  width: 100%;
+}
+
+.annotation-modal textarea {
+  resize: vertical;
+  min-height: 230px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.annotation-modal__preview {
+  min-height: 230px;
+  border: 1px solid rgb(244 241 232 / 12%);
+  border-radius: 6px;
+  padding: 12px;
+  color: #d7ddd8;
+  background: #15181a;
+}
+
+.annotation-modal__preview-title {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid rgb(255 210 138 / 22%);
+  padding: 2px 0 10px;
+}
+
+.annotation-modal__preview-title small {
+  color: #aeb8b2;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.annotation-modal__preview-title strong {
+  color: #fff8e7;
+  font-size: 1.1rem;
+}
+
 .token-list {
   display: grid;
   gap: 8px;

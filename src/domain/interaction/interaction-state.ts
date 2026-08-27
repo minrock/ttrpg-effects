@@ -5,7 +5,15 @@ import {
   type TacticalElementKind
 } from "../tools/tactical-elements";
 
-export type InteractionTool = "select" | "fog-reveal" | "fire-paint" | "path" | "water" | "arcane-pointer";
+export type InteractionTool =
+  | "select"
+  | "fog-reveal"
+  | "fire-paint"
+  | "path"
+  | "water"
+  | "arcane-pointer"
+  | "room-pin"
+  | "information-area";
 
 export interface ContextMenuState {
   readonly screen: ScreenPoint;

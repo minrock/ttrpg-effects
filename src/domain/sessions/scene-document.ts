@@ -1,5 +1,6 @@
 import type { SceneAside } from "./scene-aside";
 import type { CombatTracker } from "../combat/combat-tracker";
+import type { MapAnnotations } from "../annotations/map-annotations";
 
 export const SCENE_DOCUMENT_VERSION = 1;
 
@@ -249,6 +250,7 @@ export interface SceneDocumentV1 {
   readonly shapes: readonly SceneShape[];
   readonly tokens: readonly SceneToken[];
   readonly labels: readonly SceneLabel[];
+  readonly mapAnnotations: MapAnnotations;
   readonly sceneAside?: SceneAside;
   readonly combatTracker: CombatTracker;
 }

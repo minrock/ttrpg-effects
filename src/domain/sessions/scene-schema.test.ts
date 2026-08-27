@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultScene } from "./default-scene";
-import { parseSceneDocument, parseSceneJson, serializeSceneDocument } from "./scene-schema";
+import {
+  detectOutdatedSceneFields,
+  parseSceneDocument,
+  parseSceneJson,
+  serializeSceneDocument
+} from "./scene-schema";
 
 describe("scene document schema", () => {
   it("accepts the default scene", () => {
@@ -65,6 +70,61 @@ describe("scene document schema", () => {
       currentParticipantId: null,
       round: 0
     });
+  });
+
+  it("adds empty map annotations to older v1 scenes and reports the missing field", () => {
+    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    delete legacyScene.mapAnnotations;
+
+    expect(parseSceneDocument(legacyScene).mapAnnotations).toEqual({ pins: [], areas: [] });
+    expect(detectOutdatedSceneFields(legacyScene)).toContain("mapAnnotations");
+  });
+
+  it("round-trips valid map pins and information areas", () => {
+    const scene = {
+      ...createDefaultScene(),
+      mapAnnotations: {
+        pins: [{
+          id: "room-pin-1",
+          kind: "room-pin" as const,
+          position: { x: 12, y: 30 },
+          title: "Biblioteca",
+          content: "Una nota **privada**.",
+          locked: true
+        }],
+        areas: [{
+          id: "information-area-1",
+          kind: "information-area" as const,
+          areaType: "trap" as const,
+          name: "Foso",
+          description: "CD 15",
+          cells: [{ x: 0, y: 0, size: 100 }],
+          locked: false
+        }]
+      }
+    };
+
+    expect(parseSceneJson(serializeSceneDocument(scene)).mapAnnotations).toEqual(scene.mapAnnotations);
+  });
+
+  it("rejects invalid information-area geometry", () => {
+    const scene = {
+      ...createDefaultScene(),
+      mapAnnotations: {
+        pins: [],
+        areas: [{
+          id: "information-area-1",
+          kind: "information-area",
+          areaType: "terrain",
+          name: "",
+          description: "",
+          cells: [{ x: 0, y: 0, size: 0 }],
+          locked: false
+        }]
+      }
+    };
+
+    expect(() => parseSceneDocument(scene)).toThrow();
   });
 
   it("preserves enabled darkvision in scene darkness", () => {

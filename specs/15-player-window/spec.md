@@ -258,3 +258,8 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - `PixiViewport` en modo jugador debe permitir input de navegacion aunque `readOnly` bloquee edicion.
 - `MapViewport`/`PlayerApp` deben separar `readOnly` de `navigationEnabled` o equivalente para que jugador pueda pan/zoom sin herramientas de edicion.
 - El apuntador arcano se emite como evento temporal DM -> jugador y no se persiste.
+## Privacidad y highlights de anotaciones
+
+- Player View nunca recibe pines, areas ni su contenido Markdown dentro del snapshot de escena.
+- El DM puede publicar un highlight efimero de 5 segundos con solo id, tipo y celdas.
+- Los highlights aparecen sobre fog, admiten convivencia multiple y no se retienen al abrir tarde Player View.

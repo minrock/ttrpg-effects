@@ -10,6 +10,21 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.4.0] - 2026-08-26
+
+### Added
+
+- Pines privados de habitacion y areas informativas de terreno/trampa persistidas en escenas.
+- Pintado por celdas con feedback, seleccion, movimiento, bloqueo, edicion Markdown y borrado.
+- Arbol izquierdo `Anotaciones` agrupado en habitaciones, terrenos y trampas, con busqueda, navegacion, bloqueo y accion explicita para mostrar areas al jugador.
+- Highlights temporales de 5 segundos para Player View sin exponer contenido privado del DM.
+
+### Changed
+
+- Los snapshots de Player View eliminan por construccion etiquetas y anotaciones privadas.
+- El renderer Markdown compartido conserva GFM/tablas y sanitiza HTML con DOMPurify.
+- Los pines de habitacion usan un icono y area de seleccion mayores, muestran un label legible de tamano constante durante el zoom y abren primero la vista previa al hacer doble click; los controles de creacion/visibilidad permanecen en el sidebar derecho.
+
 ## [1.3.0] - 2026-07-29
 
 ### Added

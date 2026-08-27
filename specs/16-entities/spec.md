@@ -1068,3 +1068,7 @@ Persistencia local de templates:
 - El CSS del template no afecta el resto de la app.
 - El `templateId` del monstruo se guarda y carga dentro de `.ttrpgscene`.
 - Si un template falta, el monstruo sigue siendo visible con Markdown normal.
+## Markdown seguro compartido
+
+- Todo Markdown mostrado con `dangerouslySetInnerHTML`, tanto de entidades como de anotaciones, debe pasar por el mismo pipeline GFM sanitizado.
+- Se conservan tablas y caracteres especiales, pero se elimina HTML crudo, handlers y URLs inseguras.

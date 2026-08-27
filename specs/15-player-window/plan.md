@@ -250,3 +250,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Documentacion actualizada para el nuevo comportamiento.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+## Extension: highlights de areas informativas
+
+- Construir snapshots publicos mediante una funcion de dominio que vacie etiquetas y anotaciones privadas.
+- Validar y sanitizar el payload minimo en main antes de reenviarlo por un canal preload especifico.
+- Renderizar y limpiar highlights temporales en una capa superior a fog sin publicar la escena completa.

@@ -8,6 +8,7 @@ import { MapViewport } from "./components/MapViewport";
 import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
+import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 
 export function PlayerApp(): JSX.Element {
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -23,6 +24,9 @@ export function PlayerApp(): JSX.Element {
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [isZoomLocked, setIsZoomLocked] = useState(true);
   const [arcanePointerEvent, setArcanePointerEvent] = useState<ArcanePointerBroadcast | null>(null);
+  const [informationAreaHighlightEvent, setInformationAreaHighlightEvent] =
+    useState<InformationAreaHighlightBroadcast | null>(null);
+  const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
 
   const applySnapshot = useCallback((snapshot: PlayerWindowSnapshot | null): void => {
     if (snapshot === null) {
@@ -33,6 +37,7 @@ export function PlayerApp(): JSX.Element {
     setMapImageUrl(snapshot.mapImageUrl);
     setTokenImageUrls(snapshot.tokenImageUrls);
     setIsHydrated(true);
+    setInformationAreaHighlightResetKey(snapshot.informationAreaHighlightResetKey ?? 0);
     const nextMapLoadKey =
       snapshot.scene.map.imagePath !== null && snapshot.mapImageUrl !== null
         ? `${snapshot.scene.map.imagePath}:${snapshot.mapImageUrl}`
@@ -64,6 +69,11 @@ export function PlayerApp(): JSX.Element {
         setArcanePointerEvent(pointer);
       }
     });
+    const offInformationAreaHighlight = window.ttrpg?.onPlayerInformationAreaHighlight((highlight) => {
+      if (mounted) {
+        setInformationAreaHighlightEvent(highlight);
+      }
+    });
 
     void window.ttrpg?.getPlayerWindowState().then((state) => {
       if (!mounted) {
@@ -81,6 +91,7 @@ export function PlayerApp(): JSX.Element {
       mounted = false;
       offScene?.();
       offPointer?.();
+      offInformationAreaHighlight?.();
     };
   }, [applySnapshot]);
 
@@ -130,6 +141,8 @@ export function PlayerApp(): JSX.Element {
           effects={scene.effects}
           tokens={renderedTokens}
           labels={[]}
+          mapAnnotations={{ pins: [], areas: [] }}
+          showMapAnnotations={false}
           selectedElementId={null}
           isZoomLocked={isZoomLocked}
           isMapAdjustMode={false}
@@ -146,9 +159,13 @@ export function PlayerApp(): JSX.Element {
           isPathDrawingMode={false}
           isWaterDrawingMode={false}
           isArcanePointerMode={false}
+          isRoomPinMode={false}
+          isInformationAreaMode={false}
           arcanePointerCreatureSize="medium"
           arcanePointerResetKey={0}
           arcanePointerEvent={arcanePointerEvent}
+          informationAreaHighlightEvent={informationAreaHighlightEvent}
+          informationAreaHighlightResetKey={informationAreaHighlightResetKey}
           pathPreviewPoints={[]}
           pathPreviewHoverPoint={null}
           waterPreviewPoints={[]}
@@ -179,6 +196,10 @@ export function PlayerApp(): JSX.Element {
           onMagicalDarknessRadiusChange={noop}
           onWaterLineRotationChange={noop}
           onWaterPatternRotationChange={noop}
+          onRoomPinPlace={noop}
+          onInformationAreaPaint={noop}
+          onInformationAreaHighlight={noop}
+          onMapAnnotationPreview={noop}
         />
       ) : null}
       {isHydrated && (
