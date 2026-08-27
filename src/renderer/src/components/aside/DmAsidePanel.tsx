@@ -20,6 +20,7 @@ import { NotesSection } from "./NotesSection";
 import { PlayerCharacterSection } from "./PlayerCharacterSection";
 import type { MapAnnotation, MapAnnotations } from "../../../../domain/annotations/map-annotations";
 import { MapAnnotationsTree } from "../annotations/MapAnnotationsTree";
+import type { SceneLinkValidationStatus } from "../../../../domain/annotations/scene-navigation-links";
 
 interface DmAsidePanelProps {
   readonly aside: SceneAside;
@@ -32,6 +33,7 @@ interface DmAsidePanelProps {
   readonly onEditAnnotation: (annotation: MapAnnotation) => void;
   readonly onToggleAnnotationLock: (annotation: MapAnnotation) => void;
   readonly onHighlightInformationArea: (areaId: string) => void;
+  readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
   readonly hidden?: boolean;
 }
 
@@ -48,6 +50,7 @@ export function DmAsidePanel({
   onEditAnnotation,
   onToggleAnnotationLock,
   onHighlightInformationArea,
+  sceneLinkStatuses = {},
   hidden
 }: DmAsidePanelProps): JSX.Element {
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
@@ -114,7 +117,7 @@ export function DmAsidePanel({
           title="◆ Anotaciones"
           sectionKey="annotations"
           open={openSections.has("annotations")}
-          badge={annotations.pins.length + annotations.areas.length}
+          badge={annotations.pins.length + annotations.areas.length + annotations.sceneLinks.length}
           onToggle={toggleSection}
         >
           <MapAnnotationsTree
@@ -125,6 +128,7 @@ export function DmAsidePanel({
             onEdit={onEditAnnotation}
             onToggleLock={onToggleAnnotationLock}
             onHighlightArea={onHighlightInformationArea}
+            sceneLinkStatuses={sceneLinkStatuses}
           />
         </AccordionSection>
 

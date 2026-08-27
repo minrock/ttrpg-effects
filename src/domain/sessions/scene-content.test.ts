@@ -102,7 +102,8 @@ describe("scene content detection", () => {
             content: "Informacion privada",
             locked: false
           }],
-          areas: []
+          areas: [],
+          sceneLinks: []
         }
       })
     ).toBe(true);

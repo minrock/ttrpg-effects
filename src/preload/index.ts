@@ -12,6 +12,12 @@ contextBridge.exposeInMainWorld("ttrpg", {
   saveScene: (scene: unknown, options?: { readonly suggestedFilePath?: string | null }) =>
     ipcRenderer.invoke("scene:save", { scene, suggestedFilePath: options?.suggestedFilePath ?? null }),
   loadScene: () => ipcRenderer.invoke("scene:load"),
+  selectSceneLinkTargetFile: () => ipcRenderer.invoke("scene-link:select-target-file"),
+  listSceneLinkCandidates: (filePath: string) => ipcRenderer.invoke("scene-link:list-candidates", filePath),
+  connectSceneLink: (request: unknown) => ipcRenderer.invoke("scene-link:connect", request),
+  disconnectSceneLink: (request: unknown) => ipcRenderer.invoke("scene-link:disconnect", request),
+  validateSceneLinks: (request: unknown) => ipcRenderer.invoke("scene-link:validate", request),
+  loadSceneLinkTarget: (request: unknown) => ipcRenderer.invoke("scene-link:load-target", request),
   onRecentSceneOpen: (handler: (result: unknown) => void) => {
     const listener = (_event: IpcRendererEvent, result: unknown): void => handler(result);
     ipcRenderer.on("scene:recent-opened", listener);

@@ -1,7 +1,8 @@
 import { BrowserWindow, dialog } from "electron";
 import type { OpenDialogOptions, SaveDialogOptions } from "electron";
-import { access, readFile, writeFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { access, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { dirname, extname, join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import type { SceneFileStorage } from "../../application/services/scene-file-storage";
 
@@ -40,6 +41,16 @@ export class ElectronSceneFileStorage implements SceneFileStorage {
   }
 
   async loadSceneJson(): Promise<{ filePath: string; json: string } | null> {
+    const filePath = await this.selectSceneJsonPath();
+    if (filePath === null) return null;
+
+    return {
+      filePath,
+      json: await readFile(filePath, "utf8")
+    };
+  }
+
+  async selectSceneJsonPath(): Promise<string | null> {
     const targetWindow = this.getWindow();
     const options: OpenDialogOptions = {
       title: "Cargar escena",
@@ -60,11 +71,7 @@ export class ElectronSceneFileStorage implements SceneFileStorage {
       return null;
     }
 
-    const filePath = result.filePaths[0];
-    return {
-      filePath,
-      json: await readFile(filePath, "utf8")
-    };
+    return result.filePaths[0] ?? null;
   }
 
   async loadSceneJsonFromPath(filePath: string): Promise<{ filePath: string; json: string }> {
@@ -80,6 +87,57 @@ export class ElectronSceneFileStorage implements SceneFileStorage {
       return true;
     } catch {
       return false;
+    }
+  }
+
+  async replaceSceneJsonFiles(
+    files: readonly { readonly filePath: string; readonly json: string }[]
+  ): Promise<void> {
+    const temporaries = files.map(({ filePath, json }) => ({
+      filePath,
+      json,
+      tempPath: join(dirname(filePath), `.${randomUUID()}.ttrpgscene.tmp`),
+      backupPath: join(dirname(filePath), `.${randomUUID()}.ttrpgscene.bak`)
+    }));
+    const replaced: string[] = [];
+    const backedUp: string[] = [];
+
+    try {
+      await Promise.all(temporaries.map((entry) => writeFile(entry.tempPath, entry.json, "utf8")));
+      for (const entry of temporaries) {
+        await rename(entry.filePath, entry.backupPath);
+        backedUp.push(entry.filePath);
+        await rename(entry.tempPath, entry.filePath);
+        replaced.push(entry.filePath);
+      }
+      await Promise.all(temporaries.map(async (entry) => {
+        try {
+          await unlink(entry.backupPath);
+        } catch {
+          // A stale backup is safer than failing an otherwise completed pair update.
+        }
+      }));
+    } catch (error) {
+      for (const entry of [...temporaries].reverse()) {
+        if (!backedUp.includes(entry.filePath)) continue;
+        try {
+          if (replaced.includes(entry.filePath)) await unlink(entry.filePath);
+          await rename(entry.backupPath, entry.filePath);
+        } catch {
+          // The use case reports the operation as failed; manual review may be required.
+        }
+      }
+      throw error;
+    } finally {
+      await Promise.all(
+        temporaries.map(async ({ tempPath }) => {
+          try {
+            await unlink(tempPath);
+          } catch {
+            // The file was either promoted or never created.
+          }
+        })
+      );
     }
   }
 

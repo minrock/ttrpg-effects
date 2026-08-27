@@ -141,7 +141,7 @@ export function PlayerApp(): JSX.Element {
           effects={scene.effects}
           tokens={renderedTokens}
           labels={[]}
-          mapAnnotations={{ pins: [], areas: [] }}
+          mapAnnotations={{ pins: [], areas: [], sceneLinks: [] }}
           showMapAnnotations={false}
           selectedElementId={null}
           isZoomLocked={isZoomLocked}

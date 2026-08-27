@@ -2556,6 +2556,71 @@ body {
   background: transparent;
 }
 
+.scene-link-modal {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid rgb(125 211 252 / 35%);
+  border-radius: 8px;
+  background: #1b1f21;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 55%);
+}
+
+.scene-link-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.scene-link-modal__header h2,
+.scene-link-modal__header small {
+  margin: 0;
+}
+
+.scene-link-modal label,
+.scene-link-candidates {
+  display: grid;
+  gap: 7px;
+}
+
+.scene-link-status,
+.scene-link-inline-status {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-left: 3px solid #94a3b8;
+  background: rgb(148 163 184 / 8%);
+  overflow-wrap: anywhere;
+}
+
+.scene-link-status.is-valid,
+.scene-link-inline-status.is-valid {
+  border-color: #7dd3fc;
+}
+
+.scene-link-status.is-validating,
+.scene-link-inline-status.is-validating {
+  border-color: #facc15;
+}
+
+.scene-link-status.is-broken,
+.scene-link-inline-status.is-broken,
+.annotation-tree__leaf.is-broken {
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.scene-link-candidates {
+  padding: 12px;
+  border: 1px solid rgb(244 241 232 / 14%);
+  border-radius: 6px;
+  background: rgb(0 0 0 / 14%);
+}
+
 .context-menu hr {
   width: 100%;
   height: 1px;

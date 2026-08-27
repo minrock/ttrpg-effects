@@ -13,6 +13,7 @@ import { registerMonsterLibraryIpc } from "./ipc/monster-library-ipc";
 import { registerMonsterTemplateIpc } from "./ipc/monster-template-ipc";
 import { getPlayerWindowRendererIndexPath, preloadPlayerWindow, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
 import { registerSceneIpc } from "./ipc/scene-ipc";
+import { registerSceneNavigationLinksIpc } from "./ipc/scene-navigation-links-ipc";
 import { RecentScenesStore } from "./recent-scenes-store";
 
 protocol.registerSchemesAsPrivileged([
@@ -80,6 +81,13 @@ app.whenReady().then(async () => {
   };
   await installAppMenu(menuOptions);
   registerSceneIpc(sceneFileStorage, {
+    onRecentScenePath: async (filePath) => {
+      await registerRecentScene(recentScenes, filePath);
+      await rebuildAppMenu(menuOptions);
+    }
+  });
+  registerSceneNavigationLinksIpc(sceneFileStorage, {
+    getMainWindow: () => mainWindow,
     onRecentScenePath: async (filePath) => {
       await registerRecentScene(recentScenes, filePath);
       await rebuildAppMenu(menuOptions);

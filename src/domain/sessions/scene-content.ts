@@ -16,6 +16,7 @@ export function hasSceneContent(
     scene.labels.length > 0 ||
     scene.mapAnnotations.pins.length > 0 ||
     scene.mapAnnotations.areas.length > 0 ||
+    scene.mapAnnotations.sceneLinks.length > 0 ||
     scene.combatTracker.active ||
     tacticalElementsCount > 0 ||
     scene.fogOfWar.revealedAreas.length > 0 ||
