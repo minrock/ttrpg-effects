@@ -1,4 +1,5 @@
 import { useMemo, useState, type JSX, type ReactNode } from "react";
+import { Search } from "lucide-react";
 import {
   searchMapAnnotations,
   type MapAnnotation,
@@ -38,13 +39,16 @@ export function MapAnnotationsTree({
 
   return (
     <div className="annotation-tree-panel">
-      <input
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder="Buscar anotaciones"
-        aria-label="Buscar anotaciones"
-      />
+      <label className="annotation-tree-search">
+        <Search aria-hidden="true" size={14} />
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Buscar anotaciones"
+          aria-label="Buscar anotaciones"
+        />
+      </label>
       <ul className="annotation-tree" role="tree" aria-label="Arbol de anotaciones">
         <AnnotationBranch label="Habitaciones" icon="◆" count={pins.length}>
           {pins.map((pin) => (

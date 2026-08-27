@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { Lock, Unlock } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { getTokensForRole, normalizeCameraSnapshot, type ArcanePointerBroadcast, type PlayerWindowSnapshot, type ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { sortTokensByOrder } from "../../domain/tokens/tokens";
@@ -222,7 +223,8 @@ export function PlayerApp(): JSX.Element {
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => setIsZoomLocked((current) => !current)}
       >
-        {isZoomLocked ? "Zoom bloqueado" : "Zoom desbloqueado"}
+        {isZoomLocked ? <Lock aria-hidden="true" size={15} /> : <Unlock aria-hidden="true" size={15} />}
+        <span>{isZoomLocked ? "Zoom bloqueado" : "Zoom desbloqueado"}</span>
       </button>
     </main>
   );

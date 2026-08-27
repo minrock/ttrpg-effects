@@ -10,6 +10,16 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.5.1] - 2026-08-27
+
+### Changed
+
+- Refactor visual del frontend inspirado en el editor VTT de referencia, conservando el logo y el viewport PixiJS existentes.
+- Toolbar principal compacta con iconos, agrupacion de acciones y estados activos coherentes.
+- Paneles laterales y acordeones reorganizados con una jerarquia visual mas clara y controles de menor densidad.
+- Buscador del arbol de anotaciones integrado al nuevo look and feel con icono y estados de foco.
+- Boton de bloqueo de zoom del Player View actualizado con iconos y estados visuales consistentes con la vista del DM.
+
 ## [1.5.0] - 2026-08-27
 
 ### Added
