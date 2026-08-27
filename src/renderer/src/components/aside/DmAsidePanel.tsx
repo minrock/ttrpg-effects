@@ -1,4 +1,14 @@
 import { useCallback, useState, type JSX } from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Diamond,
+  Skull,
+  StickyNote,
+  UserRound,
+  UsersRound,
+  type LucideIcon
+} from "lucide-react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneAside, SceneMonster, SceneNpc, SceneNote, ScenePlayerCharacter } from "../../../../domain/sessions/scene-aside";
 import {
@@ -114,7 +124,9 @@ export function DmAsidePanel({
 
       <div className="dm-aside-content">
         <AccordionSection
-          title="◆ Anotaciones"
+          title="Anotaciones"
+          icon={Diamond}
+          tone="annotation"
           sectionKey="annotations"
           open={openSections.has("annotations")}
           badge={annotations.pins.length + annotations.areas.length + annotations.sceneLinks.length}
@@ -133,7 +145,9 @@ export function DmAsidePanel({
         </AccordionSection>
 
         <AccordionSection
-          title="🐉 Monstruos"
+          title="Monstruos"
+          icon={Skull}
+          tone="monster"
           sectionKey="monsters"
           open={openSections.has("monsters")}
           badge={aside.monsters.length}
@@ -150,7 +164,9 @@ export function DmAsidePanel({
         </AccordionSection>
 
         <AccordionSection
-          title="🧑 NPCs"
+          title="NPCs"
+          icon={UserRound}
+          tone="npc"
           sectionKey="npcs"
           open={openSections.has("npcs")}
           badge={aside.npcs.length}
@@ -166,7 +182,9 @@ export function DmAsidePanel({
         </AccordionSection>
 
         <AccordionSection
-          title="🧙 Personajes"
+          title="Personajes"
+          icon={UsersRound}
+          tone="player"
           sectionKey="playerCharacters"
           open={openSections.has("playerCharacters")}
           badge={aside.playerCharacters.length}
@@ -180,7 +198,9 @@ export function DmAsidePanel({
         </AccordionSection>
 
         <AccordionSection
-          title="📝 Notas"
+          title="Notas"
+          icon={StickyNote}
+          tone="note"
           sectionKey="notes"
           open={openSections.has("notes")}
           badge={aside.notes.length}
@@ -198,8 +218,10 @@ export function DmAsidePanel({
   );
 }
 
-function AccordionSection({ title, sectionKey, open, badge, onToggle, children }: {
+function AccordionSection({ title, icon: Icon, tone, sectionKey, open, badge, onToggle, children }: {
   title: string;
+  icon: LucideIcon;
+  tone: "annotation" | "monster" | "npc" | "player" | "note";
   sectionKey: SectionKey;
   open: boolean;
   badge: number;
@@ -213,10 +235,15 @@ function AccordionSection({ title, sectionKey, open, badge, onToggle, children }
         onClick={() => onToggle(sectionKey)}
       >
         <span className="dm-aside-accordion-title">
+          <span className="dm-aside-accordion-icon" data-tone={tone} aria-hidden="true">
+            <Icon size={14} />
+          </span>
           {title}
-          {badge > 0 && <span className="dm-aside-accordion-badge">({badge})</span>}
+          <span className="dm-aside-accordion-badge">{badge}</span>
         </span>
-        <span className="dm-aside-accordion-arrow">{open ? "▲" : "▼"}</span>
+        <span className="dm-aside-accordion-arrow" aria-hidden="true">
+          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        </span>
       </button>
       {open && (
         <div className="dm-aside-accordion-body">

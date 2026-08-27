@@ -10,6 +10,26 @@ import {
 } from "react";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import * as Switch from "@radix-ui/react-switch";
+import {
+  CircleDot,
+  CloudFog,
+  Crosshair,
+  FilePlus,
+  FolderOpen,
+  Grid3X3,
+  Lock,
+  Map as MapIcon,
+  MapPin,
+  Monitor,
+  Moon,
+  Save,
+  Shapes,
+  Sparkles,
+  Swords,
+  Unlock,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
 import type { MonsterTemplate } from "../../domain/monster-templates/monster-template";
 import {
   cancelInteraction,
@@ -2492,47 +2512,63 @@ export function App(): JSX.Element {
           </div>
         </div>
         <div className="scene-actions" aria-label="Acciones de escena">
-          <button type="button" onClick={handleOpenMapImage} disabled={isBusy}>
-            Cargar mapa
-          </button>
-          <button
-            type="button"
-            className={interaction.isZoomLocked ? "is-active" : ""}
-            onClick={handleToggleZoomLock}
-            aria-pressed={interaction.isZoomLocked}
-          >
-            {interaction.isZoomLocked ? "Zoom bloqueado" : "Bloquear zoom"}
-          </button>
-          <button
-            type="button"
-            className={interaction.activeTool === "arcane-pointer" ? "is-active" : ""}
-            onClick={handleToggleArcanePointerMode}
-            aria-pressed={interaction.activeTool === "arcane-pointer"}
-          >
-            {interaction.activeTool === "arcane-pointer" ? "Apuntador activo" : "Apuntador"}
-          </button>
-          <button type="button" onClick={() => void handleOpenPlayerWindow()} disabled={isBusy}>
-            Ventana de jugador
-          </button>
-          <button
-            type="button"
-            className={scene.combatTracker.active ? "is-active" : ""}
-            onClick={() => setIsCombatSetupOpen(true)}
-            disabled={isBusy}
-          >
-            {scene.combatTracker.active ? "Batalla activa" : "Iniciar batalla"}
-          </button>
-          {canCreateNewScene ? (
-            <button type="button" onClick={handleRequestNewScene} disabled={isBusy}>
-              Nueva escena
+          <div className="scene-actions__group scene-actions__group--tools">
+            <button type="button" onClick={handleOpenMapImage} disabled={isBusy}>
+              <MapIcon size={15} aria-hidden="true" />
+              Cargar mapa
             </button>
-          ) : null}
-          <button type="button" onClick={handleSaveScene} disabled={isBusy}>
-            Guardar escena
-          </button>
-          <button type="button" onClick={handleLoadScene} disabled={isBusy}>
-            Cargar escena
-          </button>
+            <button
+              type="button"
+              className={interaction.isZoomLocked ? "is-active" : ""}
+              onClick={handleToggleZoomLock}
+              aria-pressed={interaction.isZoomLocked}
+            >
+              {interaction.isZoomLocked ? <Lock size={15} aria-hidden="true" /> : <Unlock size={15} aria-hidden="true" />}
+              {interaction.isZoomLocked ? "Zoom bloqueado" : "Bloquear zoom"}
+            </button>
+            <button
+              type="button"
+              className={interaction.activeTool === "arcane-pointer" ? "is-active" : ""}
+              onClick={handleToggleArcanePointerMode}
+              aria-pressed={interaction.activeTool === "arcane-pointer"}
+            >
+              <Crosshair size={15} aria-hidden="true" />
+              {interaction.activeTool === "arcane-pointer" ? "Apuntador activo" : "Apuntador"}
+            </button>
+          </div>
+          <div className="scene-actions__divider" aria-hidden="true" />
+          <div className="scene-actions__group scene-actions__group--player">
+            <button type="button" onClick={() => void handleOpenPlayerWindow()} disabled={isBusy}>
+              <Monitor size={15} aria-hidden="true" />
+              Ventana de jugador
+            </button>
+          </div>
+          <div className="scene-actions__spacer" />
+          <div className="scene-actions__group scene-actions__group--files">
+            {canCreateNewScene ? (
+              <button type="button" className="is-quiet" onClick={handleRequestNewScene} disabled={isBusy}>
+                <FilePlus size={15} aria-hidden="true" />
+                Nueva escena
+              </button>
+            ) : null}
+            <button type="button" onClick={handleSaveScene} disabled={isBusy}>
+              <Save size={15} aria-hidden="true" />
+              Guardar escena
+            </button>
+            <button type="button" className="is-quiet" onClick={handleLoadScene} disabled={isBusy}>
+              <FolderOpen size={15} aria-hidden="true" />
+              Cargar escena
+            </button>
+            <button
+              type="button"
+              className={`is-battle${scene.combatTracker.active ? " is-active" : ""}`}
+              onClick={() => setIsCombatSetupOpen(true)}
+              disabled={isBusy}
+            >
+              <Swords size={15} aria-hidden="true" />
+              {scene.combatTracker.active ? "Batalla activa" : "Iniciar batalla"}
+            </button>
+          </div>
         </div>
       </header>
       {needsResave && (
@@ -2559,7 +2595,7 @@ export function App(): JSX.Element {
         </div>
       )}
       <aside className="scene-status" aria-label="Estado de escena">
-        <span>{feedback}</span>
+        <span className="scene-status__primary">{feedback}</span>
         <span>{scene.map.imagePath ?? "Sin mapa"}</span>
         <span>{currentFilePath ?? "Sin archivo seleccionado"}</span>
         <span>
@@ -2578,7 +2614,7 @@ export function App(): JSX.Element {
             ? "Sin seleccion"
             : `Seleccion: ${interaction.selectedElementId}`}
         </span>
-        <span>v{scene.version}</span>
+        <span className="scene-status__version">v{scene.version}</span>
         {warnings.map((warning) => (
           <strong key={warning}>{warning}</strong>
         ))}
@@ -2605,7 +2641,7 @@ export function App(): JSX.Element {
           aria-label={isAsidePanelVisible ? "Ocultar panel de escena" : "Mostrar panel de escena"}
           onClick={() => setIsAsidePanelVisible((v) => !v)}
         >
-          {isAsidePanelVisible ? "‹" : "›"}
+          {isAsidePanelVisible ? <ChevronLeft aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
         </button>
         <MapViewport
           ref={viewportHandleRef}
@@ -2692,6 +2728,7 @@ export function App(): JSX.Element {
           onToggleDefeated={handleToggleCombatParticipantDefeated}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
+          <div className="control-sidebar-header">Capas</div>
           {hasSelectedObject ? (
             <SidebarAccordion
               id="selected-object-properties-panel"
@@ -3202,7 +3239,7 @@ export function App(): JSX.Element {
 
           <SidebarAccordion
             id="grid-controls-panel"
-            icon="▦"
+            icon={<Grid3X3 size={16} />}
             title="Grilla"
             isOpen={openSidebarSections.grid}
             onToggle={() => toggleSidebarSection("grid")}
@@ -3344,9 +3381,11 @@ export function App(): JSX.Element {
             </label>
           </SidebarAccordion>
 
+          <div className="control-sidebar-group-label">Herramientas</div>
+
           <SidebarAccordion
             id="figure-controls-panel"
-            icon="◇"
+            icon={<Shapes size={16} />}
             title="Figuras"
             isOpen={openSidebarSections.figures}
             onToggle={() => toggleSidebarSection("figures")}
@@ -3388,7 +3427,7 @@ export function App(): JSX.Element {
 
           <SidebarAccordion
             id="effects-controls-panel"
-            icon="✦"
+            icon={<Sparkles size={16} />}
             title="Efectos"
             isOpen={openSidebarSections.effects}
             onToggle={() => toggleSidebarSection("effects")}
@@ -3429,7 +3468,7 @@ export function App(): JSX.Element {
 
           <SidebarAccordion
             id="token-controls-panel"
-            icon="◉"
+            icon={<CircleDot size={16} />}
             title="Tokens"
             isOpen={openSidebarSections.tokens}
             onToggle={() => toggleSidebarSection("tokens")}
@@ -3488,7 +3527,7 @@ export function App(): JSX.Element {
 
           <SidebarAccordion
             id="annotations-controls-panel"
-            icon="◆"
+            icon={<MapPin size={16} />}
             title="Anotaciones"
             isOpen={openSidebarSections.annotations}
             onToggle={() => toggleSidebarSection("annotations")}
@@ -3503,9 +3542,11 @@ export function App(): JSX.Element {
             />
           </SidebarAccordion>
 
+          <div className="control-sidebar-group-label">Visibilidad</div>
+
           <SidebarAccordion
             id="darkness-controls-panel"
-            icon="●"
+            icon={<Moon size={16} />}
             title="Oscuridad"
             isOpen={openSidebarSections.darkness}
             onToggle={() => toggleSidebarSection("darkness")}
@@ -3541,7 +3582,7 @@ export function App(): JSX.Element {
 
           <SidebarAccordion
             id="fog-controls-panel"
-            icon="◌"
+            icon={<CloudFog size={16} />}
             title="Niebla"
             isOpen={openSidebarSections.fog}
             onToggle={() => toggleSidebarSection("fog")}
@@ -3616,7 +3657,7 @@ export function App(): JSX.Element {
           aria-label={isSidebarVisible ? "Ocultar menú lateral" : "Mostrar menú lateral"}
           onClick={() => setIsSidebarVisible((current) => !current)}
         >
-          {isSidebarVisible ? "›" : "‹"}
+          {isSidebarVisible ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
         </button>
       </div>
       {isNewSceneDialogOpen ? (
@@ -3978,7 +4019,7 @@ function getSceneLinkStatusText(
 
 interface SidebarAccordionProps {
   readonly id: string;
-  readonly icon: string;
+  readonly icon: ReactNode;
   readonly title: string;
   readonly isOpen: boolean;
   readonly onToggle: () => void;
@@ -3994,7 +4035,11 @@ function SidebarAccordion({
   children
 }: SidebarAccordionProps): JSX.Element {
   return (
-    <section className={`sidebar-accordion${isOpen ? " is-open" : ""}`} aria-labelledby={`${id}-header`}>
+    <section
+      className={`sidebar-accordion${isOpen ? " is-open" : ""}`}
+      data-panel={id}
+      aria-labelledby={`${id}-header`}
+    >
       <button
         id={`${id}-header`}
         className="sidebar-accordion-header"
