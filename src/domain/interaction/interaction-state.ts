@@ -13,7 +13,8 @@ export type InteractionTool =
   | "water"
   | "arcane-pointer"
   | "room-pin"
-  | "information-area";
+  | "information-area"
+  | "scene-link";
 
 export interface ContextMenuState {
   readonly screen: ScreenPoint;

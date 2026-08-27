@@ -76,7 +76,7 @@ describe("scene document schema", () => {
     const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
     delete legacyScene.mapAnnotations;
 
-    expect(parseSceneDocument(legacyScene).mapAnnotations).toEqual({ pins: [], areas: [] });
+    expect(parseSceneDocument(legacyScene).mapAnnotations).toEqual({ pins: [], areas: [], sceneLinks: [] });
     expect(detectOutdatedSceneFields(legacyScene)).toContain("mapAnnotations");
   });
 
@@ -100,11 +100,20 @@ describe("scene document schema", () => {
           description: "CD 15",
           cells: [{ x: 0, y: 0, size: 100 }],
           locked: false
-        }]
+        }],
+        sceneLinks: []
       }
     };
 
     expect(parseSceneJson(serializeSceneDocument(scene)).mapAnnotations).toEqual(scene.mapAnnotations);
+  });
+
+  it("defaults scene links for annotation documents saved before spec 23", () => {
+    const legacyScene = createDefaultScene() as unknown as Record<string, unknown>;
+    legacyScene.mapAnnotations = { pins: [], areas: [] };
+
+    expect(parseSceneDocument(legacyScene).mapAnnotations.sceneLinks).toEqual([]);
+    expect(detectOutdatedSceneFields(legacyScene)).toContain("mapAnnotations.sceneLinks");
   });
 
   it("rejects invalid information-area geometry", () => {

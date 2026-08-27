@@ -236,6 +236,28 @@ const mapInformationAreaSchema = z.object({
   locked: z.boolean().default(false)
 });
 
+const sceneLinkEndpointSchema = z.object({
+  scenePath: z.string().min(1),
+  markerId: z.string().min(1)
+});
+
+const sceneLinkConnectionSchema = z.object({
+  connectionId: z.string().min(1),
+  role: z.enum(["origin", "destination"]),
+  origin: sceneLinkEndpointSchema,
+  destination: sceneLinkEndpointSchema,
+  peer: sceneLinkEndpointSchema
+});
+
+export const mapSceneLinkMarkerSchema = z.object({
+  id: z.string().trim().min(1),
+  kind: z.literal("scene-link"),
+  position: worldPointSchema,
+  name: z.string().trim().min(1).max(120),
+  locked: z.boolean().default(false),
+  connection: sceneLinkConnectionSchema.nullable().default(null)
+});
+
 const combatParticipantTypeSchema = z.enum(["monster", "npc", "playerCharacter"]);
 
 const combatParticipantSchema = z.object({
@@ -328,9 +350,10 @@ export const sceneDocumentV1Schema = z.object({
   mapAnnotations: z
     .object({
       pins: z.array(mapInformationPinSchema),
-      areas: z.array(mapInformationAreaSchema)
+      areas: z.array(mapInformationAreaSchema),
+      sceneLinks: z.array(mapSceneLinkMarkerSchema).default([])
     })
-    .default(() => ({ pins: [], areas: [] })),
+    .default(() => ({ pins: [], areas: [], sceneLinks: [] })),
   sceneAside: z
     .object({
       monsters: z.array(
@@ -436,6 +459,16 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
   if (!("combatTracker" in obj)) missing.push("combatTracker");
   // Added in spec 22 (map information pins and areas)
   if (!("mapAnnotations" in obj)) missing.push("mapAnnotations");
+  else {
+    const mapAnnotations = obj["mapAnnotations"];
+    if (
+      typeof mapAnnotations === "object" &&
+      mapAnnotations !== null &&
+      !("sceneLinks" in mapAnnotations)
+    ) {
+      missing.push("mapAnnotations.sceneLinks");
+    }
+  }
   return missing;
 }
 

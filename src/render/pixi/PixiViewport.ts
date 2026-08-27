@@ -58,6 +58,7 @@ import {
   type MapAnnotation,
   type MapAnnotations
 } from "../../domain/annotations/map-annotations";
+import type { SceneLinkValidationStatus } from "../../domain/annotations/scene-navigation-links";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
@@ -151,6 +152,7 @@ export interface PixiViewportOptions {
   readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
   readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
   readonly onRoomPinPlace?: (position: WorldPoint) => void;
+  readonly onSceneLinkPlace?: (position: WorldPoint) => void;
   readonly onInformationAreaPaint?: (cells: readonly InformationAreaCell[]) => void;
   readonly onInformationAreaHighlight?: (areaId: string) => void;
   readonly onMapAnnotationPreview?: (annotationId: string) => void;
@@ -186,7 +188,8 @@ export class PixiViewport {
   private effects: readonly SceneEffect[] = [];
   private tokens: readonly RenderSceneToken[] = [];
   private labels: readonly SceneLabel[] = [];
-  private mapAnnotations: MapAnnotations = { pins: [], areas: [] };
+  private mapAnnotations: MapAnnotations = { pins: [], areas: [], sceneLinks: [] };
+  private sceneLinkStatuses: Readonly<Record<string, SceneLinkValidationStatus>> = {};
   private showMapAnnotations = true;
   private selectedElementId: string | null = null;
   private isZoomLocked = false;
@@ -201,6 +204,7 @@ export class PixiViewport {
   private isWaterDrawingMode = false;
   private isArcanePointerMode = false;
   private isRoomPinMode = false;
+  private isSceneLinkMode = false;
   private isInformationAreaMode = false;
   private arcanePointerCreatureSize: ArcanePointerCreatureSize = "medium";
   private viewRole: ViewportViewRole = "dm";
@@ -340,6 +344,11 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  setSceneLinkStatuses(statuses: Readonly<Record<string, SceneLinkValidationStatus>>): void {
+    this.sceneLinkStatuses = statuses;
+    this.drawMapAnnotationsLayer();
+  }
+
   setShowMapAnnotations(showMapAnnotations: boolean): void {
     this.showMapAnnotations = showMapAnnotations;
     this.drawMapAnnotationsLayer();
@@ -408,6 +417,11 @@ export class PixiViewport {
 
   setRoomPinMode(isRoomPinMode: boolean): void {
     this.isRoomPinMode = isRoomPinMode;
+    this.updateCursor();
+  }
+
+  setSceneLinkMode(isSceneLinkMode: boolean): void {
+    this.isSceneLinkMode = isSceneLinkMode;
     this.updateCursor();
   }
 
@@ -948,6 +962,19 @@ export class PixiViewport {
     if (pin !== undefined) {
       event.preventDefault();
       this.options.onMapAnnotationPreview?.(pin.id);
+      return;
+    }
+
+    const sceneLink = [...this.mapAnnotations.sceneLinks]
+      .reverse()
+      .find(
+        (candidate) =>
+          Math.hypot(worldPoint.x - candidate.position.x, worldPoint.y - candidate.position.y) <=
+          MAP_INFORMATION_PIN_HIT_RADIUS
+      );
+    if (sceneLink !== undefined) {
+      event.preventDefault();
+      this.options.onMapAnnotationPreview?.(sceneLink.id);
     }
   };
 
@@ -980,7 +1007,7 @@ export class PixiViewport {
         mode = "information-area-paint";
         this.informationAreaStrokePoints = [screenToWorld(point, this.camera, this.getViewportSize())];
         this.drawSelectionLayer();
-      } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode) {
+      } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode) {
         mode = "idle";
       } else {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
@@ -1322,6 +1349,10 @@ export class PixiViewport {
         this.options.onRoomPinPlace?.(
           screenToWorld(releasePoint, this.camera, this.getViewportSize())
         );
+      } else if (this.isSceneLinkMode) {
+        this.options.onSceneLinkPlace?.(
+          screenToWorld(releasePoint, this.camera, this.getViewportSize())
+        );
       } else {
         this.options.onElementSelect?.(this.hitTestElement(releasePoint));
       }
@@ -1513,7 +1544,7 @@ export class PixiViewport {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
-    } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode) {
+    } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isFogRevealMode || this.isFirePaintMode || this.isInformationAreaMode) {
       this.app.canvas.style.cursor = "cell";
@@ -2013,6 +2044,14 @@ export class PixiViewport {
     for (const pin of this.mapAnnotations.pins) {
       const container = drawMapInformationPin(pin.position, pin.title, pin.locked);
       container.label = pin.id;
+      layer.addChild(container);
+    }
+
+    for (const marker of this.mapAnnotations.sceneLinks) {
+      const status = this.sceneLinkStatuses[marker.id] ??
+        (marker.connection === null ? { state: "unlinked" as const } : { state: "validating" as const });
+      const container = drawSceneLinkMarker(marker.position, marker.name, marker.locked, status);
+      container.label = marker.id;
       layer.addChild(container);
     }
 
@@ -3129,6 +3168,13 @@ export class PixiViewport {
               position: getMapAnnotationCenter(area),
               hitRadius: 32,
               selectionColor: getInformationAreaColor(area.areaType)
+            })),
+            ...this.mapAnnotations.sceneLinks.map((marker) => ({
+              id: marker.id,
+              kind: "scene-link" as const,
+              position: marker.position,
+              hitRadius: MAP_INFORMATION_PIN_HIT_RADIUS,
+              selectionColor: this.sceneLinkStatuses[marker.id]?.state === "broken" ? "#ef4444" : "#7dd3fc"
             }))
           ]
         : []),
@@ -3172,7 +3218,8 @@ export class PixiViewport {
   private findMapAnnotation(elementId: string): MapAnnotation | undefined {
     return (
       this.mapAnnotations.pins.find((pin) => pin.id === elementId) ??
-      this.mapAnnotations.areas.find((area) => area.id === elementId)
+      this.mapAnnotations.areas.find((area) => area.id === elementId) ??
+      this.mapAnnotations.sceneLinks.find((marker) => marker.id === elementId)
     );
   }
 
@@ -3396,7 +3443,7 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water" | "label" | "room-pin" | "information-area";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water" | "label" | "room-pin" | "information-area" | "scene-link";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
   readonly selectionColor?: string;
@@ -5399,6 +5446,48 @@ function drawMapInformationPin(position: WorldPoint, title: string, locked: bool
   return container;
 }
 
+function drawSceneLinkMarker(
+  position: WorldPoint,
+  name: string,
+  locked: boolean,
+  status: SceneLinkValidationStatus
+): Container {
+  const container = new Container();
+  const color =
+    status.state === "broken"
+      ? 0xef4444
+      : status.state === "valid"
+        ? 0x7dd3fc
+        : status.state === "validating"
+          ? 0xfacc15
+          : 0x94a3b8;
+  const marker = new Graphics()
+    .circle(position.x, position.y, MAP_INFORMATION_PIN_RADIUS)
+    .fill({ color: 0x111315, alpha: 0.94 })
+    .circle(position.x, position.y, MAP_INFORMATION_PIN_RADIUS)
+    .stroke({ color, width: 4, alpha: 0.98 })
+    .circle(position.x, position.y, 17)
+    .stroke({ color, width: 4, alpha: locked ? 0.55 : 0.95 })
+    .circle(position.x, position.y, 6)
+    .fill({ color, alpha: 0.95 });
+  const label = new Text({
+    text: name,
+    style: {
+      fill: status.state === "broken" ? 0xfca5a5 : 0xe0f2fe,
+      fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+      fontSize: 24,
+      fontWeight: "600",
+      stroke: { color: 0x101315, width: 5 }
+    }
+  });
+  label.anchor.set(0, 0.5);
+  label.position.set(position.x + MAP_INFORMATION_PIN_RADIUS + 10, position.y);
+  label.alpha = 0.94;
+  label.label = "room-pin-name";
+  container.addChild(marker, label);
+  return container;
+}
+
 function drawSelection(element: SelectableRenderElement): Graphics {
   const { x, y } = element.position;
   const radius = (element.hitRadius ?? getHitRadius(element.kind)) + 8;
@@ -5784,6 +5873,7 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
     case "label":
       return 72;
     case "room-pin":
+    case "scene-link":
       return MAP_INFORMATION_PIN_HIT_RADIUS;
     case "information-area":
       return 32;

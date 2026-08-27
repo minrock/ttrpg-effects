@@ -7,6 +7,7 @@ interface MapAnnotationsSectionProps {
   readonly onVisibleChange: (visible: boolean) => void;
   readonly onStartPin: () => void;
   readonly onStartArea: () => void;
+  readonly onStartSceneLink: () => void;
 }
 
 export function MapAnnotationsSection({
@@ -14,7 +15,8 @@ export function MapAnnotationsSection({
   activeTool,
   onVisibleChange,
   onStartPin,
-  onStartArea
+  onStartArea,
+  onStartSceneLink
 }: MapAnnotationsSectionProps): JSX.Element {
   return (
     <div className="annotations-section">
@@ -30,6 +32,9 @@ export function MapAnnotationsSection({
         </button>
         <button type="button" className={activeTool === "information-area" ? "is-active" : ""} onClick={onStartArea}>
           Area de informacion
+        </button>
+        <button type="button" className={activeTool === "scene-link" ? "is-active" : ""} onClick={onStartSceneLink}>
+          Conexion de escena
         </button>
       </div>
     </div>

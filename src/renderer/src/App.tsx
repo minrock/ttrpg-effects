@@ -148,6 +148,11 @@ import {
   type MapAnnotationModalDraft
 } from "./components/annotations/MapAnnotationModal";
 import { MapAnnotationsSection } from "./components/annotations/MapAnnotationsSection";
+import { SceneLinkModal } from "./components/annotations/SceneLinkModal";
+import type {
+  MapSceneLinkMarker,
+  SceneLinkValidationStatus
+} from "../../domain/annotations/scene-navigation-links";
 
 const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
@@ -228,6 +233,11 @@ export function App(): JSX.Element {
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
   const [showMapAnnotations, setShowMapAnnotations] = useState(true);
   const [mapAnnotationModal, setMapAnnotationModal] = useState<MapAnnotationModalDraft | null>(null);
+  const [sceneLinkModalId, setSceneLinkModalId] = useState<string | null>(null);
+  const [sceneLinkStatuses, setSceneLinkStatuses] = useState<Readonly<Record<string, SceneLinkValidationStatus>>>({});
+  const sceneLinkStatusesRef = useRef(sceneLinkStatuses);
+  sceneLinkStatusesRef.current = sceneLinkStatuses;
+  const navigateSceneLinkRef = useRef<(marker: MapSceneLinkMarker) => Promise<void>>(async () => {});
   const [isPlayerWindowOpen, setIsPlayerWindowOpen] = useState(false);
   const isPlayerWindowOpenRef = useRef(isPlayerWindowOpen);
   isPlayerWindowOpenRef.current = isPlayerWindowOpen;
@@ -264,6 +274,9 @@ export function App(): JSX.Element {
   const nextRevealId = useRef(1);
   const nextPinId = useRef(1);
   const nextInformationAreaId = useRef(1);
+  const nextSceneLinkId = useRef(1);
+  const sceneLinkValidationRequestId = useRef(0);
+  const lastSavedSceneJsonRef = useRef<string | null>(null);
   const syncSceneEntityCounters = useCallback((targetScene: SceneDocument): void => {
     nextShapeId.current = getNextNumericIdForPrefixes(
       targetScene.shapes.map((shape) => shape.id),
@@ -285,6 +298,10 @@ export function App(): JSX.Element {
       targetScene.mapAnnotations.areas.map((area) => area.id),
       "information-area-"
     );
+    nextSceneLinkId.current = getNextNumericId(
+      targetScene.mapAnnotations.sceneLinks.map((marker) => marker.id),
+      "scene-link-"
+    );
   }, []);
   const viewportHandleRef = useRef<MapViewportHandle | null>(null);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
@@ -300,6 +317,28 @@ export function App(): JSX.Element {
   useEffect(() => {
     syncSceneEntityCounters(sceneRef.current);
   }, [syncSceneEntityCounters]);
+
+  useEffect(() => {
+    const markers = scene.mapAnnotations.sceneLinks;
+    const requestId = sceneLinkValidationRequestId.current + 1;
+    sceneLinkValidationRequestId.current = requestId;
+    setSceneLinkStatuses(Object.fromEntries(markers.map((marker) => [
+      marker.id,
+      marker.connection === null
+        ? { state: "unlinked" as const }
+        : { state: "validating" as const }
+    ])));
+
+    if (currentFilePath === null || markers.length === 0 || window.ttrpg === undefined) return;
+    void window.ttrpg.validateSceneLinks({ scenePath: currentFilePath, markers }).then((result) => {
+      if (sceneLinkValidationRequestId.current !== requestId) return;
+      if (result.ok) {
+        setSceneLinkStatuses(result.statuses);
+      } else {
+        setFeedback(result.error);
+      }
+    });
+  }, [currentFilePath, scene.mapAnnotations.sceneLinks]);
 
   // Phase 1: Reconstruct the runtime map URL on mount if the scene has a map but no URL yet.
   // This covers renderer remounts where scene was restored from sessionStorage but mapImageUrl was lost.
@@ -389,6 +428,27 @@ export function App(): JSX.Element {
     setInteraction((current) => setActiveTool(current, "select"));
   }, []);
 
+  const handleSceneLinkPlace = useCallback((position: WorldPoint): void => {
+    const id = getNextAvailableSceneId(sceneRef.current, ["scene-link-"], nextSceneLinkId);
+    const marker: MapSceneLinkMarker = {
+      id,
+      kind: "scene-link",
+      position,
+      name: `Conexion ${nextSceneLinkId.current - 1}`,
+      locked: false,
+      connection: null
+    };
+    setScene((current) => ({
+      ...current,
+      mapAnnotations: {
+        ...current.mapAnnotations,
+        sceneLinks: [...current.mapAnnotations.sceneLinks, marker]
+      }
+    }));
+    setSceneLinkModalId(id);
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), id));
+  }, []);
+
   const handleInformationAreaPaint = useCallback((cells: readonly InformationAreaCell[]): void => {
     if (cells.length === 0) return;
     const id = getNextAvailableSceneId(sceneRef.current, ["information-area-"], nextInformationAreaId);
@@ -442,9 +502,19 @@ export function App(): JSX.Element {
 
   const handleStartRoomPin = useCallback((): void => {
     setMapAnnotationModal(null);
+    setSceneLinkModalId(null);
+    setSceneLinkStatuses({});
     setIsSidebarVisible(true);
     setOpenSidebarSections((current) => ({ ...current, annotations: true }));
     setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "room-pin"), null));
+  }, []);
+
+  const handleStartSceneLink = useCallback((): void => {
+    setMapAnnotationModal(null);
+    setSceneLinkModalId(null);
+    setIsSidebarVisible(true);
+    setOpenSidebarSections((current) => ({ ...current, annotations: true }));
+    setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "scene-link"), null));
   }, []);
 
   const handleStartInformationArea = useCallback((): void => {
@@ -483,6 +553,10 @@ export function App(): JSX.Element {
   }, []);
 
   const handleEditMapAnnotation = useCallback((annotation: MapAnnotation): void => {
+    if (annotation.kind === "scene-link") {
+      setSceneLinkModalId(annotation.id);
+      return;
+    }
     setMapAnnotationModal(
       annotation.kind === "room-pin"
         ? { kind: "room-pin", id: annotation.id, position: annotation.position, initial: annotation, initialMode: "edit" }
@@ -491,6 +565,15 @@ export function App(): JSX.Element {
   }, []);
 
   const handleMapAnnotationPreviewById = useCallback((annotationId: string): void => {
+    const sceneLink = sceneRef.current.mapAnnotations.sceneLinks.find((candidate) => candidate.id === annotationId);
+    if (sceneLink !== undefined) {
+      if (sceneLink.connection === null || sceneLinkStatusesRef.current[sceneLink.id]?.state === "broken") {
+        setSceneLinkModalId(sceneLink.id);
+      } else {
+        void navigateSceneLinkRef.current(sceneLink);
+      }
+      return;
+    }
     const pin = sceneRef.current.mapAnnotations.pins.find((candidate) => candidate.id === annotationId);
     if (pin === undefined) return;
     setMapAnnotationModal({
@@ -506,11 +589,15 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       mapAnnotations: {
+        ...current.mapAnnotations,
         pins: current.mapAnnotations.pins.map((pin) =>
           pin.id === annotation.id ? { ...pin, locked: !pin.locked } : pin
         ),
         areas: current.mapAnnotations.areas.map((area) =>
           area.id === annotation.id ? { ...area, locked: !area.locked } : area
+        ),
+        sceneLinks: current.mapAnnotations.sceneLinks.map((marker) =>
+          marker.id === annotation.id ? { ...marker, locked: !marker.locked } : marker
         )
       }
     }));
@@ -524,6 +611,127 @@ export function App(): JSX.Element {
     viewportHandleRef.current?.centerOnWorldPoint(getMapAnnotationCenter(annotation));
     setInteraction((current) => selectElement(setActiveTool(current, "select"), annotation.id));
   }, []);
+
+  const handleRenameSceneLink = useCallback((markerId: string, name: string): void => {
+    if (name.trim() === "") return;
+    setScene((current) => ({
+      ...current,
+      mapAnnotations: {
+        ...current.mapAnnotations,
+        sceneLinks: current.mapAnnotations.sceneLinks.map((marker) =>
+          marker.id === markerId ? { ...marker, name: name.trim() } : marker
+        )
+      }
+    }));
+  }, []);
+
+  async function ensureCurrentScenePath(): Promise<string | null> {
+    const currentSnapshot = JSON.stringify({ ...sceneRef.current, sceneAside });
+    if (currentFilePath !== null && lastSavedSceneJsonRef.current === currentSnapshot) {
+      return currentFilePath;
+    }
+    const saved = await saveCurrentScene();
+    if (!saved.ok) {
+      setFeedback(saved.error);
+      return null;
+    }
+    setCurrentFilePath(saved.filePath);
+    lastSavedSceneJsonRef.current = JSON.stringify({ ...saved.scene, sceneAside });
+    setFeedback("Escena guardada");
+    return saved.filePath;
+  }
+
+  async function handleConnectSceneLink(
+    marker: MapSceneLinkMarker,
+    targetScenePath: string,
+    targetMarkerId: string
+  ): Promise<boolean> {
+    if (window.ttrpg === undefined) return false;
+    const sourceScenePath = await ensureCurrentScenePath();
+    if (sourceScenePath === null) return false;
+
+    setIsBusy(true);
+    try {
+      const result = await window.ttrpg.connectSceneLink({
+        sourceScenePath,
+        sourceMarkerId: marker.id,
+        targetScenePath,
+        targetMarkerId
+      });
+      if (!result.ok) {
+        setFeedback(result.error);
+        return false;
+      }
+      setScene((current) => ({ ...current, mapAnnotations: result.mapAnnotations }));
+      lastSavedSceneJsonRef.current = JSON.stringify({
+        ...sceneRef.current,
+        mapAnnotations: result.mapAnnotations,
+        sceneAside
+      });
+      setFeedback(result.warning ?? "Conexion reciproca guardada.");
+      return true;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDisconnectSceneLink(marker: MapSceneLinkMarker): Promise<boolean> {
+    if (window.ttrpg === undefined) return false;
+    const scenePath = await ensureCurrentScenePath();
+    if (scenePath === null) return false;
+    setIsBusy(true);
+    try {
+      const result = await window.ttrpg.disconnectSceneLink({ scenePath, markerId: marker.id });
+      if (!result.ok) {
+        setFeedback(result.error);
+        return false;
+      }
+      setScene((current) => ({ ...current, mapAnnotations: result.mapAnnotations }));
+      lastSavedSceneJsonRef.current = JSON.stringify({
+        ...sceneRef.current,
+        mapAnnotations: result.mapAnnotations,
+        sceneAside
+      });
+      setFeedback(result.warning ?? "Conexion eliminada.");
+      return true;
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleNavigateSceneLink(marker: MapSceneLinkMarker): Promise<void> {
+    if (window.ttrpg === undefined || currentFilePath === null) {
+      setSceneLinkModalId(marker.id);
+      return;
+    }
+    const currentSnapshot = JSON.stringify({ ...sceneRef.current, sceneAside });
+    if (lastSavedSceneJsonRef.current !== currentSnapshot) {
+      const saved = await saveCurrentScene();
+      if (!saved.ok) {
+        setFeedback(saved.error);
+        return;
+      }
+      lastSavedSceneJsonRef.current = JSON.stringify({ ...saved.scene, sceneAside });
+    }
+    setIsBusy(true);
+    try {
+      const result = await window.ttrpg.loadSceneLinkTarget({
+        scenePath: currentFilePath,
+        markerId: marker.id
+      });
+      if (!result.ok) {
+        setFeedback(result.error);
+        setSceneLinkModalId(marker.id);
+        return;
+      }
+      await runSceneOperation("cargada", async () => result.sceneResult, {
+        playerEntryPoint: result.entryPoint
+      });
+    } finally {
+      setIsBusy(false);
+    }
+  }
+  navigateSceneLinkRef.current = handleNavigateSceneLink;
 
   const handleCreateShape = (kind: TacticalShapeKind): void => {
     if (interaction.contextMenu === null) {
@@ -611,9 +819,25 @@ export function App(): JSX.Element {
     const selectedId = selectedElementIdRef.current;
     const selectedAnnotation =
       sceneRef.current.mapAnnotations.pins.find((pin) => pin.id === selectedId) ??
-      sceneRef.current.mapAnnotations.areas.find((area) => area.id === selectedId);
+      sceneRef.current.mapAnnotations.areas.find((area) => area.id === selectedId) ??
+      sceneRef.current.mapAnnotations.sceneLinks.find((marker) => marker.id === selectedId);
     if (selectedAnnotation !== undefined && !canDeleteMapAnnotation(selectedAnnotation)) {
       setFeedback("Desbloquea la anotacion antes de eliminarla.");
+      return;
+    }
+
+    if (selectedAnnotation?.kind === "scene-link" && selectedAnnotation.connection !== null) {
+      void handleDisconnectSceneLink(selectedAnnotation).then((disconnected) => {
+        if (!disconnected) return;
+        setScene((current) => ({
+          ...current,
+          mapAnnotations: {
+            ...current.mapAnnotations,
+            sceneLinks: current.mapAnnotations.sceneLinks.filter((marker) => marker.id !== selectedAnnotation.id)
+          }
+        }));
+        setInteraction((current) => selectElement(current, null));
+      });
       return;
     }
 
@@ -630,8 +854,10 @@ export function App(): JSX.Element {
         tokens: current.tokens.filter((token) => token.id !== interaction.selectedElementId),
         labels: current.labels.filter((label) => label.id !== interaction.selectedElementId),
         mapAnnotations: {
+          ...current.mapAnnotations,
           pins: current.mapAnnotations.pins.filter((pin) => pin.id !== interaction.selectedElementId),
-          areas: current.mapAnnotations.areas.filter((area) => area.id !== interaction.selectedElementId)
+          areas: current.mapAnnotations.areas.filter((area) => area.id !== interaction.selectedElementId),
+          sceneLinks: current.mapAnnotations.sceneLinks.filter((marker) => marker.id !== interaction.selectedElementId)
         }
       };
     });
@@ -795,6 +1021,8 @@ export function App(): JSX.Element {
     nextRevealId.current = 1;
     nextPinId.current = 1;
     nextInformationAreaId.current = 1;
+    nextSceneLinkId.current = 1;
+    lastSavedSceneJsonRef.current = null;
   }, [setGridAdjustMode]);
 
   const handleRequestNewScene = useCallback((): void => {
@@ -1179,7 +1407,8 @@ export function App(): JSX.Element {
 
   async function runSceneOperation(
     actionLabel: "guardada" | "cargada",
-    operation: () => Promise<SceneOperationResult>
+    operation: () => Promise<SceneOperationResult>,
+    options?: { readonly playerEntryPoint?: WorldPoint }
   ): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
@@ -1196,6 +1425,7 @@ export function App(): JSX.Element {
 
       setScene(result.scene);
       setMapAnnotationModal(null);
+      setSceneLinkModalId(null);
       const loadedSceneAside = result.scene.sceneAside ?? createDefaultSceneAside();
       setSceneAside(loadedSceneAside);
       if (actionLabel === "cargada") {
@@ -1203,8 +1433,11 @@ export function App(): JSX.Element {
           center: { x: result.scene.camera.x, y: result.scene.camera.y },
           zoom: result.scene.camera.zoom
         });
+        const playerCamera = options?.playerEntryPoint === undefined
+          ? loadedCamera
+          : normalizeCameraSnapshot({ center: options.playerEntryPoint, zoom: loadedCamera.zoom });
         const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
-        playerCameraRef.current = loadedCamera;
+        playerCameraRef.current = playerCamera;
         playerCameraSyncKeyRef.current = nextCameraSyncKey;
         setPlayerCameraSyncKey(nextCameraSyncKey);
         setMapImageUrl(result.mapImageUrl ?? null);
@@ -1218,11 +1451,12 @@ export function App(): JSX.Element {
           sceneAside: loadedSceneAside,
           mapImageUrl: result.mapImageUrl ?? null,
           tokenImageUrls: result.tokenImageUrls ?? {},
-          camera: loadedCamera,
+          camera: playerCamera,
           cameraSyncKey: nextCameraSyncKey
         });
       }
       setCurrentFilePath(result.filePath);
+      lastSavedSceneJsonRef.current = JSON.stringify({ ...result.scene, sceneAside: loadedSceneAside });
       setFeedback(`Escena ${actionLabel}`);
 
       // Separate "scene-format-outdated" from generic warnings so it can get
@@ -1443,6 +1677,7 @@ export function App(): JSX.Element {
         label.id === elementId ? updateSceneLabel(label, { position: { x, y } }) : label
       ),
       mapAnnotations: {
+        ...current.mapAnnotations,
         pins: current.mapAnnotations.pins.map((candidate) =>
           candidate.id === elementId && !candidate.locked
             ? { ...candidate, position: { x, y } }
@@ -1454,6 +1689,11 @@ export function App(): JSX.Element {
                 x: x - getMapAnnotationCenter(candidate).x,
                 y: y - getMapAnnotationCenter(candidate).y
               })
+            : candidate
+        ),
+        sceneLinks: current.mapAnnotations.sceneLinks.map((candidate) =>
+          candidate.id === elementId && !candidate.locked
+            ? { ...candidate, position: { x, y } }
             : candidate
         )
       }
@@ -1949,7 +2189,11 @@ export function App(): JSX.Element {
     interaction.selectedElementId === null
       ? undefined
       : scene.mapAnnotations.pins.find((pin) => pin.id === interaction.selectedElementId) ??
-        scene.mapAnnotations.areas.find((area) => area.id === interaction.selectedElementId);
+        scene.mapAnnotations.areas.find((area) => area.id === interaction.selectedElementId) ??
+        scene.mapAnnotations.sceneLinks.find((marker) => marker.id === interaction.selectedElementId);
+  const sceneLinkModalMarker = sceneLinkModalId === null
+    ? undefined
+    : scene.mapAnnotations.sceneLinks.find((marker) => marker.id === sceneLinkModalId);
   const selectedMeasurement =
     selectedShape?.type === "measurement"
       ? measureDistance(selectedShape.points[0], selectedShape.points[1], {
@@ -2164,7 +2408,9 @@ export function App(): JSX.Element {
     selectedMapAnnotation !== undefined
       ? selectedMapAnnotation.kind === "room-pin"
         ? "Pin de habitacion"
-        : selectedMapAnnotation.areaType === "terrain" ? "Area de terreno" : "Area de trampa"
+        : selectedMapAnnotation.kind === "scene-link"
+          ? "Conexion de escena"
+          : selectedMapAnnotation.areaType === "terrain" ? "Area de terreno" : "Area de trampa"
       : selectedLight !== undefined
       ? selectedLight.kind === "point"
         ? "Luz puntual"
@@ -2192,7 +2438,7 @@ export function App(): JSX.Element {
                           : "Propiedades";
   const selectedPropertiesIcon =
     selectedMapAnnotation !== undefined
-      ? selectedMapAnnotation.kind === "room-pin" ? "◆" : selectedMapAnnotation.areaType === "terrain" ? "▧" : "▲"
+      ? selectedMapAnnotation.kind === "room-pin" ? "◆" : selectedMapAnnotation.kind === "scene-link" ? "◎" : selectedMapAnnotation.areaType === "terrain" ? "▧" : "▲"
       : selectedLight !== undefined
       ? selectedLight.kind === "point"
         ? "●"
@@ -2324,6 +2570,7 @@ export function App(): JSX.Element {
             scene.labels.length +
             scene.mapAnnotations.pins.length +
             scene.mapAnnotations.areas.length +
+            scene.mapAnnotations.sceneLinks.length +
             interaction.elements.length} elementos
         </span>
         <span>
@@ -2348,6 +2595,7 @@ export function App(): JSX.Element {
           onEditAnnotation={handleEditMapAnnotation}
           onToggleAnnotationLock={handleToggleMapAnnotationLock}
           onHighlightInformationArea={handleInformationAreaHighlight}
+          sceneLinkStatuses={sceneLinkStatuses}
           hidden={!isAsidePanelVisible}
         />
         <button
@@ -2373,6 +2621,7 @@ export function App(): JSX.Element {
           tokens={renderedTokens}
           labels={scene.labels}
           mapAnnotations={scene.mapAnnotations}
+          sceneLinkStatuses={sceneLinkStatuses}
           showMapAnnotations={showMapAnnotations}
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
@@ -2390,6 +2639,7 @@ export function App(): JSX.Element {
           isWaterDrawingMode={interaction.activeTool === "water"}
           isArcanePointerMode={interaction.activeTool === "arcane-pointer"}
           isRoomPinMode={interaction.activeTool === "room-pin"}
+          isSceneLinkMode={interaction.activeTool === "scene-link"}
           isInformationAreaMode={interaction.activeTool === "information-area"}
           arcanePointerCreatureSize={arcanePointerCreatureSize}
           arcanePointerResetKey={arcanePointerResetKey}
@@ -2427,6 +2677,7 @@ export function App(): JSX.Element {
           onCameraChange={handleCameraChange}
           onArcanePointerTrigger={handleArcanePointerTrigger}
           onRoomPinPlace={handleRoomPinPlace}
+          onSceneLinkPlace={handleSceneLinkPlace}
           onInformationAreaPaint={handleInformationAreaPaint}
           onInformationAreaHighlight={handleInformationAreaHighlight}
           onMapAnnotationPreview={handleMapAnnotationPreviewById}
@@ -2454,7 +2705,9 @@ export function App(): JSX.Element {
                   <strong>
                     {selectedMapAnnotation.kind === "room-pin"
                       ? selectedMapAnnotation.title
-                      : selectedMapAnnotation.name || (selectedMapAnnotation.areaType === "terrain" ? "Terreno" : "Trampa")}
+                      : selectedMapAnnotation.kind === "scene-link"
+                        ? selectedMapAnnotation.name
+                        : selectedMapAnnotation.name || (selectedMapAnnotation.areaType === "terrain" ? "Terreno" : "Trampa")}
                   </strong>
                   <button type="button" onClick={() => handleEditMapAnnotation(selectedMapAnnotation)}>
                     Ver / editar
@@ -2466,6 +2719,14 @@ export function App(): JSX.Element {
                     <button type="button" onClick={() => handleInformationAreaHighlight(selectedMapAnnotation.id)}>
                       Resaltar para jugadores
                     </button>
+                  ) : null}
+                  {selectedMapAnnotation.kind === "scene-link" ? (
+                    <div className={`scene-link-inline-status is-${sceneLinkStatuses[selectedMapAnnotation.id]?.state ?? "unlinked"}`}>
+                      {getSceneLinkStatusText(
+                        sceneLinkStatuses[selectedMapAnnotation.id],
+                        selectedMapAnnotation.connection !== null
+                      )}
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -3238,6 +3499,7 @@ export function App(): JSX.Element {
               onVisibleChange={setShowMapAnnotations}
               onStartPin={handleStartRoomPin}
               onStartArea={handleStartInformationArea}
+              onStartSceneLink={handleStartSceneLink}
             />
           </SidebarAccordion>
 
@@ -3479,6 +3741,22 @@ export function App(): JSX.Element {
           onSaveArea={handleSaveMapInformationArea}
         />
       ) : null}
+      {sceneLinkModalMarker !== undefined ? (
+        <SceneLinkModal
+          marker={sceneLinkModalMarker}
+          status={sceneLinkStatuses[sceneLinkModalMarker.id] ?? (
+            sceneLinkModalMarker.connection === null ? { state: "unlinked" } : { state: "validating" }
+          )}
+          currentScenePath={currentFilePath}
+          onRename={(name) => handleRenameSceneLink(sceneLinkModalMarker.id, name)}
+          onConnect={(targetScenePath, targetMarkerId) =>
+            handleConnectSceneLink(sceneLinkModalMarker, targetScenePath, targetMarkerId)
+          }
+          onDisconnect={() => handleDisconnectSceneLink(sceneLinkModalMarker)}
+          onNavigate={() => handleNavigateSceneLink(sceneLinkModalMarker)}
+          onClose={() => setSceneLinkModalId(null)}
+        />
+      ) : null}
       {interaction.contextMenu !== null ? (
         <div
           className="context-menu-backdrop"
@@ -3517,6 +3795,7 @@ export function App(): JSX.Element {
               <menu className="context-submenu">
                 <button type="button" onClick={handleStartRoomPin}>Pin de habitacion</button>
                 <button type="button" onClick={handleStartInformationArea}>Area de informacion</button>
+                <button type="button" onClick={handleStartSceneLink}>Link a otro mapa</button>
               </menu>
             </li>
             <li className="has-submenu">
@@ -3673,6 +3952,7 @@ function getSceneObjectIds(scene: SceneDocument): readonly string[] {
     ...scene.labels.map((label) => label.id),
     ...scene.mapAnnotations.pins.map((pin) => pin.id),
     ...scene.mapAnnotations.areas.map((area) => area.id),
+    ...scene.mapAnnotations.sceneLinks.map((marker) => marker.id),
     ...scene.fogOfWar.revealedAreas.map((area) => area.id),
     ...scene.fogOfWar.obstacles.map((obstacle) => obstacle.id)
   ];
@@ -3685,6 +3965,15 @@ function sameTokenName(left: string, right: string): boolean {
 function getTokenNameCardinality(tokens: readonly SceneToken[], tokenName: string): string {
   const count = tokens.filter((token) => sameTokenName(token.name, tokenName)).length;
   return `${count} ${count === 1 ? "igual" : "iguales"}`;
+}
+
+function getSceneLinkStatusText(
+  status: SceneLinkValidationStatus | undefined,
+  connected: boolean
+): string {
+  if (status?.state === "broken") return status.message;
+  if (status?.state === "valid") return "Conexion valida";
+  return connected ? "Validando" : "Sin enlazar";
 }
 
 interface SidebarAccordionProps {

@@ -10,6 +10,22 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.5.0] - 2026-08-27
+
+### Added
+
+- Marcadores privados del DM para conectar puntos entre dos archivos `.ttrpgscene`.
+- Seleccion segura de una escena externa y de uno de sus puntos de conexion sin reemplazar la escena activa ni cargar sus assets.
+- Persistencia reciproca recuperable, validacion asincrona y estados visuales neutral, validando, valido y roto.
+- Navegacion por doble click con revalidacion previa, registro en escenas recientes y centrado de Player View en el punto de entrada.
+- Controles de conexiones en el sidebar, arbol de anotaciones y propiedades del objeto seleccionado.
+- Acceso `Link a otro mapa` en el submenu contextual de anotaciones del canvas.
+
+### Changed
+
+- `mapAnnotations` incorpora `sceneLinks` con compatibilidad automatica para escenas anteriores.
+- Los snapshots de Player View eliminan puntos, nombres, rutas y diagnosticos de conexiones.
+
 ## [1.4.0] - 2026-08-26
 
 ### Added

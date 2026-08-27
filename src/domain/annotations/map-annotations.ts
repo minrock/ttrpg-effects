@@ -1,5 +1,6 @@
 import type { SceneDocument } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
+import type { MapSceneLinkMarker } from "./scene-navigation-links";
 
 export const INFORMATION_AREA_HIGHLIGHT_DURATION_MS = 5_000 as const;
 export const TERRAIN_INFORMATION_AREA_COLOR = "#6b7d32";
@@ -32,11 +33,12 @@ export interface MapInformationArea {
   readonly locked: boolean;
 }
 
-export type MapAnnotation = MapInformationPin | MapInformationArea;
+export type MapAnnotation = MapInformationPin | MapInformationArea | MapSceneLinkMarker;
 
 export interface MapAnnotations {
   readonly pins: readonly MapInformationPin[];
   readonly areas: readonly MapInformationArea[];
+  readonly sceneLinks: readonly MapSceneLinkMarker[];
 }
 
 export interface InformationAreaHighlightBroadcast {
@@ -48,7 +50,7 @@ export interface InformationAreaHighlightBroadcast {
 }
 
 export function createDefaultMapAnnotations(): MapAnnotations {
-  return { pins: [], areas: [] };
+  return { pins: [], areas: [], sceneLinks: [] };
 }
 
 export function getInformationAreaColor(type: InformationAreaType): string {
@@ -128,7 +130,7 @@ export function translateInformationArea(
 }
 
 export function getMapAnnotationCenter(annotation: MapAnnotation): WorldPoint {
-  if (annotation.kind === "room-pin") return annotation.position;
+  if (annotation.kind === "room-pin" || annotation.kind === "scene-link") return annotation.position;
   if (annotation.cells.length === 0) return { x: 0, y: 0 };
 
   let left = Number.POSITIVE_INFINITY;
@@ -151,7 +153,11 @@ export function searchMapAnnotations(
   query: string
 ): readonly MapAnnotation[] {
   const normalizedQuery = normalizeSearchText(query);
-  const allAnnotations: readonly MapAnnotation[] = [...annotations.pins, ...annotations.areas];
+  const allAnnotations: readonly MapAnnotation[] = [
+    ...annotations.pins,
+    ...annotations.areas,
+    ...annotations.sceneLinks
+  ];
 
   if (normalizedQuery === "") return allAnnotations;
 
@@ -159,6 +165,8 @@ export function searchMapAnnotations(
     const searchable =
       annotation.kind === "room-pin"
         ? [annotation.title, "habitacion", annotation.content]
+        : annotation.kind === "scene-link"
+          ? [annotation.name, "conexion", "escena"]
         : [
             annotation.name,
             annotation.areaType === "terrain" ? "terreno" : "trampa",

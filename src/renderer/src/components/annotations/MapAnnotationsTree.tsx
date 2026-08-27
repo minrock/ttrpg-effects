@@ -5,6 +5,7 @@ import {
   type MapAnnotations,
   type MapInformationArea
 } from "../../../../domain/annotations/map-annotations";
+import type { SceneLinkValidationStatus } from "../../../../domain/annotations/scene-navigation-links";
 
 interface MapAnnotationsTreeProps {
   readonly annotations: MapAnnotations;
@@ -14,6 +15,7 @@ interface MapAnnotationsTreeProps {
   readonly onEdit: (annotation: MapAnnotation) => void;
   readonly onToggleLock: (annotation: MapAnnotation) => void;
   readonly onHighlightArea: (areaId: string) => void;
+  readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
 }
 
 export function MapAnnotationsTree({
@@ -23,7 +25,8 @@ export function MapAnnotationsTree({
   onGoTo,
   onEdit,
   onToggleLock,
-  onHighlightArea
+  onHighlightArea,
+  sceneLinkStatuses = {}
 }: MapAnnotationsTreeProps): JSX.Element {
   const [query, setQuery] = useState("");
   const results = useMemo(() => searchMapAnnotations(annotations, query), [annotations, query]);
@@ -31,6 +34,7 @@ export function MapAnnotationsTree({
   const areas = results.filter((annotation): annotation is MapInformationArea => annotation.kind === "information-area");
   const terrainAreas = areas.filter((area) => area.areaType === "terrain");
   const trapAreas = areas.filter((area) => area.areaType === "trap");
+  const sceneLinks = results.filter((annotation) => annotation.kind === "scene-link");
 
   return (
     <div className="annotation-tree-panel">
@@ -86,6 +90,21 @@ export function MapAnnotationsTree({
             ))}
           </AnnotationBranch>
         </AnnotationBranch>
+        <AnnotationBranch label="Conexiones" icon="◎" count={sceneLinks.length}>
+          {sceneLinks.map((marker) => (
+            <AnnotationLeaf
+              key={marker.id}
+              annotation={marker}
+              selected={selectedElementId === marker.id}
+              onSelect={onSelect}
+              onGoTo={onGoTo}
+              onEdit={onEdit}
+              onToggleLock={onToggleLock}
+              onHighlightArea={onHighlightArea}
+              sceneLinkStatus={sceneLinkStatuses[marker.id]}
+            />
+          ))}
+        </AnnotationBranch>
       </ul>
       {results.length === 0 ? <p className="sidebar-hint">No hay anotaciones.</p> : null}
     </div>
@@ -126,7 +145,8 @@ function AnnotationLeaf({
   onGoTo,
   onEdit,
   onToggleLock,
-  onHighlightArea
+  onHighlightArea,
+  sceneLinkStatus
 }: {
   readonly annotation: MapAnnotation;
   readonly selected: boolean;
@@ -135,13 +155,14 @@ function AnnotationLeaf({
   readonly onEdit: (annotation: MapAnnotation) => void;
   readonly onToggleLock: (annotation: MapAnnotation) => void;
   readonly onHighlightArea: (areaId: string) => void;
+  readonly sceneLinkStatus?: SceneLinkValidationStatus;
 }): JSX.Element {
   const label = getAnnotationLabel(annotation);
 
   return (
-    <li className={`annotation-tree__leaf${selected ? " is-selected" : ""}`} role="treeitem" aria-selected={selected}>
+    <li className={`annotation-tree__leaf${selected ? " is-selected" : ""}${sceneLinkStatus?.state === "broken" ? " is-broken" : ""}`} role="treeitem" aria-selected={selected}>
       <button type="button" className="annotation-tree__leaf-main" onClick={() => onSelect(annotation)}>
-        <span aria-hidden="true">{annotation.kind === "room-pin" ? "◆" : annotation.areaType === "terrain" ? "▧" : "▲"}</span>
+        <span aria-hidden="true">{annotation.kind === "room-pin" ? "◆" : annotation.kind === "scene-link" ? "◎" : annotation.areaType === "terrain" ? "▧" : "▲"}</span>
         <span>{label}</span>
       </button>
       <div className="annotation-tree__actions">
@@ -172,5 +193,6 @@ function AnnotationLeaf({
 
 function getAnnotationLabel(annotation: MapAnnotation): string {
   if (annotation.kind === "room-pin") return annotation.title;
+  if (annotation.kind === "scene-link") return annotation.name;
   return annotation.name.trim() || (annotation.areaType === "terrain" ? "Terreno" : "Trampa");
 }

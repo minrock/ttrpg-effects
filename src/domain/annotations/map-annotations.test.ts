@@ -44,7 +44,7 @@ describe("map annotations", () => {
   it("creates isolated empty defaults", () => {
     const first = createDefaultMapAnnotations();
     const second = createDefaultMapAnnotations();
-    expect(first).toEqual({ pins: [], areas: [] });
+    expect(first).toEqual({ pins: [], areas: [], sceneLinks: [] });
     expect(first).not.toBe(second);
   });
 
@@ -77,7 +77,7 @@ describe("map annotations", () => {
   });
 
   it("searches names, categories and markdown without accents", () => {
-    const annotations = { pins: [pin], areas: [area] };
+    const annotations = { pins: [pin], areas: [area], sceneLinks: [] };
     expect(searchMapAnnotations(annotations, "camara")).toEqual([pin]);
     expect(searchMapAnnotations(annotations, "trampa")).toEqual([area]);
     expect(searchMapAnnotations(annotations, "destreza")).toEqual([area]);
@@ -101,9 +101,9 @@ describe("map annotations", () => {
   it("removes all private annotations from the player scene", () => {
     const scene = {
       ...createDefaultScene(),
-      mapAnnotations: { pins: [pin], areas: [area] }
+      mapAnnotations: { pins: [pin], areas: [area], sceneLinks: [] }
     };
-    expect(stripPrivateMapAnnotationsForPlayer(scene).mapAnnotations).toEqual({ pins: [], areas: [] });
+    expect(stripPrivateMapAnnotationsForPlayer(scene).mapAnnotations).toEqual({ pins: [], areas: [], sceneLinks: [] });
   });
 
   it("uses stable semantic colors", () => {

@@ -20,6 +20,18 @@ import type {
   PlayerCharacterLibraryEntry,
   PlayerCharacterLibrarySaveInput
 } from "../domain/entity-library/entity-library";
+import type {
+  ConnectSceneLinkRequest,
+  DisconnectSceneLinkRequest,
+  LoadSceneLinkTargetRequest,
+  SceneLinkCandidateFile,
+  SceneLinkValidationStatus,
+  ValidateSceneLinksRequest
+} from "../domain/annotations/scene-navigation-links";
+import type {
+  SceneLinkMutationResult,
+  SceneLinkNavigationResult
+} from "../application/use-cases/scene-navigation-links";
 
 export interface TtrpgAppInfo {
   name: "TTRPG Effects";
@@ -34,6 +46,19 @@ export interface TtrpgApi {
     options?: { readonly suggestedFilePath?: string | null }
   ) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
+  selectSceneLinkTargetFile: () => Promise<
+    { readonly ok: true; readonly filePath: string | null } | { readonly ok: false; readonly error: string }
+  >;
+  listSceneLinkCandidates: (filePath: string) => Promise<
+    { readonly ok: true; readonly candidate: SceneLinkCandidateFile } | { readonly ok: false; readonly error: string }
+  >;
+  connectSceneLink: (request: ConnectSceneLinkRequest) => Promise<SceneLinkMutationResult>;
+  disconnectSceneLink: (request: DisconnectSceneLinkRequest) => Promise<SceneLinkMutationResult>;
+  validateSceneLinks: (request: ValidateSceneLinksRequest) => Promise<
+    { readonly ok: true; readonly statuses: Readonly<Record<string, SceneLinkValidationStatus>> } |
+    { readonly ok: false; readonly error: string }
+  >;
+  loadSceneLinkTarget: (request: LoadSceneLinkTargetRequest) => Promise<SceneLinkNavigationResult>;
   onRecentSceneOpen: (handler: (result: SceneOperationResult) => void) => () => void;
   listMonsterTemplates: () => Promise<MonsterTemplateOperationResult>;
   saveMonsterTemplate: (template: MonsterTemplate) => Promise<MonsterTemplateOperationResult>;

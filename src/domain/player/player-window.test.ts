@@ -77,11 +77,12 @@ describe("player window view rules", () => {
             cells: [{ x: 0, y: 0, size: 100 }],
             locked: false
           }
-        ]
+        ],
+        sceneLinks: []
       }
     });
 
     expect(snapshot.labels).toEqual([]);
-    expect(snapshot.mapAnnotations).toEqual({ pins: [], areas: [] });
+    expect(snapshot.mapAnnotations).toEqual({ pins: [], areas: [], sceneLinks: [] });
   });
 });
