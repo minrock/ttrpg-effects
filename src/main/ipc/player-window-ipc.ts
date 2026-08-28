@@ -1,6 +1,11 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { sanitizeInformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
+import {
+  sanitizePlayerCameraCommand,
+  sanitizePlayerCameraReport,
+  type PlayerCameraCommand
+} from "../../domain/player/player-camera-control";
 
 interface PlayerWindowIpcOptions {
   readonly isDevelopment: boolean;
@@ -13,6 +18,7 @@ interface PlayerWindowIpcOptions {
 let playerWindow: BrowserWindow | null = null;
 let latestSnapshot: unknown = null;
 let latestCamera: unknown = null;
+let latestCameraCommand: PlayerCameraCommand | null = null;
 let isPlayerWindowReady = false;
 let shouldShowPlayerWindowWhenReady = false;
 
@@ -36,7 +42,9 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
 
   ipcMain.handle("player-window:get-state", () => ({
     snapshot: latestSnapshot,
-    camera: latestCamera
+    camera: latestCamera,
+    cameraCommand: latestCameraCommand,
+    isOpen: playerWindow !== null && !playerWindow.isDestroyed() && playerWindow.isVisible()
   }));
 
   ipcMain.handle("player-window:publish-scene", (event: IpcMainInvokeEvent, snapshot: unknown) => {
@@ -66,6 +74,40 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
 
     latestCamera = camera;
     sendToPlayerWindow("player-window:camera", camera);
+    return { ok: true };
+  });
+
+  ipcMain.handle("player-window:camera-command", (event: IpcMainInvokeEvent, payload: unknown) => {
+    if (!isFromDmWindow(event)) {
+      return { ok: false, error: "Solo la ventana del DM puede controlar la camara de jugador." };
+    }
+
+    const command = sanitizePlayerCameraCommand(payload);
+    if (command === null) {
+      return { ok: false, error: "El comando de camara no es valido." };
+    }
+
+    if (latestCameraCommand !== null && command.revision <= latestCameraCommand.revision) {
+      return { ok: true };
+    }
+
+    latestCameraCommand = command;
+    latestCamera = command.camera;
+    sendToPlayerWindow("player-window:camera-command", command);
+    return { ok: true };
+  });
+
+  ipcMain.handle("player-window:camera-report", (event: IpcMainInvokeEvent, payload: unknown) => {
+    if (!isFromPlayerWindow(event)) {
+      return { ok: false, error: "Solo la ventana de jugador puede reportar su camara." };
+    }
+
+    const report = sanitizePlayerCameraReport(payload);
+    if (report === null) {
+      return { ok: false, error: "El reporte de camara no es valido." };
+    }
+
+    notifyDmWindows("player-window:camera-report", report);
     return { ok: true };
   });
 
@@ -103,6 +145,7 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
       return { ok: false, error: "Solo la ventana de jugador puede marcar contenido listo." };
     }
 
+    notifyDmWindows("player-window:ready");
     return { ok: true };
   });
 }
@@ -154,6 +197,9 @@ function ensurePlayerWindow(options: PlayerWindowIpcOptions): void {
     if (latestCamera !== null) {
       sendToPlayerWindow("player-window:camera", latestCamera);
     }
+    if (latestCameraCommand !== null) {
+      sendToPlayerWindow("player-window:camera-command", latestCameraCommand);
+    }
   });
 
   playerWindow.on("closed", () => {
@@ -162,6 +208,7 @@ function ensurePlayerWindow(options: PlayerWindowIpcOptions): void {
     shouldShowPlayerWindowWhenReady = false;
     latestSnapshot = null;
     latestCamera = null;
+    latestCameraCommand = null;
     notifyDmWindows("player-window:closed");
   });
 
@@ -193,10 +240,10 @@ function showPlayerWindow(): void {
   playerWindow.focus();
 }
 
-function notifyDmWindows(channel: string): void {
+function notifyDmWindows(channel: string, payload?: unknown): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (window !== playerWindow && !window.isDestroyed()) {
-      window.webContents.send(channel);
+      window.webContents.send(channel, payload);
     }
   }
 }

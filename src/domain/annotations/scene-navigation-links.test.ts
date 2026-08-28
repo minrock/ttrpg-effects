@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createReciprocalSceneLinkMarkers,
   disconnectSceneLinkMarker,
+  renameSceneLinkMarker,
   validateReciprocalSceneLink,
   type MapSceneLinkMarker
 } from "./scene-navigation-links";
@@ -67,5 +68,22 @@ describe("scene navigation links", () => {
       "connection-1"
     );
     expect(disconnectSceneLinkMarker(origin)).toEqual({ ...source, connection: null });
+  });
+
+  it("renames a marker without changing its reciprocal connection", () => {
+    const [origin] = createReciprocalSceneLinkMarkers(
+      source,
+      "/maps/a.ttrpgscene",
+      target,
+      "/maps/b.ttrpgscene",
+      "connection-1"
+    );
+
+    const renamed = renameSceneLinkMarker(origin, "Escalera principal");
+
+    expect(renamed.name).toBe("Escalera principal");
+    expect(renamed.connection).toEqual(origin.connection);
+    expect(renamed.id).toBe(origin.id);
+    expect(renamed.position).toEqual(origin.position);
   });
 });

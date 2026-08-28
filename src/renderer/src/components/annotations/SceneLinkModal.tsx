@@ -9,7 +9,7 @@ interface SceneLinkModalProps {
   readonly marker: MapSceneLinkMarker;
   readonly status: SceneLinkValidationStatus;
   readonly currentScenePath: string | null;
-  readonly onRename: (name: string) => void;
+  readonly onRename: (name: string) => Promise<boolean>;
   readonly onConnect: (targetScenePath: string, targetMarkerId: string) => Promise<boolean>;
   readonly onDisconnect: () => Promise<boolean>;
   readonly onNavigate: () => Promise<void>;
@@ -70,6 +70,22 @@ export function SceneLinkModal({
     }
   };
 
+  const rename = async (): Promise<void> => {
+    const trimmedName = name.trim();
+    if (trimmedName === "" || trimmedName === marker.name) return;
+    setBusy(true);
+    setError(null);
+    try {
+      if (!await onRename(trimmedName)) {
+        setError("No fue posible guardar el nuevo nombre del punto.");
+      }
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : "No fue posible guardar el nuevo nombre del punto.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const disconnect = async (): Promise<void> => {
     setBusy(true);
     setError(null);
@@ -95,7 +111,11 @@ export function SceneLinkModal({
           Nombre del punto
           <input value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} />
         </label>
-        <button type="button" onClick={() => onRename(name.trim())} disabled={name.trim() === "" || name.trim() === marker.name}>
+        <button
+          type="button"
+          onClick={() => void rename()}
+          disabled={busy || name.trim() === "" || name.trim() === marker.name}
+        >
           Guardar nombre
         </button>
 
@@ -138,7 +158,15 @@ export function SceneLinkModal({
         {marker.connection !== null ? (
           <div className="modal-actions">
             <button type="button" onClick={() => void onNavigate()} disabled={busy}>Abrir escena conectada</button>
-            <button type="button" className="is-danger" onClick={() => void disconnect()} disabled={busy}>Desconectar</button>
+            <button
+              type="button"
+              className="is-danger"
+              title="Liberar los dos puntos de esta conexion"
+              onClick={() => void disconnect()}
+              disabled={busy}
+            >
+              Desligar
+            </button>
           </div>
         ) : null}
         {error !== null ? <p className="form-error">{error}</p> : null}

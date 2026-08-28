@@ -32,12 +32,15 @@ import type {
   MapAnnotations
 } from "../../../domain/annotations/map-annotations";
 import type { SceneLinkValidationStatus } from "../../../domain/annotations/scene-navigation-links";
+import type { PlayerCameraControlViewState } from "../../../domain/player/player-camera-control";
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
   setPathHoverPoint: (point: { readonly x: number; readonly y: number } | null) => void;
   setWaterHoverPoint: (point: { readonly x: number; readonly y: number } | null) => void;
   centerOnWorldPoint: (point: { readonly x: number; readonly y: number }) => void;
+  setPlayerCameraControlState: (state: PlayerCameraControlViewState) => void;
+  clearPlayerCameraControlState: () => void;
 }
 
 interface MapViewportProps {
@@ -110,6 +113,8 @@ interface MapViewportProps {
   readonly onWaterLineRotationChange: (elementId: string, rotation: number) => void;
   readonly onWaterPatternRotationChange: (elementId: string, rotation: number) => void;
   readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
+  readonly onCameraInteractionEnd?: (camera: ViewportCameraSnapshot) => void;
+  readonly onPlayerCameraControlMove?: (position: { readonly x: number; readonly y: number }) => void;
   readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
   readonly onRoomPinPlace: (position: { readonly x: number; readonly y: number }) => void;
   readonly onSceneLinkPlace?: (position: { readonly x: number; readonly y: number }) => void;
@@ -190,6 +195,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onWaterLineRotationChange,
   onWaterPatternRotationChange,
   onCameraChange,
+  onCameraInteractionEnd,
+  onPlayerCameraControlMove,
   onArcanePointerTrigger,
   onRoomPinPlace,
   onSceneLinkPlace,
@@ -201,13 +208,22 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
   const mapRef = useRef(map);
+  const playerCameraControlStateRef = useRef<PlayerCameraControlViewState | null>(null);
   mapRef.current = map;
 
   useImperativeHandle(ref, () => ({
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
     setPathHoverPoint: (point) => viewportRef.current?.setPathHoverPoint(point),
     setWaterHoverPoint: (point) => viewportRef.current?.setWaterHoverPoint(point),
-    centerOnWorldPoint: (point) => viewportRef.current?.centerOnWorldPoint(point)
+    centerOnWorldPoint: (point) => viewportRef.current?.centerOnWorldPoint(point),
+    setPlayerCameraControlState: (state) => {
+      playerCameraControlStateRef.current = state;
+      viewportRef.current?.setPlayerCameraControlState(state);
+    },
+    clearPlayerCameraControlState: () => {
+      playerCameraControlStateRef.current = null;
+      viewportRef.current?.clearPlayerCameraControlState();
+    }
   }), []);
 
   useEffect(() => {
@@ -247,6 +263,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onWaterLineRotationChange,
       onWaterPatternRotationChange,
       onCameraChange,
+      onCameraInteractionEnd,
+      onPlayerCameraControlMove,
       onArcanePointerTrigger,
       onRoomPinPlace,
       onSceneLinkPlace,
@@ -285,6 +303,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       if (cameraSnapshot !== null) {
         createdViewport.setCameraSnapshot(cameraSnapshot);
       }
+      if (playerCameraControlStateRef.current !== null) {
+        createdViewport.setPlayerCameraControlState(playerCameraControlStateRef.current);
+      }
       createdViewport.setGrabMode(isGrabMode);
       createdViewport.setGridAdjustMode(isGridAdjustMode);
       createdViewport.setFogRevealMode(isFogRevealMode);
@@ -308,7 +329,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);

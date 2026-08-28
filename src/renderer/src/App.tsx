@@ -12,6 +12,7 @@ import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import * as Switch from "@radix-ui/react-switch";
 import {
   CircleDot,
+  Camera,
   CloudFog,
   Crosshair,
   FilePlus,
@@ -26,6 +27,9 @@ import {
   Shapes,
   Sparkles,
   Swords,
+  ZoomIn,
+  ZoomOut,
+  LocateFixed,
   Unlock,
   ChevronLeft,
   ChevronRight
@@ -120,6 +124,13 @@ import {
   type ViewportCameraSnapshot
 } from "../../domain/player/player-window";
 import {
+  derivePlayerCameraSyncStatus,
+  shouldApplyPlayerCameraReport,
+  zoomPlayerCamera,
+  type PlayerCameraCommandReason,
+  type PlayerCameraSyncStatus
+} from "../../domain/player/player-camera-control";
+import {
   ALLOWED_SHAPE_EMOJIS,
   getSelectedShapeEmojis
 } from "../../domain/shapes/shape-emojis";
@@ -169,9 +180,10 @@ import {
 } from "./components/annotations/MapAnnotationModal";
 import { MapAnnotationsSection } from "./components/annotations/MapAnnotationsSection";
 import { SceneLinkModal } from "./components/annotations/SceneLinkModal";
-import type {
-  MapSceneLinkMarker,
-  SceneLinkValidationStatus
+import {
+  renameSceneLinkMarker,
+  type MapSceneLinkMarker,
+  type SceneLinkValidationStatus
 } from "../../domain/annotations/scene-navigation-links";
 
 const logoUrl = "logo/ttrpg-effects-logo.png";
@@ -264,6 +276,14 @@ export function App(): JSX.Element {
   const playerCameraRef = useRef<ViewportCameraSnapshot>(
     normalizeCameraSnapshot({ center: { x: scene.camera.x, y: scene.camera.y }, zoom: scene.camera.zoom })
   );
+  const dmCameraRef = useRef<ViewportCameraSnapshot>(playerCameraRef.current);
+  const effectivePlayerCameraRef = useRef<ViewportCameraSnapshot | null>(null);
+  const playerCameraCommandRevisionRef = useRef(0);
+  const pendingPlayerCameraCommandRevisionRef = useRef<number | null>(null);
+  const acknowledgedPlayerCameraCommandRevisionRef = useRef<number | null>(null);
+  const lastPlayerCameraReportRevisionRef = useRef(-1);
+  const [playerCameraSyncStatus, setPlayerCameraSyncStatus] =
+    useState<PlayerCameraSyncStatus>("closed");
   const [playerCameraSyncKey, setPlayerCameraSyncKey] = useState(0);
   const playerCameraSyncKeyRef = useRef(playerCameraSyncKey);
   playerCameraSyncKeyRef.current = playerCameraSyncKey;
@@ -432,9 +452,72 @@ export function App(): JSX.Element {
     setInteraction((current) => selectElement(current, elementId));
   }, []);
 
-  const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
-    playerCameraRef.current = normalizeCameraSnapshot(camera);
+  const refreshPlayerCameraControl = useCallback((statusOverride?: PlayerCameraSyncStatus): void => {
+    const status =
+      statusOverride ??
+      derivePlayerCameraSyncStatus({
+        isPlayerWindowOpen: isPlayerWindowOpenRef.current,
+        primaryCamera: playerCameraRef.current,
+        effectiveCamera: effectivePlayerCameraRef.current,
+        pendingCommandRevision: pendingPlayerCameraCommandRevisionRef.current,
+        acknowledgedCommandRevision: acknowledgedPlayerCameraCommandRevisionRef.current
+      });
+    setPlayerCameraSyncStatus((current) => (current === status ? current : status));
+    viewportHandleRef.current?.setPlayerCameraControlState({
+      primaryCamera: playerCameraRef.current,
+      effectiveCamera: effectivePlayerCameraRef.current,
+      status
+    });
   }, []);
+
+  const sendPlayerCameraCommand = useCallback(
+    (reason: PlayerCameraCommandReason): void => {
+      if (!isPlayerWindowOpenRef.current || window.ttrpg === undefined) {
+        refreshPlayerCameraControl("closed");
+        return;
+      }
+
+      const revision = playerCameraCommandRevisionRef.current + 1;
+      playerCameraCommandRevisionRef.current = revision;
+      pendingPlayerCameraCommandRevisionRef.current = revision;
+      refreshPlayerCameraControl("pending");
+      void window.ttrpg.commandPlayerCamera({
+        revision,
+        camera: playerCameraRef.current,
+        reason
+      });
+    },
+    [refreshPlayerCameraControl]
+  );
+
+  const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
+    dmCameraRef.current = normalizeCameraSnapshot(camera);
+  }, []);
+
+  const handlePlayerCameraControlMove = useCallback(
+    (position: WorldPoint): void => {
+      playerCameraRef.current = normalizeCameraSnapshot({
+        ...playerCameraRef.current,
+        center: position
+      });
+      refreshPlayerCameraControl();
+      sendPlayerCameraCommand("move");
+    },
+    [refreshPlayerCameraControl, sendPlayerCameraCommand]
+  );
+
+  const handlePlayerCameraZoom = useCallback(
+    (direction: "in" | "out"): void => {
+      playerCameraRef.current = zoomPlayerCamera(playerCameraRef.current, direction);
+      refreshPlayerCameraControl();
+      sendPlayerCameraCommand("zoom");
+    },
+    [refreshPlayerCameraControl, sendPlayerCameraCommand]
+  );
+
+  const handleRecenterPlayerCamera = useCallback((): void => {
+    sendPlayerCameraCommand("recenter");
+  }, [sendPlayerCameraCommand]);
 
   const handleArcanePointerTrigger = useCallback((pointer: ArcanePointerBroadcast): void => {
     if (isPlayerWindowOpenRef.current) {
@@ -632,32 +715,97 @@ export function App(): JSX.Element {
     setInteraction((current) => selectElement(setActiveTool(current, "select"), annotation.id));
   }, []);
 
-  const handleRenameSceneLink = useCallback((markerId: string, name: string): void => {
-    if (name.trim() === "") return;
-    setScene((current) => ({
-      ...current,
+  const handleRenameSceneLink = useCallback(async (markerId: string, name: string): Promise<boolean> => {
+    const trimmedName = name.trim();
+    if (trimmedName === "") return false;
+
+    const currentScene = sceneRef.current;
+    const marker = currentScene.mapAnnotations.sceneLinks.find((candidate) => candidate.id === markerId);
+    if (marker === undefined) {
+      setFeedback("El punto de conexion ya no existe.");
+      return false;
+    }
+
+    const nextScene: SceneDocument = {
+      ...currentScene,
       mapAnnotations: {
-        ...current.mapAnnotations,
-        sceneLinks: current.mapAnnotations.sceneLinks.map((marker) =>
-          marker.id === markerId ? { ...marker, name: name.trim() } : marker
+        ...currentScene.mapAnnotations,
+        sceneLinks: currentScene.mapAnnotations.sceneLinks.map((candidate) =>
+          candidate.id === markerId ? renameSceneLinkMarker(candidate, trimmedName) : candidate
         )
       }
-    }));
-  }, []);
+    };
 
-  async function ensureCurrentScenePath(): Promise<string | null> {
+    if (currentFilePath === null) {
+      setScene((current) => ({
+        ...current,
+        mapAnnotations: {
+          ...current.mapAnnotations,
+          sceneLinks: current.mapAnnotations.sceneLinks.map((candidate) =>
+            candidate.id === markerId ? renameSceneLinkMarker(candidate, trimmedName) : candidate
+          )
+        }
+      }));
+      setFeedback("Nombre actualizado; se guardara al establecer la ruta de la escena.");
+      return true;
+    }
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return false;
+    }
+
+    setIsBusy(true);
+    try {
+      const saved = await window.ttrpg.saveSceneToPath({ ...nextScene, sceneAside }, currentFilePath);
+      if (!saved.ok) {
+        setFeedback(saved.error);
+        return false;
+      }
+      setScene((current) => ({
+        ...current,
+        mapAnnotations: {
+          ...current.mapAnnotations,
+          sceneLinks: current.mapAnnotations.sceneLinks.map((candidate) =>
+            candidate.id === markerId ? renameSceneLinkMarker(candidate, trimmedName) : candidate
+          )
+        }
+      }));
+      lastSavedSceneJsonRef.current = JSON.stringify({ ...saved.scene, sceneAside });
+      setFeedback("Nombre del punto guardado.");
+      return true;
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo guardar el nombre del punto.");
+      return false;
+    } finally {
+      setIsBusy(false);
+    }
+  }, [currentFilePath, sceneAside]);
+
+  async function persistCurrentSceneForSceneLink(): Promise<string | null> {
     const currentSnapshot = JSON.stringify({ ...sceneRef.current, sceneAside });
     if (currentFilePath !== null && lastSavedSceneJsonRef.current === currentSnapshot) {
       return currentFilePath;
     }
-    const saved = await saveCurrentScene();
+
+    let saved: SceneOperationResult | undefined;
+    try {
+      saved = currentFilePath === null
+        ? await saveCurrentScene()
+        : await window.ttrpg?.saveSceneToPath({ ...sceneRef.current, sceneAside }, currentFilePath);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo guardar la escena en segundo plano.");
+      return null;
+    }
+    if (saved === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return null;
+    }
     if (!saved.ok) {
       setFeedback(saved.error);
       return null;
     }
     setCurrentFilePath(saved.filePath);
     lastSavedSceneJsonRef.current = JSON.stringify({ ...saved.scene, sceneAside });
-    setFeedback("Escena guardada");
     return saved.filePath;
   }
 
@@ -667,7 +815,7 @@ export function App(): JSX.Element {
     targetMarkerId: string
   ): Promise<boolean> {
     if (window.ttrpg === undefined) return false;
-    const sourceScenePath = await ensureCurrentScenePath();
+    const sourceScenePath = await persistCurrentSceneForSceneLink();
     if (sourceScenePath === null) return false;
 
     setIsBusy(true);
@@ -697,7 +845,7 @@ export function App(): JSX.Element {
 
   async function handleDisconnectSceneLink(marker: MapSceneLinkMarker): Promise<boolean> {
     if (window.ttrpg === undefined) return false;
-    const scenePath = await ensureCurrentScenePath();
+    const scenePath = await persistCurrentSceneForSceneLink();
     if (scenePath === null) return false;
     setIsBusy(true);
     try {
@@ -712,7 +860,7 @@ export function App(): JSX.Element {
         mapAnnotations: result.mapAnnotations,
         sceneAside
       });
-      setFeedback(result.warning ?? "Conexion eliminada.");
+      setFeedback(result.warning ?? "Conexion desligada.");
       return true;
     } finally {
       setIsBusy(false);
@@ -720,23 +868,16 @@ export function App(): JSX.Element {
   }
 
   async function handleNavigateSceneLink(marker: MapSceneLinkMarker): Promise<void> {
-    if (window.ttrpg === undefined || currentFilePath === null) {
+    if (window.ttrpg === undefined) {
       setSceneLinkModalId(marker.id);
       return;
     }
-    const currentSnapshot = JSON.stringify({ ...sceneRef.current, sceneAside });
-    if (lastSavedSceneJsonRef.current !== currentSnapshot) {
-      const saved = await saveCurrentScene();
-      if (!saved.ok) {
-        setFeedback(saved.error);
-        return;
-      }
-      lastSavedSceneJsonRef.current = JSON.stringify({ ...saved.scene, sceneAside });
-    }
+    const scenePath = await persistCurrentSceneForSceneLink();
+    if (scenePath === null) return;
     setIsBusy(true);
     try {
       const result = await window.ttrpg.loadSceneLinkTarget({
-        scenePath: currentFilePath,
+        scenePath,
         markerId: marker.id
       });
       if (!result.ok) {
@@ -955,12 +1096,65 @@ export function App(): JSX.Element {
   }, [isPlayerWindowOpen, playerWindowSnapshot]);
 
   useEffect(() => {
-    const unsubscribe = window.ttrpg?.onPlayerWindowClosed(() => {
+    const unsubscribeClosed = window.ttrpg?.onPlayerWindowClosed(() => {
+      isPlayerWindowOpenRef.current = false;
       setIsPlayerWindowOpen(false);
+      effectivePlayerCameraRef.current = null;
+      pendingPlayerCameraCommandRevisionRef.current = null;
+      acknowledgedPlayerCameraCommandRevisionRef.current = null;
+      refreshPlayerCameraControl("closed");
+    });
+    const unsubscribeCameraReport = window.ttrpg?.onPlayerCameraReport((report) => {
+      if (!shouldApplyPlayerCameraReport(lastPlayerCameraReportRevisionRef.current, report)) {
+        return;
+      }
+
+      lastPlayerCameraReportRevisionRef.current = report.reportRevision;
+      effectivePlayerCameraRef.current = normalizeCameraSnapshot(report.camera);
+      if (report.acknowledgedCommandRevision !== null) {
+        acknowledgedPlayerCameraCommandRevisionRef.current = Math.max(
+          acknowledgedPlayerCameraCommandRevisionRef.current ?? -1,
+          report.acknowledgedCommandRevision
+        );
+      }
+      refreshPlayerCameraControl();
+    });
+    const unsubscribePlayerReady = window.ttrpg?.onPlayerWindowReady(() => {
+      lastPlayerCameraReportRevisionRef.current = -1;
+      effectivePlayerCameraRef.current = null;
+      acknowledgedPlayerCameraCommandRevisionRef.current = null;
+      if (isPlayerWindowOpenRef.current) {
+        sendPlayerCameraCommand("open");
+      } else {
+        refreshPlayerCameraControl("closed");
+      }
     });
 
-    return () => unsubscribe?.();
-  }, []);
+    void window.ttrpg?.getPlayerWindowState().then((state) => {
+      if (state.cameraCommand !== null) {
+        playerCameraCommandRevisionRef.current = Math.max(
+          playerCameraCommandRevisionRef.current,
+          state.cameraCommand.revision
+        );
+        playerCameraRef.current = normalizeCameraSnapshot(state.cameraCommand.camera);
+      }
+      if (state.isOpen) {
+        isPlayerWindowOpenRef.current = true;
+        setIsPlayerWindowOpen(true);
+        sendPlayerCameraCommand("open");
+      }
+    });
+
+    return () => {
+      unsubscribeClosed?.();
+      unsubscribeCameraReport?.();
+      unsubscribePlayerReady?.();
+    };
+  }, [refreshPlayerCameraControl, sendPlayerCameraCommand]);
+
+  useEffect(() => {
+    refreshPlayerCameraControl();
+  }, [refreshPlayerCameraControl]);
 
   useEffect(() => {
     void refreshMonsterTemplates();
@@ -1018,6 +1212,9 @@ export function App(): JSX.Element {
       center: { x: defaultScene.camera.x, y: defaultScene.camera.y },
       zoom: defaultScene.camera.zoom
     });
+    dmCameraRef.current = playerCameraRef.current;
+    effectivePlayerCameraRef.current = null;
+    acknowledgedPlayerCameraCommandRevisionRef.current = null;
     setPlayerCameraSyncKey((current) => current + 1);
     setMapImageUrl(null);
     setTokenImageUrls({});
@@ -1043,7 +1240,9 @@ export function App(): JSX.Element {
     nextInformationAreaId.current = 1;
     nextSceneLinkId.current = 1;
     lastSavedSceneJsonRef.current = null;
-  }, [setGridAdjustMode]);
+    refreshPlayerCameraControl();
+    sendPlayerCameraCommand("scene-change");
+  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, setGridAdjustMode]);
 
   const handleRequestNewScene = useCallback((): void => {
     if (!canCreateNewScene) {
@@ -1458,6 +1657,9 @@ export function App(): JSX.Element {
           : normalizeCameraSnapshot({ center: options.playerEntryPoint, zoom: loadedCamera.zoom });
         const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
         playerCameraRef.current = playerCamera;
+        dmCameraRef.current = loadedCamera;
+        effectivePlayerCameraRef.current = null;
+        acknowledgedPlayerCameraCommandRevisionRef.current = null;
         playerCameraSyncKeyRef.current = nextCameraSyncKey;
         setPlayerCameraSyncKey(nextCameraSyncKey);
         setMapImageUrl(result.mapImageUrl ?? null);
@@ -1474,6 +1676,8 @@ export function App(): JSX.Element {
           camera: playerCamera,
           cameraSyncKey: nextCameraSyncKey
         });
+        refreshPlayerCameraControl();
+        sendPlayerCameraCommand("scene-change");
       }
       setCurrentFilePath(result.filePath);
       lastSavedSceneJsonRef.current = JSON.stringify({ ...result.scene, sceneAside: loadedSceneAside });
@@ -2011,14 +2215,19 @@ export function App(): JSX.Element {
       return;
     }
 
-    const result = await window.ttrpg.openPlayerWindow(playerWindowSnapshot);
+    const result = await window.ttrpg.openPlayerWindow({
+      ...playerWindowSnapshot,
+      camera: playerCameraRef.current
+    });
 
     if (!result.ok) {
       setFeedback(result.error ?? "No se pudo abrir la ventana de jugador.");
       return;
     }
 
+    isPlayerWindowOpenRef.current = true;
     setIsPlayerWindowOpen(true);
+    sendPlayerCameraCommand("open");
     setFeedback("Ventana de jugador lista.");
   }
 
@@ -2542,6 +2751,43 @@ export function App(): JSX.Element {
               <Monitor size={15} aria-hidden="true" />
               Ventana de jugador
             </button>
+            <div
+              className={`player-camera-toolbar is-${playerCameraSyncStatus}`}
+              aria-label={`Camara de jugador: ${getPlayerCameraStatusLabel(playerCameraSyncStatus)}`}
+            >
+              <Camera size={15} aria-hidden="true" />
+              <span>{getPlayerCameraStatusLabel(playerCameraSyncStatus)}</span>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label="Alejar camara de jugador"
+                title="Alejar camara de jugador"
+                disabled={!isPlayerWindowOpen || isBusy}
+                onClick={() => handlePlayerCameraZoom("out")}
+              >
+                <ZoomOut size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label="Acercar camara de jugador"
+                title="Acercar camara de jugador"
+                disabled={!isPlayerWindowOpen || isBusy}
+                onClick={() => handlePlayerCameraZoom("in")}
+              >
+                <ZoomIn size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label="Recentrar vista de jugador"
+                title="Recentrar vista de jugador"
+                disabled={playerCameraSyncStatus !== "desynchronized" || isBusy}
+                onClick={handleRecenterPlayerCamera}
+              >
+                <LocateFixed size={14} aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <div className="scene-actions__spacer" />
           <div className="scene-actions__group scene-actions__group--files">
@@ -2711,6 +2957,7 @@ export function App(): JSX.Element {
           onWaterLineRotationChange={handleWaterLineRotationChange}
           onWaterPatternRotationChange={handleWaterPatternRotationChange}
           onCameraChange={handleCameraChange}
+          onPlayerCameraControlMove={handlePlayerCameraControlMove}
           onArcanePointerTrigger={handleArcanePointerTrigger}
           onRoomPinPlace={handleRoomPinPlace}
           onSceneLinkPlace={handleSceneLinkPlace}
@@ -2758,12 +3005,24 @@ export function App(): JSX.Element {
                     </button>
                   ) : null}
                   {selectedMapAnnotation.kind === "scene-link" ? (
-                    <div className={`scene-link-inline-status is-${sceneLinkStatuses[selectedMapAnnotation.id]?.state ?? "unlinked"}`}>
-                      {getSceneLinkStatusText(
-                        sceneLinkStatuses[selectedMapAnnotation.id],
-                        selectedMapAnnotation.connection !== null
-                      )}
-                    </div>
+                    <>
+                      <div className={`scene-link-inline-status is-${sceneLinkStatuses[selectedMapAnnotation.id]?.state ?? "unlinked"}`}>
+                        {getSceneLinkStatusText(
+                          sceneLinkStatuses[selectedMapAnnotation.id],
+                          selectedMapAnnotation.connection !== null
+                        )}
+                      </div>
+                      {selectedMapAnnotation.connection !== null ? (
+                        <button
+                          type="button"
+                          className="is-danger"
+                          onClick={() => void handleDisconnectSceneLink(selectedMapAnnotation)}
+                          disabled={isBusy}
+                        >
+                          Desligar
+                        </button>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
               ) : null}
@@ -4015,6 +4274,19 @@ function getSceneLinkStatusText(
   if (status?.state === "broken") return status.message;
   if (status?.state === "valid") return "Conexion valida";
   return connected ? "Validando" : "Sin enlazar";
+}
+
+function getPlayerCameraStatusLabel(status: PlayerCameraSyncStatus): string {
+  switch (status) {
+    case "pending":
+      return "Sincronizando";
+    case "synchronized":
+      return "Sincronizada";
+    case "desynchronized":
+      return "Vista libre";
+    case "closed":
+      return "Cerrada";
+  }
 }
 
 interface SidebarAccordionProps {

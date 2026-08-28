@@ -7,6 +7,10 @@ import type {
   PlayerWindowSnapshot,
   ViewportCameraSnapshot
 } from "../domain/player/player-window";
+import type {
+  PlayerCameraCommand,
+  PlayerCameraReport
+} from "../domain/player/player-camera-control";
 import type { MonsterTemplate } from "../domain/monster-templates/monster-template";
 import type {
   MonsterLibraryEntry,
@@ -45,6 +49,7 @@ export interface TtrpgApi {
     scene: SceneDocument,
     options?: { readonly suggestedFilePath?: string | null }
   ) => Promise<SceneOperationResult>;
+  saveSceneToPath: (scene: SceneDocument, filePath: string) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
   selectSceneLinkTargetFile: () => Promise<
     { readonly ok: true; readonly filePath: string | null } | { readonly ok: false; readonly error: string }
@@ -83,17 +88,24 @@ export interface TtrpgApi {
   getPlayerWindowState: () => Promise<{
     readonly snapshot: PlayerWindowSnapshot | null;
     readonly camera: ViewportCameraSnapshot | null;
+    readonly cameraCommand: PlayerCameraCommand | null;
+    readonly isOpen: boolean;
   }>;
   publishPlayerScene: (snapshot: PlayerWindowSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerCamera: (camera: ViewportCameraSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  commandPlayerCamera: (command: PlayerCameraCommand) => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  reportPlayerCamera: (report: PlayerCameraReport) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerPointer: (pointer: ArcanePointerBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerInformationAreaHighlight: (highlight: InformationAreaHighlightBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   notifyPlayerContentReady: () => Promise<{ readonly ok: boolean; readonly error?: string }>;
   onPlayerScene: (handler: (snapshot: PlayerWindowSnapshot) => void) => () => void;
   onPlayerCamera: (handler: (camera: ViewportCameraSnapshot) => void) => () => void;
+  onPlayerCameraCommand: (handler: (command: PlayerCameraCommand) => void) => () => void;
+  onPlayerCameraReport: (handler: (report: PlayerCameraReport) => void) => () => void;
   onPlayerPointer: (handler: (pointer: ArcanePointerBroadcast) => void) => () => void;
   onPlayerInformationAreaHighlight: (handler: (highlight: InformationAreaHighlightBroadcast) => void) => () => void;
   onPlayerWindowClosed: (handler: () => void) => () => void;
+  onPlayerWindowReady: (handler: () => void) => () => void;
 }
 
 export type MonsterTemplateOperationResult =

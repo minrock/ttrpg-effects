@@ -13,6 +13,7 @@ import {
 
 const pathA = "/scenes/a.ttrpgscene";
 const pathB = "/scenes/b.ttrpgscene";
+const pathC = "/scenes/c.ttrpgscene";
 
 describe("scene navigation link use cases", () => {
   it("connects, validates, navigates and disconnects reciprocal files", async () => {
@@ -83,6 +84,74 @@ describe("scene navigation link use cases", () => {
       message: "El archivo de escena conectado ya no existe."
     });
   });
+
+  it("frees a remote point that still points to the current marker even if its connection metadata is stale", async () => {
+    const markerA = marker("scene-link-a", "Salida", 10, 20);
+    const markerB = marker("scene-link-b", "Entrada", 300, 400);
+    const storage = createStorage([
+      [pathA, sceneJson(markerA)],
+      [pathB, sceneJson(markerB)]
+    ]);
+    await connectSceneLink(storage, {
+      sourceScenePath: pathA,
+      sourceMarkerId: markerA.id,
+      targetScenePath: pathB,
+      targetMarkerId: markerB.id
+    });
+
+    const sceneB = parseSceneJson(storage.files.get(pathB) ?? "");
+    const connectedMarkerB = sceneB.mapAnnotations.sceneLinks[0];
+    if (connectedMarkerB?.connection === null || connectedMarkerB === undefined) {
+      throw new Error("Expected a connected remote marker.");
+    }
+    storage.files.set(pathB, serializeSceneDocument(replaceMarker(sceneB, {
+      ...connectedMarkerB,
+      connection: { ...connectedMarkerB.connection, connectionId: "stale-connection-id" }
+    })));
+
+    const disconnected = await disconnectSceneLink(storage, { scenePath: pathA, markerId: markerA.id });
+
+    expect(disconnected.ok).toBe(true);
+    expect(parseSceneJson(storage.files.get(pathA) ?? "").mapAnnotations.sceneLinks[0]?.connection).toBeNull();
+    expect(parseSceneJson(storage.files.get(pathB) ?? "").mapAnnotations.sceneLinks[0]?.connection).toBeNull();
+  });
+
+  it("does not free a remote point that was reassigned to another scene", async () => {
+    const markerA = marker("scene-link-a", "Salida", 10, 20);
+    const markerB = marker("scene-link-b", "Entrada", 300, 400);
+    const storage = createStorage([
+      [pathA, sceneJson(markerA)],
+      [pathB, sceneJson(markerB)]
+    ]);
+    await connectSceneLink(storage, {
+      sourceScenePath: pathA,
+      sourceMarkerId: markerA.id,
+      targetScenePath: pathB,
+      targetMarkerId: markerB.id
+    });
+
+    const sceneB = parseSceneJson(storage.files.get(pathB) ?? "");
+    const connectedMarkerB = sceneB.mapAnnotations.sceneLinks[0];
+    if (connectedMarkerB?.connection === null || connectedMarkerB === undefined) {
+      throw new Error("Expected a connected remote marker.");
+    }
+    storage.files.set(pathB, serializeSceneDocument(replaceMarker(sceneB, {
+      ...connectedMarkerB,
+      connection: {
+        ...connectedMarkerB.connection,
+        peer: { scenePath: pathC, markerId: "scene-link-c" }
+      }
+    })));
+
+    const disconnected = await disconnectSceneLink(storage, { scenePath: pathA, markerId: markerA.id });
+
+    expect(disconnected.ok && disconnected.warning).toContain("otra conexion");
+    expect(parseSceneJson(storage.files.get(pathA) ?? "").mapAnnotations.sceneLinks[0]?.connection).toBeNull();
+    expect(parseSceneJson(storage.files.get(pathB) ?? "").mapAnnotations.sceneLinks[0]?.connection?.peer).toEqual({
+      scenePath: pathC,
+      markerId: "scene-link-c"
+    });
+  });
 });
 
 function marker(id: string, name: string, x: number, y: number): MapSceneLinkMarker {
@@ -95,6 +164,16 @@ function sceneJson(sceneLink: MapSceneLinkMarker): string {
     ...scene,
     mapAnnotations: { ...scene.mapAnnotations, sceneLinks: [sceneLink] }
   });
+}
+
+function replaceMarker(
+  scene: ReturnType<typeof parseSceneJson>,
+  sceneLink: MapSceneLinkMarker
+): ReturnType<typeof parseSceneJson> {
+  return {
+    ...scene,
+    mapAnnotations: { ...scene.mapAnnotations, sceneLinks: [sceneLink] }
+  };
 }
 
 function createStorage(entries: readonly (readonly [string, string])[]): SceneFileStorage & { files: Map<string, string> } {

@@ -10,6 +10,10 @@ import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
+import {
+  sanitizePlayerCameraCommand,
+  type PlayerCameraReportOrigin
+} from "../../domain/player/player-camera-control";
 
 export function PlayerApp(): JSX.Element {
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -28,6 +32,91 @@ export function PlayerApp(): JSX.Element {
   const [informationAreaHighlightEvent, setInformationAreaHighlightEvent] =
     useState<InformationAreaHighlightBroadcast | null>(null);
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
+  const latestPlayerCameraRef = useRef(camera);
+  const lastCameraCommandRevisionRef = useRef(-1);
+  const acknowledgedCameraCommandRevisionRef = useRef<number | null>(null);
+  const cameraReportRevisionRef = useRef(0);
+  const cameraReportTimerRef = useRef<number | null>(null);
+  const isCameraReportInFlightRef = useRef(false);
+  const isCameraReporterActiveRef = useRef(true);
+  const pendingCameraReportRef = useRef<{
+    readonly camera: ViewportCameraSnapshot;
+    readonly origin: PlayerCameraReportOrigin;
+    readonly final: boolean;
+  } | null>(null);
+
+  const flushPlayerCameraReport = useCallback((): void => {
+    if (cameraReportTimerRef.current !== null) {
+      window.clearTimeout(cameraReportTimerRef.current);
+      cameraReportTimerRef.current = null;
+    }
+    const pending = pendingCameraReportRef.current;
+    if (
+      pending === null ||
+      window.ttrpg === undefined ||
+      isCameraReportInFlightRef.current
+    ) {
+      return;
+    }
+
+    pendingCameraReportRef.current = null;
+    isCameraReportInFlightRef.current = true;
+    const reportRevision = cameraReportRevisionRef.current + 1;
+    cameraReportRevisionRef.current = reportRevision;
+    void window.ttrpg.reportPlayerCamera({
+      reportRevision,
+      acknowledgedCommandRevision: acknowledgedCameraCommandRevisionRef.current,
+      camera: pending.camera,
+      origin: pending.origin,
+      final: pending.final
+    }).finally(() => {
+      isCameraReportInFlightRef.current = false;
+      if (
+        isCameraReporterActiveRef.current &&
+        pendingCameraReportRef.current !== null &&
+        cameraReportTimerRef.current === null
+      ) {
+        cameraReportTimerRef.current = window.setTimeout(flushPlayerCameraReport, 0);
+      }
+    });
+  }, []);
+
+  const queuePlayerCameraReport = useCallback(
+    (
+      nextCamera: ViewportCameraSnapshot,
+      origin: PlayerCameraReportOrigin,
+      final: boolean
+    ): void => {
+      const normalized = normalizeCameraSnapshot(nextCamera);
+      latestPlayerCameraRef.current = normalized;
+      pendingCameraReportRef.current = { camera: normalized, origin, final };
+      if (final) {
+        flushPlayerCameraReport();
+        return;
+      }
+      if (cameraReportTimerRef.current === null) {
+        cameraReportTimerRef.current = window.setTimeout(flushPlayerCameraReport, 80);
+      }
+    },
+    [flushPlayerCameraReport]
+  );
+
+  const applyPlayerCameraCommand = useCallback(
+    (value: unknown): void => {
+      const command = sanitizePlayerCameraCommand(value);
+      if (command === null || command.revision <= lastCameraCommandRevisionRef.current) {
+        return;
+      }
+
+      lastCameraCommandRevisionRef.current = command.revision;
+      acknowledgedCameraCommandRevisionRef.current = command.revision;
+      const normalized = normalizeCameraSnapshot(command.camera);
+      latestPlayerCameraRef.current = normalized;
+      setCamera(normalized);
+      queuePlayerCameraReport(normalized, "remote-command", true);
+    },
+    [queuePlayerCameraReport]
+  );
 
   const applySnapshot = useCallback((snapshot: PlayerWindowSnapshot | null): void => {
     if (snapshot === null) {
@@ -52,7 +141,9 @@ export function PlayerApp(): JSX.Element {
     }
     const nextCameraSyncKey = snapshot.cameraSyncKey ?? 0;
     if (!hasInitializedCameraRef.current || cameraSyncKeyRef.current !== nextCameraSyncKey) {
-      setCamera(normalizeCameraSnapshot(snapshot.camera));
+      const normalized = normalizeCameraSnapshot(snapshot.camera);
+      latestPlayerCameraRef.current = normalized;
+      setCamera(normalized);
       hasInitializedCameraRef.current = true;
       cameraSyncKeyRef.current = nextCameraSyncKey;
     }
@@ -60,6 +151,7 @@ export function PlayerApp(): JSX.Element {
 
   useEffect(() => {
     let mounted = true;
+    isCameraReporterActiveRef.current = true;
     const offScene = window.ttrpg?.onPlayerScene((snapshot) => {
       if (mounted) {
         applySnapshot(snapshot);
@@ -75,6 +167,11 @@ export function PlayerApp(): JSX.Element {
         setInformationAreaHighlightEvent(highlight);
       }
     });
+    const offCameraCommand = window.ttrpg?.onPlayerCameraCommand((command) => {
+      if (mounted) {
+        applyPlayerCameraCommand(command);
+      }
+    });
 
     void window.ttrpg?.getPlayerWindowState().then((state) => {
       if (!mounted) {
@@ -83,18 +180,29 @@ export function PlayerApp(): JSX.Element {
 
       applySnapshot(state.snapshot);
       if (!hasInitializedCameraRef.current && state.camera !== null) {
-        setCamera(normalizeCameraSnapshot(state.camera));
+        const normalized = normalizeCameraSnapshot(state.camera);
+        latestPlayerCameraRef.current = normalized;
+        setCamera(normalized);
         hasInitializedCameraRef.current = true;
+      }
+      if (state.cameraCommand !== null) {
+        applyPlayerCameraCommand(state.cameraCommand);
       }
     });
 
     return () => {
       mounted = false;
+      isCameraReporterActiveRef.current = false;
       offScene?.();
       offPointer?.();
       offInformationAreaHighlight?.();
+      offCameraCommand?.();
+      if (cameraReportTimerRef.current !== null) {
+        window.clearTimeout(cameraReportTimerRef.current);
+        cameraReportTimerRef.current = null;
+      }
     };
-  }, [applySnapshot]);
+  }, [applyPlayerCameraCommand, applySnapshot]);
 
   const mapState = useMemo<MapImageState | null>(
     () =>
@@ -117,6 +225,18 @@ export function PlayerApp(): JSX.Element {
     [scene.tokens, tokenImageUrls]
   );
   const noop = useCallback((): void => undefined, []);
+  const handlePlayerCameraChange = useCallback(
+    (nextCamera: ViewportCameraSnapshot): void => {
+      queuePlayerCameraReport(nextCamera, "local-navigation", false);
+    },
+    [queuePlayerCameraReport]
+  );
+  const handlePlayerCameraInteractionEnd = useCallback(
+    (nextCamera: ViewportCameraSnapshot): void => {
+      queuePlayerCameraReport(nextCamera, "local-navigation", true);
+    },
+    [queuePlayerCameraReport]
+  );
   const handlePlayerMapReady = useCallback((): void => {
     setIsViewportReady(true);
   }, []);
@@ -124,8 +244,9 @@ export function PlayerApp(): JSX.Element {
   useEffect(() => {
     if (isHydrated && isViewportReady) {
       void window.ttrpg?.notifyPlayerContentReady();
+      queuePlayerCameraReport(latestPlayerCameraRef.current, "initialization", true);
     }
-  }, [isHydrated, isViewportReady]);
+  }, [isHydrated, isViewportReady, queuePlayerCameraReport]);
 
   return (
     <main className="player-shell" aria-label="TTRPG Effects jugador">
@@ -197,6 +318,8 @@ export function PlayerApp(): JSX.Element {
           onMagicalDarknessRadiusChange={noop}
           onWaterLineRotationChange={noop}
           onWaterPatternRotationChange={noop}
+          onCameraChange={handlePlayerCameraChange}
+          onCameraInteractionEnd={handlePlayerCameraInteractionEnd}
           onRoomPinPlace={noop}
           onInformationAreaPaint={noop}
           onInformationAreaHighlight={noop}

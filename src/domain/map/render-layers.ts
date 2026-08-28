@@ -14,7 +14,8 @@ export const renderLayerNames = [
   "labels",
   "informationAreaHighlights",
   "selection",
-  "pointer"
+  "pointer",
+  "playerCameraControls"
 ] as const;
 
 export type RenderLayerName = (typeof renderLayerNames)[number];

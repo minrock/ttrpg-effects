@@ -31,3 +31,25 @@ export async function saveSceneUseCase(
     };
   }
 }
+
+export async function saveSceneToPathUseCase(
+  storage: SceneFileStorage,
+  scene: SceneDocument,
+  filePath: string
+): Promise<SceneOperationResult> {
+  if (storage.replaceSceneJsonFiles === undefined) {
+    return { ok: false, error: "El guardado directo de escenas no esta disponible." };
+  }
+
+  try {
+    await storage.replaceSceneJsonFiles([
+      { filePath, json: serializeSceneDocument(scene) }
+    ]);
+    return { ok: true, scene, filePath, warnings: [] };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "No se pudo guardar la escena en segundo plano."
+    };
+  }
+}

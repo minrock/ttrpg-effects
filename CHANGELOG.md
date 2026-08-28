@@ -10,6 +10,25 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.5.3] - 2026-08-27
+
+### Added
+
+- Control de camara de jugador desde la vista DM mediante marcador principal, zoom remoto y accion de recentrado.
+- Camara virtual privada para mostrar al DM la posicion efectiva de Player View cuando el jugador navega de forma independiente.
+
+### Changed
+
+- Sincronizacion bidireccional de camara mediante mensajes IPC ligeros, revisiones monotonicamente crecientes y reportes coalescidos para evitar loops y colas sin limite.
+- Las conexiones entre escenas guardan directamente por la ruta `.ttrpgscene` conocida; solo se muestra el selector del archivo destino y las escrituras se realizan en segundo plano.
+- Los puntos conectados ofrecen la accion `Desligar` desde el modal y las propiedades del sidebar.
+
+### Fixed
+
+- Desligar una conexion solo libera el extremo remoto si todavia apunta al archivo y marcador actuales, evitando borrar conexiones reasignadas.
+- Renombrar un punto conectado persiste inmediatamente el archivo local sin alterar `connectionId`, rol, origen, destino o `peer`.
+- Los fallos IPC del guardado de enlaces se muestran en la interfaz sin producir promesas rechazadas sin manejar.
+
 ## [1.5.1] - 2026-08-27
 
 ### Changed
