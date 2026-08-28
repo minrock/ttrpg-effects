@@ -99,7 +99,11 @@ export interface SceneLight {
   readonly snapToGrid: boolean;
 }
 
-export type SceneEffect = SceneFireEffect | SceneMagicalDarknessEffect | SceneWaterEffect;
+export type SceneEffect =
+  | SceneFireEffect
+  | SceneDynamicLightEffect
+  | SceneMagicalDarknessEffect
+  | SceneWaterEffect;
 
 export interface SceneFireEffect {
   readonly id: string;
@@ -115,6 +119,23 @@ export interface SceneFireEffect {
   readonly visible: boolean;
   readonly emitsLight: boolean;
   readonly lightRadius: number;
+}
+
+export interface SceneDynamicLightEffect {
+  readonly id: string;
+  readonly kind: "dynamic-light";
+  readonly position: {
+    readonly x: number;
+    readonly y: number;
+  };
+  readonly brightRadiusCells: number;
+  readonly dimRadiusCells: number;
+  readonly color: string;
+  readonly intensity: number;
+  readonly opacity: number;
+  readonly flicker: number;
+  readonly speed: number;
+  readonly visible: boolean;
 }
 
 export interface SceneMagicalDarknessEffect {

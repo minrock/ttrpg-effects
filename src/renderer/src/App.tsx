@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -8,6 +9,10 @@ import {
   type ReactNode,
   type SetStateAction
 } from "react";
+import {
+  resolveContextMenuPosition,
+  type ContextMenuPosition
+} from "./context-menu-position";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import * as Switch from "@radix-ui/react-switch";
 import {
@@ -60,6 +65,12 @@ import {
   updateMagicalDarknessEffect,
   type MagicalDarknessPatch
 } from "../../domain/effects/magical-darkness";
+import {
+  createDynamicLightSavePayload,
+  createDynamicLightEffect,
+  updateDynamicLightEffect,
+  type DynamicLightPatch
+} from "../../domain/effects/dynamic-light";
 import {
   createWaterEffect,
   mergeConsecutiveRiverEffects,
@@ -253,6 +264,8 @@ export function App(): JSX.Element {
   const [needsResave, setNeedsResave] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
+  const contextMenuRef = useRef<HTMLElement | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState<ContextMenuPosition | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isAsidePanelVisible, setIsAsidePanelVisible] = useState(true);
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
@@ -447,6 +460,31 @@ export function App(): JSX.Element {
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     setInteraction((current) => openContextMenu(current, request));
   }, []);
+
+  useLayoutEffect(() => {
+    if (interaction.contextMenu === null) {
+      setContextMenuPosition(null);
+      return;
+    }
+
+    const menu = contextMenuRef.current;
+    const backdrop = menu?.parentElement;
+    if (menu === null || backdrop === null || backdrop === undefined) {
+      return;
+    }
+
+    const backdropBounds = backdrop.getBoundingClientRect();
+    setContextMenuPosition(
+      resolveContextMenuPosition(
+        {
+          x: interaction.contextMenu.screen.x - backdropBounds.left,
+          y: interaction.contextMenu.screen.y - backdropBounds.top
+        },
+        { width: menu.offsetWidth, height: menu.offsetHeight },
+        { width: backdropBounds.width, height: backdropBounds.height }
+      )
+    );
+  }, [interaction.contextMenu]);
 
   const handleElementSelect = useCallback((elementId: string | null) => {
     setInteraction((current) => selectElement(current, elementId));
@@ -756,7 +794,10 @@ export function App(): JSX.Element {
 
     setIsBusy(true);
     try {
-      const saved = await window.ttrpg.saveSceneToPath({ ...nextScene, sceneAside }, currentFilePath);
+      const saved = await window.ttrpg.saveSceneToPath(
+        createSceneSavePayload(nextScene, sceneAside),
+        currentFilePath
+      );
       if (!saved.ok) {
         setFeedback(saved.error);
         return false;
@@ -791,7 +832,10 @@ export function App(): JSX.Element {
     try {
       saved = currentFilePath === null
         ? await saveCurrentScene()
-        : await window.ttrpg?.saveSceneToPath({ ...sceneRef.current, sceneAside }, currentFilePath);
+        : await window.ttrpg?.saveSceneToPath(
+            createSceneSavePayload(sceneRef.current, sceneAside),
+            currentFilePath
+          );
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "No se pudo guardar la escena en segundo plano.");
       return null;
@@ -952,6 +996,21 @@ export function App(): JSX.Element {
 
     const id = getNextAvailableSceneId(sceneRef.current, ["magical-darkness-"], nextEffectId);
     const effect = createMagicalDarknessEffect(id, interaction.contextMenu.world);
+
+    setScene((current) => ({
+      ...current,
+      effects: [...current.effects, effect]
+    }));
+    setInteraction((current) => selectElement(closeContextMenu(current), id));
+  };
+
+  const handleCreateDynamicLight = (): void => {
+    if (interaction.contextMenu === null) {
+      return;
+    }
+
+    const id = getNextAvailableSceneId(sceneRef.current, ["dynamic-light-"], nextEffectId);
+    const effect = createDynamicLightEffect(id, interaction.contextMenu.world);
 
     setScene((current) => ({
       ...current,
@@ -1556,7 +1615,7 @@ export function App(): JSX.Element {
       return { ok: false, error: "La API de preload no esta disponible." };
     }
 
-    return window.ttrpg.saveScene({ ...sceneRef.current, sceneAside }, {
+    return window.ttrpg.saveScene(createSceneSavePayload(sceneRef.current, sceneAside), {
       suggestedFilePath: currentFilePath
     });
   }
@@ -1884,6 +1943,8 @@ export function App(): JSX.Element {
         effect.id === elementId
           ? effect.kind === "fire"
             ? updateAnimatedFireEffect(effect, { position: { x, y } })
+            : effect.kind === "dynamic-light"
+              ? updateDynamicLightEffect(effect, { position: { x, y } })
             : effect.kind === "magical-darkness"
               ? updateMagicalDarknessEffect(effect, { position: { x, y } })
               : updateWaterEffect(effect, { position: { x, y } })
@@ -2398,6 +2459,8 @@ export function App(): JSX.Element {
       : scene.effects.find((effect) => effect.id === interaction.selectedElementId);
   const selectedFireEffect =
     selectedEffect?.kind === "fire" ? selectedEffect : undefined;
+  const selectedDynamicLight =
+    selectedEffect?.kind === "dynamic-light" ? selectedEffect : undefined;
   const selectedMagicalDarkness =
     selectedEffect?.kind === "magical-darkness" ? selectedEffect : undefined;
   const selectedWaterEffect =
@@ -2480,6 +2543,21 @@ export function App(): JSX.Element {
       effects: current.effects.map((effect) =>
         effect.id === selectedFireEffect.id && effect.kind === "fire"
           ? updateAnimatedFireEffect(effect, patch)
+          : effect
+      )
+    }));
+  }
+
+  function updateSelectedDynamicLight(patch: DynamicLightPatch): void {
+    if (selectedDynamicLight === undefined) {
+      return;
+    }
+
+    setScene((current) => ({
+      ...current,
+      effects: current.effects.map((effect) =>
+        effect.id === selectedDynamicLight.id && effect.kind === "dynamic-light"
+          ? updateDynamicLightEffect(effect, patch)
           : effect
       )
     }));
@@ -2646,6 +2724,8 @@ export function App(): JSX.Element {
         : "Luz conica"
       : selectedFireEffect !== undefined
         ? "Fuego"
+        : selectedDynamicLight !== undefined
+          ? "Luz dinamica"
         : selectedMagicalDarkness !== undefined
           ? "Oscuridad magica"
           : selectedWaterEffect !== undefined
@@ -2674,6 +2754,8 @@ export function App(): JSX.Element {
         : "◖"
       : selectedFireEffect !== undefined
         ? "火"
+        : selectedDynamicLight !== undefined
+          ? "✦"
         : selectedMagicalDarkness !== undefined
           ? "●"
           : selectedWaterEffect !== undefined
@@ -3211,6 +3293,96 @@ export function App(): JSX.Element {
                       max="1000"
                       value={selectedFireEffect.lightRadius}
                       onChange={(event) => updateSelectedFireEffect({ lightRadius: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {selectedDynamicLight !== undefined ? (
+                <div className="selected-properties-content" aria-label="Propiedades de luz dinamica">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedDynamicLight.visible}
+                      onChange={(event) => updateSelectedDynamicLight({ visible: event.currentTarget.checked })}
+                    />
+                    Visible
+                  </label>
+                  <label>
+                    Color
+                    <input
+                      type="color"
+                      value={selectedDynamicLight.color}
+                      onChange={(event) => updateSelectedDynamicLight({ color: event.currentTarget.value })}
+                    />
+                  </label>
+                  <label>
+                    Luz fuerte (cuadros)
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="40"
+                      step="0.25"
+                      value={selectedDynamicLight.brightRadiusCells}
+                      onChange={(event) =>
+                        updateSelectedDynamicLight({ brightRadiusCells: event.currentTarget.valueAsNumber })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Luz tenue (cuadros)
+                    <input
+                      type="number"
+                      min={Math.max(0.5, selectedDynamicLight.brightRadiusCells)}
+                      max="80"
+                      step="0.25"
+                      value={selectedDynamicLight.dimRadiusCells}
+                      onChange={(event) =>
+                        updateSelectedDynamicLight({ dimRadiusCells: event.currentTarget.valueAsNumber })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Intensidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedDynamicLight.intensity}
+                      onChange={(event) => updateSelectedDynamicLight({ intensity: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    Opacidad
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedDynamicLight.opacity}
+                      onChange={(event) => updateSelectedDynamicLight({ opacity: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    Variacion
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selectedDynamicLight.flicker}
+                      onChange={(event) => updateSelectedDynamicLight({ flicker: event.currentTarget.valueAsNumber })}
+                    />
+                  </label>
+                  <label>
+                    Velocidad
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="4"
+                      step="0.1"
+                      value={selectedDynamicLight.speed}
+                      onChange={(event) => updateSelectedDynamicLight({ speed: event.currentTarget.valueAsNumber })}
                     />
                   </label>
                 </div>
@@ -4067,10 +4239,15 @@ export function App(): JSX.Element {
           }}
         >
           <menu
-            className="context-menu"
+            ref={contextMenuRef}
+            className={[
+              "context-menu",
+              contextMenuPosition?.opensUpward === true ? "is-opening-upward" : "",
+              contextMenuPosition?.opensLeftward === true ? "is-opening-leftward" : ""
+            ].filter(Boolean).join(" ")}
             style={{
-              left: interaction.contextMenu.screen.x,
-              top: interaction.contextMenu.screen.y
+              left: contextMenuPosition?.left ?? interaction.contextMenu.screen.x,
+              top: contextMenuPosition?.top ?? interaction.contextMenu.screen.y
             }}
             onClick={(event) => {
               event.stopPropagation();
@@ -4123,6 +4300,7 @@ export function App(): JSX.Element {
                 </button>
                 <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
                 <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
+                <button type="button" onClick={handleCreateDynamicLight}>Luz dinamica</button>
                 <button type="button" onClick={handleCreateMagicalDarkness}>Oscuridad magica</button>
                 <button type="button" onClick={handleStartWaterDrawing}>Agua</button>
               </menu>
@@ -4256,6 +4434,18 @@ function getSceneObjectIds(scene: SceneDocument): readonly string[] {
     ...scene.fogOfWar.revealedAreas.map((area) => area.id),
     ...scene.fogOfWar.obstacles.map((obstacle) => obstacle.id)
   ];
+}
+
+function createSceneSavePayload(scene: SceneDocument, sceneAside: SceneAside): SceneDocument {
+  return {
+    ...scene,
+    sceneAside,
+    effects: scene.effects.map((effect) =>
+      effect.kind === "dynamic-light"
+        ? createDynamicLightSavePayload(effect, scene.grid.cellSizeWorld)
+        : effect
+    )
+  };
 }
 
 function sameTokenName(left: string, right: string): boolean {

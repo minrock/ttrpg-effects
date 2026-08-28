@@ -84,6 +84,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 #### `renderer`
 
 - Agregar menu contextual React posicionado sobre el canvas.
+- Medir el menu contextual al montarlo y resolver su direccion vertical y horizontal contra el espacio real disponible del viewport.
+- Mantener el menu dentro del viewport usable y orientar los submenus hacia el lado disponible sin recortarlos desde el contenedor raiz.
 - Agregar accion compacta de bloqueo/desbloqueo de zoom dentro del menu contextual.
 - Agregar toolbar compacta para herramienta activa y bloqueo de zoom.
 - Escuchar `Delete`, `Backspace` y `Escape` a nivel de app con cleanup correcto.
@@ -365,9 +367,17 @@ Cambiar a:
 - [x] `NavigationLegend` montado en `MapViewport.tsx`.
 - [x] `pnpm typecheck` ejecutado.
 - [x] `pnpm test` ejecutado.
-- [ ] `pnpm lint` ejecutado.
-- [ ] `pnpm build` ejecutado.
-- [ ] Smoke/manual test realizado.
+- [x] `pnpm lint` ejecutado.
+- [x] `pnpm build` ejecutado.
+- [x] Smoke/manual test realizado.
+
+### Cierre del posicionamiento contextual
+
+- [x] El menu se mide al abrirse y cambia hacia arriba cuando no cabe debajo del puntero.
+- [x] La posicion se limita a los bordes laterales del viewport usable.
+- [x] Los submenus se orientan hacia el espacio disponible sin quedar recortados.
+- [x] Casos inferior, inferior derecho y submenu abierto verificados visualmente.
+- [x] Calculo cubierto por pruebas unitarias.
 ## Extension: herramientas de anotacion
 
 - Integrar `room-pin` e `information-area` como herramientas exclusivas en la maquina de interaccion.

@@ -10,6 +10,23 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.5.4] - 2026-08-28
+
+### Added
+
+- Nuevo efecto `Luz dinamica` con fuente circular animada, luz fuerte y tenue configurables en cuadros, movimiento libre y propiedades editables desde el aside.
+- Persistencia compatible de luces dinamicas en `.ttrpgscene`, incluyendo color, radios, intensidad, opacidad, variacion y velocidad.
+
+### Changed
+
+- El render de luces dinamicas reutiliza su jerarquia PixiJS, actualiza el parpadeo sin estado React por frame y evita invalidar capas no relacionadas.
+- La luz dinamica participa en oscuridad normal y vision en la oscuridad, respetando la prioridad de oscuridad magica y niebla.
+
+### Fixed
+
+- Guardar escenas con luces dinamicas vuelve a abrir correctamente el dialogo y todos los caminos de guardado comparten la misma normalizacion compatible.
+- El menu contextual se abre hacia arriba cuando no cabe debajo del puntero, se mantiene dentro del viewport y conserva submenus accesibles junto a los bordes.
+
 ## [1.5.3] - 2026-08-27
 
 ### Added

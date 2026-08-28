@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { SceneFileStorage } from "../services/scene-file-storage";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { serializeSceneDocument } from "../../domain/sessions/scene-schema";
+import {
+  createDynamicLightEffect,
+  createDynamicLightSavePayload
+} from "../../domain/effects/dynamic-light";
 import { loadSceneUseCase } from "./load-scene";
 import { saveSceneToPathUseCase, saveSceneUseCase } from "./save-scene";
 
@@ -21,6 +25,30 @@ describe("scene use cases", () => {
 
     expect(result).toMatchObject({ ok: true, filePath: "/tmp/example.ttrpgscene" });
     expect(JSON.parse(savedJson)).toMatchObject({ version: 1 });
+  });
+
+  it("persists dynamic lights inside scene JSON", async () => {
+    let savedJson = "";
+    const dynamicLight = createDynamicLightEffect("dynamic-light-1", { x: 80, y: 120 });
+    const scene = {
+      ...createDefaultScene(),
+      effects: [createDynamicLightSavePayload(dynamicLight, 100)]
+    };
+    const storage: SceneFileStorage = {
+      saveSceneJson: async (json) => {
+        savedJson = json;
+        return "/tmp/dynamic-light.ttrpgscene";
+      },
+      loadSceneJson: async () => null,
+      fileExists: async () => true
+    };
+
+    const result = await saveSceneUseCase(storage, scene);
+
+    expect(result).toMatchObject({ ok: true, filePath: "/tmp/dynamic-light.ttrpgscene" });
+    const savedScene = JSON.parse(savedJson) as { effects: Array<Record<string, unknown>> };
+    expect(savedScene).toMatchObject({ effects: [dynamicLight] });
+    expect(savedScene.effects[0]).not.toHaveProperty("radius");
   });
 
   it("saves virtual tokens inside scene JSON", async () => {

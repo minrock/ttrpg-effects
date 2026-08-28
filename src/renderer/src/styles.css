@@ -2733,6 +2733,16 @@ body {
   z-index: 1;
 }
 
+.context-menu.is-opening-leftward .context-submenu {
+  right: 100%;
+  left: auto;
+}
+
+.context-menu.is-opening-upward .context-submenu {
+  top: auto;
+  bottom: 0;
+}
+
 .has-submenu:hover .context-submenu,
 .has-submenu:focus-within .context-submenu {
   display: grid;
