@@ -19,7 +19,8 @@ describe("render layer order", () => {
       "labels",
       "informationAreaHighlights",
       "selection",
-      "pointer"
+      "pointer",
+      "playerCameraControls"
     ]);
   });
 });

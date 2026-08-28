@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld("ttrpg", {
   getAppInfo: () => appInfo,
   saveScene: (scene: unknown, options?: { readonly suggestedFilePath?: string | null }) =>
     ipcRenderer.invoke("scene:save", { scene, suggestedFilePath: options?.suggestedFilePath ?? null }),
+  saveSceneToPath: (scene: unknown, filePath: string) =>
+    ipcRenderer.invoke("scene:save-to-path", { scene, filePath }),
   loadScene: () => ipcRenderer.invoke("scene:load"),
   selectSceneLinkTargetFile: () => ipcRenderer.invoke("scene-link:select-target-file"),
   listSceneLinkCandidates: (filePath: string) => ipcRenderer.invoke("scene-link:list-candidates", filePath),
@@ -50,6 +52,8 @@ contextBridge.exposeInMainWorld("ttrpg", {
   getPlayerWindowState: () => ipcRenderer.invoke("player-window:get-state"),
   publishPlayerScene: (snapshot: unknown) => ipcRenderer.invoke("player-window:publish-scene", snapshot),
   publishPlayerCamera: (camera: unknown) => ipcRenderer.invoke("player-window:publish-camera", camera),
+  commandPlayerCamera: (command: unknown) => ipcRenderer.invoke("player-window:camera-command", command),
+  reportPlayerCamera: (report: unknown) => ipcRenderer.invoke("player-window:camera-report", report),
   publishPlayerPointer: (pointer: unknown) => ipcRenderer.invoke("player-window:publish-pointer", pointer),
   publishPlayerInformationAreaHighlight: (highlight: unknown) =>
     ipcRenderer.invoke("player-window:publish-information-area-highlight", highlight),
@@ -63,6 +67,16 @@ contextBridge.exposeInMainWorld("ttrpg", {
     const listener = (_event: IpcRendererEvent, camera: unknown): void => handler(camera);
     ipcRenderer.on("player-window:camera", listener);
     return () => ipcRenderer.removeListener("player-window:camera", listener);
+  },
+  onPlayerCameraCommand: (handler: (command: unknown) => void) => {
+    const listener = (_event: IpcRendererEvent, command: unknown): void => handler(command);
+    ipcRenderer.on("player-window:camera-command", listener);
+    return () => ipcRenderer.removeListener("player-window:camera-command", listener);
+  },
+  onPlayerCameraReport: (handler: (report: unknown) => void) => {
+    const listener = (_event: IpcRendererEvent, report: unknown): void => handler(report);
+    ipcRenderer.on("player-window:camera-report", listener);
+    return () => ipcRenderer.removeListener("player-window:camera-report", listener);
   },
   onPlayerPointer: (handler: (pointer: unknown) => void) => {
     const listener = (_event: IpcRendererEvent, pointer: unknown): void => handler(pointer);
@@ -78,5 +92,10 @@ contextBridge.exposeInMainWorld("ttrpg", {
     const listener = (): void => handler();
     ipcRenderer.on("player-window:closed", listener);
     return () => ipcRenderer.removeListener("player-window:closed", listener);
+  },
+  onPlayerWindowReady: (handler: () => void) => {
+    const listener = (): void => handler();
+    ipcRenderer.on("player-window:ready", listener);
+    return () => ipcRenderer.removeListener("player-window:ready", listener);
   }
 });

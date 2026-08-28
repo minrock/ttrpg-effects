@@ -3,7 +3,7 @@ import type { SceneFileStorage } from "../services/scene-file-storage";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { serializeSceneDocument } from "../../domain/sessions/scene-schema";
 import { loadSceneUseCase } from "./load-scene";
-import { saveSceneUseCase } from "./save-scene";
+import { saveSceneToPathUseCase, saveSceneUseCase } from "./save-scene";
 
 describe("scene use cases", () => {
   it("saves valid scene JSON through storage", async () => {
@@ -91,6 +91,34 @@ describe("scene use cases", () => {
 
     expect(result).toMatchObject({ ok: true, filePath: "/tmp/current-scene.ttrpgscene" });
     expect(suggestedFilePath).toBe("/tmp/current-scene.ttrpgscene");
+  });
+
+  it("saves an existing scene directly to its path without invoking the save dialog", async () => {
+    const updates: { readonly filePath: string; readonly json: string }[] = [];
+    let dialogInvoked = false;
+    const storage: SceneFileStorage = {
+      saveSceneJson: async () => {
+        dialogInvoked = true;
+        return null;
+      },
+      loadSceneJson: async () => null,
+      replaceSceneJsonFiles: async (files) => {
+        updates.push(...files);
+      },
+      fileExists: async () => true
+    };
+
+    const result = await saveSceneToPathUseCase(
+      storage,
+      createDefaultScene(),
+      "/tmp/current-scene.ttrpgscene"
+    );
+
+    expect(result).toMatchObject({ ok: true, filePath: "/tmp/current-scene.ttrpgscene" });
+    expect(dialogInvoked).toBe(false);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.filePath).toBe("/tmp/current-scene.ttrpgscene");
+    expect(JSON.parse(updates[0]?.json ?? "")).toMatchObject({ version: 1 });
   });
 
   it("loads a scene and reports missing map image as a warning", async () => {

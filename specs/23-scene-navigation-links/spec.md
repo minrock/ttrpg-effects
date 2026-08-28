@@ -4,7 +4,7 @@ Este documento define una funcionalidad para conectar puntos de distintas escena
 
 ## Estado
 
-Implementado. Pendiente de smoke visual y aceptacion final.
+Implementado y aceptado.
 
 ## Objetivo
 
@@ -119,6 +119,13 @@ Un marcador sin enlazar no se considera roto. Debe usar la presentacion neutral 
 9. La escena actualiza su estado en memoria con el extremo local ya conectado.
 10. El modal se cierra y el marcador refleja su estado valido.
 
+Cuando la escena actual ya tiene una ruta conocida, este flujo no abre un dialogo de guardado adicional:
+
+- el unico selector visible es el dialogo para elegir el archivo `.ttrpgscene` destino;
+- el estado vigente de la escena actual se persiste directamente en su ruta conocida;
+- la escritura reciproca de origen y destino se ejecuta en segundo plano y confirma ambos archivos antes de cerrar el flujo;
+- una escena nueva sin ruta solicita `Guardar como` una sola vez para establecer su archivo antes de conectar.
+
 Si el archivo elegido no contiene marcadores de conexion, el modal muestra un estado vacio y no permite confirmar.
 
 ### Crear una relacion reciproca
@@ -146,12 +153,23 @@ La direccion original se conserva para que ambos archivos puedan indicar de dond
 - La nueva conexion solo se considera valida cuando ambos archivos contienen extremos reciprocos consistentes.
 - Cancelar el flujo no modifica la conexion existente.
 
-### Desconectar sin eliminar el marcador
+### Renombrar un marcador conectado
 
-- El panel contextual ofrece `Desconectar` para conservar la posicion local y volver a `connection: null`.
-- La aplicacion intenta limpiar el extremo par antes de guardar el extremo local sin enlace.
-- Si no puede acceder al archivo par, debe advertir que ese archivo conservara una referencia rota.
-- Desconectar no elimina ninguno de los dos marcadores.
+- `Guardar nombre` modifica solamente el nombre local; conserva id, posicion, `connectionId`, rol y referencias de ambos extremos.
+- Si la escena actual ya tiene ruta, el nuevo nombre se escribe inmediatamente en ese `.ttrpgscene` mediante guardado directo en segundo plano y sin abrir `Guardar como`.
+- La interfaz solo confirma el nuevo nombre despues de que Electron complete la escritura.
+- El extremo remoto no se reescribe porque la conexion se identifica mediante ids y rutas, no mediante el nombre visible.
+- Despues del guardado se vuelve a ejecutar la validacion habitual sin romper la reciprocidad.
+- Si la escena aun no tiene ruta, el nombre queda en memoria y se incluye en el primer guardado requerido antes de conectar.
+
+### Desligar sin eliminar el marcador
+
+- El modal y el panel contextual del punto ofrecen `Desligar` para conservar la posicion local y volver a `connection: null`.
+- La aplicacion lee el extremo remoto y solo lo libera si su `peer.scenePath` y `peer.markerId` todavia apuntan al archivo actual y al marcador local.
+- Si el extremo remoto ya esta libre, se guarda solamente el extremo local sin enlace.
+- Si el extremo remoto fue reasignado a otra escena o marcador, no se modifica: se desliga el extremo local y se advierte al DM.
+- Si no puede acceder al archivo par, debe advertir que ese archivo puede conservar una referencia rota.
+- Desligar no elimina ninguno de los dos marcadores.
 
 ### Cargar una escena con conexiones
 
@@ -222,7 +240,7 @@ El doble click sobre un marcador sin enlazar abre su configuracion y no intenta 
   - identidad de conexion diferente;
   - reciprocidad ausente o inconsistente.
 - Doble click no navega y vuelve a ejecutar la validacion.
-- El DM puede editar, desconectar o eliminar el marcador siguiendo las reglas normales.
+- El DM puede editar, desligar o eliminar el marcador siguiendo las reglas normales.
 
 ## Arbol de anotaciones y propiedades
 
@@ -233,7 +251,7 @@ El doble click sobre un marcador sin enlazar abre su configuracion y no intenta 
   - nombre del archivo par cuando exista;
   - accion `Ir a` para centrar la camara local;
   - accion `Configurar` o `Editar conexion`;
-  - accion `Desconectar` cuando aplique.
+  - accion `Desligar` cuando aplique.
 - El buscador de anotaciones incluye nombre local y nombre del archivo par.
 - Seleccionar una hoja selecciona el marcador correspondiente en el mapa.
 - El accordion contextual del sidebar derecho muestra:
@@ -241,7 +259,7 @@ El doble click sobre un marcador sin enlazar abre su configuracion y no intenta 
   - estado de validacion;
   - archivo y marcador par;
   - rol local `Origen` o `Destino`;
-  - acciones configurar, revalidar y desconectar.
+  - acciones configurar, revalidar y desligar.
 - El estado roto debe ser entendible sin depender solamente del color.
 
 ## Modelo de datos propuesto
@@ -386,7 +404,7 @@ Los siguientes datos pertenecen al estado de ejecucion y no al `.ttrpgscene`:
 - Si la escritura reciproca falla, se informa que archivos fueron o no actualizados y se evita reportar exito.
 - Si el archivo cambia entre seleccion y confirmacion, se vuelve a leer antes de escribir.
 - Si el archivo cambia entre carga y doble click, la revalidacion usa el contenido mas reciente.
-- Los mensajes deben indicar una accion recuperable: reintentar, editar conexion, desconectar o cancelar.
+- Los mensajes deben indicar una accion recuperable: reintentar, editar conexion, desligar o cancelar.
 
 ## Testing y verificacion
 
@@ -400,13 +418,15 @@ Los siguientes datos pertenecen al estado de ejecucion y no al `.ttrpgscene`:
 - Deteccion de connection id diferente.
 - Deteccion de marcador remoto ausente.
 - Renombrar o mover un marcador conserva la conexion.
+- Renombrar un marcador con ruta conocida persiste el nombre sin abrir un dialogo y sin modificar su conexion.
 - Snapshot de Player View elimina todos los datos de `sceneLinks`.
 
 ### Integracion de archivos
 
 - Leer solo marcadores del archivo candidato.
 - Conectar dos escenas actualiza ambos archivos.
-- Desconectar limpia ambos extremos cuando son accesibles.
+- Desligar limpia ambos extremos cuando el remoto sigue ocupado por el archivo y marcador actuales.
+- Desligar nunca libera un punto remoto que ya fue reasignado a otra conexion.
 - Reconfigurar reemplaza la reciprocidad anterior.
 - Fallo de lectura no modifica archivos.
 - Fallo de validacion no modifica archivos.

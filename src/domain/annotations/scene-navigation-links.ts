@@ -113,6 +113,13 @@ export function disconnectSceneLinkMarker(marker: MapSceneLinkMarker): MapSceneL
   return { ...marker, connection: null };
 }
 
+export function renameSceneLinkMarker(
+  marker: MapSceneLinkMarker,
+  name: string
+): MapSceneLinkMarker {
+  return { ...marker, name };
+}
+
 export function validateReciprocalSceneLink(
   local: MapSceneLinkMarker,
   localScenePath: string,
@@ -142,6 +149,15 @@ export function validateReciprocalSceneLink(
 
 export function getSceneLinkPeer(marker: MapSceneLinkMarker): SceneLinkEndpointReference | null {
   return marker.connection?.peer ?? null;
+}
+
+export function isSceneLinkMarkerConnectedTo(
+  marker: MapSceneLinkMarker,
+  scenePath: string,
+  markerId: string
+): boolean {
+  const peer = getSceneLinkPeer(marker);
+  return peer !== null && sameEndpoint(peer, endpoint(scenePath, markerId));
 }
 
 export function replaceSceneLinkMarker(

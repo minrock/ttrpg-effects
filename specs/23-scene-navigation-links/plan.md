@@ -6,7 +6,7 @@ Este documento define el plan tecnico para crear marcadores privados que conecte
 
 - **Spec fuente:** `./specs/23-scene-navigation-links/spec.md`
 - **Objetivo:** Implementar marcadores persistentes de conexion entre escenas, escritura reciproca recuperable, validacion asincrona de enlaces y navegacion segura con centrado de Player View en el punto de entrada.
-- **Estado:** Implementado; pendiente de smoke visual y aceptacion final.
+- **Estado:** Implementado y aceptado.
 - **Prioridad:** Alta.
 - **Dependencias:** Specs 01, 03, 05, 06, 15, 18, 19 y 22; schema de escena V1; casos de uso de guardar/cargar; anotaciones DM; Player View y sincronizacion de camara.
 
@@ -15,14 +15,14 @@ Este documento define el plan tecnico para crear marcadores privados que conecte
 ### Incluido
 
 - Agregar marcadores `scene-link` privados del DM dentro de `mapAnnotations`.
-- Crear, seleccionar, mover, bloquear, editar, desconectar y eliminar marcadores.
+- Crear, seleccionar, mover, bloquear, editar, desligar y eliminar marcadores.
 - Guardar marcadores inicialmente sin enlace.
 - Exigir una ruta de archivo para la escena origen antes de configurar una conexion.
 - Seleccionar otro `.ttrpgscene` mediante dialogo nativo.
 - Leer del archivo candidato solo los marcadores de conexion validados.
 - Elegir un marcador destino preexistente.
 - Persistir una conexion reciproca con la misma identidad en ambos archivos.
-- Reconfigurar y desconectar limpiando el extremo remoto cuando sea accesible.
+- Reconfigurar y desligar limpiando el extremo remoto solamente cuando conserve la referencia hacia el punto local.
 - Validar enlaces de forma asincrona al cargar una escena.
 - Revalidar inmediatamente antes de navegar.
 - Mostrar estados neutral, validando, valido y roto solo en DM.
@@ -50,7 +50,8 @@ Este documento define el plan tecnico para crear marcadores privados que conecte
 - **Estado derivado:** `validating`, `valid` y `broken` no se guardan en `.ttrpgscene`. Se mantienen en un mapa de estado de ejecucion indexado por id de marcador y se recalculan al cargar, reconfigurar o navegar.
 - **Escritura reciproca:** Preparar y validar ambos documentos antes de escribir. Crear archivos temporales en el mismo directorio que cada escena y reemplazar los originales. Conservar los JSON originales durante la operacion para intentar restaurar el primer archivo si falla el segundo reemplazo. El resultado debe distinguir exito, fallo recuperado y posible inconsistencia que requiere revision.
 - **Lectura externa:** El renderer no recibe la escena externa completa. Main devuelve un DTO reducido con ruta, marcador, nombre y estado util para la seleccion.
-- **IPC / Electron:** Agregar canales dedicados para elegir archivo candidato, listar marcadores, conectar, desconectar, validar y cargar un destino validado. Todos los payloads se validan, el sender debe ser la ventana DM y no se expone `fs`, `path` ni un canal generico.
+- **IPC / Electron:** Agregar canales dedicados para elegir archivo candidato, listar marcadores, conectar, desligar, validar y cargar un destino validado. Todos los payloads se validan, el sender debe ser la ventana DM y no se expone `fs`, `path` ni un canal generico.
+- **Guardado por ruta:** Separar el `Guardar como` interactivo del guardado interno de una escena con ruta conocida. El flujo de conexiones usa escritura directa y recuperable sin abrir un segundo modal; solamente muestra el selector del archivo destino.
 - **Navegacion:** Reutilizar `loadSceneUseCase` para obtener el documento, mapa y tokens. Extraer en `App.tsx` una unica rutina que aplique el resultado cargado tanto desde dialogo, recientes como desde una conexion.
 - **Player View:** La escena cargada se publica con `createPlayerSceneSnapshot`. Para la navegacion se incrementa `cameraSyncKey` y se envia una camara cuyo centro sea la posicion del marcador destino; el DM conserva el comportamiento normal de camara de la escena cargada.
 - **Render / PixiJS:** Reutilizar `mapAnnotations` como capa DM. El color final del marcador se obtiene del estado de validacion proporcionado por React. Player View recibe `sceneLinks: []` y ademas Pixi no renderiza anotaciones en rol jugador.
@@ -170,11 +171,11 @@ Definir DTOs compartidos y acotados:
 - Crear `src/application/use-cases/scene-navigation-links.ts` con casos de uso para:
   - listar marcadores candidatos;
   - conectar dos marcadores;
-  - desconectar o reconfigurar una conexion;
+  - desligar o reconfigurar una conexion;
   - validar enlaces de la escena activa;
   - revalidar y cargar el destino.
 - Reutilizar `parseSceneJson`, `serializeSceneDocument` y `loadSceneUseCase`; no duplicar carga de assets.
-- Hacer que conectar/desconectar retorne el `MapAnnotations` actualizado de la escena actual para sincronizar inmediatamente memoria y archivo.
+- Hacer que conectar/desligar retorne el `MapAnnotations` actualizado de la escena actual para sincronizar inmediatamente memoria y archivo.
 - Deduplicar archivos durante validacion y limitar concurrencia para no bloquear el renderer.
 
 ### `infrastructure`
@@ -228,7 +229,7 @@ Definir DTOs compartidos y acotados:
   - extraer una funcion comun para aplicar `SceneOperationResult` desde dialogo, recientes y navegacion;
   - publicar la nueva escena a Player View y forzar el centro de entrada mediante `cameraSyncKey`;
   - limpiar modal, seleccion, drafts y validaciones al cambiar de escena.
-- Crear `SceneLinkModal.tsx` para nombre, archivo, listado de marcadores, estado de carga, errores, conectar, reconfigurar y desconectar.
+- Crear `SceneLinkModal.tsx` para nombre, archivo, listado de marcadores, estado de carga, errores, conectar, reconfigurar y desligar.
 - Extender `MapAnnotationsSection.tsx` con la accion `Conexion de escena`.
 - Extender el submenu contextual `Anotaciones` con `Link a otro mapa`, reutilizando el mismo handler de activacion de `scene-link` del sidebar.
 - Extender `MapAnnotationsTree.tsx` con rama `Conexiones`, estado visual, `Ir a`, editar y bloquear.
@@ -260,7 +261,7 @@ Definir DTOs compartidos y acotados:
 5. Agregar tests de round-trip para marcador sin enlace y conexion reciproca.
 6. Ampliar el puerto `SceneFileStorage` con lectura/escritura por ruta y selector candidato.
 7. Implementar reemplazo temporal recuperable de dos archivos y sus tests en directorios temporales.
-8. Crear casos de uso para listar candidatos, conectar, desconectar, validar y cargar destino.
+8. Crear casos de uso para listar candidatos, conectar, desligar, validar y cargar destino.
 9. Probar casos de uso con archivos validos, destino ausente, marcador ausente, reciprocidad invalida y fallo parcial simulado.
 10. Crear y registrar handlers IPC con validacion de sender y payload.
 11. Exponer la API tipada en preload.
@@ -274,10 +275,12 @@ Definir DTOs compartidos y acotados:
 19. Extraer y reutilizar la aplicacion comun de escenas cargadas.
 20. Implementar navegacion revalidada, registro en recientes y retorno reciproco.
 21. Publicar Player View sin anotaciones privadas y centrarla en el marcador destino con una nueva `cameraSyncKey`.
-22. Verificar reconfiguracion, desconexion y borrado con limpieza remota y advertencias recuperables.
-23. Ejecutar tests, typecheck, lint y build.
-24. Realizar smoke manual con dos escenas y Player View.
-25. Al aceptar y cerrar la feature, incrementar version minor y actualizar `CHANGELOG.md` conforme a `AGENTS.md`.
+22. Verificar reconfiguracion, desligado y borrado con limpieza remota y advertencias recuperables.
+23. Persistir por ruta conocida el snapshot actual antes de conectar, desligar o navegar, sin mostrar `showSaveDialog`.
+24. Convertir `Guardar nombre` en una operacion asincrona que persista por ruta el marcador renombrado y conserve intactos sus metadatos de conexion.
+25. Ejecutar tests, typecheck, lint y build.
+26. Realizar smoke manual con dos escenas y Player View.
+27. Al aceptar y cerrar la feature, incrementar version minor y actualizar `CHANGELOG.md` conforme a `AGENTS.md`.
 
 ## 7. Testing y verificacion
 
@@ -286,7 +289,8 @@ Definir DTOs compartidos y acotados:
 - Crear una conexion produce extremos con igual `connectionId`, roles complementarios y referencias inversas.
 - Validar un par correcto devuelve `valid` desde ambos extremos.
 - Detectar archivo ausente, marcador ausente, id de conexion distinto, rol incorrecto y referencia inversa invalida.
-- Desconectar conserva id, nombre, posicion y bloqueo, pero elimina la conexion.
+- Desligar conserva id, nombre, posicion y bloqueo, pero elimina la conexion.
+- Antes de liberar el extremo remoto, verificar que su `peer` siga apuntando a la ruta de escena y al id del marcador local; una reasignacion remota se conserva y produce una advertencia recuperable.
 - Buscar anotaciones encuentra conexiones por nombre sin depender de la ruta.
 - `stripPrivateMapAnnotationsForPlayer` elimina tambien `sceneLinks`.
 - Escena nueva incluye `sceneLinks: []`.
@@ -297,7 +301,11 @@ Definir DTOs compartidos y acotados:
 - Listar candidatos lee solo marcadores del archivo seleccionado.
 - Conectar actualiza ambos archivos con una relacion reciproca.
 - Reconfigurar limpia el par anterior antes de crear el nuevo.
-- Desconectar limpia ambos extremos cuando son accesibles.
+- Desligar limpia ambos extremos cuando el remoto sigue perteneciendo a la conexion local.
+- Desligar solo limpia el extremo local si el remoto esta libre o fue reasignado, sin sobrescribir la conexion remota vigente.
+- Una escena cargada con cambios pendientes se guarda en su ruta conocida sin invocar el dialogo de guardado antes de actualizar la conexion reciproca.
+- Una escena nueva sin ruta conserva el dialogo inicial necesario para elegir su archivo.
+- Renombrar un nodo conectado guarda de nuevo la escena local por su ruta y conserva `connectionId`, rol, origen, destino y `peer`.
 - Un fallo previo a escritura no modifica archivos.
 - Un fallo durante el segundo reemplazo intenta restaurar el primero y reporta el resultado real.
 - Validar varias conexiones deduplica lecturas de la misma escena.
@@ -331,7 +339,7 @@ Definir DTOs compartidos y acotados:
 - **Riesgo:** una escritura de dos archivos queda a medias.
   **Mitigacion:** validar primero, usar temporales, conservar originales, intentar rollback y nunca devolver exito ante incertidumbre.
 - **Riesgo:** una escritura externa queda sobrescrita luego por el estado React anterior.
-  **Mitigacion:** retornar y aplicar inmediatamente `mapAnnotations` de la escena actual despues de conectar o desconectar.
+  **Mitigacion:** retornar y aplicar inmediatamente `mapAnnotations` de la escena actual despues de conectar o desligar.
 - **Riesgo:** resultados asincronos de validacion colorean una escena ya reemplazada.
   **Mitigacion:** asociar cada solicitud con ruta y generacion de carga; ignorar respuestas obsoletas.
 - **Riesgo:** rutas privadas llegan a Player View.
@@ -351,7 +359,7 @@ Definir DTOs compartidos y acotados:
 - El selector externo no reemplaza la escena activa ni carga sus assets.
 - Solo se muestran marcadores destino preexistentes y validos.
 - La conexion queda reciproca y coherente en ambos archivos.
-- Reconfigurar, desconectar y borrar intentan limpiar ambos extremos.
+- Reconfigurar, desligar y borrar intentan limpiar ambos extremos sin sobrescribir un extremo remoto reasignado.
 - La validacion al cargar no bloquea el mapa.
 - Un enlace roto se ve rojo y explica la causa solo en DM.
 - Doble click revalida antes de navegar.
@@ -384,11 +392,14 @@ Definir DTOs compartidos y acotados:
 - [x] Navegacion reciproca y centrado de Player View verificados por tests automatizados.
 - [x] Privacidad de Player View verificada por test.
 - [x] Tests relevantes agregados o actualizados.
-- [x] `pnpm test` ejecutado: 225 tests aprobados.
+- [x] `pnpm test` ejecutado: 235 tests aprobados.
 - [x] `pnpm typecheck` ejecutado.
 - [ ] `pnpm lint` global: bloqueado por errores preexistentes en `index.js` y `MonsterLibraryModal.tsx`; los archivos de esta feature pasan ESLint.
 - [x] `pnpm build` ejecutado.
-- [ ] Smoke manual DM + Player View completado.
+- [x] Smoke manual DM + Player View completado y aceptado por el usuario.
+- [x] Accion `Desligar` libera de forma segura ambos extremos sin borrar conexiones remotas reasignadas.
+- [x] Guardado por ruta conocida evita dialogos adicionales al conectar, desligar, navegar o renombrar.
+- [x] Renombrado persistente conserva todos los metadatos de la conexion.
 - [x] Version minor y `CHANGELOG.md` actualizados al cerrar la feature.
 - [x] Sin acceso directo del renderer a filesystem, Electron internals o SQLite.
 - [x] Sin dependencias nuevas.

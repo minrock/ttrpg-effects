@@ -4,6 +4,7 @@ import {
   createReciprocalSceneLinkMarkers,
   disconnectSceneLinkMarker,
   getSceneLinkPeer,
+  isSceneLinkMarkerConnectedTo,
   replaceSceneLinkMarker,
   validateReciprocalSceneLink,
   type ConnectSceneLinkRequest,
@@ -164,6 +165,25 @@ export async function disconnectSceneLink(
     try {
       const remoteScene = await readScene(storage, peer.scenePath);
       const remoteMarker = findMarker(remoteScene, peer.markerId);
+
+      if (remoteMarker.connection === null) {
+        await storage.replaceSceneJsonFiles([
+          { filePath: request.scenePath, json: serializeSceneDocument(nextLocal) }
+        ]);
+        return { ok: true, mapAnnotations: nextLocal.mapAnnotations };
+      }
+
+      if (!isSceneLinkMarkerConnectedTo(remoteMarker, request.scenePath, request.markerId)) {
+        await storage.replaceSceneJsonFiles([
+          { filePath: request.scenePath, json: serializeSceneDocument(nextLocal) }
+        ]);
+        return {
+          ok: true,
+          mapAnnotations: nextLocal.mapAnnotations,
+          warning: "El punto remoto ya pertenece a otra conexion; se desligo solo el punto actual."
+        };
+      }
+
       const nextRemote = replaceMarkerInScene(remoteScene, disconnectSceneLinkMarker(remoteMarker));
       await storage.replaceSceneJsonFiles([
         { filePath: request.scenePath, json: serializeSceneDocument(nextLocal) },
@@ -177,11 +197,11 @@ export async function disconnectSceneLink(
       return {
         ok: true,
         mapAnnotations: nextLocal.mapAnnotations,
-        warning: "La conexion local se elimino, pero no fue posible limpiar el archivo remoto."
+        warning: "El punto local se desligo, pero no fue posible liberar el punto remoto."
       };
     }
   } catch (error) {
-    return failure(error, "No se pudo desconectar el marcador.");
+    return failure(error, "No se pudo desligar el marcador.");
   }
 }
 

@@ -59,6 +59,7 @@ import {
   type MapAnnotations
 } from "../../domain/annotations/map-annotations";
 import type { SceneLinkValidationStatus } from "../../domain/annotations/scene-navigation-links";
+import type { PlayerCameraControlViewState } from "../../domain/player/player-camera-control";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
@@ -86,6 +87,7 @@ interface PointerDragState {
   readonly mode:
     | "idle"
     | "pan"
+    | "player-camera-move"
     | "calibrate"
     | "map-move"
     | "element-move"
@@ -150,6 +152,8 @@ export interface PixiViewportOptions {
   readonly onShapeRadiusChange?: (elementId: string, radius: number) => void;
   readonly onShapeRectResize?: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
   readonly onCameraChange?: (camera: ViewportCameraSnapshot) => void;
+  readonly onCameraInteractionEnd?: (camera: ViewportCameraSnapshot) => void;
+  readonly onPlayerCameraControlMove?: (position: WorldPoint) => void;
   readonly onArcanePointerTrigger?: (pointer: ArcanePointerBroadcast) => void;
   readonly onRoomPinPlace?: (position: WorldPoint) => void;
   readonly onSceneLinkPlace?: (position: WorldPoint) => void;
@@ -258,6 +262,11 @@ export class PixiViewport {
   private pendingViewportUpdateFrame: number | null = null;
   private readonly pendingFirePaintCells = new Map<string, FireCell>();
   private pendingFirePaintCenter: WorldPoint | null = null;
+  private playerCameraControlState: PlayerCameraControlViewState | null = null;
+  private primaryPlayerCameraControl: Container | null = null;
+  private virtualPlayerCameraControl: Container | null = null;
+  private isPlayerCameraControlHovered = false;
+  private cameraInteractionEndTimer: number | null = null;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
@@ -447,6 +456,7 @@ export class PixiViewport {
     this.drawDarkvisionLayer();
     this.drawLabelsLayer();
     this.drawMapAnnotationsLayer();
+    this.updatePlayerCameraControls();
   }
 
   setReadOnly(isReadOnly: boolean): void {
@@ -468,6 +478,30 @@ export class PixiViewport {
   setCameraSnapshot(camera: ViewportCameraSnapshot): void {
     this.camera = normalizeCameraSnapshot(camera);
     this.applyCamera(false);
+  }
+
+  setPlayerCameraControlState(state: PlayerCameraControlViewState): void {
+    const primaryCamera = normalizeCameraSnapshot(state.primaryCamera);
+    const effectiveCamera =
+      state.effectiveCamera === null ? null : normalizeCameraSnapshot(state.effectiveCamera);
+    this.playerCameraControlState = {
+      primaryCamera,
+      effectiveCamera,
+      status: state.status
+    };
+    this.updatePlayerCameraControls();
+  }
+
+  clearPlayerCameraControlState(): void {
+    this.playerCameraControlState = null;
+    this.isPlayerCameraControlHovered = false;
+    if (this.primaryPlayerCameraControl !== null) {
+      this.primaryPlayerCameraControl.visible = false;
+    }
+    if (this.virtualPlayerCameraControl !== null) {
+      this.virtualPlayerCameraControl.visible = false;
+    }
+    this.updateCursor();
   }
 
   showArcanePointer(pointer: ArcanePointerBroadcast): void {
@@ -608,6 +642,10 @@ export class PixiViewport {
     this.cancelScheduledFogRedraw();
     this.cancelScheduledDarknessRedraw();
     this.cancelPendingViewportUpdates();
+    if (this.cameraInteractionEndTimer !== null) {
+      window.clearTimeout(this.cameraInteractionEndTimer);
+      this.cameraInteractionEndTimer = null;
+    }
     this._darknessTexture?.destroy();
     this._darknessTexture = null;
     this._darknessTextureSize = null;
@@ -997,6 +1035,17 @@ export class PixiViewport {
       if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
         this.app.canvas.style.cursor = "grabbing";
+      } else if (this.hitTestPlayerCameraControl(point)) {
+        mode = "player-camera-move";
+        const worldPoint = screenToWorld(point, this.camera, this.getViewportSize());
+        const primaryCenter = this.playerCameraControlState?.primaryCamera.center;
+        if (primaryCenter !== undefined) {
+          grabOffset = {
+            x: worldPoint.x - primaryCenter.x,
+            y: worldPoint.y - primaryCenter.y
+          };
+        }
+        this.app.canvas.style.cursor = "grabbing";
       } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
         this.startFogRevealStroke(point);
@@ -1163,8 +1212,13 @@ export class PixiViewport {
 
     if (this.dragState === null) {
       const newZone = this.hitTestPathHandles(screenPoint)?.zone ?? null;
-      if (newZone !== this.pathHoverZone) {
+      const isPlayerCameraHovered = this.hitTestPlayerCameraControl(screenPoint);
+      if (
+        newZone !== this.pathHoverZone ||
+        isPlayerCameraHovered !== this.isPlayerCameraControlHovered
+      ) {
         this.pathHoverZone = newZone;
+        this.isPlayerCameraControlHovered = isPlayerCameraHovered;
         this.updateCursor();
       }
       return;
@@ -1193,6 +1247,10 @@ export class PixiViewport {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
       this.applyElementMovePreview(this.dragState.elementId, targetPoint, this.dragState.moveStartPosition);
+    } else if (this.dragState.mode === "player-camera-move" && this.primaryPlayerCameraControl !== null) {
+      const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
+      this.primaryPlayerCameraControl.position.set(targetPoint.x, targetPoint.y);
     } else if (this.dragState.mode === "light-rotate" && this.dragState.elementId !== undefined) {
       this.updateLightDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "light-resize" && this.dragState.elementId !== undefined) {
@@ -1259,7 +1317,8 @@ export class PixiViewport {
       grabOffset: this.dragState.grabOffset,
       moveStartPosition: this.dragState.moveStartPosition,
       pendingMovePosition:
-        this.dragState.mode === "element-move" && this.dragState.elementId !== undefined
+        (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) ||
+        this.dragState.mode === "player-camera-move"
           ? subtractGrabOffset(screenToWorld(nextPoint, this.camera, this.getViewportSize()), this.dragState.grabOffset)
           : this.dragState.pendingMovePosition
     };
@@ -1329,6 +1388,16 @@ export class PixiViewport {
       this.clearElementMovePreview();
     }
 
+    if (!isClick && this.dragState.mode === "player-camera-move") {
+      const pendingPosition =
+        this.dragState.pendingMovePosition ??
+        subtractGrabOffset(
+          screenToWorld(releasePoint, this.camera, this.getViewportSize()),
+          this.dragState.grabOffset
+        );
+      this.options.onPlayerCameraControlMove?.(pendingPosition);
+    }
+
     if (!isClick && isPreviewCommitDragMode(this.dragState.mode)) {
       this.commitPreviewForDrag(this.dragState, releasePoint);
     } else if (isPreviewCommitDragMode(this.dragState.mode)) {
@@ -1365,6 +1434,10 @@ export class PixiViewport {
 
     this.dragState = null;
     if (completedMode === "pan") {
+      this.options.onCameraInteractionEnd?.(cameraStateToSnapshot(this.camera));
+      this.updateCursor();
+    } else if (completedMode === "player-camera-move") {
+      this.isPlayerCameraControlHovered = this.hitTestPlayerCameraControl(releasePoint);
       this.updateCursor();
     }
   };
@@ -1544,6 +1617,8 @@ export class PixiViewport {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
+    } else if (this.isPlayerCameraControlHovered) {
+      this.app.canvas.style.cursor = "grab";
     } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isFogRevealMode || this.isFirePaintMode || this.isInformationAreaMode) {
@@ -1570,6 +1645,13 @@ export class PixiViewport {
       this.camera.zoom * zoomFactor
     );
     this.applyCamera();
+    if (this.cameraInteractionEndTimer !== null) {
+      window.clearTimeout(this.cameraInteractionEndTimer);
+    }
+    this.cameraInteractionEndTimer = window.setTimeout(() => {
+      this.cameraInteractionEndTimer = null;
+      this.options.onCameraInteractionEnd?.(cameraStateToSnapshot(this.camera));
+    }, 120);
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
@@ -1603,6 +1685,7 @@ export class PixiViewport {
 
     this.isSpaceNavigationActive = false;
     if (this.dragState?.mode === "pan") {
+      this.options.onCameraInteractionEnd?.(cameraStateToSnapshot(this.camera));
       this.dragState = null;
     }
     this.updateCursor();
@@ -1625,7 +1708,8 @@ export class PixiViewport {
       viewport.height / 2 - this.camera.center.y * this.camera.zoom
     );
     this.updateMapInformationPinLabelScale();
-    if (emit && this.viewRole === "dm") {
+    this.updatePlayerCameraControlScale();
+    if (emit) {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
     this.cancelScheduledDarknessRedraw();
@@ -3237,6 +3321,91 @@ export class PixiViewport {
     return layer;
   }
 
+  private ensurePlayerCameraControls(): void {
+    if (this.primaryPlayerCameraControl !== null && this.virtualPlayerCameraControl !== null) {
+      return;
+    }
+
+    const layer = this.getLayer("playerCameraControls");
+    this.primaryPlayerCameraControl = buildPlayerCameraControl(0xf2c66d, false);
+    this.primaryPlayerCameraControl.label = "primary-player-camera";
+    this.virtualPlayerCameraControl = buildPlayerCameraControl(0x66d9ef, true);
+    this.virtualPlayerCameraControl.label = "virtual-player-camera";
+    layer.addChild(this.virtualPlayerCameraControl, this.primaryPlayerCameraControl);
+  }
+
+  private updatePlayerCameraControls(): void {
+    if (this.viewRole !== "dm") {
+      if (this.primaryPlayerCameraControl !== null) {
+        this.primaryPlayerCameraControl.visible = false;
+      }
+      if (this.virtualPlayerCameraControl !== null) {
+        this.virtualPlayerCameraControl.visible = false;
+      }
+      this.isPlayerCameraControlHovered = false;
+      return;
+    }
+
+    this.ensurePlayerCameraControls();
+    const state = this.playerCameraControlState;
+    const shouldShow = state !== null;
+
+    if (this.primaryPlayerCameraControl !== null) {
+      this.primaryPlayerCameraControl.visible = shouldShow;
+      if (shouldShow && state !== null) {
+        this.primaryPlayerCameraControl.position.set(
+          state.primaryCamera.center.x,
+          state.primaryCamera.center.y
+        );
+      }
+    }
+
+    if (this.virtualPlayerCameraControl !== null) {
+      const shouldShowVirtual =
+        shouldShow &&
+        state?.effectiveCamera !== null &&
+        state?.status !== "synchronized" &&
+        state?.status !== "closed";
+      this.virtualPlayerCameraControl.visible = shouldShowVirtual;
+      if (shouldShowVirtual && state?.effectiveCamera !== null && state?.effectiveCamera !== undefined) {
+        this.virtualPlayerCameraControl.position.set(
+          state.effectiveCamera.center.x,
+          state.effectiveCamera.center.y
+        );
+      }
+    }
+
+    if (!shouldShow) {
+      this.isPlayerCameraControlHovered = false;
+    }
+    this.updatePlayerCameraControlScale();
+  }
+
+  private updatePlayerCameraControlScale(): void {
+    const inverseZoom = 1 / Math.max(this.camera.zoom, 0.01);
+    this.primaryPlayerCameraControl?.scale.set(inverseZoom);
+    this.virtualPlayerCameraControl?.scale.set(inverseZoom);
+  }
+
+  private hitTestPlayerCameraControl(screenPoint: ScreenPoint): boolean {
+    if (
+      this.viewRole !== "dm" ||
+      this.isReadOnly ||
+      this.playerCameraControlState === null ||
+      this.primaryPlayerCameraControl?.visible !== true
+    ) {
+      return false;
+    }
+
+    const markerScreen = worldToScreen(
+      this.primaryPlayerCameraControl.position.x,
+      this.primaryPlayerCameraControl.position.y,
+      this.camera,
+      this.getViewportSize()
+    );
+    return Math.hypot(screenPoint.x - markerScreen.x, screenPoint.y - markerScreen.y) <= 28;
+  }
+
   private spawnArcanePointer(pointer: ArcanePointerBroadcast): void {
     const layer = this.getLayer("pointer");
     const cellSize = this.grid?.cellSizeWorld ?? 100;
@@ -4413,6 +4582,45 @@ function worldToScreen(
     x: (worldX - camera.center.x) * camera.zoom + viewport.width / 2,
     y: (worldY - camera.center.y) * camera.zoom + viewport.height / 2
   };
+}
+
+function buildPlayerCameraControl(color: number, isVirtual: boolean): Container {
+  const container = new Container();
+  const radius = isVirtual ? 30 : 22;
+  const graphic = new Graphics()
+    .circle(0, 0, radius)
+    .fill({ color: 0x101517, alpha: isVirtual ? 0.2 : 0.9 })
+    .stroke({ color, width: isVirtual ? 2 : 3, alpha: 0.96 });
+
+  if (isVirtual) {
+    graphic
+      .circle(0, 0, 25)
+      .stroke({ color, width: 1, alpha: 0.7 })
+      .moveTo(-36, 0)
+      .lineTo(-28, 0)
+      .moveTo(28, 0)
+      .lineTo(36, 0)
+      .moveTo(0, -36)
+      .lineTo(0, -28)
+      .moveTo(0, 28)
+      .lineTo(0, 36)
+      .stroke({ color, width: 2, alpha: 0.9 });
+  }
+
+  graphic
+    .roundRect(-10, -7, 16, 14, 3)
+    .stroke({ color, width: 2, alpha: 1 })
+    .moveTo(6, -4)
+    .lineTo(12, -8)
+    .lineTo(12, 8)
+    .lineTo(6, 4)
+    .closePath()
+    .stroke({ color, width: 2, alpha: 1 })
+    .circle(-2, 0, 3)
+    .stroke({ color, width: 1.5, alpha: 1 });
+
+  container.addChild(graphic);
+  return container;
 }
 
 function buildLightEraseGraphicScreen(

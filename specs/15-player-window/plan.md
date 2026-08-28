@@ -51,7 +51,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 
 - **Arquitectura:** DM sigue siendo fuente de verdad de la escena. La ventana jugador recibe snapshots/eventos desde main/preload y renderiza con componentes compartidos en modo read-only para edicion, pero conserva camara local independiente.
 - **Persistencia:** No se modifica `.ttrpgscene`. La preferencia `showDmFogOverlay` es estado local de UI del DM.
-- **IPC / Electron:** Agregar canales especificos y tipados para abrir la ventana jugador, subscribirse a estado, publicar snapshots de escena y emitir apuntadores temporales. La camara DM puede enviarse solo como valor inicial; no debe sincronizarse continuamente. No exponer `ipcRenderer` ni APIs genericas.
+- **IPC / Electron:** Agregar canales especificos y tipados para abrir la ventana jugador, subscribirse a estado, publicar snapshots de escena y emitir apuntadores temporales. La camara local DM no se sincroniza continuamente; `24-player-camera-control` agrega ordenes explicitas de camara principal y reportes coalescidos de camara efectiva. No exponer `ipcRenderer` ni APIs genericas.
 - **Render / PixiJS:** Reutilizar `MapViewport` y `PixiViewport` con props de vista (`viewRole`, `readOnly`, `navigationEnabled`, `fogPresentation`, `hiddenTokenPolicy`). Evitar duplicar calculos de dominio.
 - **Validacion:** Los payloads IPC deben usar tipos compartidos y validaciones basicas para escena/camara/eventos. La ventana jugador debe tolerar assets faltantes con placeholders/feedback no invasivo.
 - **Dependencias nuevas:** Ninguna prevista.
@@ -109,7 +109,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
   - `player-window:camera`;
   - `player-window:pointer`;
   - evento de cierre opcional.
-- Main debe rutear eventos DM -> ventana jugador y no aceptar eventos jugador -> DM que cambien estado.
+- Main debe rutear snapshots/eventos DM -> jugador y aceptar solo reportes tipados de camara jugador -> DM que actualicen estado efimero de presentacion, nunca escena.
 
 #### `preload`
 
@@ -134,6 +134,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
   - agregar control en accordion `Niebla`;
   - construir y publicar snapshot cuando cambie escena, mapa URL, tokens URLs o flags de vista relevantes;
   - no publicar pan/zoom normal del DM hacia jugador despues de la apertura;
+  - controlar Player View mediante camara principal, zoom remoto y recentrado explicitos;
+  - mostrar una camara virtual cuando el jugador reporte una vista diferente;
   - publicar apuntador cuando se dispara desde DM.
 - En jugador:
   - renderizar solo viewport full-screen;
@@ -144,6 +146,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
   - mostrar boton local de bloqueo de zoom;
   - permitir pan local con barra espaciadora sostenida;
   - permitir zoom local solo si esta desbloqueado;
+  - reportar camara efectiva con throttle y reporte final, sin persistirla;
+  - aplicar ordenes remotas correlacionadas aunque el zoom local este bloqueado;
   - reproducir apuntadores recibidos.
 
 #### `render`
@@ -201,8 +205,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
   **Mitigacion:** Empezar con snapshot debounced/throttled; separar apuntador como evento ligero y no incluir pan/zoom continuo del DM.
 - **Riesgo:** El jugador podria perder la referencia del mapa al tener camara independiente.
   **Mitigacion:** Inicializar la camara desde el DM al abrir y permitir pan/zoom local con controles simples.
-- **Riesgo:** Loop de eventos si jugador emite cambios de camara.
-  **Mitigacion:** La camara de jugador nunca se publica hacia DM; sus cambios son locales al viewport jugador.
+- **Riesgo:** Loop de eventos al reportar la camara efectiva del jugador.
+  **Mitigacion:** Revisiones monotonas, origen explicito, tolerancias y aplicacion programatica sin emitir un gesto local falso.
 - **Riesgo:** Assets de mapa/tokens no cargan en segunda ventana.
   **Mitigacion:** Usar el mismo protocolo/URL resuelta que DM y validar CSP/protocol handlers en ambas ventanas.
 - **Riesgo:** Fog/oscuro/darkvision divergen entre roles.
@@ -220,6 +224,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - La ventana jugador tiene boton local para bloquear/desbloquear zoom.
 - La ventana jugador permite zoom local solo cuando el zoom esta desbloqueado.
 - Cambios de camara en jugador no afectan al DM ni a la escena.
+- Cambios de camara en jugador reportan una camara virtual efimera al DM.
+- El DM puede mover la camara principal, cambiar zoom y recentrar Player View mediante ordenes explicitas.
 - Cambios de escena/mapa/tokens/efectos/luces/formas se reflejan en jugador.
 - Tokens ocultos no aparecen en jugador.
 - Tokens ocultos aparecen en DM con indicador de ojo cerrado aun sin seleccion.

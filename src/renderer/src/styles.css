@@ -2875,6 +2875,56 @@ body {
   gap: 6px;
 }
 
+.player-camera-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 5px 0 9px;
+  border: 1px solid #263040;
+  border-radius: 8px;
+  color: var(--editor-dim);
+  background: #121820;
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.player-camera-toolbar > svg {
+  color: #758395;
+}
+
+.player-camera-toolbar.is-synchronized {
+  border-color: rgb(92 186 137 / 38%);
+  color: #93d8b2;
+}
+
+.player-camera-toolbar.is-pending {
+  border-color: rgb(240 185 92 / 42%);
+  color: var(--editor-accent);
+}
+
+.player-camera-toolbar.is-desynchronized {
+  border-color: rgb(102 217 239 / 45%);
+  color: #82ddeb;
+}
+
+.scene-actions button.player-camera-toolbar__icon {
+  width: 27px;
+  min-width: 27px;
+  min-height: 26px;
+  height: 26px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.scene-actions button.player-camera-toolbar__icon:hover:not(:disabled) {
+  border-color: #33404f;
+  background: #212a36;
+}
+
 .scene-actions__divider {
   flex: 0 0 1px;
   width: 1px;
