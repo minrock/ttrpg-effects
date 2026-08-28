@@ -1,4 +1,4 @@
-import { Application, Assets, ColorMatrixFilter, Container, Graphics, RenderTexture, Sprite, Text, type Texture } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, Text, type Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
   createCameraState,
@@ -13,6 +13,7 @@ import type { TacticalElement } from "../../domain/tools/tactical-elements";
 import type { MapImageState } from "../../domain/map/map-image";
 import type {
   SceneDarkness,
+  SceneDynamicLightEffect,
   SceneEffect,
   SceneFireEffect,
   SceneFogRevealArea,
@@ -77,6 +78,13 @@ interface ArcanePointerAnimation {
 interface InformationAreaHighlightAnimation {
   readonly container: Container;
   readonly timeoutId: number;
+}
+
+interface DynamicLightRenderState {
+  intensity: number;
+  opacity: number;
+  flicker: number;
+  speed: number;
 }
 
 interface PointerDragState {
@@ -254,6 +262,7 @@ export class PixiViewport {
   >();
   private readonly shapeRenderCache = new Map<string, { readonly signature: string; readonly container: Container }>();
   private readonly lightRenderCache = new Map<string, { readonly signature: string; readonly container: Container }>();
+  private readonly dynamicLightRenderStates = new Map<string, DynamicLightRenderState>();
   private readonly magicalDarknessRenderCache = new Map<string, { readonly signature: string; readonly container: Container }>();
   private readonly previewShapes = new Map<string, SceneShape>();
   private readonly previewLights = new Map<string, SceneLight>();
@@ -312,27 +321,39 @@ export class PixiViewport {
   }
 
   setEffects(effects: readonly SceneEffect[]): void {
-    const previousLightingSignature = getEffectsLightingSignature(this.effects);
-    const nextLightingSignature = getEffectsLightingSignature(effects);
+    const cellSizeWorld = this.grid?.cellSizeWorld ?? 100;
+    const previousLightingMaskSignature = getEffectsLightingMaskSignature(this.effects, cellSizeWorld);
+    const nextLightingMaskSignature = getEffectsLightingMaskSignature(effects, cellSizeWorld);
+    const previousLightLayerSignature = getEffectsLightLayerSignature(this.effects, cellSizeWorld);
+    const nextLightLayerSignature = getEffectsLightLayerSignature(effects, cellSizeWorld);
+    const shouldDrawEffectsLayer = haveEffectLayerReferencesChanged(this.effects, effects);
+    const shouldDrawSelectionLayer = haveEffectSelectionChanged(this.effects, effects);
     const previousMagicalDarknessSignature = getMagicalDarknessSignature(this.effects);
     const nextMagicalDarknessSignature = getMagicalDarknessSignature(effects);
     this.effects = effects;
     this.previewEffects.clear();
+    this.syncDynamicLightRenderStates(effects);
 
-    if (previousLightingSignature !== nextLightingSignature) {
+    if (previousLightingMaskSignature !== nextLightingMaskSignature) {
       this.drawDarkvisionLayer();
       this.scheduleDarknessRedraw();
-      this.scheduleFogOfWarRedraw();
+    }
+
+    if (previousLightLayerSignature !== nextLightLayerSignature) {
       this.drawLightsLayer();
     }
 
-    this.drawEffectsLayer();
+    if (shouldDrawEffectsLayer) {
+      this.drawEffectsLayer();
+    }
 
     if (previousMagicalDarknessSignature !== nextMagicalDarknessSignature) {
       this.drawMagicalDarknessLayer();
     }
 
-    this.drawSelectionLayer();
+    if (shouldDrawSelectionLayer) {
+      this.drawSelectionLayer();
+    }
   }
 
   setTokens(tokens: readonly RenderSceneToken[]): void {
@@ -610,8 +631,10 @@ export class PixiViewport {
   setGrid(grid: SceneGrid): void {
     this.grid = grid;
     this.drawGrid();
+    this.drawDarkvisionLayer();
     this.scheduleDarknessRedraw();
     this.scheduleFogOfWarRedraw();
+    this.drawLightsLayer();
     void this.drawTokenLayer(true);
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
@@ -682,6 +705,7 @@ export class PixiViewport {
       destroyDisplayObject(cached.container);
     }
     this.lightRenderCache.clear();
+    this.dynamicLightRenderStates.clear();
     for (const cached of this.magicalDarknessRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
@@ -846,13 +870,32 @@ export class PixiViewport {
           ? effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, cell.size, viewportBounds))
           : isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds))
     );
-    if (activeLights.length > 0 || activeFireEffects.length > 0) {
+    const activeDynamicLights = this.getRenderableEffects().filter(
+      (effect): effect is SceneDynamicLightEffect =>
+        isVisibleDynamicLightEffect(effect) &&
+        isCircleNearViewport(
+          effect.position,
+          effect.dimRadiusCells * (this.grid?.cellSizeWorld ?? 100),
+          viewportBounds
+        )
+    );
+    if (activeLights.length > 0 || activeFireEffects.length > 0 || activeDynamicLights.length > 0) {
       const eraseContainer = new Container();
       for (const light of activeLights) {
         eraseContainer.addChild(buildLightEraseGraphicScreen(light, this.camera, viewport));
       }
       for (const effect of activeFireEffects) {
         eraseContainer.addChild(buildFireLightEraseGraphicScreen(effect, this.camera, viewport));
+      }
+      for (const effect of activeDynamicLights) {
+        eraseContainer.addChild(
+          buildDynamicLightEraseGraphicScreen(
+            effect,
+            this.grid?.cellSizeWorld ?? 100,
+            this.camera,
+            viewport
+          )
+        );
       }
       this.app.renderer.render({ container: eraseContainer, target: rt, clear: false });
       eraseContainer.destroy({ children: true });
@@ -907,7 +950,12 @@ export class PixiViewport {
     // viewport we force the signature to "" so the existing cleanup path
     // removes the grayscale filter and the colour-overlay mask.
     const nextSig = (spritesReady && this.viewRole !== "dm")
-      ? getDarkvisionSignature(this.darkness, renderableLights, renderableEffects)
+      ? getDarkvisionSignature(
+          this.darkness,
+          renderableLights,
+          renderableEffects,
+          this.grid?.cellSizeWorld ?? 100
+        )
       : "";
 
     if (nextSig === this.darkvisionSignature) {
@@ -927,7 +975,11 @@ export class PixiViewport {
       return;
     }
 
-    const mask = buildDarkvisionColorMask(renderableLights, renderableEffects);
+    const mask = buildDarkvisionColorMask(
+      renderableLights,
+      renderableEffects,
+      this.grid?.cellSizeWorld ?? 100
+    );
 
     if (mask === null) {
       return;
@@ -1816,6 +1868,29 @@ export class PixiViewport {
       lightsLayer.addChild(rendered.container);
     }
 
+    for (const effect of this.getRenderableEffects().filter(isVisibleDynamicLightEffect)) {
+      const key = `dynamic-light:${effect.id}`;
+      const cellSizeWorld = this.grid?.cellSizeWorld ?? 100;
+      const signature = getDynamicLightContainerSignature(effect, cellSizeWorld);
+      const cached = this.lightRenderCache.get(key);
+      const rendered =
+        cached !== undefined && cached.signature === signature
+          ? cached
+          : {
+              signature,
+              container: drawDynamicLight(
+                effect,
+                cellSizeWorld,
+                this.getDynamicLightRenderState(effect)
+              )
+            };
+
+      rendered.container.label = effect.id;
+      nextCache.set(key, rendered);
+      reusedContainers.add(rendered.container);
+      lightsLayer.addChild(rendered.container);
+    }
+
     for (const light of this.getRenderableLights()) {
       if (light.visible) {
         const key = `light:${light.id}`;
@@ -1845,6 +1920,44 @@ export class PixiViewport {
     for (const [id, cached] of nextCache) {
       this.lightRenderCache.set(id, cached);
     }
+  }
+
+  private syncDynamicLightRenderStates(effects: readonly SceneEffect[]): void {
+    const activeIds = new Set<string>();
+
+    for (const effect of effects) {
+      if (effect.kind !== "dynamic-light") {
+        continue;
+      }
+
+      activeIds.add(effect.id);
+      const state = this.dynamicLightRenderStates.get(effect.id);
+      if (state === undefined) {
+        this.dynamicLightRenderStates.set(effect.id, createDynamicLightRenderState(effect));
+      } else {
+        state.intensity = effect.intensity;
+        state.opacity = effect.opacity;
+        state.flicker = effect.flicker;
+        state.speed = effect.speed;
+      }
+    }
+
+    for (const id of this.dynamicLightRenderStates.keys()) {
+      if (!activeIds.has(id)) {
+        this.dynamicLightRenderStates.delete(id);
+      }
+    }
+  }
+
+  private getDynamicLightRenderState(effect: SceneDynamicLightEffect): DynamicLightRenderState {
+    const state = this.dynamicLightRenderStates.get(effect.id);
+    if (state !== undefined) {
+      return state;
+    }
+
+    const created = createDynamicLightRenderState(effect);
+    this.dynamicLightRenderStates.set(effect.id, created);
+    return created;
   }
 
   private drawEffectsLayer(): void {
@@ -3274,9 +3387,21 @@ export class PixiViewport {
       })),
       ...this.getRenderableEffects().map((effect) => ({
         id: effect.id,
-        kind: effect.kind === "fire" ? "fire" as const : effect.kind === "magical-darkness" ? "magical-darkness" as const : "water" as const,
+        kind:
+          effect.kind === "fire"
+            ? "fire" as const
+            : effect.kind === "dynamic-light"
+              ? "dynamic-light" as const
+              : effect.kind === "magical-darkness"
+                ? "magical-darkness" as const
+                : "water" as const,
         position: effect.position,
-        hitRadius: effect.kind === "magical-darkness" ? effect.radius : undefined
+        hitRadius:
+          effect.kind === "magical-darkness"
+            ? effect.radius
+            : effect.kind === "dynamic-light"
+              ? 44
+              : undefined
       })),
       ...this.tokens
         .filter((token) => token.visible || this.hiddenTokenPolicy === "show-with-indicator")
@@ -3612,7 +3737,7 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "magical-darkness" | "token" | "water" | "label" | "room-pin" | "information-area" | "scene-link";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "dynamic-light" | "magical-darkness" | "token" | "water" | "label" | "room-pin" | "information-area" | "scene-link";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
   readonly selectionColor?: string;
@@ -3771,10 +3896,41 @@ function getFireLightRenderSignature(effect: SceneFireEffect): string {
   ].join(":");
 }
 
+function getDynamicLightContainerSignature(
+  effect: SceneDynamicLightEffect,
+  cellSizeWorld = 0
+): string {
+  return [
+    effect.id,
+    effect.visible,
+    effect.position.x,
+    effect.position.y,
+    effect.brightRadiusCells,
+    effect.dimRadiusCells,
+    cellSizeWorld,
+    effect.color
+  ].join(":");
+}
+
+function getDynamicLightMaskSignature(
+  effect: SceneDynamicLightEffect,
+  cellSizeWorld: number
+): string {
+  return [
+    effect.id,
+    effect.position.x,
+    effect.position.y,
+    effect.brightRadiusCells,
+    effect.dimRadiusCells,
+    cellSizeWorld
+  ].join(":");
+}
+
 function getDarkvisionSignature(
   darkness: SceneDarkness | null,
   lights: readonly SceneLight[],
-  effects: readonly SceneEffect[]
+  effects: readonly SceneEffect[],
+  cellSizeWorld: number
 ): string {
   if (darkness?.darkvisionEnabled !== true) {
     return "";
@@ -3784,7 +3940,7 @@ function getDarkvisionSignature(
     .filter((l) => l.visible)
     .map((l) => `${l.id}:${l.kind}:${l.position.x}:${l.position.y}:${l.radius}:${l.direction}`)
     .join("|");
-  return `${lightSig}/${getEffectsLightingSignature(effects)}`;
+  return `${lightSig}/${getEffectsLightingMaskSignature(effects, cellSizeWorld)}`;
 }
 
 function getMagicalDarknessRenderSignature(effect: SceneMagicalDarknessEffect): string {
@@ -3798,24 +3954,94 @@ function getMagicalDarknessRenderSignature(effect: SceneMagicalDarknessEffect): 
   ].join(":");
 }
 
-function getEffectsLightingSignature(effects: readonly SceneEffect[]): string {
+function getEffectsLightLayerSignature(
+  effects: readonly SceneEffect[],
+  cellSizeWorld = 0
+): string {
   return effects
-    .filter((effect): effect is SceneFireEffect => effect.kind === "fire")
+    .filter(
+      (effect): effect is SceneFireEffect | SceneDynamicLightEffect =>
+        isVisibleLightEmittingFireEffect(effect) || isVisibleDynamicLightEffect(effect)
+    )
     .map((effect) => {
+      if (effect.kind === "dynamic-light") {
+        return `dynamic:${getDynamicLightContainerSignature(effect, cellSizeWorld)}`;
+      }
+
+      return `fire:${getFireLightRenderSignature(effect)}`;
+    })
+    .join("|");
+}
+
+function getEffectsLightingMaskSignature(
+  effects: readonly SceneEffect[],
+  cellSizeWorld = 0
+): string {
+  return effects
+    .filter(
+      (effect): effect is SceneFireEffect | SceneDynamicLightEffect =>
+        isVisibleLightEmittingFireEffect(effect) || isVisibleDynamicLightEffect(effect)
+    )
+    .map((effect) => {
+      if (effect.kind === "dynamic-light") {
+        return `dynamic:${getDynamicLightMaskSignature(effect, cellSizeWorld)}`;
+      }
+
       const zoneSignature =
         effect.zone.kind === "circle"
           ? `circle:${effect.position.x}:${effect.position.y}:${effect.zone.radius}:${effect.scale}`
           : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
-      return [
-        effect.id,
-        effect.visible,
-        effect.emitsLight,
-        effect.lightRadius,
-        effect.opacity,
-        zoneSignature
-      ].join(":");
+      return `fire:${effect.id}:${effect.lightRadius}:${zoneSignature}`;
     })
     .join("|");
+}
+
+function haveEffectLayerReferencesChanged(
+  previous: readonly SceneEffect[],
+  next: readonly SceneEffect[]
+): boolean {
+  const previousLayerEffects = previous.filter(isEffectLayerEffect);
+  const nextLayerEffects = next.filter(isEffectLayerEffect);
+
+  return (
+    previousLayerEffects.length !== nextLayerEffects.length ||
+    previousLayerEffects.some((effect, index) => effect !== nextLayerEffects[index])
+  );
+}
+
+function isEffectLayerEffect(effect: SceneEffect): effect is SceneFireEffect | SceneWaterEffect {
+  return effect.kind === "fire" || effect.kind === "water";
+}
+
+function haveEffectSelectionChanged(
+  previous: readonly SceneEffect[],
+  next: readonly SceneEffect[]
+): boolean {
+  if (previous.length !== next.length) {
+    return true;
+  }
+
+  return previous.some((effect, index) => {
+    const nextEffect = next[index];
+    if (effect === nextEffect) {
+      return false;
+    }
+
+    if (
+      nextEffect !== undefined &&
+      effect.kind === "dynamic-light" &&
+      nextEffect.kind === "dynamic-light" &&
+      effect.id === nextEffect.id
+    ) {
+      return (
+        effect.visible !== nextEffect.visible ||
+        effect.position.x !== nextEffect.position.x ||
+        effect.position.y !== nextEffect.position.y
+      );
+    }
+
+    return true;
+  });
 }
 
 function getMagicalDarknessSignature(effects: readonly SceneEffect[]): string {
@@ -4011,6 +4237,10 @@ function parseHexColor(color: string): number {
 
 function isVisibleLightEmittingFireEffect(effect: SceneEffect): effect is SceneFireEffect {
   return effect.kind === "fire" && effect.visible && effect.emitsLight;
+}
+
+function isVisibleDynamicLightEffect(effect: SceneEffect): effect is SceneDynamicLightEffect {
+  return effect.kind === "dynamic-light" && effect.visible;
 }
 
 async function loadFirePatternSource(): Promise<GifSource | null> {
@@ -4674,9 +4904,29 @@ function buildFireLightEraseGraphicScreen(
   return graphic;
 }
 
+function buildDynamicLightEraseGraphicScreen(
+  effect: SceneDynamicLightEffect,
+  cellSizeWorld: number,
+  camera: CameraState,
+  viewport: ViewportSize
+): Graphics {
+  const { x, y } = worldToScreen(effect.position.x, effect.position.y, camera, viewport);
+  const brightRadius = effect.brightRadiusCells * cellSizeWorld * camera.zoom;
+  const dimRadius = effect.dimRadiusCells * cellSizeWorld * camera.zoom;
+  const graphic = new Graphics()
+    .circle(x, y, dimRadius)
+    .fill({ color: 0xffffff, alpha: 0.42 })
+    .circle(x, y, brightRadius)
+    .fill({ color: 0xffffff, alpha: 1 });
+
+  graphic.blendMode = "erase";
+  return graphic;
+}
+
 function buildDarkvisionColorMask(
   lights: readonly SceneLight[],
-  effects: readonly SceneEffect[]
+  effects: readonly SceneEffect[],
+  cellSizeWorld: number
 ): Graphics | null {
   const graphic = new Graphics();
   let hasMaskGeometry = false;
@@ -4705,6 +4955,24 @@ function buildDarkvisionColorMask(
   }
 
   for (const effect of effects) {
+    if (isVisibleDynamicLightEffect(effect)) {
+      graphic
+        .circle(
+          effect.position.x,
+          effect.position.y,
+          effect.dimRadiusCells * cellSizeWorld
+        )
+        .fill({ color: 0xffffff, alpha: 0.5 })
+        .circle(
+          effect.position.x,
+          effect.position.y,
+          effect.brightRadiusCells * cellSizeWorld
+        )
+        .fill({ color: 0xffffff, alpha: 1 });
+      hasMaskGeometry = true;
+      continue;
+    }
+
     if (!isVisibleLightEmittingFireEffect(effect)) {
       continue;
     }
@@ -5156,6 +5424,86 @@ function drawFireLight(effect: SceneFireEffect): Graphics {
     .fill({ color: 0xffa54f, alpha: 0.12 * effect.opacity })
     .circle(effect.position.x, effect.position.y, effect.lightRadius * 0.5)
     .fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
+}
+
+function drawDynamicLight(
+  effect: SceneDynamicLightEffect,
+  cellSizeWorld: number,
+  renderState: DynamicLightRenderState
+): Container {
+  const container = new Container();
+  // The root stays at the world origin because drag previews apply a delta to it.
+  const visual = new Container();
+  visual.position.set(effect.position.x, effect.position.y);
+  const dimRadiusWorld = effect.dimRadiusCells * cellSizeWorld;
+  visual.cullable = true;
+  visual.cullableChildren = false;
+  visual.cullArea = new Rectangle(
+    -dimRadiusWorld,
+    -dimRadiusWorld,
+    dimRadiusWorld * 2,
+    dimRadiusWorld * 2
+  );
+
+  const color = parseHexColor(effect.color);
+  const dimHalo = new Graphics()
+    .circle(0, 0, dimRadiusWorld)
+    .fill({ color, alpha: 0.12 });
+  const brightHalo = new Graphics()
+    .circle(0, 0, effect.brightRadiusCells * cellSizeWorld)
+    .fill({ color, alpha: 0.21 });
+  const sourceDisk = new Graphics()
+    .circle(0, 0, cellSizeWorld * 0.5)
+    .fill({ color: 0xff7628, alpha: 0.31 });
+  const sourceGlow = new Graphics()
+    .circle(0, 0, cellSizeWorld * 0.31)
+    .fill({ color, alpha: 0.58 });
+  const sourceCore = new Graphics()
+    .circle(0, 0, cellSizeWorld * 0.13)
+    .fill({ color: 0xfff1b8, alpha: 0.94 });
+
+  dimHalo.blendMode = "add";
+  brightHalo.blendMode = "add";
+  sourceDisk.blendMode = "add";
+  sourceGlow.blendMode = "add";
+  sourceCore.blendMode = "add";
+
+  visual.addChild(dimHalo, brightHalo, sourceDisk, sourceGlow, sourceCore);
+  container.addChild(visual);
+
+  const phase = (hashString(effect.id) % 6283) / 1000;
+  visual.onRender = () => {
+    const time = performance.now() * 0.001 * renderState.speed + phase;
+    const slowWave = Math.sin(time * 2.25) * 0.36;
+    const mediumWave = Math.sin(time * 4.9 + 1.4) * 0.2;
+    const fastWave = Math.sin(time * 9.7 + 0.8) * 0.1;
+    const rawBrightness = Math.max(0.24, Math.min(1, 0.64 + slowWave + mediumWave + fastWave));
+    const flickerDepth = Math.min(0.82, renderState.flicker * 1.15);
+    const animatedBrightness = 1 - flickerDepth * (1 - rawBrightness);
+    const intensity = renderState.opacity * renderState.intensity;
+
+    dimHalo.alpha = Math.max(0, intensity * animatedBrightness);
+    brightHalo.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.08));
+    sourceDisk.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.15));
+    sourceGlow.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.3));
+    sourceCore.alpha = Math.max(
+      0,
+      Math.min(1, intensity * (0.14 + Math.pow(animatedBrightness, 1.65) * 0.86))
+    );
+  };
+
+  return container;
+}
+
+function createDynamicLightRenderState(
+  effect: SceneDynamicLightEffect
+): DynamicLightRenderState {
+  return {
+    intensity: effect.intensity,
+    opacity: effect.opacity,
+    flicker: effect.flicker,
+    speed: effect.speed
+  };
 }
 
 function computeCellRings(
@@ -6072,6 +6420,8 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
       return 72;
     case "fire":
       return 42;
+    case "dynamic-light":
+      return 44;
     case "magical-darkness":
       return 72;
     case "token":

@@ -60,6 +60,8 @@ El menu contextual debe permitir crear:
 ### Criterios de aceptacion
 
 - El click derecho abre un menu en la posicion correcta.
+- Si no hay espacio suficiente debajo del puntero, el menu contextual se abre hacia arriba y permanece contenido dentro del viewport usable.
+- El menu y sus submenus no deben desbordar los bordes laterales o verticales del viewport.
 - El usuario puede seleccionar un elemento creado.
 - El usuario puede borrar el elemento seleccionado con boton visible.
 - El usuario puede borrar el elemento seleccionado con Delete o Backspace.

@@ -137,6 +137,27 @@ const fireEffectSchema = z.object({
   lightRadius: positiveNumber
 });
 
+const dynamicLightEffectSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("dynamic-light"),
+  position: worldPointSchema,
+  brightRadiusCells: positiveNumber.default(2),
+  dimRadiusCells: positiveNumber.default(4),
+  radius: positiveNumber.optional(),
+  color: hexColor,
+  intensity: opacity,
+  opacity,
+  flicker: opacity,
+  speed: finiteNumber.min(0.1).max(4),
+  visible: z.boolean()
+}).transform(({ radius: legacyRadius, ...effect }) => {
+  void legacyRadius;
+  return {
+    ...effect,
+    dimRadiusCells: Math.max(effect.brightRadiusCells, effect.dimRadiusCells)
+  };
+});
+
 const magicalDarknessEffectSchema = z.object({
   id: z.string().min(1),
   kind: z.literal("magical-darkness"),
@@ -330,7 +351,14 @@ export const sceneDocumentV1Schema = z.object({
       snapToGrid: z.boolean()
     })
   ),
-  effects: z.array(z.union([fireEffectSchema, magicalDarknessEffectSchema, waterEffectSchema])),
+  effects: z.array(
+    z.union([
+      fireEffectSchema,
+      dynamicLightEffectSchema,
+      magicalDarknessEffectSchema,
+      waterEffectSchema
+    ])
+  ),
   shapes: z
     .array(
       z.union([

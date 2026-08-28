@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import {
   createSceneMonsterFromLibraryEntry,
-  getMonsterLibraryPreview,
   type MonsterLibraryEntry
 } from "../../../../domain/monster-library/monster-library";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";

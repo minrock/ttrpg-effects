@@ -265,6 +265,31 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(scene)).toEqual(scene);
   });
 
+  it("accepts dynamic light effects", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "dynamic-light-1",
+          kind: "dynamic-light",
+          position: { x: 80, y: 120 },
+          brightRadiusCells: 2,
+          dimRadiusCells: 4,
+          color: "#ff9f43",
+          intensity: 0.9,
+          opacity: 0.85,
+          flicker: 0.55,
+          speed: 1,
+          visible: true
+        }
+      ]
+    };
+
+    const parsedScene = parseSceneDocument(scene);
+    expect(parsedScene).toEqual(scene);
+    expect(parseSceneJson(serializeSceneDocument(parsedScene))).toEqual(scene);
+  });
+
   it("rejects invalid magical darkness ranges", () => {
     const scene = {
       ...createDefaultScene(),
