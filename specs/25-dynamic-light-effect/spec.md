@@ -4,6 +4,7 @@
 
 - Implementacion base aceptada y mergeada en `1.5.4`.
 - Extension de apertura y direccion aceptada para la version `1.6.0`.
+- Indicador de fuente exclusivo del DM corregido y cerrado en `1.7.1`.
 
 ## Objetivo
 
@@ -45,6 +46,7 @@ La implementacion debe producir su propia animacion con PixiJS. No debe copiar n
     - angulo personalizado entre `1°` y `359°`, usando `90°` al entrar por primera vez en este modo.
 15. Las aperturas menores a `360°` tienen una direccion editable entre `0°` y `359°`.
 16. Al seleccionar una luz direccional, una manivela circular permite cambiar su orientacion directamente sobre el mapa.
+17. Los circulos concentricos de la fuente son feedback editorial exclusivo del DM y no deben mostrarse en la ventana del jugador.
 
 ## Comportamiento visual
 
@@ -57,6 +59,7 @@ La implementacion debe producir su propia animacion con PixiJS. No debe copiar n
 - Los alcances efectivos permanecen estables durante la animacion; solo cambia la luminancia.
 - La apertura recorta por igual el halo tenue, el halo fuerte y el area que atraviesa oscuridad o recupera color en darkvision.
 - La fuente central conserva su forma circular de una celda aunque la emision sea semicircular o angular.
+- El Player View recibe los halos y la iluminacion, pero no los circulos naranjas usados para ubicar la fuente en el editor del DM.
 
 ## Rendimiento
 

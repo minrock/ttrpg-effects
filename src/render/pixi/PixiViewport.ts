@@ -477,6 +477,7 @@ export class PixiViewport {
     // canvas clears them the moment the role is applied.
     this.scheduleDarknessRedraw();
     this.drawDarkvisionLayer();
+    this.drawLightsLayer();
     this.drawLabelsLayer();
     this.drawMapAnnotationsLayer();
     this.updatePlayerCameraControls();
@@ -1890,7 +1891,12 @@ export class PixiViewport {
     for (const effect of this.getRenderableEffects().filter(isVisibleDynamicLightEffect)) {
       const key = `dynamic-light:${effect.id}`;
       const cellSizeWorld = this.grid?.cellSizeWorld ?? 100;
-      const signature = getDynamicLightContainerSignature(effect, cellSizeWorld);
+      const showSourceIndicator = this.viewRole === "dm";
+      const signature = getDynamicLightContainerSignature(
+        effect,
+        cellSizeWorld,
+        showSourceIndicator
+      );
       const cached = this.lightRenderCache.get(key);
       const rendered =
         cached !== undefined && cached.signature === signature
@@ -1900,7 +1906,8 @@ export class PixiViewport {
               container: drawDynamicLight(
                 effect,
                 cellSizeWorld,
-                this.getDynamicLightRenderState(effect)
+                this.getDynamicLightRenderState(effect),
+                showSourceIndicator
               )
             };
 
@@ -3985,7 +3992,8 @@ function getFireLightRenderSignature(effect: SceneFireEffect): string {
 
 function getDynamicLightContainerSignature(
   effect: SceneDynamicLightEffect,
-  cellSizeWorld = 0
+  cellSizeWorld = 0,
+  showSourceIndicator = true
 ): string {
   return [
     effect.id,
@@ -3997,7 +4005,8 @@ function getDynamicLightContainerSignature(
     effect.apertureDegrees,
     effect.direction,
     cellSizeWorld,
-    effect.color
+    effect.color,
+    showSourceIndicator
   ].join(":");
 }
 
@@ -5538,7 +5547,8 @@ function drawFireLight(effect: SceneFireEffect): Graphics {
 function drawDynamicLight(
   effect: SceneDynamicLightEffect,
   cellSizeWorld: number,
-  renderState: DynamicLightRenderState
+  renderState: DynamicLightRenderState,
+  showSourceIndicator: boolean
 ): Container {
   const container = new Container();
   // The root stays at the world origin because drag previews apply a delta to it.
@@ -5571,23 +5581,34 @@ function drawDynamicLight(
     effect.apertureDegrees,
     effect.direction
   ).fill({ color, alpha: 0.21 });
-  const sourceDisk = new Graphics()
-    .circle(0, 0, cellSizeWorld * 0.5)
-    .fill({ color: 0xff7628, alpha: 0.31 });
-  const sourceGlow = new Graphics()
-    .circle(0, 0, cellSizeWorld * 0.31)
-    .fill({ color, alpha: 0.58 });
-  const sourceCore = new Graphics()
-    .circle(0, 0, cellSizeWorld * 0.13)
-    .fill({ color: 0xfff1b8, alpha: 0.94 });
+  const sourceDisk = showSourceIndicator
+    ? new Graphics()
+        .circle(0, 0, cellSizeWorld * 0.5)
+        .fill({ color: 0xff7628, alpha: 0.31 })
+    : null;
+  const sourceGlow = showSourceIndicator
+    ? new Graphics()
+        .circle(0, 0, cellSizeWorld * 0.31)
+        .fill({ color, alpha: 0.58 })
+    : null;
+  const sourceCore = showSourceIndicator
+    ? new Graphics()
+        .circle(0, 0, cellSizeWorld * 0.13)
+        .fill({ color: 0xfff1b8, alpha: 0.94 })
+    : null;
 
   dimHalo.blendMode = "add";
   brightHalo.blendMode = "add";
-  sourceDisk.blendMode = "add";
-  sourceGlow.blendMode = "add";
-  sourceCore.blendMode = "add";
+  if (sourceDisk !== null && sourceGlow !== null && sourceCore !== null) {
+    sourceDisk.blendMode = "add";
+    sourceGlow.blendMode = "add";
+    sourceCore.blendMode = "add";
+  }
 
-  visual.addChild(dimHalo, brightHalo, sourceDisk, sourceGlow, sourceCore);
+  visual.addChild(dimHalo, brightHalo);
+  if (sourceDisk !== null && sourceGlow !== null && sourceCore !== null) {
+    visual.addChild(sourceDisk, sourceGlow, sourceCore);
+  }
   container.addChild(visual);
 
   const phase = (hashString(effect.id) % 6283) / 1000;
@@ -5603,12 +5624,14 @@ function drawDynamicLight(
 
     dimHalo.alpha = Math.max(0, intensity * animatedBrightness);
     brightHalo.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.08));
-    sourceDisk.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.15));
-    sourceGlow.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.3));
-    sourceCore.alpha = Math.max(
-      0,
-      Math.min(1, intensity * (0.14 + Math.pow(animatedBrightness, 1.65) * 0.86))
-    );
+    if (sourceDisk !== null && sourceGlow !== null && sourceCore !== null) {
+      sourceDisk.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.15));
+      sourceGlow.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.3));
+      sourceCore.alpha = Math.max(
+        0,
+        Math.min(1, intensity * (0.14 + Math.pow(animatedBrightness, 1.65) * 0.86))
+      );
+    }
   };
 
   return container;

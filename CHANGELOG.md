@@ -10,6 +10,13 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.7.1] - 2026-08-28
+
+### Fixed
+
+- Los circulos concentricos que identifican la fuente de una luz dinamica ahora se renderizan exclusivamente en la vista del DM.
+- Player View conserva los halos, la animacion y la iluminacion sin mostrar controles ni indicadores editoriales de la fuente.
+
 ## [1.7.0] - 2026-08-28
 
 ### Added
