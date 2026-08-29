@@ -1,5 +1,6 @@
 import { marked, Renderer } from "marked";
 import DOMPurify from "dompurify";
+import { encodeCalloutDirectivesAsBlockquotes, upgradeCalloutBlockquotes } from "./callout";
 
 const safeRenderer = new Renderer();
 safeRenderer.html = (): string => "";
@@ -7,8 +8,13 @@ safeRenderer.html = (): string => "";
 const UNDERLINE_OPEN_TOKEN = "TTRPGUNDERLINEOPEN";
 const UNDERLINE_CLOSE_TOKEN = "TTRPGUNDERLINECLOSE";
 
-export function renderMarkdown(markdown: string): string {
-  const source = preserveUnderlineMarkup(normalizeLooseMarkdownTables(markdown));
+interface MarkdownRenderOptions {
+  readonly callouts?: boolean;
+}
+
+export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
+  const normalized = preserveUnderlineMarkup(normalizeLooseMarkdownTables(markdown));
+  const source = options.callouts === true ? encodeCalloutDirectivesAsBlockquotes(normalized) : normalized;
   const html = marked.parse(source, {
     async: false,
     breaks: false,
@@ -20,11 +26,16 @@ export function renderMarkdown(markdown: string): string {
     .replaceAll(UNDERLINE_OPEN_TOKEN, "<u>")
     .replaceAll(UNDERLINE_CLOSE_TOKEN, "</u>");
 
-  return DOMPurify.sanitize(restoredHtml, {
+  const sanitized = DOMPurify.sanitize(restoredHtml, {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ["style", "iframe", "object", "embed", "form"],
     FORBID_ATTR: ["style"]
   });
+
+  if (options.callouts !== true) return sanitized;
+  const document = new DOMParser().parseFromString(`<body>${sanitized}</body>`, "text/html");
+  upgradeCalloutBlockquotes(document.body);
+  return document.body.innerHTML;
 }
 
 function preserveUnderlineMarkup(markdown: string): string {

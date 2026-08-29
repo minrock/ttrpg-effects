@@ -30,4 +30,29 @@ describe("safe markdown rendering", () => {
     expect(html).not.toContain("onerror");
     expect(html).not.toContain("javascript:");
   });
+
+  it("renders room callouts only when explicitly enabled", () => {
+    const markdown = ':::callout emoji="⚠️" color="#CC3300"\n**Peligro** en la sala.\n:::';
+    const regularHtml = renderMarkdown(markdown);
+    const calloutHtml = renderMarkdown(markdown, { callouts: true });
+
+    expect(regularHtml).not.toContain("markdown-callout");
+    expect(calloutHtml).toContain('class="markdown-callout"');
+    expect(calloutHtml).toContain('data-callout-color="#CC3300"');
+    expect(calloutHtml).toContain("<strong>Peligro</strong>");
+    expect(calloutHtml).not.toContain(":::callout");
+  });
+
+  it("falls back safely for invalid metadata and still sanitizes its body", () => {
+    const html = renderMarkdown(
+      ':::callout emoji="texto" color="red; background:url(javascript:alert(1))"\n<img src="x" onerror="alert(2)">Contenido\n:::',
+      { callouts: true }
+    );
+
+    expect(html).toContain('data-callout-color="#D5AB5D"');
+    expect(html).not.toContain("data-callout-emoji");
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("onerror");
+    expect(html).toContain("Contenido");
+  });
 });
