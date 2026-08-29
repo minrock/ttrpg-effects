@@ -143,6 +143,8 @@ const dynamicLightEffectSchema = z.object({
   position: worldPointSchema,
   brightRadiusCells: positiveNumber.default(2),
   dimRadiusCells: positiveNumber.default(4),
+  apertureDegrees: finiteNumber.min(1).max(360).default(360),
+  direction: finiteNumber.default(0).transform((value) => ((value % 360) + 360) % 360),
   radius: positiveNumber.optional(),
   color: hexColor,
   intensity: opacity,

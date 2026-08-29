@@ -10,6 +10,18 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.6.0] - 2026-08-28
+
+### Added
+
+- Cobertura configurable para luces dinamicas: circulo completo de `360°`, semicirculo de `180°` o angulo personalizado.
+- Manivela visual y campo numerico para orientar luces con apertura menor a `360°`.
+
+### Changed
+
+- Los halos fuerte y tenue, la perforacion de oscuridad y la recuperacion de color en darkvision comparten la misma geometria radial.
+- Las escenas anteriores siguen cargando sus luces dinamicas como circulos completos mediante valores compatibles por defecto.
+
 ## [1.5.4] - 2026-08-28
 
 ### Added

@@ -95,6 +95,7 @@ interface MapViewportProps {
   readonly onElementMove: (elementId: string, x: number, y: number) => void;
   readonly onLightDirectionChange: (elementId: string, direction: number) => void;
   readonly onLightRadiusChange: (elementId: string, radius: number) => void;
+  readonly onDynamicLightDirectionChange?: (elementId: string, direction: number) => void;
   readonly onShapeEndMove: (elementId: string, x: number, y: number) => void;
   readonly onPathPointAdd: (point: { readonly x: number; readonly y: number }) => void;
   readonly onPathPointerMove: (point: { readonly x: number; readonly y: number } | null) => void;
@@ -177,6 +178,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onElementMove,
   onLightDirectionChange,
   onLightRadiusChange,
+  onDynamicLightDirectionChange,
   onShapeEndMove,
   onPathPointAdd,
   onPathPointerMove,
@@ -245,6 +247,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onElementMove,
       onLightDirectionChange,
       onLightRadiusChange,
+      onDynamicLightDirectionChange,
       onShapeEndMove,
       onPathPointAdd,
       onPathPointerMove,
@@ -329,7 +332,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);

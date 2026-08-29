@@ -13,6 +13,8 @@ describe("dynamic light effects", () => {
       position: { x: 20, y: 40 },
       brightRadiusCells: 2,
       dimRadiusCells: 4,
+      apertureDegrees: 360,
+      direction: 0,
       color: "#ff9f43",
       intensity: 0.9,
       opacity: 0.85,
@@ -31,7 +33,9 @@ describe("dynamic light effects", () => {
       intensity: 4,
       opacity: -1,
       flicker: 2,
-      speed: 20
+      speed: 20,
+      apertureDegrees: 720,
+      direction: -90
     });
 
     expect(updated).toMatchObject({
@@ -41,7 +45,22 @@ describe("dynamic light effects", () => {
       intensity: 1,
       opacity: 0,
       flicker: 1,
-      speed: 4
+      speed: 4,
+      apertureDegrees: 360,
+      direction: 270
+    });
+  });
+
+  it("supports full, half and custom directional apertures", () => {
+    const effect = createDynamicLightEffect("dynamic-light-1", { x: 0, y: 0 });
+
+    expect(updateDynamicLightEffect(effect, { apertureDegrees: 180, direction: 45 })).toMatchObject({
+      apertureDegrees: 180,
+      direction: 45
+    });
+    expect(updateDynamicLightEffect(effect, { apertureDegrees: 90, direction: 450 })).toMatchObject({
+      apertureDegrees: 90,
+      direction: 90
     });
   });
 

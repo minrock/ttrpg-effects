@@ -2004,6 +2004,20 @@ export function App(): JSX.Element {
     }));
   }, []);
 
+  const handleDynamicLightDirectionChange = useCallback(
+    (elementId: string, direction: number): void => {
+      setScene((current) => ({
+        ...current,
+        effects: current.effects.map((effect) =>
+          effect.id === elementId && effect.kind === "dynamic-light"
+            ? updateDynamicLightEffect(effect, { direction })
+            : effect
+        )
+      }));
+    },
+    []
+  );
+
   const handleShapeEndMove = useCallback((elementId: string, x: number, y: number): void => {
     setScene((current) => ({
       ...current,
@@ -3021,6 +3035,7 @@ export function App(): JSX.Element {
           onElementMove={handleElementMove}
           onLightDirectionChange={handleLightDirectionChange}
           onLightRadiusChange={handleLightRadiusChange}
+          onDynamicLightDirectionChange={handleDynamicLightDirectionChange}
           onShapeEndMove={handleShapeEndMove}
           onPathPointAdd={handlePathPointAdd}
           onPathPointerMove={handlePathPointerMove}
@@ -3315,6 +3330,67 @@ export function App(): JSX.Element {
                       onChange={(event) => updateSelectedDynamicLight({ color: event.currentTarget.value })}
                     />
                   </label>
+                  <label>
+                    Cobertura
+                    <select
+                      value={
+                        selectedDynamicLight.apertureDegrees === 360
+                          ? "full"
+                          : selectedDynamicLight.apertureDegrees === 180
+                            ? "half"
+                            : "angle"
+                      }
+                      onChange={(event) => {
+                        const mode = event.currentTarget.value;
+                        updateSelectedDynamicLight({
+                          apertureDegrees:
+                            mode === "full"
+                              ? 360
+                              : mode === "half"
+                                ? 180
+                                : selectedDynamicLight.apertureDegrees === 360 ||
+                                    selectedDynamicLight.apertureDegrees === 180
+                                  ? 90
+                                  : selectedDynamicLight.apertureDegrees
+                        });
+                      }}
+                    >
+                      <option value="full">Completa (360°)</option>
+                      <option value="half">Mitad (180°)</option>
+                      <option value="angle">Angulo personalizado</option>
+                    </select>
+                  </label>
+                  {selectedDynamicLight.apertureDegrees !== 360 &&
+                  selectedDynamicLight.apertureDegrees !== 180 ? (
+                    <label>
+                      Apertura (°)
+                      <input
+                        type="number"
+                        min="1"
+                        max="359"
+                        step="1"
+                        value={selectedDynamicLight.apertureDegrees}
+                        onChange={(event) =>
+                          updateSelectedDynamicLight({ apertureDegrees: event.currentTarget.valueAsNumber })
+                        }
+                      />
+                    </label>
+                  ) : null}
+                  {selectedDynamicLight.apertureDegrees < 360 ? (
+                    <label>
+                      Direccion (°)
+                      <input
+                        type="number"
+                        min="0"
+                        max="359"
+                        step="1"
+                        value={selectedDynamicLight.direction}
+                        onChange={(event) =>
+                          updateSelectedDynamicLight({ direction: event.currentTarget.valueAsNumber })
+                        }
+                      />
+                    </label>
+                  ) : null}
                   <label>
                     Luz fuerte (cuadros)
                     <input

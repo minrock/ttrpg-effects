@@ -61,3 +61,29 @@
 - [x] Guardado nuevo, guardado directo y round trip `.ttrpgscene` verificados.
 - [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` completados.
 - [x] Smoke test visual completado y cambios aceptados.
+
+## Extension: apertura y direccion
+
+### Estado
+
+- [x] Extender dominio y schema con `apertureDegrees` y `direction`.
+- [x] Mantener compatibilidad con escenas anteriores mediante defaults `360°` y `0°`.
+- [x] Agregar selector de cobertura completa, mitad y angulo personalizado.
+- [x] Agregar control numerico de apertura y direccion.
+- [x] Recortar halos, oscuridad y mascara de color con la misma geometria radial.
+- [x] Implementar manivela de orientacion con preview Pixi local.
+- [x] Incluir apertura y direccion en firmas de cache visual, mascara y seleccion.
+- [x] Cubrir defaults, normalizacion y round trip con pruebas automatizadas.
+- [x] Completar smoke visual en DM y Player View.
+- [x] Obtener aceptacion antes de mergear nuevamente.
+
+### Implementacion tecnica
+
+1. Modelar la apertura como grados para evitar estados duplicados: `360` representa completa, `180` mitad y cualquier otro valor el modo angular.
+2. Derivar el modo del selector desde `apertureDegrees`; al pasar por primera vez a angulo usar `90°`.
+3. Reutilizar una funcion geometrica que dibuje circulo para `360°` y sector radial para aperturas menores.
+4. Aplicar esa funcion a halo tenue, halo fuerte, borrado de oscuridad y recuperacion de color en darkvision.
+5. Mantener los circulos de la fuente central completos para representar una fuente fisica circular de una celda.
+6. Mostrar la manivela solo cuando la apertura sea menor a `360°`.
+7. Guardar el preview de direccion en `previewEffects` y publicar `onDynamicLightDirectionChange` solo al finalizar el drag.
+8. No invalidar niebla, capas de efectos ni estado React durante cada movimiento de la manivela.
