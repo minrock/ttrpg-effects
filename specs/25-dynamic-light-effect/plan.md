@@ -37,6 +37,7 @@
 8. Usar firmas independientes para geometria visual, mascara de iluminacion y capas de efectos, invalidando solo la capa afectada.
 9. Evitar redibujar la niebla y la seleccion cuando un cambio de luz no altera su geometria.
 10. Configurar culling por el radio tenue para omitir luces dinamicas completamente fuera del viewport.
+11. Incluir el rol del viewport en la firma visual y construir los circulos de fuente solo para el DM, sin duplicar capas ni agregar trabajo por frame.
 
 ## Vision y capas
 
@@ -61,6 +62,13 @@
 - [x] Guardado nuevo, guardado directo y round trip `.ttrpgscene` verificados.
 - [x] `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` completados.
 - [x] Smoke test visual completado y cambios aceptados.
+
+## Correccion: indicador de fuente en Player View
+
+- [x] Identificar los circulos concentricos como chrome editorial dentro del contenedor compartido de luz.
+- [x] Mantener el indicador en la vista del DM y omitirlo en la ventana del jugador.
+- [x] Incluir la variante por rol en la firma de cache para impedir reutilizar el contenedor incorrecto.
+- [x] Verificar automaticamente y mediante smoke visual que los halos siguen visibles en ambas ventanas.
 
 ## Extension: apertura y direccion
 
