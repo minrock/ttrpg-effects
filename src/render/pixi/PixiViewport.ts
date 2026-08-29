@@ -131,6 +131,7 @@ export interface PixiContextMenuRequest {
     readonly x: number;
     readonly y: number;
   };
+  readonly targetElementId: string | null;
 }
 
 export interface PixiViewportOptions {
@@ -606,6 +607,64 @@ export class PixiViewport {
     };
 
     return screenToWorld(screenPoint, this.camera, viewport);
+  }
+
+  getNearbyVisibleWorldPoint(origin: WorldPoint, excludedElementId?: string): WorldPoint {
+    const viewport = this.getViewportSize();
+    const sourceScreen = worldToScreen(origin.x, origin.y, this.camera, viewport);
+    const margin = Math.min(48, Math.max(16, Math.min(viewport.width, viewport.height) * 0.08));
+    const cellSizeScreen = (this.grid?.cellSizeWorld ?? 100) * this.camera.zoom;
+    const maximumSpacing = Math.max(64, Math.min(viewport.width, viewport.height) * 0.36);
+    const spacing = Math.min(Math.max(72, cellSizeScreen * 1.75), maximumSpacing);
+    const directions = [
+      { x: 1, y: 0 },
+      { x: -1, y: 0 },
+      { x: 0, y: 1 },
+      { x: 0, y: -1 },
+      { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+      { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
+      { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
+      { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }
+    ];
+    const occupied = this.getSelectableElements()
+      .filter((element) => element.id !== excludedElementId)
+      .map((element) => worldToScreen(element.position.x, element.position.y, this.camera, viewport));
+    let bestCandidate: ScreenPoint | null = null;
+    let bestClearance = -Infinity;
+
+    for (const direction of directions) {
+      const candidate = {
+        x: sourceScreen.x + direction.x * spacing,
+        y: sourceScreen.y + direction.y * spacing
+      };
+      if (
+        candidate.x < margin ||
+        candidate.x > viewport.width - margin ||
+        candidate.y < margin ||
+        candidate.y > viewport.height - margin
+      ) {
+        continue;
+      }
+
+      const clearance = occupied.reduce(
+        (minimum, point) => Math.min(minimum, Math.hypot(candidate.x - point.x, candidate.y - point.y)),
+        Infinity
+      );
+      if (bestCandidate === null || clearance > bestClearance) {
+        bestCandidate = candidate;
+        bestClearance = clearance;
+      }
+    }
+
+    if (bestCandidate === null) {
+      const angle = Math.atan2(viewport.height / 2 - sourceScreen.y, viewport.width / 2 - sourceScreen.x);
+      bestCandidate = {
+        x: Math.min(viewport.width - margin, Math.max(margin, sourceScreen.x + Math.cos(angle) * spacing)),
+        y: Math.min(viewport.height - margin, Math.max(margin, sourceScreen.y + Math.sin(angle) * spacing))
+      };
+    }
+
+    return screenToWorld(bestCandidate, this.camera, viewport);
   }
 
   setMap(map: MapImageState | null): void {
@@ -1409,7 +1468,8 @@ export class PixiViewport {
       const screen = this.eventToClientPoint(event);
       this.options.onContextMenu?.({
         screen,
-        world: screenToWorld(releasePoint, this.camera, this.getViewportSize())
+        world: screenToWorld(releasePoint, this.camera, this.getViewportSize()),
+        targetElementId: this.hitTestElement(releasePoint)
       });
     }
 
@@ -1891,11 +1951,11 @@ export class PixiViewport {
     for (const effect of this.getRenderableEffects().filter(isVisibleDynamicLightEffect)) {
       const key = `dynamic-light:${effect.id}`;
       const cellSizeWorld = this.grid?.cellSizeWorld ?? 100;
-      const showSourceIndicator = this.viewRole === "dm";
+      const showSourceLocator = this.viewRole === "dm";
       const signature = getDynamicLightContainerSignature(
         effect,
         cellSizeWorld,
-        showSourceIndicator
+        showSourceLocator
       );
       const cached = this.lightRenderCache.get(key);
       const rendered =
@@ -1907,7 +1967,7 @@ export class PixiViewport {
                 effect,
                 cellSizeWorld,
                 this.getDynamicLightRenderState(effect),
-                showSourceIndicator
+                showSourceLocator
               )
             };
 
@@ -3993,7 +4053,7 @@ function getFireLightRenderSignature(effect: SceneFireEffect): string {
 function getDynamicLightContainerSignature(
   effect: SceneDynamicLightEffect,
   cellSizeWorld = 0,
-  showSourceIndicator = true
+  showSourceLocator = true
 ): string {
   return [
     effect.id,
@@ -4006,7 +4066,7 @@ function getDynamicLightContainerSignature(
     effect.direction,
     cellSizeWorld,
     effect.color,
-    showSourceIndicator
+    showSourceLocator
   ].join(":");
 }
 
@@ -5548,7 +5608,7 @@ function drawDynamicLight(
   effect: SceneDynamicLightEffect,
   cellSizeWorld: number,
   renderState: DynamicLightRenderState,
-  showSourceIndicator: boolean
+  showSourceLocator: boolean
 ): Container {
   const container = new Container();
   // The root stays at the world origin because drag previews apply a delta to it.
@@ -5581,34 +5641,31 @@ function drawDynamicLight(
     effect.apertureDegrees,
     effect.direction
   ).fill({ color, alpha: 0.21 });
-  const sourceDisk = showSourceIndicator
+  const sourceDisk = showSourceLocator
     ? new Graphics()
         .circle(0, 0, cellSizeWorld * 0.5)
         .fill({ color: 0xff7628, alpha: 0.31 })
     : null;
-  const sourceGlow = showSourceIndicator
-    ? new Graphics()
-        .circle(0, 0, cellSizeWorld * 0.31)
-        .fill({ color, alpha: 0.58 })
-    : null;
-  const sourceCore = showSourceIndicator
-    ? new Graphics()
-        .circle(0, 0, cellSizeWorld * 0.13)
-        .fill({ color: 0xfff1b8, alpha: 0.94 })
-    : null;
+  const sourceGlow = new Graphics()
+    .circle(0, 0, cellSizeWorld * 0.31)
+    .fill({ color, alpha: 0.58 });
+  const sourceCore = new Graphics()
+    .circle(0, 0, cellSizeWorld * 0.13)
+    .fill({ color: 0xfff1b8, alpha: 0.94 });
 
   dimHalo.blendMode = "add";
   brightHalo.blendMode = "add";
-  if (sourceDisk !== null && sourceGlow !== null && sourceCore !== null) {
+  if (sourceDisk !== null) {
     sourceDisk.blendMode = "add";
-    sourceGlow.blendMode = "add";
-    sourceCore.blendMode = "add";
   }
+  sourceGlow.blendMode = "add";
+  sourceCore.blendMode = "add";
 
   visual.addChild(dimHalo, brightHalo);
-  if (sourceDisk !== null && sourceGlow !== null && sourceCore !== null) {
-    visual.addChild(sourceDisk, sourceGlow, sourceCore);
+  if (sourceDisk !== null) {
+    visual.addChild(sourceDisk);
   }
+  visual.addChild(sourceGlow, sourceCore);
   container.addChild(visual);
 
   const phase = (hashString(effect.id) % 6283) / 1000;
@@ -5624,14 +5681,14 @@ function drawDynamicLight(
 
     dimHalo.alpha = Math.max(0, intensity * animatedBrightness);
     brightHalo.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.08));
-    if (sourceDisk !== null && sourceGlow !== null && sourceCore !== null) {
+    if (sourceDisk !== null) {
       sourceDisk.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.15));
-      sourceGlow.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.3));
-      sourceCore.alpha = Math.max(
-        0,
-        Math.min(1, intensity * (0.14 + Math.pow(animatedBrightness, 1.65) * 0.86))
-      );
     }
+    sourceGlow.alpha = Math.max(0, intensity * Math.pow(animatedBrightness, 1.3));
+    sourceCore.alpha = Math.max(
+      0,
+      Math.min(1, intensity * (0.14 + Math.pow(animatedBrightness, 1.65) * 0.86))
+    );
   };
 
   return container;

@@ -10,6 +10,17 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.7.3] - 2026-08-29
+
+### Added
+
+- Accion contextual `Clonar luz` para duplicar una luz dinamica con todas sus propiedades y ubicar el clon cerca, visible y seleccionado.
+
+### Changed
+
+- Player View conserva el nucleo blanco y el circulo interior intenso de las luces dinamicas, mientras el disco naranja de ubicacion permanece exclusivo del DM.
+- El menu contextual identifica el elemento bajo el puntero para ofrecer acciones especificas sin confundirlo con una seleccion anterior.
+
 ## [1.7.1] - 2026-08-28
 
 ### Fixed

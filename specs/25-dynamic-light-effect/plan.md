@@ -65,10 +65,21 @@
 
 ## Correccion: indicador de fuente en Player View
 
-- [x] Identificar los circulos concentricos como chrome editorial dentro del contenedor compartido de luz.
-- [x] Mantener el indicador en la vista del DM y omitirlo en la ventana del jugador.
+- [x] Identificar el disco naranja exterior como chrome editorial dentro del contenedor compartido de luz.
+- [x] Mantener el disco localizador en DM y omitirlo en Player View.
+- [x] Mantener el circulo de color intenso y el nucleo blanco animado en ambas ventanas.
 - [x] Incluir la variante por rol en la firma de cache para impedir reutilizar el contenedor incorrecto.
 - [x] Verificar automaticamente y mediante smoke visual que los halos siguen visibles en ambas ventanas.
+
+## Extension: clonar luz dinamica
+
+- [x] Conservar el id del elemento bajo el puntero dentro del estado del menu contextual.
+- [x] Mostrar `Clonar luz` exclusivamente al hacer clic derecho sobre una luz dinamica.
+- [x] Implementar una operacion pura que copie todas las propiedades con un id y posicion nuevos.
+- [x] Calcular la posicion en espacio de pantalla para mantener el clon visible, separado y alejado de otros elementos cuando sea posible.
+- [x] Seleccionar el clon y cerrar el menu inmediatamente despues de crearlo.
+- [x] Cubrir la clonacion con pruebas y completar smoke visual.
+- [x] Obtener aceptacion antes de mergear a `main`.
 
 ## Extension: apertura y direccion
 
