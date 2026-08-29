@@ -1,4 +1,10 @@
-import { clampPositive, clampUnit, normalizeHexColor } from "../lighting/lights";
+import {
+  clampAngle,
+  clampPositive,
+  clampUnit,
+  normalizeDirection,
+  normalizeHexColor
+} from "../lighting/lights";
 import type { SceneDynamicLightEffect } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 
@@ -6,6 +12,8 @@ export interface DynamicLightPatch {
   readonly position?: WorldPoint;
   readonly brightRadiusCells?: number;
   readonly dimRadiusCells?: number;
+  readonly apertureDegrees?: number;
+  readonly direction?: number;
   readonly color?: string;
   readonly intensity?: number;
   readonly opacity?: number;
@@ -32,6 +40,8 @@ export function createDynamicLightEffect(
     position,
     brightRadiusCells: 2,
     dimRadiusCells: 4,
+    apertureDegrees: 360,
+    direction: 0,
     color: "#ff9f43",
     intensity: 0.9,
     opacity: 0.85,
@@ -57,6 +67,14 @@ export function updateDynamicLightEffect(
       patch.dimRadiusCells === undefined
         ? effect.dimRadiusCells
         : clampPositive(patch.dimRadiusCells, 0.5),
+    apertureDegrees:
+      patch.apertureDegrees === undefined
+        ? effect.apertureDegrees
+        : clampAngle(patch.apertureDegrees),
+    direction:
+      patch.direction === undefined
+        ? effect.direction
+        : normalizeDirection(patch.direction),
     color: patch.color === undefined ? effect.color : normalizeHexColor(patch.color),
     intensity: patch.intensity === undefined ? effect.intensity : clampUnit(patch.intensity),
     opacity: patch.opacity === undefined ? effect.opacity : clampUnit(patch.opacity),

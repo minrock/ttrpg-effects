@@ -101,6 +101,7 @@ interface PointerDragState {
     | "element-move"
     | "light-rotate"
     | "light-resize"
+    | "dynamic-light-rotate"
     | "shape-end-move"
     | "shape-rotate"
     | "shape-circle-resize"
@@ -142,6 +143,7 @@ export interface PixiViewportOptions {
   readonly onElementMove?: (elementId: string, x: number, y: number) => void;
   readonly onLightDirectionChange?: (elementId: string, direction: number) => void;
   readonly onLightRadiusChange?: (elementId: string, radius: number) => void;
+  readonly onDynamicLightDirectionChange?: (elementId: string, direction: number) => void;
   readonly onShapeEndMove?: (elementId: string, x: number, y: number) => void;
   readonly onPathPointAdd?: (point: WorldPoint) => void;
   readonly onPathPointerMove?: (point: WorldPoint | null) => void;
@@ -1114,6 +1116,7 @@ export class PixiViewport {
         const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
         const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
         const hitMagicalDarknessResizeElementId = this.hitTestMagicalDarknessResizeHandle(point);
+        const hitDynamicLightDirectionElementId = this.hitTestDynamicLightDirectionHandle(point);
         const hitWaterLineRotationElementId = this.hitTestWaterLineRotationHandle(point);
         const hitWaterPatternRotationElementId = this.hitTestWaterPatternRotationHandle(point);
         const hitLightResizeElementId = this.hitTestLightResizeHandle(point);
@@ -1142,6 +1145,11 @@ export class PixiViewport {
           elementId = hitMagicalDarknessResizeElementId;
           this.options.onElementSelect?.(hitMagicalDarknessResizeElementId);
           this.updateMagicalDarknessRadiusFromScreenPoint(hitMagicalDarknessResizeElementId, point);
+        } else if (hitDynamicLightDirectionElementId !== null) {
+          mode = "dynamic-light-rotate";
+          elementId = hitDynamicLightDirectionElementId;
+          this.options.onElementSelect?.(hitDynamicLightDirectionElementId);
+          this.updateDynamicLightDirectionFromScreenPoint(hitDynamicLightDirectionElementId, point);
         } else if (hitWaterLineRotationElementId !== null) {
           mode = "water-line-rotate";
           elementId = hitWaterLineRotationElementId;
@@ -1307,6 +1315,8 @@ export class PixiViewport {
       this.updateLightDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "light-resize" && this.dragState.elementId !== undefined) {
       this.updateLightRadiusFromScreenPoint(this.dragState.elementId, nextPoint);
+    } else if (this.dragState.mode === "dynamic-light-rotate" && this.dragState.elementId !== undefined) {
+      this.updateDynamicLightDirectionFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-end-move" && this.dragState.elementId !== undefined) {
       this.updateLinearShapeEndFromScreenPoint(this.dragState.elementId, nextPoint);
     } else if (this.dragState.mode === "shape-rotate" && this.dragState.elementId !== undefined) {
@@ -1564,6 +1574,13 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  private drawDynamicLightPreviewLayers(): void {
+    this.drawDarkvisionLayer();
+    this.drawDarknessLayer();
+    this.drawLightsLayer();
+    this.drawSelectionLayer();
+  }
+
   private updatePathMovePreview(elementId: string, x: number, y: number): void {
     const shape = this.shapes.find((candidate) => candidate.id === elementId && candidate.type === "path");
     const firstPoint = shape?.points[0];
@@ -1636,6 +1653,8 @@ export class PixiViewport {
         this.options.onFireLightRadiusChange?.(previewEffect.id, previewEffect.lightRadius);
       } else if (dragState.mode === "magical-darkness-resize" && previewEffect.kind === "magical-darkness") {
         this.options.onMagicalDarknessRadiusChange?.(previewEffect.id, previewEffect.radius);
+      } else if (dragState.mode === "dynamic-light-rotate" && previewEffect.kind === "dynamic-light") {
+        this.options.onDynamicLightDirectionChange?.(previewEffect.id, previewEffect.direction);
       } else if (dragState.mode === "water-line-rotate" && previewEffect.kind === "water") {
         this.options.onWaterLineRotationChange?.(previewEffect.id, previewEffect.lineRotation);
       } else if (dragState.mode === "water-pattern-rotate" && previewEffect.kind === "water") {
@@ -2143,6 +2162,21 @@ export class PixiViewport {
 
       if (selectedFireEffect !== undefined) {
         selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect));
+      }
+
+      const selectedDynamicLight = this.getRenderableEffects().find(
+        (effect): effect is SceneDynamicLightEffect =>
+          effect.id === this.selectedElementId && effect.kind === "dynamic-light"
+      );
+
+      if (
+        selectedDynamicLight !== undefined &&
+        selectedDynamicLight.apertureDegrees < 360 &&
+        this.grid !== null
+      ) {
+        selectionLayer.addChild(
+          drawDynamicLightDirectionHandle(selectedDynamicLight, this.grid.cellSizeWorld)
+        );
       }
 
       const selectedMagicalDarkness = this.getRenderableEffects().find(
@@ -2909,6 +2943,25 @@ export class PixiViewport {
       : null;
   }
 
+  private hitTestDynamicLightDirectionHandle(screenPoint: ScreenPoint): string | null {
+    const selectedDynamicLight = this.getSelectedDynamicLightEffect();
+
+    if (selectedDynamicLight === null || selectedDynamicLight.apertureDegrees >= 360) {
+      return null;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const ringRadius = getDynamicLightDirectionRingRadius(this.grid?.cellSizeWorld ?? 100);
+    const distance = Math.hypot(
+      worldPoint.x - selectedDynamicLight.position.x,
+      worldPoint.y - selectedDynamicLight.position.y
+    );
+
+    return distance >= ringRadius - 16 && distance <= ringRadius + 18
+      ? selectedDynamicLight.id
+      : null;
+  }
+
   private getSelectedFireEffect(): SceneFireEffect | null {
     if (this.selectedElementId === null) {
       return null;
@@ -2931,6 +2984,19 @@ export class PixiViewport {
       this.effects.find(
         (effect): effect is SceneMagicalDarknessEffect =>
           effect.id === this.selectedElementId && effect.kind === "magical-darkness"
+      ) ?? null
+    );
+  }
+
+  private getSelectedDynamicLightEffect(): SceneDynamicLightEffect | null {
+    if (this.selectedElementId === null) {
+      return null;
+    }
+
+    return (
+      this.effects.find(
+        (effect): effect is SceneDynamicLightEffect =>
+          effect.id === this.selectedElementId && effect.kind === "dynamic-light"
       ) ?? null
     );
   }
@@ -3015,6 +3081,27 @@ export class PixiViewport {
     const nextRadius = Math.max(10, radius);
     this.previewLights.set(elementId, { ...light, radius: nextRadius });
     this.drawLightDependentPreviewLayers();
+  }
+
+  private updateDynamicLightDirectionFromScreenPoint(
+    elementId: string,
+    screenPoint: ScreenPoint
+  ): void {
+    const effect = this.effects.find(
+      (candidate): candidate is SceneDynamicLightEffect =>
+        candidate.id === elementId && candidate.kind === "dynamic-light"
+    );
+
+    if (effect === undefined || effect.apertureDegrees >= 360) {
+      return;
+    }
+
+    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const direction =
+      (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) /
+      Math.PI;
+    this.previewEffects.set(elementId, { ...effect, direction });
+    this.drawDynamicLightPreviewLayers();
   }
 
   private updateLinearShapeEndFromScreenPoint(elementId: string, screenPoint: ScreenPoint): void {
@@ -3907,6 +3994,8 @@ function getDynamicLightContainerSignature(
     effect.position.y,
     effect.brightRadiusCells,
     effect.dimRadiusCells,
+    effect.apertureDegrees,
+    effect.direction,
     cellSizeWorld,
     effect.color
   ].join(":");
@@ -3922,6 +4011,8 @@ function getDynamicLightMaskSignature(
     effect.position.y,
     effect.brightRadiusCells,
     effect.dimRadiusCells,
+    effect.apertureDegrees,
+    effect.direction,
     cellSizeWorld
   ].join(":");
 }
@@ -4036,7 +4127,9 @@ function haveEffectSelectionChanged(
       return (
         effect.visible !== nextEffect.visible ||
         effect.position.x !== nextEffect.position.x ||
-        effect.position.y !== nextEffect.position.y
+        effect.position.y !== nextEffect.position.y ||
+        effect.apertureDegrees !== nextEffect.apertureDegrees ||
+        effect.direction !== nextEffect.direction
       );
     }
 
@@ -4102,6 +4195,7 @@ function isPreviewCommitDragMode(mode: PointerDragState["mode"]): boolean {
   return (
     mode === "light-rotate" ||
     mode === "light-resize" ||
+    mode === "dynamic-light-rotate" ||
     mode === "shape-end-move" ||
     mode === "shape-rotate" ||
     mode === "shape-circle-resize" ||
@@ -4913,11 +5007,23 @@ function buildDynamicLightEraseGraphicScreen(
   const { x, y } = worldToScreen(effect.position.x, effect.position.y, camera, viewport);
   const brightRadius = effect.brightRadiusCells * cellSizeWorld * camera.zoom;
   const dimRadius = effect.dimRadiusCells * cellSizeWorld * camera.zoom;
-  const graphic = new Graphics()
-    .circle(x, y, dimRadius)
-    .fill({ color: 0xffffff, alpha: 0.42 })
-    .circle(x, y, brightRadius)
-    .fill({ color: 0xffffff, alpha: 1 });
+  const graphic = new Graphics();
+  drawDynamicLightArea(
+    graphic,
+    x,
+    y,
+    dimRadius,
+    effect.apertureDegrees,
+    effect.direction
+  ).fill({ color: 0xffffff, alpha: 0.42 });
+  drawDynamicLightArea(
+    graphic,
+    x,
+    y,
+    brightRadius,
+    effect.apertureDegrees,
+    effect.direction
+  ).fill({ color: 0xffffff, alpha: 1 });
 
   graphic.blendMode = "erase";
   return graphic;
@@ -4956,19 +5062,22 @@ function buildDarkvisionColorMask(
 
   for (const effect of effects) {
     if (isVisibleDynamicLightEffect(effect)) {
-      graphic
-        .circle(
-          effect.position.x,
-          effect.position.y,
-          effect.dimRadiusCells * cellSizeWorld
-        )
-        .fill({ color: 0xffffff, alpha: 0.5 })
-        .circle(
-          effect.position.x,
-          effect.position.y,
-          effect.brightRadiusCells * cellSizeWorld
-        )
-        .fill({ color: 0xffffff, alpha: 1 });
+      drawDynamicLightArea(
+        graphic,
+        effect.position.x,
+        effect.position.y,
+        effect.dimRadiusCells * cellSizeWorld,
+        effect.apertureDegrees,
+        effect.direction
+      ).fill({ color: 0xffffff, alpha: 0.5 });
+      drawDynamicLightArea(
+        graphic,
+        effect.position.x,
+        effect.position.y,
+        effect.brightRadiusCells * cellSizeWorld,
+        effect.apertureDegrees,
+        effect.direction
+      ).fill({ color: 0xffffff, alpha: 1 });
       hasMaskGeometry = true;
       continue;
     }
@@ -5446,12 +5555,22 @@ function drawDynamicLight(
   );
 
   const color = parseHexColor(effect.color);
-  const dimHalo = new Graphics()
-    .circle(0, 0, dimRadiusWorld)
-    .fill({ color, alpha: 0.12 });
-  const brightHalo = new Graphics()
-    .circle(0, 0, effect.brightRadiusCells * cellSizeWorld)
-    .fill({ color, alpha: 0.21 });
+  const dimHalo = drawDynamicLightArea(
+    new Graphics(),
+    0,
+    0,
+    dimRadiusWorld,
+    effect.apertureDegrees,
+    effect.direction
+  ).fill({ color, alpha: 0.12 });
+  const brightHalo = drawDynamicLightArea(
+    new Graphics(),
+    0,
+    0,
+    effect.brightRadiusCells * cellSizeWorld,
+    effect.apertureDegrees,
+    effect.direction
+  ).fill({ color, alpha: 0.21 });
   const sourceDisk = new Graphics()
     .circle(0, 0, cellSizeWorld * 0.5)
     .fill({ color: 0xff7628, alpha: 0.31 });
@@ -6126,6 +6245,31 @@ function drawConeRotationHandle(light: SceneLight): Graphics {
     .fill({ color: 0xfff0a8, alpha: 0.95 });
 }
 
+function drawDynamicLightDirectionHandle(
+  effect: SceneDynamicLightEffect,
+  cellSizeWorld: number
+): Graphics {
+  const ringRadius = getDynamicLightDirectionRingRadius(cellSizeWorld);
+  const angle = (effect.direction * Math.PI) / 180;
+  const handleX = effect.position.x + Math.cos(angle) * ringRadius;
+  const handleY = effect.position.y + Math.sin(angle) * ringRadius;
+
+  return new Graphics()
+    .circle(effect.position.x, effect.position.y, ringRadius)
+    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.75 })
+    .moveTo(effect.position.x, effect.position.y)
+    .lineTo(handleX, handleY)
+    .stroke({ color: 0xfff0a8, width: 3, alpha: 0.85 })
+    .circle(handleX, handleY, 9)
+    .fill({ color: 0x101315, alpha: 0.92 })
+    .circle(handleX, handleY, 6)
+    .fill({ color: 0xfff0a8, alpha: 0.98 });
+}
+
+function getDynamicLightDirectionRingRadius(cellSizeWorld: number): number {
+  return Math.max(52, cellSizeWorld * 0.72);
+}
+
 function drawWaterRotationHandles(effect: SceneWaterEffect): Graphics {
   const lineRadius = getWaterLineRotationRadius(effect);
   const patternRadius = getWaterPatternRotationRadius(effect);
@@ -6290,6 +6434,21 @@ function drawConeShape(
   }
 
   return graphic.closePath();
+}
+
+function drawDynamicLightArea(
+  graphic: Graphics,
+  x: number,
+  y: number,
+  radius: number,
+  apertureDegrees: number,
+  directionDegrees: number
+): Graphics {
+  if (apertureDegrees >= 360) {
+    return graphic.circle(x, y, radius);
+  }
+
+  return drawConeShape(graphic, x, y, radius, apertureDegrees, directionDegrees);
 }
 
 function drawStrokeRevealShapeScreen(

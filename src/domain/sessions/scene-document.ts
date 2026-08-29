@@ -130,6 +130,8 @@ export interface SceneDynamicLightEffect {
   };
   readonly brightRadiusCells: number;
   readonly dimRadiusCells: number;
+  readonly apertureDegrees: number;
+  readonly direction: number;
   readonly color: string;
   readonly intensity: number;
   readonly opacity: number;

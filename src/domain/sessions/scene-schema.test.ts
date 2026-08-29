@@ -275,6 +275,8 @@ describe("scene document schema", () => {
           position: { x: 80, y: 120 },
           brightRadiusCells: 2,
           dimRadiusCells: 4,
+          apertureDegrees: 180,
+          direction: 90,
           color: "#ff9f43",
           intensity: 0.9,
           opacity: 0.85,
@@ -288,6 +290,32 @@ describe("scene document schema", () => {
     const parsedScene = parseSceneDocument(scene);
     expect(parsedScene).toEqual(scene);
     expect(parseSceneJson(serializeSceneDocument(parsedScene))).toEqual(scene);
+  });
+
+  it("defaults legacy dynamic lights to a full aperture", () => {
+    const scene = {
+      ...createDefaultScene(),
+      effects: [
+        {
+          id: "dynamic-light-legacy",
+          kind: "dynamic-light",
+          position: { x: 0, y: 0 },
+          brightRadiusCells: 2,
+          dimRadiusCells: 4,
+          color: "#ff9f43",
+          intensity: 0.9,
+          opacity: 0.85,
+          flicker: 0.55,
+          speed: 1,
+          visible: true
+        }
+      ]
+    };
+
+    expect(parseSceneDocument(scene).effects[0]).toMatchObject({
+      apertureDegrees: 360,
+      direction: 0
+    });
   });
 
   it("rejects invalid magical darkness ranges", () => {
