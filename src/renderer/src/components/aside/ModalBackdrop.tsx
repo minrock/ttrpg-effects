@@ -9,10 +9,23 @@ interface ModalBackdropProps {
   /** 80 vw min-width × 60 vh min-height — for detail / presentation modals */
   readonly large?: boolean;
   readonly fitContent?: boolean;
+  readonly documentLayout?: boolean;
 }
 
-export function ModalBackdrop({ onClose, children, wide = false, large = false, fitContent = false }: ModalBackdropProps): JSX.Element {
-  const panelStyle: React.CSSProperties = fitContent
+export function ModalBackdrop({ onClose, children, wide = false, large = false, fitContent = false, documentLayout = false }: ModalBackdropProps): JSX.Element {
+  const panelStyle: React.CSSProperties = documentLayout
+    ? {
+        width: "min(1240px, calc(100vw - 48px))",
+        height: "min(900px, calc(100vh - 48px))",
+        minHeight: 520,
+        overflow: "hidden",
+        border: "1px solid rgb(255 210 138 / 24%)",
+        borderRadius: 8,
+        color: "#f4f1e8",
+        backgroundColor: "#111315",
+        boxShadow: "0 26px 90px rgba(0,0,0,0.78)"
+      }
+    : fitContent
     ? {
         backgroundColor: "#1e2025",
         border: "1px solid #2e3035",
@@ -64,7 +77,7 @@ export function ModalBackdrop({ onClose, children, wide = false, large = false, 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div style={panelStyle}>
+      <div style={panelStyle} className={documentLayout ? "modal-panel modal-panel--document" : "modal-panel"}>
         {children}
       </div>
     </div>,

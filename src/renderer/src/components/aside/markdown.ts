@@ -4,19 +4,33 @@ import DOMPurify from "dompurify";
 const safeRenderer = new Renderer();
 safeRenderer.html = (): string => "";
 
+const UNDERLINE_OPEN_TOKEN = "TTRPGUNDERLINEOPEN";
+const UNDERLINE_CLOSE_TOKEN = "TTRPGUNDERLINECLOSE";
+
 export function renderMarkdown(markdown: string): string {
-  const html = marked.parse(normalizeLooseMarkdownTables(markdown), {
+  const source = preserveUnderlineMarkup(normalizeLooseMarkdownTables(markdown));
+  const html = marked.parse(source, {
     async: false,
     breaks: false,
     gfm: true,
     renderer: safeRenderer
   }) as string;
 
-  return DOMPurify.sanitize(html, {
+  const restoredHtml = html
+    .replaceAll(UNDERLINE_OPEN_TOKEN, "<u>")
+    .replaceAll(UNDERLINE_CLOSE_TOKEN, "</u>");
+
+  return DOMPurify.sanitize(restoredHtml, {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ["style", "iframe", "object", "embed", "form"],
     FORBID_ATTR: ["style"]
   });
+}
+
+function preserveUnderlineMarkup(markdown: string): string {
+  return markdown
+    .replaceAll(/<u>/gi, UNDERLINE_OPEN_TOKEN)
+    .replaceAll(/<\/u>/gi, UNDERLINE_CLOSE_TOKEN);
 }
 
 function normalizeLooseMarkdownTables(markdown: string): string {
