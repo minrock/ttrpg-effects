@@ -1,4 +1,5 @@
-import { useMemo, useState, type JSX } from "react";
+import { lazy, Suspense, useMemo, useState, type JSX } from "react";
+import { Eye, Pencil } from "lucide-react";
 import type {
   InformationAreaCell,
   InformationAreaType,
@@ -8,6 +9,11 @@ import type {
 import type { WorldPoint } from "../../../../domain/shared/coordinates";
 import { ModalBackdrop } from "../aside/ModalBackdrop";
 import { renderMarkdown } from "../aside/markdown";
+
+const NoteEditor = lazy(async () => {
+  const mod = await import("../aside/NoteEditor");
+  return { default: mod.NoteEditor };
+});
 
 export type MapAnnotationModalDraft =
   | {
@@ -51,6 +57,7 @@ export function MapAnnotationModal({
   const previewHtml = useMemo(() => renderMarkdown(content), [content]);
   const isPin = draft.kind === "room-pin";
   const normalizedTitle = title.trim();
+  const documentType = isPin ? "Habitacion" : areaType === "terrain" ? "Terreno" : "Trampa";
 
   const save = (): void => {
     if (isPin) {
@@ -78,71 +85,73 @@ export function MapAnnotationModal({
   };
 
   return (
-    <ModalBackdrop onClose={onCancel} wide>
-      <div className="annotation-modal">
-        <div className="annotation-modal__header">
+    <ModalBackdrop onClose={onCancel} documentLayout>
+      <div className="document-modal annotation-document-modal">
+        <header className="document-modal__context">
           <div>
-            <h2>{isPin ? "Pin de habitacion" : "Area de informacion"}</h2>
-            <p>{draft.initial === undefined ? "Crear anotacion" : "Editar anotacion"}</p>
+            <small>{draft.initial === undefined ? "Crear anotacion" : "Editar anotacion"}</small>
+            <span>{documentType}</span>
           </div>
-          <div className="annotation-modal__tabs" role="tablist" aria-label="Modo de contenido">
-            <button type="button" className={!isPreview ? "is-active" : ""} onClick={() => setIsPreview(false)}>
-              Editar
-            </button>
-            <button type="button" className={isPreview ? "is-active" : ""} onClick={() => setIsPreview(true)}>
-              Vista previa
-            </button>
+
+          <div className="annotation-document-modal__controls">
+            {!isPin ? (
+              <label>
+                <span>Tipo</span>
+                <select value={areaType} onChange={(event) => setAreaType(event.currentTarget.value as InformationAreaType)}>
+                  <option value="terrain">Terreno</option>
+                  <option value="trap">Trampa</option>
+                </select>
+              </label>
+            ) : null}
+            <div className="document-mode-tabs" role="tablist" aria-label="Modo del documento">
+              <button type="button" className={!isPreview ? "is-active" : ""} onClick={() => setIsPreview(false)}>
+                <Pencil aria-hidden="true" />
+                Editar
+              </button>
+              <button type="button" className={isPreview ? "is-active" : ""} onClick={() => setIsPreview(true)}>
+                <Eye aria-hidden="true" />
+                Vista previa
+              </button>
+            </div>
           </div>
-        </div>
+        </header>
 
-        {!isPin ? (
-          <label>
-            Tipo
-            <select value={areaType} onChange={(event) => setAreaType(event.currentTarget.value as InformationAreaType)}>
-              <option value="terrain">Terreno</option>
-              <option value="trap">Trampa</option>
-            </select>
-          </label>
-        ) : null}
+        <main className="document-modal__body">
+          {isPreview ? (
+            <div className="document-preview">
+              <small>{documentType}</small>
+              <h1>{normalizedTitle || (isPin ? "Habitacion sin nombre" : "Area sin nombre")}</h1>
+              <div className="markdown-content document-preview__content" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            </div>
+          ) : (
+            <Suspense fallback={<div className="document-modal__loading">Cargando editor...</div>}>
+              <NoteEditor
+                initialContent={content}
+                onChange={setContent}
+                variant="document"
+                placeholder={isPin ? "Describe la habitacion, sus detalles y secretos..." : "Describe el terreno o la trampa..."}
+                titleField={(
+                  <input
+                    autoFocus
+                    className="note-editor__title"
+                    aria-label={isPin ? "Nombre de la habitacion" : "Nombre del area"}
+                    maxLength={120}
+                    value={title}
+                    onChange={(event) => setTitle(event.currentTarget.value)}
+                    placeholder={isPin ? "Nombre de la habitacion" : "Nombre del area (opcional)"}
+                  />
+                )}
+              />
+            </Suspense>
+          )}
+        </main>
 
-        {isPreview ? (
-          <div className="annotation-modal__preview-title">
-            <small>{isPin ? "Habitacion" : areaType === "terrain" ? "Terreno" : "Trampa"}</small>
-            <strong>{normalizedTitle || (isPin ? "Sin nombre" : "Area sin nombre")}</strong>
-          </div>
-        ) : (
-          <label>
-            {isPin ? "Nombre de la habitacion" : "Nombre (opcional)"}
-            <input
-              autoFocus
-              maxLength={120}
-              value={title}
-              onChange={(event) => setTitle(event.currentTarget.value)}
-            />
-          </label>
-        )}
-
-        {isPreview ? (
-          <div className="markdown-content annotation-modal__preview" dangerouslySetInnerHTML={{ __html: previewHtml }} />
-        ) : (
-          <label>
-            {isPin ? "Informacion" : "Descripcion"}
-            <textarea
-              rows={12}
-              maxLength={100_000}
-              value={content}
-              onChange={(event) => setContent(event.currentTarget.value)}
-              placeholder="Markdown"
-            />
-          </label>
-        )}
-
-        <div className="modal-actions">
+        <footer className="document-modal__footer">
           <button type="button" onClick={onCancel}>Cancelar</button>
           <button type="button" className="is-primary" onClick={save} disabled={isPin && normalizedTitle === ""}>
             Guardar
           </button>
-        </div>
+        </footer>
       </div>
     </ModalBackdrop>
   );

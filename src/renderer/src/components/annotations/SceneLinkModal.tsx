@@ -1,4 +1,5 @@
 import { useState, type JSX } from "react";
+import { ExternalLink, Link2, MapPinned, Save, Unlink, X } from "lucide-react";
 import type {
   MapSceneLinkMarker,
   SceneLinkCandidateFile,
@@ -76,9 +77,7 @@ export function SceneLinkModal({
     setBusy(true);
     setError(null);
     try {
-      if (!await onRename(trimmedName)) {
-        setError("No fue posible guardar el nuevo nombre del punto.");
-      }
+      if (!await onRename(trimmedName)) setError("No fue posible guardar el nuevo nombre del punto.");
     } catch (renameError) {
       setError(renameError instanceof Error ? renameError.message : "No fue posible guardar el nuevo nombre del punto.");
     } finally {
@@ -97,79 +96,119 @@ export function SceneLinkModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop scene-link-backdrop" onClick={onClose}>
       <section className="scene-link-modal" role="dialog" aria-modal="true" aria-labelledby="scene-link-title" onClick={(event) => event.stopPropagation()}>
         <header className="scene-link-modal__header">
-          <div>
-            <small>Conexion entre escenas</small>
-            <h2 id="scene-link-title">{marker.name}</h2>
+          <div className="scene-link-modal__identity">
+            <span className="scene-link-modal__icon"><MapPinned aria-hidden="true" /></span>
+            <div>
+              <small>Habitacion enlazada</small>
+              <h2 id="scene-link-title">{marker.name}</h2>
+            </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Cerrar">✕</button>
+          <button type="button" className="scene-link-modal__close" onClick={onClose} aria-label="Cerrar">
+            <X aria-hidden="true" />
+          </button>
         </header>
 
-        <label>
-          Nombre del punto
-          <input value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} />
-        </label>
-        <button
-          type="button"
-          onClick={() => void rename()}
-          disabled={busy || name.trim() === "" || name.trim() === marker.name}
-        >
-          Guardar nombre
-        </button>
+        <div className="scene-link-modal__body">
+          <section className="scene-link-panel">
+            <div className="scene-link-panel__heading">
+              <div>
+                <small>Identidad</small>
+                <h3>Nombre del punto</h3>
+              </div>
+            </div>
+            <div className="scene-link-name-row">
+              <input aria-label="Nombre del punto" value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} />
+              <button
+                type="button"
+                title="Guardar nombre"
+                onClick={() => void rename()}
+                disabled={busy || name.trim() === "" || name.trim() === marker.name}
+              >
+                <Save aria-hidden="true" />
+                Guardar
+              </button>
+            </div>
 
-        <div className={`scene-link-status is-${status.state}`}>
-          <strong>{statusLabel(status)}</strong>
-          {status.state === "broken" ? <span>{status.message}</span> : null}
-          {marker.connection !== null ? <span>{marker.connection.peer.scenePath}</span> : null}
+            <div className={`scene-link-status is-${status.state}`}>
+              <span className="scene-link-status__dot" aria-hidden="true" />
+              <div>
+                <strong>{statusLabel(status)}</strong>
+                {status.state === "broken" ? <span>{status.message}</span> : null}
+                {marker.connection !== null ? <span>{marker.connection.peer.scenePath}</span> : null}
+              </div>
+            </div>
+          </section>
+
+          <section className="scene-link-panel">
+            <div className="scene-link-panel__heading">
+              <div>
+                <small>Destino</small>
+                <h3>Escena y punto de entrada</h3>
+              </div>
+              <Link2 aria-hidden="true" />
+            </div>
+
+            {currentScenePath === null ? (
+              <p className="sidebar-hint">La escena se guardara antes de configurar la conexion.</p>
+            ) : null}
+
+            <button type="button" className="scene-link-file-button" onClick={() => void chooseTargetFile()} disabled={busy}>
+              {marker.connection === null ? "Elegir escena destino" : "Reconfigurar conexion"}
+            </button>
+
+            {candidate !== null ? (
+              <div className="scene-link-candidates">
+                <strong>{fileName(candidate.filePath)}</strong>
+                {candidate.markers.length === 0 ? <p>No hay puntos de conexion en esta escena.</p> : (
+                  <label>
+                    Punto de entrada
+                    <select value={selectedMarkerId} onChange={(event) => setSelectedMarkerId(event.currentTarget.value)}>
+                      <option value="">Selecciona un punto</option>
+                      {candidate.markers.map((item) => (
+                        <option key={item.id} value={item.id} disabled={!item.available}>
+                          {item.name}{item.available ? "" : " (ocupado)"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                <button type="button" className="is-primary" onClick={() => void connect()} disabled={busy || selectedMarkerId === ""}>
+                  <Link2 aria-hidden="true" />
+                  Conectar habitaciones
+                </button>
+              </div>
+            ) : null}
+          </section>
         </div>
 
-        {currentScenePath === null ? (
-          <p className="sidebar-hint">La escena se guardara antes de configurar la conexion.</p>
-        ) : null}
+        {error !== null ? <p className="form-error scene-link-modal__error">{error}</p> : null}
 
-        <button type="button" onClick={() => void chooseTargetFile()} disabled={busy}>
-          {marker.connection === null ? "Elegir escena destino" : "Reconfigurar conexion"}
-        </button>
-
-        {candidate !== null ? (
-          <div className="scene-link-candidates">
-            <strong>{fileName(candidate.filePath)}</strong>
-            {candidate.markers.length === 0 ? <p>No hay puntos de conexion en esta escena.</p> : (
-              <label>
-                Punto de entrada
-                <select value={selectedMarkerId} onChange={(event) => setSelectedMarkerId(event.currentTarget.value)}>
-                  <option value="">Selecciona un punto</option>
-                  {candidate.markers.map((item) => (
-                    <option key={item.id} value={item.id} disabled={!item.available}>
-                      {item.name}{item.available ? "" : " (ocupado)"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <button type="button" className="is-primary" onClick={() => void connect()} disabled={busy || selectedMarkerId === ""}>
-              Conectar
-            </button>
+        <footer className="scene-link-modal__footer">
+          <button type="button" onClick={onClose}>Cancelar</button>
+          <div>
+            {marker.connection !== null ? (
+              <>
+                <button type="button" onClick={() => void onNavigate()} disabled={busy}>
+                  <ExternalLink aria-hidden="true" />
+                  Abrir escena
+                </button>
+                <button
+                  type="button"
+                  className="is-danger"
+                  title="Liberar los dos puntos de esta conexion"
+                  onClick={() => void disconnect()}
+                  disabled={busy}
+                >
+                  <Unlink aria-hidden="true" />
+                  Desligar
+                </button>
+              </>
+            ) : null}
           </div>
-        ) : null}
-
-        {marker.connection !== null ? (
-          <div className="modal-actions">
-            <button type="button" onClick={() => void onNavigate()} disabled={busy}>Abrir escena conectada</button>
-            <button
-              type="button"
-              className="is-danger"
-              title="Liberar los dos puntos de esta conexion"
-              onClick={() => void disconnect()}
-              disabled={busy}
-            >
-              Desligar
-            </button>
-          </div>
-        ) : null}
-        {error !== null ? <p className="form-error">{error}</p> : null}
+        </footer>
       </section>
     </div>
   );

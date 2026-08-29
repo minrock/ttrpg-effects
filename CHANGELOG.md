@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.7.0] - 2026-08-28
+
+### Added
+
+- Editor enriquecido para notas e informacion de habitaciones con encabezados, listas, enfasis, subrayado, tachado y enlaces.
+- Vista previa del documento antes de guardar o volver a editar.
+
+### Changed
+
+- Los editores de notas y habitaciones ahora usan una experiencia documental amplia alineada con el lenguaje visual de la aplicacion.
+- El modal de habitaciones enlazadas adopta la misma jerarquia visual y conserva los colores principales de TTRPG Effects.
+- El render Markdown admite subrayado controlado sin habilitar HTML arbitrario.
+
 ## [1.6.0] - 2026-08-28
 
 ### Added
