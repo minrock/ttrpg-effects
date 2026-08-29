@@ -54,8 +54,8 @@ export function MapAnnotationModal({
     draft.kind === "information-area" ? draft.initial?.areaType ?? "terrain" : "terrain"
   );
   const [isPreview, setIsPreview] = useState(draft.initialMode === "preview");
-  const previewHtml = useMemo(() => renderMarkdown(content), [content]);
   const isPin = draft.kind === "room-pin";
+  const previewHtml = useMemo(() => renderMarkdown(content, { callouts: isPin }), [content, isPin]);
   const normalizedTitle = title.trim();
   const documentType = isPin ? "Habitacion" : areaType === "terrain" ? "Terreno" : "Trampa";
 
@@ -129,6 +129,7 @@ export function MapAnnotationModal({
                 initialContent={content}
                 onChange={setContent}
                 variant="document"
+                enableCallouts={isPin}
                 placeholder={isPin ? "Describe la habitacion, sus detalles y secretos..." : "Describe el terreno o la trampa..."}
                 titleField={(
                   <input

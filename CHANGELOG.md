@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.7.4] - 2026-08-29
+
+### Added
+
+- Bloques `callout` reutilizables en el editor enriquecido de habitaciones, con contenido Markdown, emoji opcional y color principal configurable.
+- Fondo pastel derivado al 80% del color principal y linea lateral con el color original, visibles de forma equivalente durante edicion y vista previa.
+- Persistencia segura mediante la directiva Markdown `:::callout`, sin cambiar el formato estructural de `.ttrpgscene`.
+
+### Fixed
+
+- Los controles contextuales del callout permanecen visibles cuando el cursor esta dentro de su contenido.
+- El campo de emoji conserva el foco al hacer clic y permite agregar, reemplazar o retirar su valor sin devolver el foco al documento.
+
 ## [1.7.3] - 2026-08-29
 
 ### Added

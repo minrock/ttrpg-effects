@@ -9,6 +9,7 @@ import {
   Link2,
   List,
   ListOrdered,
+  MessageSquare,
   Strikethrough,
   Unlink,
   Underline as UnderlineIcon
@@ -19,6 +20,7 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import { Markdown } from "tiptap-markdown";
+import { Callout } from "./CalloutExtension";
 
 interface NoteEditorProps {
   readonly initialContent: string;
@@ -26,6 +28,7 @@ interface NoteEditorProps {
   readonly placeholder?: string;
   readonly titleField?: ReactNode;
   readonly variant?: "compact" | "document";
+  readonly enableCallouts?: boolean;
 }
 
 interface ToolbarState {
@@ -39,6 +42,7 @@ interface ToolbarState {
   readonly underline: boolean;
   readonly strike: boolean;
   readonly link: boolean;
+  readonly callout: boolean;
 }
 
 const inactiveToolbarState: ToolbarState = {
@@ -51,7 +55,8 @@ const inactiveToolbarState: ToolbarState = {
   italic: false,
   underline: false,
   strike: false,
-  link: false
+  link: false,
+  callout: false
 };
 
 export function NoteEditor({
@@ -59,7 +64,8 @@ export function NoteEditor({
   onChange,
   placeholder = "Escribe la informacion aqui...",
   titleField,
-  variant = "compact"
+  variant = "compact",
+  enableCallouts = false
 }: NoteEditorProps): JSX.Element {
   const [linkEditorOpen, setLinkEditorOpen] = useState(false);
   const [linkDraft, setLinkDraft] = useState("");
@@ -69,6 +75,7 @@ export function NoteEditor({
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
       Placeholder.configure({ placeholder }),
       Underline,
+      ...(enableCallouts ? [Callout] : []),
       Markdown.configure({ transformPastedText: false, transformCopiedText: true })
     ],
     content: initialContent,
@@ -96,7 +103,8 @@ export function NoteEditor({
           italic: currentEditor.isActive("italic"),
           underline: currentEditor.isActive("underline"),
           strike: currentEditor.isActive("strike"),
-          link: currentEditor.isActive("link")
+          link: currentEditor.isActive("link"),
+          callout: currentEditor.isActive("callout")
         }
   }) ?? inactiveToolbarState;
 
@@ -168,6 +176,21 @@ export function NoteEditor({
         <ToolbarButton label={toolbarState.link ? "Editar enlace" : "Agregar enlace"} active={toolbarState.link} onClick={openLinkEditor}>
           <Link2 aria-hidden="true" />
         </ToolbarButton>
+        {enableCallouts ? (
+          <>
+            <span className="note-editor__toolbar-divider" aria-hidden="true" />
+            <ToolbarButton
+              label={toolbarState.callout ? "Callout activo" : "Insertar callout"}
+              active={toolbarState.callout}
+              onClick={() => {
+                if (toolbarState.callout) editor?.commands.focus();
+                else editor?.chain().focus().insertCallout().run();
+              }}
+            >
+              <MessageSquare aria-hidden="true" />
+            </ToolbarButton>
+          </>
+        ) : null}
       </div>
 
       {linkEditorOpen ? (
