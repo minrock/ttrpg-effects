@@ -36,6 +36,10 @@ import type { PlayerCameraControlViewState } from "../../../domain/player/player
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
+  getNearbyVisibleWorldPoint: (
+    origin: { readonly x: number; readonly y: number },
+    excludedElementId?: string
+  ) => { readonly x: number; readonly y: number };
   setPathHoverPoint: (point: { readonly x: number; readonly y: number } | null) => void;
   setWaterHoverPoint: (point: { readonly x: number; readonly y: number } | null) => void;
   centerOnWorldPoint: (point: { readonly x: number; readonly y: number }) => void;
@@ -215,6 +219,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
 
   useImperativeHandle(ref, () => ({
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
+    getNearbyVisibleWorldPoint: (origin, excludedElementId) =>
+      viewportRef.current?.getNearbyVisibleWorldPoint(origin, excludedElementId) ?? origin,
     setPathHoverPoint: (point) => viewportRef.current?.setPathHoverPoint(point),
     setWaterHoverPoint: (point) => viewportRef.current?.setWaterHoverPoint(point),
     centerOnWorldPoint: (point) => viewportRef.current?.centerOnWorldPoint(point),

@@ -51,6 +51,21 @@ export function createDynamicLightEffect(
   };
 }
 
+export function cloneDynamicLightEffect(
+  effect: SceneDynamicLightEffect,
+  id: string,
+  position: WorldPoint
+): SceneDynamicLightEffect {
+  assertId(id);
+  assertFinitePoint(position);
+
+  return {
+    ...effect,
+    id,
+    position: { ...position }
+  };
+}
+
 export function updateDynamicLightEffect(
   effect: SceneDynamicLightEffect,
   patch: DynamicLightPatch

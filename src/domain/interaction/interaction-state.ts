@@ -19,6 +19,7 @@ export type InteractionTool =
 export interface ContextMenuState {
   readonly screen: ScreenPoint;
   readonly world: WorldPoint;
+  readonly targetElementId?: string | null;
 }
 
 export interface InteractionState {

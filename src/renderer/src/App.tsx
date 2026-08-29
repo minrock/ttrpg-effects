@@ -66,6 +66,7 @@ import {
   type MagicalDarknessPatch
 } from "../../domain/effects/magical-darkness";
 import {
+  cloneDynamicLightEffect,
   createDynamicLightSavePayload,
   createDynamicLightEffect,
   updateDynamicLightEffect,
@@ -104,6 +105,7 @@ import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import type {
   SceneDocument,
+  SceneDynamicLightEffect,
   SceneFireEffect,
   SceneOperationResult,
   SceneToken
@@ -458,7 +460,12 @@ export function App(): JSX.Element {
   }, [scene]);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
-    setInteraction((current) => openContextMenu(current, request));
+    setInteraction((current) => {
+      const opened = openContextMenu(current, request);
+      return request.targetElementId === null
+        ? opened
+        : { ...opened, selectedElementId: request.targetElementId };
+    });
   }, []);
 
   useLayoutEffect(() => {
@@ -1017,6 +1024,37 @@ export function App(): JSX.Element {
       effects: [...current.effects, effect]
     }));
     setInteraction((current) => selectElement(closeContextMenu(current), id));
+  };
+
+  const handleCloneDynamicLight = (): void => {
+    const targetElementId = interaction.contextMenu?.targetElementId;
+    if (targetElementId === null || targetElementId === undefined) {
+      return;
+    }
+
+    const source = sceneRef.current.effects.find(
+      (effect): effect is SceneDynamicLightEffect =>
+        effect.id === targetElementId && effect.kind === "dynamic-light"
+    );
+    if (source === undefined) {
+      setInteraction((current) => closeContextMenu(current));
+      return;
+    }
+
+    const id = getNextAvailableSceneId(sceneRef.current, ["dynamic-light-"], nextEffectId);
+    const fallbackDistance = Math.max(sceneRef.current.grid.cellSizeWorld * 1.75, 100);
+    const position = viewportHandleRef.current?.getNearbyVisibleWorldPoint(source.position, source.id) ?? {
+      x: source.position.x + fallbackDistance,
+      y: source.position.y
+    };
+    const clone = cloneDynamicLightEffect(source, id, position);
+
+    setScene((current) => ({
+      ...current,
+      effects: [...current.effects, clone]
+    }));
+    setInteraction((current) => selectElement(closeContextMenu(current), id));
+    setFeedback("Luz dinamica clonada.");
   };
 
   const handleCreateLabel = (): void => {
@@ -2475,6 +2513,14 @@ export function App(): JSX.Element {
     selectedEffect?.kind === "fire" ? selectedEffect : undefined;
   const selectedDynamicLight =
     selectedEffect?.kind === "dynamic-light" ? selectedEffect : undefined;
+  const contextMenuDynamicLight =
+    interaction.contextMenu?.targetElementId === null ||
+    interaction.contextMenu?.targetElementId === undefined
+      ? undefined
+      : scene.effects.find(
+          (effect) =>
+            effect.id === interaction.contextMenu?.targetElementId && effect.kind === "dynamic-light"
+        );
   const selectedMagicalDarkness =
     selectedEffect?.kind === "magical-darkness" ? selectedEffect : undefined;
   const selectedWaterEffect =
@@ -4339,6 +4385,9 @@ export function App(): JSX.Element {
             <button type="button" onClick={handleToggleContextMenuZoomLock}>
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
             </button>
+            {contextMenuDynamicLight !== undefined ? (
+              <button type="button" onClick={handleCloneDynamicLight}>Clonar luz</button>
+            ) : null}
             <hr aria-hidden="true" />
             <button type="button" onClick={handleCreateLabel}>
               Crear label DM

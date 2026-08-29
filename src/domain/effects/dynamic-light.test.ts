@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cloneDynamicLightEffect,
   createDynamicLightEffect,
   createDynamicLightSavePayload,
   updateDynamicLightEffect
@@ -21,6 +22,30 @@ describe("dynamic light effects", () => {
       flicker: 0.55,
       speed: 1,
       visible: true
+    });
+  });
+
+  it("clones every visual property with a new identity and position", () => {
+    const source = updateDynamicLightEffect(
+      createDynamicLightEffect("dynamic-light-1", { x: 20, y: 40 }),
+      {
+        brightRadiusCells: 3,
+        dimRadiusCells: 7,
+        apertureDegrees: 120,
+        direction: 215,
+        color: "#22aaff",
+        intensity: 0.6,
+        opacity: 0.7,
+        flicker: 0.2,
+        speed: 2.5,
+        visible: false
+      }
+    );
+
+    expect(cloneDynamicLightEffect(source, "dynamic-light-2", { x: 180, y: 240 })).toEqual({
+      ...source,
+      id: "dynamic-light-2",
+      position: { x: 180, y: 240 }
     });
   });
 

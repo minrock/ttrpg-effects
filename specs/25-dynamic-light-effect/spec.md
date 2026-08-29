@@ -5,6 +5,7 @@
 - Implementacion base aceptada y mergeada en `1.5.4`.
 - Extension de apertura y direccion aceptada para la version `1.6.0`.
 - Indicador de fuente exclusivo del DM corregido y cerrado en `1.7.1`.
+- Clonacion de luces dinamicas y fuente visual diferenciada por vista aceptadas y cerradas en `1.7.3`.
 
 ## Objetivo
 
@@ -46,7 +47,11 @@ La implementacion debe producir su propia animacion con PixiJS. No debe copiar n
     - angulo personalizado entre `1°` y `359°`, usando `90°` al entrar por primera vez en este modo.
 15. Las aperturas menores a `360°` tienen una direccion editable entre `0°` y `359°`.
 16. Al seleccionar una luz direccional, una manivela circular permite cambiar su orientacion directamente sobre el mapa.
-17. Los circulos concentricos de la fuente son feedback editorial exclusivo del DM y no deben mostrarse en la ventana del jugador.
+17. El disco naranja exterior que ubica la fuente es feedback editorial exclusivo del DM y no debe mostrarse en la ventana del jugador.
+18. El nucleo blanco y el circulo interior de color intenso forman parte del efecto de luz y deben renderizarse tanto en DM como en Player View.
+19. Al hacer clic derecho directamente sobre una luz dinamica debe aparecer la accion `Clonar luz`.
+20. El clon conserva visibilidad, color, cobertura, direccion, radios, intensidad, opacidad, variacion y velocidad, pero recibe un id y una posicion nuevos.
+21. La posicion del clon debe permanecer dentro del viewport, separarse visualmente de la fuente y evitar otros objetos visibles cuando haya espacio disponible.
 
 ## Comportamiento visual
 
@@ -59,7 +64,8 @@ La implementacion debe producir su propia animacion con PixiJS. No debe copiar n
 - Los alcances efectivos permanecen estables durante la animacion; solo cambia la luminancia.
 - La apertura recorta por igual el halo tenue, el halo fuerte y el area que atraviesa oscuridad o recupera color en darkvision.
 - La fuente central conserva su forma circular de una celda aunque la emision sea semicircular o angular.
-- El Player View recibe los halos y la iluminacion, pero no los circulos naranjas usados para ubicar la fuente en el editor del DM.
+- El Player View recibe los halos, el circulo interior intenso y el nucleo blanco, pero no el disco naranja usado para ubicar la fuente en el editor del DM.
+- La luz clonada queda seleccionada inmediatamente para poder moverla o editarla sin confundirla con la original.
 
 ## Rendimiento
 
@@ -99,3 +105,4 @@ El efecto se guarda en `effects` con `kind: "dynamic-light"` y los campos necesa
 - Una luz de `180°` se renderiza como semicirculo y una de `90°` como cuarto de circulo orientable.
 - La manivela rota en tiempo real el halo visible y las mascaras de oscuridad/darkvision de forma coincidente.
 - Guardar y cargar conserva apertura y direccion; las luces antiguas siguen siendo circulares completas.
+- El menu ofrece `Clonar luz` solo cuando el clic derecho apunta a una luz dinamica y el clon reproduce todas sus propiedades salvo id y posicion.
