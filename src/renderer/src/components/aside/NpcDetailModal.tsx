@@ -1,20 +1,22 @@
-import { useMemo, useEffect, useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
-import { renderMarkdown } from "./markdown";
+import { RichTextPreview } from "./RichTextPreview";
 
 interface NpcDetailModalProps {
   readonly npc: SceneNpc;
   readonly onClose: () => void;
   readonly onToggleVisibility: () => void;
   readonly onEdit: () => void;
+  readonly onNotesChange: (notes: string) => void;
 }
 
 export function NpcDetailModal({
   npc,
   onClose,
   onToggleVisibility,
-  onEdit
+  onEdit,
+  onNotesChange
 }: NpcDetailModalProps): JSX.Element {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -22,11 +24,6 @@ export function NpcDetailModal({
     if (npc.imagePath === null) { setImageUrl(null); return; }
     void window.ttrpg?.resolveAsideUrl(npc.imagePath).then((url) => setImageUrl(url ?? null));
   }, [npc.imagePath]);
-
-  const notesHtml = useMemo(() => {
-    if (npc.notes.trim() === "") return "";
-    return renderMarkdown(npc.notes);
-  }, [npc.notes]);
 
   return (
     <ModalBackdrop onClose={onClose} large>
@@ -49,13 +46,14 @@ export function NpcDetailModal({
       </div>
 
       {/* Notes */}
-      {notesHtml !== "" && (
+      {npc.notes.trim() !== "" && (
         <div style={notesSectionStyle}>
           <div style={labelStyle}>Notas</div>
-          <div
-            className="markdown-content"
-            style={{ color: "#ccc", fontSize: 13, lineHeight: 1.65 }}
-            dangerouslySetInnerHTML={{ __html: notesHtml }}
+          <RichTextPreview
+            markdown={npc.notes}
+            mode="dm-editable"
+            onChange={onNotesChange}
+            contentClassName="entity-notes-preview"
           />
         </div>
       )}

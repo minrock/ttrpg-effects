@@ -1,26 +1,28 @@
-import { useEffect, useState, type FormEvent, type JSX, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type JSX, type ReactNode } from "react";
 import {
+  BetweenHorizontalEnd,
+  BetweenVerticalEnd,
   Bold,
   Check,
+  Columns3,
   Heading1,
   Heading2,
   Heading3,
   Italic,
   Link2,
   List,
+  ListChecks,
   ListOrdered,
   MessageSquare,
+  Rows3,
   Strikethrough,
+  Table2,
+  Trash2,
   Unlink,
   Underline as UnderlineIcon
 } from "lucide-react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import Link from "@tiptap/extension-link";
-import Placeholder from "@tiptap/extension-placeholder";
-import Underline from "@tiptap/extension-underline";
-import { Markdown } from "tiptap-markdown";
-import { Callout } from "./CalloutExtension";
+import { createRichTextExtensions, getEditorMarkdown } from "./rich-text-extensions";
 
 interface NoteEditorProps {
   readonly initialContent: string;
@@ -28,7 +30,6 @@ interface NoteEditorProps {
   readonly placeholder?: string;
   readonly titleField?: ReactNode;
   readonly variant?: "compact" | "document";
-  readonly enableCallouts?: boolean;
 }
 
 interface ToolbarState {
@@ -43,6 +44,13 @@ interface ToolbarState {
   readonly strike: boolean;
   readonly link: boolean;
   readonly callout: boolean;
+  readonly table: boolean;
+  readonly taskList: boolean;
+  readonly canAddRow: boolean;
+  readonly canDeleteRow: boolean;
+  readonly canAddColumn: boolean;
+  readonly canDeleteColumn: boolean;
+  readonly canDeleteTable: boolean;
 }
 
 const inactiveToolbarState: ToolbarState = {
@@ -56,7 +64,14 @@ const inactiveToolbarState: ToolbarState = {
   underline: false,
   strike: false,
   link: false,
-  callout: false
+  callout: false,
+  table: false,
+  taskList: false,
+  canAddRow: false,
+  canDeleteRow: false,
+  canAddColumn: false,
+  canDeleteColumn: false,
+  canDeleteTable: false
 };
 
 export function NoteEditor({
@@ -64,36 +79,29 @@ export function NoteEditor({
   onChange,
   placeholder = "Escribe la informacion aqui...",
   titleField,
-  variant = "compact",
-  enableCallouts = false
+  variant = "compact"
 }: NoteEditorProps): JSX.Element {
   const [linkEditorOpen, setLinkEditorOpen] = useState(false);
   const [linkDraft, setLinkDraft] = useState("");
+  const extensions = useMemo(() => createRichTextExtensions(placeholder), [placeholder]);
   const editor = useEditor({
-    extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
-      Placeholder.configure({ placeholder }),
-      Underline,
-      ...(enableCallouts ? [Callout] : []),
-      Markdown.configure({ transformPastedText: false, transformCopiedText: true })
-    ],
+    extensions,
     content: initialContent,
     editorProps: {
       attributes: { class: "note-editor__content" }
     },
     onUpdate({ editor: currentEditor }) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const markdown = (currentEditor.storage as any).markdown?.getMarkdown?.() as string | undefined ?? "";
-      onChange(markdown);
+      onChange(getEditorMarkdown(currentEditor.storage));
     }
-  });
+  }, [extensions]);
 
   const toolbarState = useEditorState({
     editor,
-    selector: ({ editor: currentEditor }): ToolbarState => currentEditor === null
-      ? inactiveToolbarState
-      : {
+    selector: ({ editor: currentEditor }): ToolbarState => {
+      if (currentEditor === null || currentEditor.isDestroyed) return inactiveToolbarState;
+
+      const table = currentEditor.isActive("table");
+      return {
           heading1: currentEditor.isActive("heading", { level: 1 }),
           heading2: currentEditor.isActive("heading", { level: 2 }),
           heading3: currentEditor.isActive("heading", { level: 3 }),
@@ -104,14 +112,21 @@ export function NoteEditor({
           underline: currentEditor.isActive("underline"),
           strike: currentEditor.isActive("strike"),
           link: currentEditor.isActive("link"),
-          callout: currentEditor.isActive("callout")
-        }
+          callout: currentEditor.isActive("callout"),
+          table,
+          taskList: currentEditor.isActive("taskList"),
+          canAddRow: table && currentEditor.can().addRowAfter(),
+          canDeleteRow: table && currentEditor.can().deleteRow(),
+          canAddColumn: table && currentEditor.can().addColumnAfter(),
+          canDeleteColumn: table && currentEditor.can().deleteColumn(),
+          canDeleteTable: table && currentEditor.can().deleteTable()
+        };
+    }
   }) ?? inactiveToolbarState;
 
   useEffect(() => {
     if (editor === null || editor.isDestroyed) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const current = (editor.storage as any).markdown?.getMarkdown?.() as string | undefined ?? "";
+    const current = getEditorMarkdown(editor.storage);
     if (current !== initialContent) editor.commands.setContent(initialContent);
   }, [editor, initialContent]);
 
@@ -159,6 +174,17 @@ export function NoteEditor({
         <ToolbarButton label="Lista numerada" active={toolbarState.orderedList} onClick={() => editor?.chain().focus().toggleOrderedList().run()}>
           <ListOrdered aria-hidden="true" />
         </ToolbarButton>
+        <ToolbarButton
+          label={toolbarState.table ? "Insertar checkbox en celda" : "Lista de verificacion"}
+          active={toolbarState.taskList}
+          onClick={() => {
+            if (editor === null) return;
+            if (toolbarState.table) editor.chain().focus().insertTableTaskCheckbox().run();
+            else editor.chain().focus().toggleTaskList().run();
+          }}
+        >
+          <ListChecks aria-hidden="true" />
+        </ToolbarButton>
         <span className="note-editor__toolbar-divider" aria-hidden="true" />
         <ToolbarButton label="Negrita" active={toolbarState.bold} onClick={() => editor?.chain().focus().toggleBold().run()}>
           <Bold aria-hidden="true" />
@@ -176,20 +202,42 @@ export function NoteEditor({
         <ToolbarButton label={toolbarState.link ? "Editar enlace" : "Agregar enlace"} active={toolbarState.link} onClick={openLinkEditor}>
           <Link2 aria-hidden="true" />
         </ToolbarButton>
-        {enableCallouts ? (
-          <>
-            <span className="note-editor__toolbar-divider" aria-hidden="true" />
-            <ToolbarButton
-              label={toolbarState.callout ? "Callout activo" : "Insertar callout"}
-              active={toolbarState.callout}
-              onClick={() => {
-                if (toolbarState.callout) editor?.commands.focus();
-                else editor?.chain().focus().insertCallout().run();
-              }}
-            >
-              <MessageSquare aria-hidden="true" />
+        <span className="note-editor__toolbar-divider" aria-hidden="true" />
+        <ToolbarButton
+          label={toolbarState.callout ? "Callout activo" : "Insertar callout"}
+          active={toolbarState.callout}
+          onClick={() => {
+            if (toolbarState.callout) editor?.commands.focus();
+            else editor?.chain().focus().insertCallout().run();
+          }}
+        >
+          <MessageSquare aria-hidden="true" />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Insertar tabla"
+          active={toolbarState.table}
+          onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+        >
+          <Table2 aria-hidden="true" />
+        </ToolbarButton>
+        {toolbarState.table ? (
+          <div className="note-editor__table-tools" role="group" aria-label="Editar tabla">
+            <ToolbarButton label="Agregar fila" active={false} disabled={!toolbarState.canAddRow} onClick={() => editor?.chain().focus().addRowAfter().run()}>
+              <BetweenHorizontalEnd aria-hidden="true" />
             </ToolbarButton>
-          </>
+            <ToolbarButton label="Eliminar fila" active={false} disabled={!toolbarState.canDeleteRow} onClick={() => editor?.chain().focus().deleteRow().run()}>
+              <Rows3 aria-hidden="true" />
+            </ToolbarButton>
+            <ToolbarButton label="Agregar columna" active={false} disabled={!toolbarState.canAddColumn} onClick={() => editor?.chain().focus().addColumnAfter().run()}>
+              <BetweenVerticalEnd aria-hidden="true" />
+            </ToolbarButton>
+            <ToolbarButton label="Eliminar columna" active={false} disabled={!toolbarState.canDeleteColumn} onClick={() => editor?.chain().focus().deleteColumn().run()}>
+              <Columns3 aria-hidden="true" />
+            </ToolbarButton>
+            <ToolbarButton label="Eliminar tabla" active={false} disabled={!toolbarState.canDeleteTable} onClick={() => editor?.chain().focus().deleteTable().run()}>
+              <Trash2 aria-hidden="true" />
+            </ToolbarButton>
+          </div>
         ) : null}
       </div>
 
@@ -225,11 +273,12 @@ export function NoteEditor({
 interface ToolbarButtonProps {
   readonly label: string;
   readonly active: boolean;
+  readonly disabled?: boolean;
   readonly onClick: () => void;
   readonly children: ReactNode;
 }
 
-function ToolbarButton({ label, active, onClick, children }: ToolbarButtonProps): JSX.Element {
+function ToolbarButton({ label, active, disabled = false, onClick, children }: ToolbarButtonProps): JSX.Element {
   return (
     <button
       type="button"
@@ -237,6 +286,7 @@ function ToolbarButton({ label, active, onClick, children }: ToolbarButtonProps)
       aria-label={label}
       aria-pressed={active}
       title={label}
+      disabled={disabled}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
     >

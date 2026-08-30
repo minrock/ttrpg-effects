@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState, type JSX } from "react";
+import { lazy, Suspense, useState, type JSX } from "react";
 import { Eye, Pencil } from "lucide-react";
 import type {
   InformationAreaCell,
@@ -8,7 +8,7 @@ import type {
 } from "../../../../domain/annotations/map-annotations";
 import type { WorldPoint } from "../../../../domain/shared/coordinates";
 import { ModalBackdrop } from "../aside/ModalBackdrop";
-import { renderMarkdown } from "../aside/markdown";
+import { RichTextPreview } from "../aside/RichTextPreview";
 
 const NoteEditor = lazy(async () => {
   const mod = await import("../aside/NoteEditor");
@@ -55,7 +55,6 @@ export function MapAnnotationModal({
   );
   const [isPreview, setIsPreview] = useState(draft.initialMode === "preview");
   const isPin = draft.kind === "room-pin";
-  const previewHtml = useMemo(() => renderMarkdown(content, { callouts: isPin }), [content, isPin]);
   const normalizedTitle = title.trim();
   const documentType = isPin ? "Habitacion" : areaType === "terrain" ? "Terreno" : "Trampa";
 
@@ -121,7 +120,13 @@ export function MapAnnotationModal({
             <div className="document-preview">
               <small>{documentType}</small>
               <h1>{normalizedTitle || (isPin ? "Habitacion sin nombre" : "Area sin nombre")}</h1>
-              <div className="markdown-content document-preview__content" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+              <RichTextPreview
+                markdown={content}
+                mode="dm-editable"
+                onChange={setContent}
+                contentClassName="document-preview__content"
+                emptyFallback="Sin descripcion."
+              />
             </div>
           ) : (
             <Suspense fallback={<div className="document-modal__loading">Cargando editor...</div>}>
@@ -129,7 +134,6 @@ export function MapAnnotationModal({
                 initialContent={content}
                 onChange={setContent}
                 variant="document"
-                enableCallouts={isPin}
                 placeholder={isPin ? "Describe la habitacion, sus detalles y secretos..." : "Describe el terreno o la trampa..."}
                 titleField={(
                   <input

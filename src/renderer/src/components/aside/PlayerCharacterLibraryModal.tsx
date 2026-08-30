@@ -165,6 +165,31 @@ export function PlayerCharacterLibraryModal({
     addEntryToScene(result.entry);
   }
 
+  function updatePreviewNotes(notes: string): void {
+    const entry = previewEntry;
+    if (entry === null || entry.notes === notes) return;
+    const optimistic = { ...entry, notes };
+    setPreviewEntry(optimistic);
+    setEntries((current) => upsertEntry(current, optimistic));
+
+    if (window.ttrpg === undefined) {
+      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
+      return;
+    }
+
+    void window.ttrpg.savePlayerCharacterLibraryEntry(toPlayerCharacterSaveInput(optimistic)).then((result) => {
+      if (!result.ok) {
+        setPreviewEntry((current) => current?.id === entry.id && current.notes === notes ? entry : current);
+        setEntries((current) => upsertEntry(current, entry));
+        setFeedback({ message: result.error, kind: "error" });
+        return;
+      }
+      setPreviewEntry((current) => current?.id === result.entry.id ? result.entry : current);
+      setEntries((current) => upsertEntry(current, result.entry));
+      setFeedback(null);
+    });
+  }
+
   return (
     <ModalBackdrop onClose={onClose} large>
       {/* Modal de lista — siempre montado, nunca se desmonta por el formulario */}
@@ -222,6 +247,7 @@ export function PlayerCharacterLibraryModal({
           onClose={() => setPreviewEntry(null)}
           onEdit={() => openEditCharacterForm(previewEntry)}
           onAddToScene={() => addEntryToScene(previewEntry)}
+          onNotesChange={updatePreviewNotes}
         />
       ) : null}
 
@@ -324,6 +350,26 @@ export function PlayerCharacterLibraryModal({
 }
 
 function createPreviewCharacter(entry: PlayerCharacterLibraryEntry): ScenePlayerCharacter {
+  return {
+    id: entry.id,
+    characterName: entry.characterName,
+    playerName: entry.playerName,
+    level: entry.level,
+    species: entry.species,
+    classes: entry.classes,
+    imagePath: entry.imagePath,
+    stats: entry.stats,
+    initiative: entry.initiative,
+    armorClass: entry.armorClass,
+    passivePerception: entry.passivePerception,
+    hitPoints: entry.hitPoints,
+    spellSaveDc: entry.spellSaveDc,
+    speeds: entry.speeds,
+    notes: entry.notes
+  };
+}
+
+function toPlayerCharacterSaveInput(entry: PlayerCharacterLibraryEntry): PlayerCharacterLibrarySaveInput {
   return {
     id: entry.id,
     characterName: entry.characterName,

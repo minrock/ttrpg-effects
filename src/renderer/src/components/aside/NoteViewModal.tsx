@@ -3,18 +3,18 @@ import { Edit3 } from "lucide-react";
 import type { SceneNote } from "../../../../domain/sessions/scene-aside";
 import { getNotePath } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
-import { renderMarkdown } from "./markdown";
+import { RichTextPreview } from "./RichTextPreview";
 
 interface NoteViewModalProps {
   readonly note: SceneNote;
   readonly allNotes: readonly SceneNote[];
   readonly onClose: () => void;
   readonly onEdit: () => void;
+  readonly onContentChange: (content: string) => void;
 }
 
-export function NoteViewModal({ note, allNotes, onClose, onEdit }: NoteViewModalProps): JSX.Element {
+export function NoteViewModal({ note, allNotes, onClose, onEdit, onContentChange }: NoteViewModalProps): JSX.Element {
   const breadcrumb = useMemo(() => getNotePath(allNotes, note.id), [allNotes, note.id]);
-  const html = useMemo(() => renderMarkdown(note.content), [note.content]);
 
   return (
     <ModalBackdrop onClose={onClose} documentLayout>
@@ -32,7 +32,12 @@ export function NoteViewModal({ note, allNotes, onClose, onEdit }: NoteViewModal
 
         <main className="document-preview">
           <h1>{note.name}</h1>
-          <div className="markdown-content document-preview__content" dangerouslySetInnerHTML={{ __html: html }} />
+          <RichTextPreview
+            markdown={note.content}
+            mode="dm-editable"
+            onChange={onContentChange}
+            contentClassName="document-preview__content"
+          />
         </main>
 
         <footer className="document-modal__footer">

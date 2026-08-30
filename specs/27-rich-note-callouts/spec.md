@@ -88,3 +88,7 @@ Permitir que el DM destaque advertencias, pistas, reglas locales y datos importa
 - La vista previa coincide visualmente con el editor y nunca muestra la sintaxis Markdown del callout.
 - Las habitaciones antiguas siguen funcionando y el archivo `.ttrpgscene` no requiere una migracion incompatible.
 - Los callouts no aparecen en Player View.
+
+## Evolucion posterior
+
+- La Spec 28 habilita el nodo reusable `callout` en todos los espacios WYSIWYG incluidos. La visibilidad sigue dependiendo del contenido anfitrion: los pines de habitacion permanecen exclusivos del DM.

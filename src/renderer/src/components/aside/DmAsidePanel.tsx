@@ -22,7 +22,8 @@ import {
   removeNpc,
   updateMonster,
   updateNote,
-  updateNpc
+  updateNpc,
+  updatePlayerCharacter
 } from "../../../../domain/sessions/scene-aside";
 import { MonsterSection } from "./MonsterSection";
 import { NpcSection } from "./NpcSection";
@@ -110,6 +111,10 @@ export function DmAsidePanel({
     (id: string) => onChange(removePlayerCharacter(aside, id)),
     [aside, onChange]
   );
+  const handleUpdatePlayerCharacter = useCallback(
+    (character: ScenePlayerCharacter) => onChange(updatePlayerCharacter(aside, character)),
+    [aside, onChange]
+  );
 
   // Note handlers
   const handleAddNote = useCallback((note: SceneNote) => onChange(addNote(aside, note)), [aside, onChange]);
@@ -193,6 +198,7 @@ export function DmAsidePanel({
           <PlayerCharacterSection
             characters={aside.playerCharacters}
             onAdd={handleAddPlayerCharacter}
+            onUpdate={handleUpdatePlayerCharacter}
             onRemove={handleRemovePlayerCharacter}
           />
         </AccordionSection>

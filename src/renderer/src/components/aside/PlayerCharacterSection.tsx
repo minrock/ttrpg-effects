@@ -6,10 +6,11 @@ import { PlayerCharacterLibraryModal } from "./PlayerCharacterLibraryModal";
 interface PlayerCharacterSectionProps {
   readonly characters: readonly ScenePlayerCharacter[];
   readonly onAdd: (character: ScenePlayerCharacter) => void;
+  readonly onUpdate: (character: ScenePlayerCharacter) => void;
   readonly onRemove: (id: string) => void;
 }
 
-export function PlayerCharacterSection({ characters, onAdd, onRemove }: PlayerCharacterSectionProps): JSX.Element {
+export function PlayerCharacterSection({ characters, onAdd, onUpdate, onRemove }: PlayerCharacterSectionProps): JSX.Element {
   const [detailCharacter, setDetailCharacter] = useState<ScenePlayerCharacter | null>(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function PlayerCharacterSection({ characters, onAdd, onRemove }: PlayerCh
         <PlayerCharacterDetailModal
           character={syncedDetail}
           onClose={() => setDetailCharacter(null)}
+          onNotesChange={(notes) => onUpdate({ ...syncedDetail, notes })}
         />
       ) : null}
 

@@ -181,3 +181,7 @@
 - [x] Smoke manual realizado.
 - [x] Plan aceptado por el usuario antes de implementar.
 - [x] Aceptacion final del usuario obtenida antes de commit y merge.
+
+## 13. Evolucion posterior
+
+- La activacion exclusiva por `enableCallouts` queda reemplazada por la configuracion unificada de la Spec 28; la extension y su formato Markdown se conservan sin migracion.

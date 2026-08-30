@@ -230,6 +230,11 @@ body {
   background: rgb(255 255 255 / 5%);
 }
 
+.note-editor__toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.34;
+}
+
 .note-editor__toolbar button.is-active {
   border-color: rgb(255 210 138 / 54%);
   color: #17191a;
@@ -248,6 +253,15 @@ body {
   height: 22px;
   margin: 0 5px;
   background: rgb(255 255 255 / 10%);
+}
+
+.note-editor__table-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 3px;
+  border-left: 1px solid rgb(255 210 138 / 20%);
+  padding-left: 7px;
 }
 
 .note-editor__link-popover {
@@ -414,6 +428,152 @@ body {
 .note-editor__content ol {
   margin: 0.55em 0;
   padding-left: 1.5em;
+}
+
+.note-editor__content .tableWrapper {
+  width: 100%;
+  margin: 1em 0;
+  overflow-x: auto;
+  border: 1px solid rgb(255 210 138 / 16%);
+  border-radius: 5px;
+}
+
+.note-editor__content table {
+  width: max(100%, 520px);
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.note-editor__content th,
+.note-editor__content td {
+  position: relative;
+  min-width: 120px;
+  border: 1px solid rgb(244 241 232 / 16%);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.note-editor__content th {
+  color: #fff8e7;
+  background: rgb(255 210 138 / 12%);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.86em;
+  font-weight: 750;
+}
+
+.note-editor__content td {
+  background: rgb(255 255 255 / 2%);
+}
+
+.note-editor__content th > :first-child,
+.note-editor__content td > :first-child {
+  margin-top: 0;
+}
+
+.note-editor__content th > :last-child,
+.note-editor__content td > :last-child {
+  margin-bottom: 0;
+}
+
+.note-editor__content .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  background: rgb(255 210 138 / 12%);
+  content: "";
+  pointer-events: none;
+}
+
+.note-editor__content ul[data-type="taskList"],
+.markdown-content ul.contains-task-list {
+  display: grid;
+  gap: 5px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.note-editor__content li[data-checked],
+.markdown-content li.task-list-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+}
+
+.note-editor__content li[data-checked] > label {
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 28px;
+  margin: 0;
+}
+
+.note-editor__content li[data-checked] > div {
+  min-width: 0;
+}
+
+.note-editor__content li[data-checked] > div > p:first-child {
+  margin-top: 0;
+}
+
+.markdown-content li.task-list-item > .task-list-item__label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  cursor: pointer;
+}
+
+.markdown-content li.task-list-item {
+  display: block;
+}
+
+.markdown-content li.task-list-item > .task-list-item__label > .task-list-item__content {
+  min-width: 0;
+  line-height: 1.55;
+}
+
+.markdown-content li.task-list-item > ul.contains-task-list {
+  margin: 5px 0 0 26px;
+}
+
+.note-editor__content input[type="checkbox"],
+.markdown-content li.task-list-item input[type="checkbox"],
+.markdown-content .table-task-checkbox input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 4px 0 0;
+  accent-color: #e8bb67;
+  cursor: pointer;
+}
+
+.table-task-checkbox-node,
+.markdown-content .table-task-checkbox {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 7px;
+  vertical-align: -0.15em;
+}
+
+.table-task-checkbox-node input[type="checkbox"],
+.markdown-content .table-task-checkbox input[type="checkbox"] {
+  margin-top: 0;
+}
+
+.markdown-content li.task-list-item input[type="checkbox"]:disabled,
+.markdown-content .table-task-checkbox input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: 0.82;
+}
+
+.note-editor__content li[data-checked="true"] > div,
+.markdown-content li.task-list-item > .task-list-item__label:has(input:checked) > .task-list-item__content {
+  color: #8d9690;
+  text-decoration: line-through;
+  text-decoration-color: rgb(141 150 144 / 52%);
 }
 
 .note-editor__content blockquote {
@@ -658,6 +818,67 @@ body {
 .document-preview__content {
   font-size: 1.08rem;
   line-height: 1.72;
+}
+
+.rich-text-preview {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.rich-text-preview__actions {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 34px;
+}
+
+.rich-text-preview__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid rgb(244 241 232 / 15%);
+  border-radius: 5px;
+  padding: 0 11px;
+  color: #c8cec9;
+  background: #24282a;
+  font: inherit;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.rich-text-preview__actions button:hover:not(:disabled) {
+  border-color: rgb(255 210 138 / 42%);
+  color: #fff8e7;
+  background: #2e3335;
+}
+
+.rich-text-preview__actions button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.rich-text-preview__actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.rich-text-preview__content {
+  min-width: 0;
+}
+
+.rich-text-preview__empty {
+  margin: 0;
+  color: #737c77;
+  font-style: italic;
+}
+
+.entity-notes-preview {
+  color: #ccc;
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .annotation-document-modal__controls,

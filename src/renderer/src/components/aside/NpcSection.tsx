@@ -76,6 +76,7 @@ export function NpcSection({
           onClose={closeDetail}
           onToggleVisibility={() => onToggleVisibility(syncedDetail.id)}
           onEdit={() => handleEditFromDetail(syncedDetail)}
+          onNotesChange={(notes) => onUpdate({ ...syncedDetail, notes })}
         />
       )}
 
