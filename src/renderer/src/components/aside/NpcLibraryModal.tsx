@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type JSX } from "react";
 import {
   createSceneNpcFromLibraryEntry,
   type NpcLibraryEntry
@@ -7,6 +7,11 @@ import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { FeedbackAlert, type Feedback } from "./FeedbackAlert";
 import { ImagePicker } from "./ImagePicker";
 import { ModalBackdrop } from "./ModalBackdrop";
+
+const NoteEditor = lazy(async () => {
+  const mod = await import("./NoteEditor");
+  return { default: mod.NoteEditor };
+});
 
 interface NpcLibraryModalProps {
   readonly existingIds: readonly string[];
@@ -164,10 +169,12 @@ export function NpcLibraryModal({ existingIds, onAddNpc, onClose }: NpcLibraryMo
             </div>
             <label className="monster-library-modal__markdown">
               Notas
-              <textarea
-                value={draft.notes}
-                onChange={(event) => { const value = event.currentTarget.value; setDraft((current) => ({ ...current, notes: value })); }}
-              />
+              <Suspense fallback={<div className="document-modal__loading">Cargando editor...</div>}>
+                <NoteEditor
+                  initialContent={draft.notes}
+                  onChange={(notes) => setDraft((current) => ({ ...current, notes }))}
+                />
+              </Suspense>
             </label>
             {feedback !== null ? <FeedbackAlert feedback={feedback} /> : null}
             <div className="monster-library-modal__footer">

@@ -49,3 +49,7 @@ Unificar la escritura y lectura de notas, informacion de habitaciones y conexion
 - Los modales mantienen footer y toolbar disponibles mientras el contenido hace scroll.
 - Las conexiones conservan todas sus acciones y muestran claramente su estado.
 - Tests, lint, typecheck, build y smoke visual completan sin errores.
+
+## Evolucion posterior
+
+- La Spec 28 extiende este editor base a todos los espacios WYSIWYG incluidos, centraliza su configuracion y agrega callouts, tablas GFM y checklists sin cambiar el formato Markdown persistido.

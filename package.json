@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -73,7 +73,9 @@
     "@radix-ui/react-switch": "^1.2.6",
     "@tiptap/core": "^3.23.6",
     "@tiptap/extension-link": "^3.23.6",
+    "@tiptap/extension-list": "^3.23.6",
     "@tiptap/extension-placeholder": "^3.23.6",
+    "@tiptap/extension-table": "^3.23.6",
     "@tiptap/extension-underline": "^3.23.6",
     "@tiptap/pm": "^3.23.6",
     "@tiptap/react": "^3.23.6",

@@ -1,6 +1,10 @@
 import { marked, Renderer } from "marked";
 import DOMPurify from "dompurify";
 import { encodeCalloutDirectivesAsBlockquotes, upgradeCalloutBlockquotes } from "./callout";
+import {
+  normalizeTableTaskCheckboxMarkdown,
+  renderTableTaskCheckboxInputs
+} from "./table-task-checkbox";
 
 const safeRenderer = new Renderer();
 safeRenderer.html = (): string => "";
@@ -9,12 +13,14 @@ const UNDERLINE_OPEN_TOKEN = "TTRPGUNDERLINEOPEN";
 const UNDERLINE_CLOSE_TOKEN = "TTRPGUNDERLINECLOSE";
 
 interface MarkdownRenderOptions {
-  readonly callouts?: boolean;
+  readonly interactiveChecklists?: boolean;
 }
 
 export function renderMarkdown(markdown: string, options: MarkdownRenderOptions = {}): string {
-  const normalized = preserveUnderlineMarkup(normalizeLooseMarkdownTables(markdown));
-  const source = options.callouts === true ? encodeCalloutDirectivesAsBlockquotes(normalized) : normalized;
+  const normalized = preserveUnderlineMarkup(
+    normalizeLooseMarkdownTables(normalizeTableTaskCheckboxMarkdown(markdown))
+  );
+  const source = encodeCalloutDirectivesAsBlockquotes(normalized);
   const html = marked.parse(source, {
     async: false,
     breaks: false,
@@ -32,10 +38,46 @@ export function renderMarkdown(markdown: string, options: MarkdownRenderOptions 
     FORBID_ATTR: ["style"]
   });
 
-  if (options.callouts !== true) return sanitized;
   const document = new DOMParser().parseFromString(`<body>${sanitized}</body>`, "text/html");
   upgradeCalloutBlockquotes(document.body);
+  renderTableTaskCheckboxInputs(document.body);
+  decorateChecklistInputs(document.body, options.interactiveChecklists === true);
   return document.body.innerHTML;
+}
+
+function decorateChecklistInputs(root: HTMLElement, interactive: boolean): void {
+  const inputs = root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+  inputs.forEach((input, index) => {
+    wrapChecklistItemContent(input);
+    input.dataset.checklistIndex = String(index);
+    input.setAttribute("aria-label", input.checked ? "Tarea completada" : "Tarea pendiente");
+    if (interactive) input.removeAttribute("disabled");
+    else input.setAttribute("disabled", "");
+  });
+}
+
+function wrapChecklistItemContent(input: HTMLInputElement): void {
+  const item = input.closest("li");
+  if (item === null || input.parentElement?.classList.contains("task-list-item__label")) return;
+
+  item.classList.add("task-list-item");
+  if (item.parentElement?.tagName === "UL") item.parentElement.classList.add("contains-task-list");
+
+  const label = item.ownerDocument.createElement("label");
+  label.className = "task-list-item__label";
+  item.insertBefore(label, input);
+  label.append(input);
+
+  const content = item.ownerDocument.createElement("span");
+  content.className = "task-list-item__content";
+  while (label.nextSibling !== null && !isNestedList(label.nextSibling)) {
+    content.append(label.nextSibling);
+  }
+  label.append(content);
+}
+
+function isNestedList(node: ChildNode): boolean {
+  return node instanceof HTMLElement && (node.tagName === "UL" || node.tagName === "OL");
 }
 
 function preserveUnderlineMarkup(markdown: string): string {

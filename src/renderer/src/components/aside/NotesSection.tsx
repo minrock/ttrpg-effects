@@ -115,6 +115,11 @@ export function NotesSection({ notes, onAdd, onUpdate, onRemove }: NotesSectionP
             const note = modal.note;
             setModal({ kind: "edit", note, parentId: note.parentId });
           }}
+          onContentChange={(content) => {
+            const note = { ...modal.note, content };
+            onUpdate(note);
+            setModal({ kind: "view", note });
+          }}
         />
       )}
 

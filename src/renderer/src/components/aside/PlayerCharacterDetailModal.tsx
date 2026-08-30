@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { formatAbilityScore } from "../../../../domain/entity-library/entity-library";
 import type { ScenePlayerCharacter } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
-import { renderMarkdown } from "./markdown";
+import { RichTextPreview } from "./RichTextPreview";
 
 interface PlayerCharacterDetailModalProps {
   readonly character: ScenePlayerCharacter;
   readonly onClose: () => void;
   readonly onEdit?: () => void;
   readonly onAddToScene?: () => void;
+  readonly onNotesChange?: (notes: string) => void;
 }
 
 export function PlayerCharacterDetailModal({
   character,
   onClose,
   onEdit,
-  onAddToScene
+  onAddToScene,
+  onNotesChange
 }: PlayerCharacterDetailModalProps): JSX.Element {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -23,11 +25,6 @@ export function PlayerCharacterDetailModal({
     if (character.imagePath === null) { setImageUrl(null); return; }
     void window.ttrpg?.resolveAsideUrl(character.imagePath).then((url) => setImageUrl(url ?? null));
   }, [character.imagePath]);
-
-  const notesHtml = useMemo(() => {
-    if (character.notes.trim() === "") return "";
-    return renderMarkdown(character.notes);
-  }, [character.notes]);
 
   return (
     <ModalBackdrop onClose={onClose} fitContent>
@@ -64,12 +61,14 @@ export function PlayerCharacterDetailModal({
           <Ability label="Car" value={character.stats.charisma} />
         </div>
 
-        {notesHtml !== "" ? (
+        {character.notes.trim() !== "" ? (
           <div className="player-character-card__notes">
             <span>Notas</span>
-            <div
-              className="markdown-content player-character-card__notes-content"
-              dangerouslySetInnerHTML={{ __html: notesHtml }}
+            <RichTextPreview
+              markdown={character.notes}
+              mode={onNotesChange === undefined ? "readonly" : "dm-editable"}
+              onChange={onNotesChange}
+              contentClassName="player-character-card__notes-content"
             />
           </div>
         ) : null}

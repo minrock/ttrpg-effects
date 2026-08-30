@@ -29,3 +29,7 @@
 - Mantener carga diferida del bundle del editor.
 - No modificar PixiJS ni invalidar el viewport al editar contenido.
 - Memorizar el HTML de vista previa a partir del Markdown persistido.
+
+## Evolucion posterior
+
+- La configuracion, toolbar y vista previa introducidos aqui pasan a ser compartidos por todos los consumidores definidos en la Spec 28.

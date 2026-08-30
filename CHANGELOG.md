@@ -10,6 +10,24 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.7.5] - 2026-08-29
+
+### Added
+
+- Editor enriquecido unificado para notas generales, habitaciones, areas informativas, NPCs y personajes jugadores.
+- Tablas editables y listas de verificacion persistidas en Markdown, incluidos checkboxes dentro de celdas.
+- Vista previa compartida con checkboxes interactivos y accion para reiniciar su estado.
+
+### Changed
+
+- Los callouts reutilizables quedan disponibles en todos los espacios con contenido enriquecido.
+- La barra de herramientas adapta la insercion de checkboxes al contexto de listas o tablas.
+
+### Fixed
+
+- Los checkboxes y sus etiquetas permanecen alineados en una misma fila.
+- Las tablas reparan contenido legado con checkboxes que habia quedado fragmentado en multiples lineas.
+
 ## [1.7.4] - 2026-08-29
 
 ### Added
