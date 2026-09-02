@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "1.7.5",
+  "version": "1.7.6",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
