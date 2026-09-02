@@ -10,6 +10,14 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.7.6] - 2026-09-01
+
+### Fixed
+
+- Los labels de distancia y tamano de las herramientas de area mantienen una escala legible durante el zoom-out.
+- Las manivelas de mediciones, caminos, circulos, conos y rectangulos conservan un tamano visible y areas de interaccion proporcionales al zoom.
+- El overlay editorial solo se reconstruye al cambiar la escala de la camara, evitando trabajo adicional durante el paneo.
+
 ## [1.7.5] - 2026-08-29
 
 ### Added

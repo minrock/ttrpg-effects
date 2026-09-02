@@ -61,9 +61,11 @@ import {
 } from "../../domain/annotations/map-annotations";
 import type { SceneLinkValidationStatus } from "../../domain/annotations/scene-navigation-links";
 import type { PlayerCameraControlViewState } from "../../domain/player/player-camera-control";
+import { getAreaToolUiScale } from "./area-tool-screen-scale";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
+const AREA_TOOL_LABEL = "area-tool-size-label";
 
 export type RenderSceneToken = SceneToken & {
   readonly imageUrl: string | null;
@@ -279,6 +281,7 @@ export class PixiViewport {
   private virtualPlayerCameraControl: Container | null = null;
   private isPlayerCameraControlHovered = false;
   private cameraInteractionEndTimer: number | null = null;
+  private areaToolUiZoom = this.camera.zoom;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
@@ -1834,6 +1837,7 @@ export class PixiViewport {
 
   private applyCamera(emit = true): void {
     const viewport = this.getViewportSize();
+    const shouldRefreshAreaToolUi = Math.abs(this.areaToolUiZoom - this.camera.zoom) > 0.0001;
     this.world.scale.set(this.camera.zoom);
     this.world.position.set(
       viewport.width / 2 - this.camera.center.x * this.camera.zoom,
@@ -1841,6 +1845,11 @@ export class PixiViewport {
     );
     this.updateMapInformationPinLabelScale();
     this.updatePlayerCameraControlScale();
+    if (shouldRefreshAreaToolUi) {
+      this.areaToolUiZoom = this.camera.zoom;
+      this.updateAreaToolLabelScale();
+      this.drawSelectionLayer();
+    }
     if (emit) {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
@@ -1924,6 +1933,25 @@ export class PixiViewport {
     this.shapeRenderCache.clear();
     for (const [id, cached] of nextCache) {
       this.shapeRenderCache.set(id, cached);
+    }
+    this.updateAreaToolLabelScale();
+  }
+
+  private updateAreaToolLabelScale(): void {
+    const uiScale = getAreaToolUiScale(this.camera.zoom);
+
+    for (const layerName of ["shapesAndMeasurements", "selection"] as const) {
+      const layer = this.getLayer(layerName);
+      for (const child of layer.children) {
+        if (!(child instanceof Container)) {
+          continue;
+        }
+        for (const nestedChild of child.children) {
+          if (nestedChild instanceof Text && nestedChild.label === AREA_TOOL_LABEL) {
+            nestedChild.scale.set(uiScale);
+          }
+        }
+      }
     }
   }
 
@@ -2205,7 +2233,7 @@ export class PixiViewport {
       );
 
       if (selectedLinearShape !== undefined) {
-        selectionLayer.addChild(drawLinearShapeHandles(selectedLinearShape));
+        selectionLayer.addChild(drawLinearShapeHandles(selectedLinearShape, this.camera.zoom));
       }
 
       const selectedConeLight = this.getRenderableLights().find(
@@ -2268,7 +2296,7 @@ export class PixiViewport {
       );
 
       if (selectedCircleShape !== undefined) {
-        selectionLayer.addChild(drawCircleResizeHandle(selectedCircleShape));
+        selectionLayer.addChild(drawCircleResizeHandle(selectedCircleShape, this.camera.zoom));
       }
 
       const selectedConeShape = this.getRenderableShapes().find(
@@ -2276,7 +2304,7 @@ export class PixiViewport {
       );
 
       if (selectedConeShape !== undefined) {
-        selectionLayer.addChild(drawConeShapeHandles(selectedConeShape));
+        selectionLayer.addChild(drawConeShapeHandles(selectedConeShape, this.camera.zoom));
       }
 
       const selectedRectShape = this.getRenderableShapes().find(
@@ -2284,7 +2312,7 @@ export class PixiViewport {
       );
 
       if (selectedRectShape !== undefined) {
-        selectionLayer.addChild(drawRectCornerHandles(selectedRectShape));
+        selectionLayer.addChild(drawRectCornerHandles(selectedRectShape, this.camera.zoom));
       }
 
       const selectedPathShape = this.getRenderableShapes().find(
@@ -2292,7 +2320,9 @@ export class PixiViewport {
       );
 
       if (selectedPathShape !== undefined && this.grid !== null) {
-        selectionLayer.addChild(drawPathPointHandles(selectedPathShape, this.grid.cellSizeWorld));
+        selectionLayer.addChild(
+          drawPathPointHandles(selectedPathShape, this.grid.cellSizeWorld, this.camera.zoom)
+        );
       }
     }
 
@@ -2324,6 +2354,8 @@ export class PixiViewport {
       );
       selectionLayer.addChild(drawInformationAreaCells(cells, "#fff0a8", 0.28, 2));
     }
+
+    this.updateAreaToolLabelScale();
   }
 
   private drawMapAnnotationsLayer(): void {
@@ -2877,7 +2909,8 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const distance = Math.hypot(worldPoint.x - firstPoint.x, worldPoint.y - firstPoint.y);
-    const pointTolerance = 18 / this.camera.zoom;
+    const uiScale = getAreaToolUiScale(this.camera.zoom);
+    const pointTolerance = 18 * uiScale;
     const circleTolerance = Math.max(this.grid.cellSizeWorld / 2, 20 / this.camera.zoom);
 
     if (distance <= pointTolerance) {
@@ -2941,7 +2974,8 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    return Math.hypot(worldPoint.x - endPoint.x, worldPoint.y - endPoint.y) <= 18
+    const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
+    return Math.hypot(worldPoint.x - endPoint.x, worldPoint.y - endPoint.y) <= hitTolerance
       ? selectedShape.id
       : null;
   }
@@ -2956,8 +2990,11 @@ export class PixiViewport {
     const anchor = getShapeAnchor(selectedShape);
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+    const uiScale = getAreaToolUiScale(this.camera.zoom);
+    const ringRadius = LINEAR_ROTATION_RING_RADIUS * uiScale;
+    const hitTolerance = 18 * uiScale;
 
-    return distance >= LINEAR_ROTATION_RING_RADIUS - 16 && distance <= LINEAR_ROTATION_RING_RADIUS + 18
+    return distance >= ringRadius - hitTolerance && distance <= ringRadius + hitTolerance
       ? selectedShape.id
       : null;
   }
@@ -3351,8 +3388,9 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const radius = shape.radius ?? 1;
     const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+    const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
 
-    return distance >= radius - 16 && distance <= radius + 18 ? shape.id : null;
+    return distance >= radius - hitTolerance && distance <= radius + hitTolerance ? shape.id : null;
   }
 
   private hitTestConeShapeResizeHandle(screenPoint: ScreenPoint): string | null {
@@ -3370,8 +3408,9 @@ export class PixiViewport {
     const tipX = anchor.x + Math.cos(direction) * radius;
     const tipY = anchor.y + Math.sin(direction) * radius;
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
 
-    return Math.hypot(worldPoint.x - tipX, worldPoint.y - tipY) <= 18 ? shape.id : null;
+    return Math.hypot(worldPoint.x - tipX, worldPoint.y - tipY) <= hitTolerance ? shape.id : null;
   }
 
   private hitTestConeShapeRotationHandle(screenPoint: ScreenPoint): string | null {
@@ -3386,9 +3425,12 @@ export class PixiViewport {
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
+    const uiScale = getAreaToolUiScale(this.camera.zoom);
+    const ringRadius = SHAPE_CONE_ROTATION_RING_RADIUS * uiScale;
+    const hitTolerance = 18 * uiScale;
 
-    return distance >= SHAPE_CONE_ROTATION_RING_RADIUS - 16 &&
-      distance <= SHAPE_CONE_ROTATION_RING_RADIUS + 18
+    return distance >= ringRadius - hitTolerance &&
+      distance <= ringRadius + hitTolerance
       ? shape.id
       : null;
   }
@@ -3412,10 +3454,14 @@ export class PixiViewport {
       { x: anchor.x - halfW, y: anchor.y + halfH }
     ];
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
 
     for (let i = 0; i < corners.length; i++) {
       const corner = corners[i];
-      if (corner !== undefined && Math.hypot(worldPoint.x - corner.x, worldPoint.y - corner.y) <= 16) {
+      if (
+        corner !== undefined &&
+        Math.hypot(worldPoint.x - corner.x, worldPoint.y - corner.y) <= hitTolerance
+      ) {
         return i;
       }
     }
@@ -4638,7 +4684,7 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
 }
 
 function drawShapeLabel(text: string): Text {
-  return new Text({
+  const label = new Text({
     text,
     style: {
       fill: 0xf4f1e8,
@@ -4648,6 +4694,8 @@ function drawShapeLabel(text: string): Text {
       stroke: { color: 0x101315, width: 4 }
     }
   });
+  label.label = AREA_TOOL_LABEL;
+  return label;
 }
 
 function drawPathGraphic(
@@ -6266,44 +6314,48 @@ function createArcanePointerBroadcast(
   };
 }
 
-function drawLinearShapeHandles(shape: SceneShape): Graphics {
+function drawLinearShapeHandles(shape: SceneShape, cameraZoom: number): Graphics {
   const anchor = getShapeAnchor(shape);
   const endPoint = getShapeEndPoint(shape);
+  const uiScale = getAreaToolUiScale(cameraZoom);
+  const ringRadius = LINEAR_ROTATION_RING_RADIUS * uiScale;
   const graphic = new Graphics()
-    .circle(anchor.x, anchor.y, LINEAR_ROTATION_RING_RADIUS)
-    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.72 });
+    .circle(anchor.x, anchor.y, ringRadius)
+    .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.72 });
 
   if (endPoint === null) {
     return graphic;
   }
 
   const direction = Math.atan2(endPoint.y - anchor.y, endPoint.x - anchor.x);
-  const handleX = anchor.x + Math.cos(direction) * LINEAR_ROTATION_RING_RADIUS;
-  const handleY = anchor.y + Math.sin(direction) * LINEAR_ROTATION_RING_RADIUS;
+  const handleX = anchor.x + Math.cos(direction) * ringRadius;
+  const handleY = anchor.y + Math.sin(direction) * ringRadius;
 
   return graphic
     .moveTo(anchor.x, anchor.y)
     .lineTo(handleX, handleY)
-    .stroke({ color: 0xfff0a8, width: 3, alpha: 0.8 })
-    .circle(handleX, handleY, 7)
+    .stroke({ color: 0xfff0a8, width: 3 * uiScale, alpha: 0.8 })
+    .circle(handleX, handleY, 7 * uiScale)
     .fill({ color: 0xfff0a8, alpha: 0.95 })
-    .circle(endPoint.x, endPoint.y, 12)
+    .circle(endPoint.x, endPoint.y, 12 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(endPoint.x, endPoint.y, 8)
+    .circle(endPoint.x, endPoint.y, 8 * uiScale)
     .fill({ color: 0x7fd3ff, alpha: 0.95 });
 }
 
-function drawPathPointHandles(shape: SceneShape, cellSizeWorld: number): Graphics {
+function drawPathPointHandles(shape: SceneShape, cellSizeWorld: number, cameraZoom: number): Graphics {
   const graphic = new Graphics();
+  const uiScale = getAreaToolUiScale(cameraZoom);
+  const movementRadius = Math.max(cellSizeWorld / 2, 24 * uiScale);
 
   const firstPoint = shape.points[0];
   if (firstPoint !== undefined) {
     graphic
-      .circle(firstPoint.x, firstPoint.y, cellSizeWorld / 2)
-      .stroke({ color: 0xfff0a8, width: 4, alpha: 0.45 })
-      .circle(firstPoint.x, firstPoint.y, 13)
+      .circle(firstPoint.x, firstPoint.y, movementRadius)
+      .stroke({ color: 0xfff0a8, width: 4 * uiScale, alpha: 0.45 })
+      .circle(firstPoint.x, firstPoint.y, 13 * uiScale)
       .fill({ color: 0x101315, alpha: 0.9 })
-      .circle(firstPoint.x, firstPoint.y, 8)
+      .circle(firstPoint.x, firstPoint.y, 8 * uiScale)
       .fill({ color: 0xfff0a8, alpha: 0.95 });
   }
 
@@ -6570,53 +6622,57 @@ function getLightRenderAngle(light: SceneLight): number {
   return light.kind === "cone" ? 60 : light.angle;
 }
 
-function drawCircleResizeHandle(shape: SceneShape): Graphics {
+function drawCircleResizeHandle(shape: SceneShape, cameraZoom: number): Graphics {
   const anchor = shape.points[0];
   if (anchor === undefined) return new Graphics();
 
   const radius = shape.radius ?? 1;
+  const uiScale = getAreaToolUiScale(cameraZoom);
 
   return new Graphics()
     .circle(anchor.x, anchor.y, radius)
-    .stroke({ color: 0x7fb8ff, width: 2, alpha: 0.75 })
-    .circle(anchor.x + radius, anchor.y, 10)
+    .stroke({ color: 0x7fb8ff, width: 2 * uiScale, alpha: 0.75 })
+    .circle(anchor.x + radius, anchor.y, 10 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(anchor.x + radius, anchor.y, 7)
+    .circle(anchor.x + radius, anchor.y, 7 * uiScale)
     .fill({ color: 0x7fb8ff, alpha: 0.95 });
 }
 
-function drawConeShapeHandles(shape: SceneShape): Graphics {
+function drawConeShapeHandles(shape: SceneShape, cameraZoom: number): Graphics {
   const anchor = shape.points[0];
   if (anchor === undefined) return new Graphics();
 
   const radius = shape.radius ?? 1;
+  const uiScale = getAreaToolUiScale(cameraZoom);
   const angle = ((shape.direction ?? 0) * Math.PI) / 180;
   const tipX = anchor.x + Math.cos(angle) * radius;
   const tipY = anchor.y + Math.sin(angle) * radius;
-  const ringHandleX = anchor.x + Math.cos(angle) * SHAPE_CONE_ROTATION_RING_RADIUS;
-  const ringHandleY = anchor.y + Math.sin(angle) * SHAPE_CONE_ROTATION_RING_RADIUS;
+  const ringRadius = SHAPE_CONE_ROTATION_RING_RADIUS * uiScale;
+  const ringHandleX = anchor.x + Math.cos(angle) * ringRadius;
+  const ringHandleY = anchor.y + Math.sin(angle) * ringRadius;
 
   return new Graphics()
-    .circle(anchor.x, anchor.y, SHAPE_CONE_ROTATION_RING_RADIUS)
-    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.72 })
+    .circle(anchor.x, anchor.y, ringRadius)
+    .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.72 })
     .moveTo(anchor.x, anchor.y)
     .lineTo(ringHandleX, ringHandleY)
-    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.8 })
-    .circle(ringHandleX, ringHandleY, 8)
+    .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.8 })
+    .circle(ringHandleX, ringHandleY, 8 * uiScale)
     .fill({ color: 0xfff0a8, alpha: 0.95 })
     .moveTo(anchor.x, anchor.y)
     .lineTo(tipX, tipY)
-    .stroke({ color: 0x79e1bf, width: 2, alpha: 0.7 })
-    .circle(tipX, tipY, 10)
+    .stroke({ color: 0x79e1bf, width: 2 * uiScale, alpha: 0.7 })
+    .circle(tipX, tipY, 10 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(tipX, tipY, 7)
+    .circle(tipX, tipY, 7 * uiScale)
     .fill({ color: 0x79e1bf, alpha: 0.95 });
 }
 
-function drawRectCornerHandles(shape: SceneShape): Graphics {
+function drawRectCornerHandles(shape: SceneShape, cameraZoom: number): Graphics {
   const anchor = shape.points[0];
   if (anchor === undefined) return new Graphics();
 
+  const uiScale = getAreaToolUiScale(cameraZoom);
   const halfW = (shape.width ?? 1) / 2;
   const halfH = (shape.height ?? 1) / 2;
   const corners = [
@@ -6629,13 +6685,13 @@ function drawRectCornerHandles(shape: SceneShape): Graphics {
 
   graphic
     .rect(anchor.x - halfW, anchor.y - halfH, halfW * 2, halfH * 2)
-    .stroke({ color: 0xffd28a, width: 2, alpha: 0.65 });
+    .stroke({ color: 0xffd28a, width: 2 * uiScale, alpha: 0.65 });
 
   for (const corner of corners) {
     graphic
-      .circle(corner.x, corner.y, 10)
+      .circle(corner.x, corner.y, 10 * uiScale)
       .fill({ color: 0x101315, alpha: 0.9 })
-      .circle(corner.x, corner.y, 7)
+      .circle(corner.x, corner.y, 7 * uiScale)
       .fill({ color: 0xffd28a, alpha: 0.95 });
   }
 
