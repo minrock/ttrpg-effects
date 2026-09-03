@@ -62,6 +62,8 @@ import {
 import type { SceneLinkValidationStatus } from "../../domain/annotations/scene-navigation-links";
 import type { PlayerCameraControlViewState } from "../../domain/player/player-camera-control";
 import { getAreaToolUiScale } from "./area-tool-screen-scale";
+import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-pattern-animation";
+import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
@@ -198,7 +200,7 @@ export class PixiViewport {
   private isMapImageLoading = false;
   private shouldDrawEffectsAfterMapLoad = false;
   private loadedTokenUrls = new Set<string>();
-  private firePatternSource: GifSource | null = null;
+  private firePatternSource: FirePatternAnimation | null = null;
   private elements: readonly TacticalElement[] = [];
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
@@ -694,6 +696,7 @@ export class PixiViewport {
   }
 
   setGrid(grid: SceneGrid): void {
+    const fireTileSizeChanged = this.grid?.cellSizeWorld !== grid.cellSizeWorld;
     this.grid = grid;
     this.drawGrid();
     this.drawDarkvisionLayer();
@@ -703,6 +706,9 @@ export class PixiViewport {
     void this.drawTokenLayer(true);
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
+    if (fireTileSizeChanged && this.effects.some((effect) => effect.kind === "fire")) {
+      this.drawEffectsLayer();
+    }
   }
 
   setDarkness(darkness: SceneDarkness): void {
@@ -750,18 +756,21 @@ export class PixiViewport {
     }
     this.darkvisionMask?.destroy();
     this.darkvisionMask = null;
+    const firePatternSource = this.firePatternSource;
     this.firePatternSource = null;
     this.waterPatternSource = null;
     this.arcanePointerSource = null;
     clearWaterFilterCache();
     fireCellRingCache.clear();
     this.app.ticker.remove(this.updateArcanePointers);
+    this.app.ticker.remove(this.updateFirePattern);
     this.clearArcanePointers();
     this.clearInformationAreaHighlights();
     for (const cached of this.effectRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
     this.effectRenderCache.clear();
+    firePatternSource?.destroy();
     for (const cached of this.shapeRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
@@ -794,6 +803,7 @@ export class PixiViewport {
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
     this.app.ticker.add(this.updateArcanePointers);
+    this.app.ticker.add(this.updateFirePattern);
 
     this.createLayers();
     this.drawStaticScene();
@@ -805,12 +815,13 @@ export class PixiViewport {
 
   private async loadPatternSources(): Promise<void> {
     const [firePatternSource, waterPatternSource, arcanePointerSource] = await Promise.all([
-      loadFirePatternSource(),
+      loadFirePatternAnimation(),
       loadWaterPatternSource(),
       loadArcanePointerSource()
     ]);
 
     if (this.disposed) {
+      firePatternSource?.destroy();
       return;
     }
 
@@ -2102,10 +2113,17 @@ export class PixiViewport {
       (effect) => effect.visible && effect.kind === "water"
     ).length;
     const waterSpriteBudget = getWaterPatternSpriteBudget(visibleWaterEffectCount, this.viewRole);
+    const fireSpriteBudget = getFireFlameBudget(this.getRenderableEffects().filter(
+      (effect) => effect.visible && effect.kind === "fire"
+    ).length);
 
     for (const effect of this.getRenderableEffects()) {
       if (effect.visible && effect.kind === "fire") {
-        const rendered = this.getCachedEffectContainer(effect, getSceneEffectRenderSignature(effect, this.firePatternSource !== null));
+        const rendered = this.getCachedEffectContainer(
+          effect,
+          `${getSceneEffectRenderSignature(effect, this.firePatternSource !== null)}:${this.grid?.cellSizeWorld ?? 100}:${fireSpriteBudget}`,
+          fireSpriteBudget
+        );
         nextCache.set(effect.id, rendered);
         reusedContainers.add(rendered.container);
         effectsLayer.addChild(rendered.container);
@@ -2150,21 +2168,21 @@ export class PixiViewport {
   private getCachedEffectContainer(
     effect: SceneFireEffect | SceneWaterEffect,
     signature: string,
-    waterSpriteBudget = MAX_WATER_PATTERN_SPRITES_PER_EFFECT
+    spriteBudget = MAX_WATER_PATTERN_SPRITES_PER_EFFECT
   ): {
     readonly signature: string;
     readonly container: Container;
   } {
     const cached = this.effectRenderCache.get(effect.id);
 
-    if (cached !== undefined && cached.signature === signature) {
+    if (cached !== undefined && !cached.container.destroyed && cached.signature === signature) {
       return cached;
     }
 
     const container =
       effect.kind === "fire"
-        ? drawSceneEffect(effect, this.firePatternSource)
-        : drawWaterEffect(effect, this.waterPatternSource, waterSpriteBudget);
+        ? drawSceneEffect(effect, this.firePatternSource, this.grid?.cellSizeWorld ?? 100, spriteBudget)
+        : drawWaterEffect(effect, this.waterPatternSource, spriteBudget);
 
     return { signature, container };
   }
@@ -3783,6 +3801,10 @@ export class PixiViewport {
     }
   };
 
+  private readonly updateFirePattern = (): void => {
+    this.firePatternSource?.update(performance.now());
+  };
+
   private async drawMapImage(): Promise<void> {
     const layer = this.getLayer("map");
     const loadVersion = ++this.mapLoadVersion;
@@ -3945,7 +3967,6 @@ interface SelectableRenderElement {
 const CONE_ROTATION_RING_RADIUS = 72;
 const LINEAR_ROTATION_RING_RADIUS = 54;
 const SHAPE_CONE_ROTATION_RING_RADIUS = 72;
-const FIRE_PATTERN_URL = "effects/area-fire.gif";
 const WATER_PATTERN_URL = "effects/water/water-center.gif";
 const ARCANE_POINTER_URL = "effects/arcane-pointer.gif";
 const WATER_BODY_TILE_SIZE = 72;
@@ -3954,7 +3975,6 @@ const WATER_RIVER_MIN_TILE_SIZE = 44;
 const WATER_RIVER_MAX_TILE_SIZE = 96;
 const WATER_RIVER_PERFORMANCE_TILE_SIZE = 180;
 const MAX_WATER_PATTERN_SPRITES_PER_EFFECT = 360;
-const FIRE_PATTERN_ALPHA_MULTIPLIER = 0.65;
 const MAX_EMOJIS_PER_ELEMENT = 120;
 const waterFilterCache = new Map<string, ColorMatrixFilter>();
 const fireCellRingCache = new Map<
@@ -3994,6 +4014,7 @@ function destroyStaleCachedContainers(
 }
 
 function destroyDisplayObject(child: Container): void {
+  if (child.destroyed) return;
   if (child instanceof Container) {
     clearContainerChildren(child);
   }
@@ -4450,14 +4471,6 @@ function isVisibleLightEmittingFireEffect(effect: SceneEffect): effect is SceneF
 
 function isVisibleDynamicLightEffect(effect: SceneEffect): effect is SceneDynamicLightEffect {
   return effect.kind === "dynamic-light" && effect.visible;
-}
-
-async function loadFirePatternSource(): Promise<GifSource | null> {
-  try {
-    return await Assets.load<GifSource>(FIRE_PATTERN_URL);
-  } catch {
-    return null;
-  }
 }
 
 async function loadWaterPatternSource(): Promise<GifSource | null> {
@@ -5818,172 +5831,51 @@ function computeCellRings(
 
 function drawSceneEffect(
   effect: SceneFireEffect,
-  firePatternSource: GifSource | null
+  firePatternSource: FirePatternAnimation | null,
+  cellSizeWorld: number,
+  spriteBudget = MAX_FIRE_FLAMES_PER_EFFECT
 ): Container {
   const container = new Container();
-  const graphic = new Graphics();
-  const color = parseHexColor(effect.color);
-  const alpha = Math.max(0.15, 0.62 * effect.opacity);
-
-  if (effect.zone.kind === "circle") {
-    const radius = effect.zone.radius * effect.scale;
-    addFirePattern(container, effect, firePatternSource);
-    if (firePatternSource === null) {
-      graphic
-        .circle(effect.position.x, effect.position.y, radius)
-        .fill({ color, alpha });
-
-      if (effect.zone.mode === "open") {
-        graphic
-          .circle(effect.position.x, effect.position.y, radius * effect.zone.innerRadiusRatio)
-          .cut();
-      }
-
-      container.addChild(graphic);
-    }
-
-    container.addChild(drawFireZoneOutline(effect));
-    return container;
-  }
-
-  addFirePattern(container, effect, firePatternSource);
-
   if (firePatternSource === null) {
-    for (const cell of effect.zone.cells) {
-      graphic
-        .rect(cell.x, cell.y, cell.size, cell.size)
-        .fill({ color, alpha });
-    }
-
+    const graphic = drawFireZoneMask(effect);
+    graphic.tint = parseHexColor(effect.color);
+    graphic.alpha = 0.62 * effect.opacity;
     container.addChild(graphic);
+  } else {
+    addFirePattern(container, effect, firePatternSource, cellSizeWorld, spriteBudget);
   }
-
   container.addChild(drawFireZoneOutline(effect));
-
   return container;
 }
 
 function addFirePattern(
   container: Container,
   effect: SceneFireEffect,
-  firePatternSource: GifSource | null
+  animation: FirePatternAnimation,
+  cellSizeWorld: number,
+  spriteBudget: number
 ): void {
-  if (firePatternSource === null) {
-    return;
+  if (effect.opacity <= 0 || (effect.zone.kind === "cells" && effect.zone.cells.length === 0)) return;
+  const pattern = new Container();
+  pattern.alpha = effect.opacity;
+  // Only the ground glow follows the exact area; the flames themselves stay whole.
+  const glow = drawFireZoneMask(effect);
+  glow.tint = 0xffb347;
+  glow.alpha = 0.22;
+  glow.blendMode = "add";
+  pattern.addChild(glow);
+
+  for (const flame of createFireFlameLayout(effect, cellSizeWorld, spriteBudget)) {
+    const sprite = animation.createSprite(flame.width, flame.width * 1.25, flame.phase);
+    sprite.anchor.set(0.5);
+    sprite.position.set(flame.x, flame.y);
+    sprite.rotation = flame.rotation;
+    if (flame.mirror) sprite.scale.x *= -1;
+    sprite.tint = 0xffde9e;
+    sprite.alpha = flame.alpha;
+    pattern.addChild(sprite);
   }
-
-  if (effect.zone.kind === "circle") {
-    addMaskedFirePatternSprite(
-      container,
-      firePatternSource,
-      getFirePatternBounds(effect),
-      drawFireZoneMask(effect),
-      effect.opacity
-    );
-    return;
-  }
-
-  for (const group of groupContiguousFireCells(effect.zone.cells)) {
-    addMaskedFirePatternSprite(
-      container,
-      firePatternSource,
-      getFireCellBounds(group),
-      drawFireCellMask(group),
-      effect.opacity
-    );
-  }
-}
-
-function getFirePatternBounds(effect: SceneFireEffect): {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-} {
-  if (effect.zone.kind === "circle") {
-    const radius = effect.zone.radius * effect.scale;
-
-    return {
-      left: effect.position.x - radius,
-      right: effect.position.x + radius,
-      top: effect.position.y - radius,
-      bottom: effect.position.y + radius
-    };
-  }
-
-  const xs = effect.zone.cells.flatMap((cell) => [cell.x, cell.x + cell.size]);
-  const ys = effect.zone.cells.flatMap((cell) => [cell.y, cell.y + cell.size]);
-
-  return {
-    left: Math.min(...xs),
-    right: Math.max(...xs),
-    top: Math.min(...ys),
-    bottom: Math.max(...ys)
-  };
-}
-
-function addMaskedFirePatternSprite(
-  container: Container,
-  firePatternSource: GifSource,
-  bounds: { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number },
-  mask: Graphics,
-  opacity: number
-): void {
-  const sprite = new GifSprite({
-    source: firePatternSource,
-    autoPlay: true,
-    loop: true,
-    animationSpeed: 1
-  });
-  sprite.x = bounds.left;
-  sprite.y = bounds.top;
-  sprite.width = Math.max(1, bounds.right - bounds.left);
-  sprite.height = Math.max(1, bounds.bottom - bounds.top);
-  sprite.alpha = Math.max(0.18, opacity * FIRE_PATTERN_ALPHA_MULTIPLIER);
-  sprite.mask = mask;
-  container.addChild(sprite);
-  container.addChild(mask);
-}
-
-function groupContiguousFireCells(cells: readonly FireCell[]): readonly (readonly FireCell[])[] {
-  const origin = getFireCellGridOrigin(cells);
-  const remaining = new Map(cells.map((cell) => [getFireCellIndexKey(cell, origin), cell] as const));
-  const groups: FireCell[][] = [];
-
-  while (remaining.size > 0) {
-    const first = remaining.values().next().value;
-
-    if (first === undefined) {
-      break;
-    }
-
-    const group: FireCell[] = [];
-    const queue = [first];
-    remaining.delete(getFireCellIndexKey(first, origin));
-
-    for (let index = 0; index < queue.length; index += 1) {
-      const cell = queue[index];
-
-      if (cell === undefined) {
-        continue;
-      }
-
-      group.push(cell);
-
-      for (const key of getFireCellNeighborKeys(cell, origin)) {
-        const neighbor = remaining.get(key);
-
-        if (neighbor !== undefined) {
-          remaining.delete(key);
-          queue.push(neighbor);
-        }
-      }
-    }
-
-    groups.push(group);
-  }
-
-  return groups;
+  container.addChild(pattern);
 }
 
 function getFireCellGridOrigin(cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]): {
@@ -6012,46 +5904,6 @@ function getFireCellIndexKey(
 ): string {
   const index = getFireCellIndex(cell, origin);
   return `${index.x}:${index.y}`;
-}
-
-function getFireCellNeighborKeys(
-  cell: FireCell,
-  origin: { readonly x: number; readonly y: number }
-): readonly string[] {
-  const index = getFireCellIndex(cell, origin);
-  return [
-    `${index.x - 1}:${index.y}`,
-    `${index.x + 1}:${index.y}`,
-    `${index.x}:${index.y - 1}`,
-    `${index.x}:${index.y + 1}`
-  ];
-}
-
-function getFireCellBounds(cells: readonly FireCell[]): {
-  left: number;
-  right: number;
-  top: number;
-  bottom: number;
-} {
-  const xs = cells.flatMap((cell) => [cell.x, cell.x + cell.size]);
-  const ys = cells.flatMap((cell) => [cell.y, cell.y + cell.size]);
-
-  return {
-    left: Math.min(...xs),
-    right: Math.max(...xs),
-    top: Math.min(...ys),
-    bottom: Math.max(...ys)
-  };
-}
-
-function drawFireCellMask(cells: readonly FireCell[]): Graphics {
-  const mask = new Graphics();
-
-  for (const cell of cells) {
-    mask.rect(cell.x, cell.y, cell.size, cell.size).fill({ color: 0xffffff, alpha: 1 });
-  }
-
-  return mask;
 }
 
 function drawFireZoneMask(effect: SceneFireEffect): Graphics {

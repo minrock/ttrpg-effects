@@ -10,6 +10,22 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.8.0] - 2026-09-02
+
+### Changed
+
+- Fuego animado con llamas completas, bordes irregulares, mayor opacidad y variacion estable de posicion, tamano y fotograma.
+- Atlas compartido, reloj unico y presupuesto de sprites para limitar memoria y reconstrucciones de efectos.
+- Los GIF anteriores permanecen conservados sin referencias desde el renderer.
+
+### Fixed
+
+- El cache de efectos no reutiliza contenedores destruidos al cargar un mapa del jugador.
+
+### Notes
+
+- GIF Fiya2 solicitado para uso personal; su licencia de redistribucion no esta confirmada. Ver `assets/effects/fiya2-preview.md` antes de distribuir builds publicos.
+
 ## [1.7.6] - 2026-09-01
 
 ### Fixed

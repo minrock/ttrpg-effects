@@ -1,106 +1,46 @@
 # Spec - Efectos de Fuego
 
-Este documento describe de forma unificada la funcionalidad de efectos de fuego, consolidando el alcance funcional vigente en el proyecto.
+Estado: implementado y aceptado, version 1.8.0.
 
-## Zonas de Fuego Animado y Pintado por Celdas
+## Objetivo
 
-### Objetivo
+Representar fuego circular, anillos y celdas pintadas mediante llamas animadas completas, con transparencia y distribucion irregular, manteniendo interaccion, persistencia y rendimiento.
 
-Simplificar el efecto de fuego para que no dependa de dibujo a mano alzada. El fuego debe representarse como un GIF interno de area, con transparencia, enmascarado a un circulo seleccionable o a grupos contiguos de celdas de grilla pintadas con un pincel circular.
+## Render y assets
 
-### Alcance
+- Usar los 32 frames del GIF Fiya2 mediante `effects/fiya2-preview.png` y metadata de atlas; assets locales empaquetados, sin acceso remoto ni ampliacion de CSP.
+- Conservar `area-fire.gif` y su backup, pero sin cargarlos ni referenciarlos desde codigo ejecutable.
+- Respetar la transparencia original. Cada llama conserva el frame completo y puede sobresalir del borde sin recortes.
+- Variar posicion, tamano, reflejo, rotacion leve y fase usando una semilla estable por id. Seleccionar, arrastrar o redibujar no cambia esa distribucion.
+- Usar opacidad del efecto multiplicada por 0.92 a 1 por llama; cero no deja un minimo visible ni sprites animados.
+- El brillo del suelo sigue la geometria exacta. Las llamas que sobresalen no amplian el area afectada ni la iluminacion.
+- No dibujar emojis ni marcos naranjas por celda. Conservar el contorno circular y los controles editoriales.
+- Compartir atlas y reloj por viewport, sin estado React por frame ni un decodificador por llama. Limite de 256 sprites por efecto y presupuesto objetivo de 2048 por viewport, minimo uno por efecto.
+- La procedencia, preparacion y limitaciones de licencia viven en `assets/effects/fiya2-preview.md`; verificar permiso antes de distribuir publicamente.
 
-- Usar un asset interno generado para el proyecto en `src/renderer/public/effects/area-fire.gif`.
-- Eliminar el modo de dibujo freehand para fuego.
-- Mantener creacion de fuego desde click derecho.
-- Mantener seleccion, movimiento, borrado, visibilidad, opacidad, escala y emision de luz.
-- Renderizar el fuego circular como un unico GIF escalado al diametro del circulo y enmascarado por la geometria circular.
-- Renderizar el fuego con un multiplicador de alpha `0.65` sobre la opacidad del efecto para permitir leer el mapa debajo.
-- Permitir ajustar el radio del fuego circular arrastrando su contorno/handle naranja.
-- Permitir ajustar el radio de luz del fuego arrastrando su contorno/handle de luz.
-- Agregar un modo `Pintar fuego` que pinte cuadrados de la grilla.
-- El pincel de pintado debe ser circular: las celdas cuyo centro queda dentro del radio de pintado se agregan al area en fuego.
-- Si el radio de pintado cubre una sola celda, se renderiza un unico GIF enmascarado a esa celda.
-- Si el radio cubre varias celdas contiguas, todas las celdas dentro del area del pincel se agrupan y usan un unico GIF escalado al bounding box de esa region.
-- Si existen regiones separadas de celdas, cada region contigua usa su propio GIF enmascarado.
-- Guardar y cargar las celdas pintadas dentro de `.ttrpgscene`.
-- La luz emitida por el fuego debe revelar la capa de oscuridad igual que una luz normal.
+## Interaccion
 
-### Fuera de alcance
+- Crear fuego circular desde Efectos en el menu contextual. Cambiar circulo cerrado/abierto, radio, escala, color, opacidad y emision de luz desde propiedades.
+- Arrastrar el contorno/handle naranja ajusta el radio del fuego circular. El control de luz ajusta su alcance cuando emite luz.
+- Pintar fuego agrega celdas cuyo centro queda dentro del pincel circular; radio inicial 25 unidades de mundo, origen mundial (0,0).
+- Si existe un fuego por celdas seleccionado, el trazo lo extiende; en otro caso crea un efecto.
+- Conservar seleccion, movimiento libre, borrado y visibilidad. Mover celdas no cambia su forma ni distribucion relativa de llamas.
+- Las zonas pintadas no muestran los handles circulares de radio de fuego/luz. Su iluminacion se calcula desde las celdas.
+- La seleccion no se amplia por el sobresaliente decorativo de las llamas.
 
-- Dibujo de multiples tiles por una misma region contigua.
-- Dibujo freehand/poligonal para fuego.
-- Simulacion fisica de propagacion de fuego.
-- Danio, reglas de combate o automatizacion TTRPG.
-- Colisiones con paredes, puertas u obstaculos.
-- Importar multiples assets de fuego.
-- Renderizar emojis dentro del fuego; el GIF animado reemplaza esa decoracion.
+## Iluminacion y persistencia
 
-### Modelo de interaccion
+- El fuego y las celdas cardinalmente adyacentes reciben luz brillante; la siguiente corona recibe luz tenue, excluyendo fuego y luz brillante de otros fuegos.
+- La luz revela oscuridad normal y recupera color en darkvision. No perfora niebla ni oscuridad magica.
+- Conservar el orden de capas canonico; los efectos permanecen debajo de niebla y herramientas de area.
+- Guardar id, kind fire, posicion mundial, zona circle/cells, celdas y radio de pincel, escala, opacidad, color, visibilidad, emision y radio de luz.
+- No modificar el formato `.ttrpgscene`; las fases y colocacion decorativas se regeneran desde el id sin serializar sprites.
 
-#### Fuego circular
+## Criterios de aceptacion
 
-- Al crear fuego desde el menu contextual, el modo inicial sigue siendo un fuego circular.
-- El fuego circular conserva un centro en coordenadas de mundo.
-- El area visual del fuego se renderiza como un unico GIF interno, escalado al diametro del circulo y recortado con una mascara circular.
-- El contorno/handle naranja controla el radio del area en fuego.
-- El contorno/handle de luz controla el radio de iluminacion si `emitsLight` esta activo.
-- El panel de propiedades permite ajustar radio, color, opacidad, escala y radio de luz.
-
-#### Pintado por celdas
-
-- Debe existir un modo `Pintar fuego` disponible desde el menu contextual.
-- En modo pintado, click o drag sobre el mapa agrega celdas de grilla al fuego.
-- El pincel usa un radio circular configurable desde el handle naranja del fuego seleccionado.
-- El radio por defecto del pincel es 25 unidades de mundo.
-- Si no hay fuego por celdas seleccionado, el primer click crea uno nuevo y lo selecciona.
-- Si hay un fuego por celdas seleccionado, los nuevos cuadrados se agregan a ese mismo efecto.
-- Las celdas pintadas se agrupan por conectividad cardinal. Cada grupo contiguo se renderiza con un unico GIF interno escalado a su bounding box y recortado por una mascara de celdas.
-- Al mover un fuego por celdas, la agrupacion contigua debe mantenerse aunque las coordenadas queden desplazadas respecto al origen exacto de la grilla; la conectividad se calcula por indice relativo de celda y no por igualdad exacta de coordenadas.
-- El fuego por celdas no debe dibujar marcos/contornos naranjas por celda. La zona afectada se comunica con el GIF enmascarado y la iluminacion, no con frames individuales.
-- El resultado debe persistir como coordenadas de mundo por celda, no como coordenadas de pantalla.
-- Las celdas se calculan usando el origen mundial (0, 0) como base, identico al grid visual, para garantizar alineacion cuando el mapa se mueve.
-
-#### Iluminacion por celdas
-
-- En modo `cells`, la luz del fuego no usa un radio circular; se deriva geometricamente del contorno de las celdas pintadas.
-- Las celdas cardinalmente adyacentes al area de fuego (sin ser fuego) emiten **luz brillante** (anillo 1).
-- Las celdas cardinalmente adyacentes al anillo brillante (sin ser fuego ni anillo 1) emiten **luz tenue** (anillo 2).
-- La capa de oscuridad se borra sobre el fuego + anillo brillante + anillo tenue.
-- El fog of war se revela sobre el fuego + anillo brillante + anillo tenue.
-- En modo `cells` no se muestran los handles de radio de fuego ni de luz (circulos naranjas/amarillos), ya que la iluminacion esta determinada por la forma pintada.
-
-### Persistencia
-
-La escena debe conservar:
-
-- `id` estable.
-- Tipo de efecto `fire`.
-- Zona `circle` con radio cuando el fuego es circular.
-- Zona `cells` con lista de celdas `{ x, y, size }` y radio de pincel.
-- Posicion en coordenadas de mundo.
-- Escala.
-- Opacidad.
-- Color.
-- Visibilidad.
-- Emision de luz y radio de luz.
-
-### Criterios de aceptacion
-
-- Se carga `src/renderer/public/effects/area-fire.gif` como asset interno del renderer, sin protocolo `map-asset:` ni rutas locales de usuario.
-- El modo freehand de fuego ya no aparece en UI ni en schema nuevo.
-- Crear fuego desde click derecho muestra un area circular animada, transparente y enmascarada.
-- El radio del fuego circular se ajusta arrastrando el handle naranja.
-- El modo `Pintar fuego` permite pintar una o varias celdas de grilla con el GIF animado enmascarado.
-- El radio del pincel por defecto es 25 unidades de mundo.
-- El radio del pincel define cuantas celdas quedan pintadas.
-- Las celdas se alinean al grid visual independientemente de la posicion del mapa.
-- Si una region pintada se mueve, debe seguir usando un unico GIF por region contigua en lugar de degradarse a un GIF por celda.
-- El fuego por celdas no muestra cuadrados naranjas alrededor de cada celda, incluso cuando esta seleccionado o si se usa el fallback vectorial.
-- En modo `cells`, los handles de radio (naranja y amarillo) no se muestran.
-- En modo `cells`, el contorno de 1 celda alrededor del fuego emite luz brillante.
-- En modo `cells`, el contorno de 2 celdas alrededor del fuego emite luz tenue.
-- La oscuridad se borra y el fog of war se revela en fuego + ambos anillos.
-- Las celdas pintadas se guardan y cargan en `.ttrpgscene`.
-- El fuego no renderiza emojis.
-- No se agregan accesos directos del renderer a Node.js, Electron internals o filesystem.
+- Circulos, anillos y areas pintadas muestran llamas completas en sus bordes, sin patron coordinado ni perdida de transparencia.
+- Movimiento y seleccion no reinician animacion ni alteran la forma pintada.
+- Controles, iluminacion y guardado/carga existentes siguen funcionando.
+- Regiones grandes agrupan espacialmente la decoracion y aumentan el tamano de llamas en vez de crear sprites ilimitados.
+- Destruir efectos elimina sus suscripciones; cargar un mapa no reutiliza contenedores destruidos.
+- Los assets antiguos permanecen disponibles como respaldo, sin llamadas desde el render.
