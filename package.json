@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "1.10.0",
+  "version": "2.0.0",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -26,8 +26,8 @@
     ],
     "extraResources": [
       {
-        "from": "assets/logo/ttrpg-effects-logo.png",
-        "to": "assets/logo/ttrpg-effects-logo.png"
+        "from": "assets/logo/ttrpg-effects-icon.png",
+        "to": "assets/logo/ttrpg-effects-icon.png"
       }
     ],
     "mac": {
@@ -40,7 +40,7 @@
           ]
         }
       ],
-      "icon": "assets/logo/ttrpg-effects-logo.png",
+      "icon": "assets/logo/ttrpg-effects-icon.png",
       "category": "public.app-category.entertainment",
       "identity": null,
       "extendInfo": {

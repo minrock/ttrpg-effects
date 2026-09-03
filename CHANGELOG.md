@@ -10,6 +10,18 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.0.0] - 2026-09-03
+
+### Changed
+
+- Nueva identidad visual con logo completo y simbolo vectorizado sin letras. La UI, ventana, Dock e instalador usan el mismo simbolo sin letras; su fuente editable `.ai` y el logo anterior se conservan como respaldo.
+- Build de esta version exclusivamente para Apple Silicon (ARM64), con arquitectura explicita en `./scripts/build-dmg.sh arm64`.
+
+### Notes
+
+- Version 2.0.0 solicitada expresamente por el usuario como excepcion visual al versionado habitual. No hay ruptura de compatibilidad, migracion ni cambio del formato `.ttrpgscene`.
+- No se modifica PixiJS, el mapa, las capas ni el comportamiento de la aplicacion.
+
 ## [1.10.0] - 2026-09-02
 
 ### Fixed

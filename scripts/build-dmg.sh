@@ -6,8 +6,13 @@ cd "$ROOT"
 
 VERSION="$(node -p "require('./package.json').version")"
 PRODUCT_NAME="$(node -p "require('./package.json').build?.productName || require('./package.json').name")"
+ARCH="${1:-$(node -p 'process.arch')}"
+case "$ARCH" in
+  arm64|x64) ;;
+  *) echo "Uso: $0 [arm64|x64]" >&2; exit 1 ;;
+esac
 
-echo "==> Building ${PRODUCT_NAME} v${VERSION}"
+echo "==> Building ${PRODUCT_NAME} v${VERSION} (${ARCH})"
 
 echo "==> Typecheck..."
 pnpm typecheck
@@ -16,7 +21,7 @@ echo "==> Compile (electron-vite)..."
 pnpm exec electron-vite build
 
 echo "==> Package DMG (electron-builder)..."
-pnpm exec electron-builder --mac dmg
+pnpm exec electron-builder --mac dmg "--${ARCH}"
 
 # Remove quarantine so macOS Gatekeeper doesn't block the app on first launch.
 # This is safe for personal/internal builds not distributed through the App Store.

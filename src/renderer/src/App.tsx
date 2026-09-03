@@ -14,6 +14,7 @@ import {
   type ContextMenuPosition
 } from "./context-menu-position";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
+import logoUrl from "../../../assets/logo/ttrpg-effects-icon.png";
 import * as Switch from "@radix-ui/react-switch";
 import {
   CircleDot,
@@ -204,7 +205,6 @@ import {
   type SceneLinkValidationStatus
 } from "../../domain/annotations/scene-navigation-links";
 
-const logoUrl = "logo/ttrpg-effects-logo.png";
 const fallbackAppInfo = {
   name: "TTRPG Effects",
   version: "0.0.0"
