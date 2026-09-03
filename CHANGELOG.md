@@ -10,6 +10,12 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.0.1] - 2026-09-03
+
+### Fixed
+
+- El editor enriquecido ya no roba el foco del titulo al volver a editarlo en notas, pines de habitacion y areas informativas.
+
 ## [2.0.0] - 2026-09-03
 
 ### Changed

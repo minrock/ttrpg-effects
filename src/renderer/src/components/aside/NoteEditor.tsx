@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type JSX, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type JSX, type MouseEvent, type ReactNode } from "react";
 import {
   BetweenHorizontalEnd,
   BetweenVerticalEnd,
@@ -155,8 +155,20 @@ export function NoteEditor({
     setLinkEditorOpen(false);
   };
 
+  const focusEditorFromDocumentClick = (event: MouseEvent<HTMLElement>): void => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const interactiveTarget = target.closest(
+      "input, textarea, select, button, a, [contenteditable='true'], .note-editor__toolbar, .note-editor__link-popover"
+    );
+    if (interactiveTarget !== null) return;
+
+    editor?.commands.focus();
+  };
+
   return (
-    <section className={`note-editor note-editor--${variant}`} onClick={() => editor?.commands.focus()}>
+    <section className={`note-editor note-editor--${variant}`} onClick={focusEditorFromDocumentClick}>
       <div className="note-editor__toolbar" role="toolbar" aria-label="Formato del documento" onClick={(event) => event.stopPropagation()}>
         <ToolbarButton label="Encabezado 1" active={toolbarState.heading1} onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}>
           <Heading1 aria-hidden="true" />
