@@ -261,3 +261,11 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Construir snapshots publicos mediante una funcion de dominio que vacie etiquetas y anotaciones privadas.
 - Validar y sanitizar el payload minimo en main antes de reenviarlo por un canal preload especifico.
 - Renderizar y limpiar highlights temporales en una capa superior a fog sin publicar la escena completa.
+
+## Integracion de grilla extendida
+
+- [x] Compartir calibracion mediante el snapshot tipado existente, sin opcion de extension ni nuevo canal IPC.
+- [x] Reutilizar calculo de ventana visible en PixiViewport para ambas camaras.
+- [x] Cubrir propagacion de calibracion sin opcion de extension en `player-window.test.ts`.
+- [x] Incluir grosor 3 en la regresion del snapshot; usar schema y setGrid existentes para carga inicial y actualizaciones sin IPC nuevo.
+- [x] Cierre autorizado para 1.9.0 con snapshot y renderer compartido cubiertos; no se repitio un smoke nativo adicional de dos ventanas.

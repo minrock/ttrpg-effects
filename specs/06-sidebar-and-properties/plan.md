@@ -358,3 +358,28 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Mantener busqueda y visibilidad como estado UI; persistir solo datos y bloqueo por anotacion.
 - Reutilizar el switch Radix y el patron vigente de propiedades seleccionadas.
 - Agrupar el arbol en habitaciones, terrenos y trampas; exponer highlight de 5 segundos en las hojas de area.
+
+## Arbol de efectos y areas
+
+Estado: implementado y aceptado para cierre 1.9.0.
+
+- [x] Derivar entradas desde lights/effects/shapes con helpers puros `scene-objects.ts`.
+- [x] Implementar borrado por coleccion/id conservando las referencias de colecciones no modificadas.
+- [x] Crear SceneObjectsTree memoizado con busqueda, grupos, seleccion, centrar y borrar.
+- [x] Integrarlo en DmAsidePanel; reutilizar seleccion, apertura de propiedades y `centerOnWorldPoint` existentes.
+- [x] Dar dimensiones estables a acciones, truncamiento con tooltip y colores del tema.
+- [x] Cubrir seleccion de ocultos, busqueda/colapso, centrar y borrado de una fila distinta a la seleccionada; evitar propagacion de Delete/Backspace.
+- [x] Retirar el switch de extension: grilla siempre extendida conforme a spec/plan 04.
+- [x] Aceptacion y merge autorizados por el usuario para 1.9.0.
+
+No crear sprites para el listado ni usar un ticker. La lista se deriva al cambiar referencias de sus colecciones; pan/zoom no recalcula las entradas. Validar visualmente busqueda, ocultar/mostrar panel, seleccion y borrado sin afectar otro objeto.
+
+Validacion de rama (2026-09-02): typecheck, lint, 322 tests y build correctos. Smoke en navegador con dos fuegos: seleccionar el primero y borrar el segundo conserva la seleccion y deja una sola hoja. Contraste y disposicion del arbol revisados por captura. Aceptacion final y cierre autorizados por el usuario para 1.9.0.
+
+## Selector de grosor
+
+- [x] Integrar botones 1/3 junto a opacidad en el accordion Grilla de App.
+- [x] Mostrar icono Minus Lucide con strokeWidth correspondiente, estado activo y foco visible.
+- [x] Dar a ambos botones columnas iguales y dimensiones estables; no introducir dependencias.
+- [x] Conectar a estado de escena evitando cambios redundantes al pulsar la opcion ya activa.
+- [x] Aceptacion del usuario para 1.9.0; ambos grosores revisados por captura en navegador.

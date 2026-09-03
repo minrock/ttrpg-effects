@@ -89,3 +89,16 @@ La secuencia de gameplay que no debe romperse es: mapa -> tokens -> oscuridad ->
 - React debe controlar paneles, menus e inputs.
 - PixiJS debe controlar render interactivo del mapa.
 - Evitar que cada herramienta implemente su propia conversion de coordenadas.
+
+## Controles de efectos y grilla acotada
+
+- Compartir con herramientas de area `getAreaToolUiScale(zoom)`: minimo visual mediante `max(1, 1/max(zoom, 0.001))`.
+- Aplicar esa escala a grosores, manivelas y tolerancias de hit testing de efectos; no al radio/longitud fisica de la iluminacion.
+- Mantener los controles en seleccion y exclusivamente en DM. Actualizar su geometria cuando cambia zoom, no recrear efectos animados por mover la camara.
+- Dibujar siempre la grilla sobre la ventana visible y overscan cacheados, sin modo limitado al mapa, con el presupuesto de lineas de spec 04; nunca crear una textura del tamano del mundo navegable.
+- El arbol React de spec 06 opera sobre ids, no sobre objetos Pixi ni copias de texturas.
+- La grilla usa ancho de trazo 1 o 3 segun `grid.lineWidth` (spec 04). Incluirlo en el cache de estilo; cambiarlo no invalida capas ajenas ni modifica la camara o las coordenadas de las lineas.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

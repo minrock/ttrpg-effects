@@ -121,3 +121,14 @@ La escena debe conservar:
 - El cuerpo cerrado usa multiples tiles GIF repetidos dentro de la mascara del poligono para evitar que el agua se vea estirada.
 - Los efectos de agua se guardan y cargan en `.ttrpgscene`.
 - Los assets se cargan desde rutas internas del renderer.
+
+## Usabilidad de controles de agua
+
+- Escalar trazos, manivelas y tolerancia de hit testing como herramientas de area (spec 01).
+- Mantener un gap minimo de 42 px en zoom-out entre aros de orientacion de geometria y patron; no escalar el cuerpo de agua ni los tiles al escalar controles.
+- Rios y cuerpos cerrados aparecen en el arbol de Efectos para seleccionar, centrar y borrar (spec 06).
+- Los controles no aparecen en jugador ni agregan trabajo de animacion por frame.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

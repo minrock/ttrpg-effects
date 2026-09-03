@@ -170,3 +170,12 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Smoke/manual test con `pnpm dev` realizado.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## Controles escalables y ventana de grilla
+
+- [x] Reutilizar helper de escala visual en controles de luces y efectos e igualar hit testing.
+- [x] Conservar invalidacion de seleccion al cambiar zoom sin reconstruir animaciones durante pan.
+- [x] Cachear region de grilla, liberar geometria reemplazada y mantener mascaras con bounds finitos.
+- [x] Agregar regresiones de controles a zoom 0.1/0.25/0.5/1/2 y de cache/limites de grilla.
+- [x] Aplicar `grid.lineWidth` al stroke/cache y probar cambio 1 -> 3 -> 1, liberacion de Graphics previos y ausencia de reconstruccion de mascaras.
+- [x] Aceptacion y cierre autorizados por el usuario para 1.9.0. Detalle funcional y pruebas: specs 04 y 06.

@@ -103,3 +103,19 @@ El contenido sera JSON.
 - La escena persiste `mapAnnotations.pins` y `mapAnnotations.areas`, incluyendo coordenadas de mundo, Markdown, tipo, geometria y bloqueo.
 - Escenas V1 anteriores cargan con ambas listas vacias y se marcan para re-guardado compatible.
 - Los highlights temporales de areas no forman parte del archivo `.ttrpgscene`.
+
+## Persistencia de extension de grilla
+
+- No guardar una opcion de extension: la grilla siempre cubre el viewport. Ignorar el campo obsoleto `grid.extendToViewport` en archivos de prueba, independientemente de su valor.
+- No cambiar version de formato ni serializar ventanas de cache, escalas de controles, filtros o expansion del arbol.
+- Seleccion, centrado y borrado desde el arbol reutilizan las entidades e ids existentes.
+
+## Persistencia del grosor de grilla
+
+- Guardar `grid.lineWidth` en `.ttrpgscene` y snapshots: 1 para delgadas, 3 para gruesas.
+- Campo ausente en archivos anteriores se normaliza a 1; rechazar otros valores. No cambiar la version V1 del formato.
+- Conservar la calibracion y demas datos al guardar/cargar. El grosor no predeterminado cuenta como contenido de escena; una escena vacia antigua con default aplicado sigue vacia.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

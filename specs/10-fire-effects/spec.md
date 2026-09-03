@@ -1,6 +1,6 @@
 # Spec - Efectos de Fuego
 
-Estado: implementado y aceptado, version 1.8.0.
+Estado: implementado y aceptado, controles actualizados en version 1.9.0.
 
 ## Objetivo
 
@@ -44,3 +44,15 @@ Representar fuego circular, anillos y celdas pintadas mediante llamas animadas c
 - Regiones grandes agrupan espacialmente la decoracion y aumentan el tamano de llamas en vez de crear sprites ilimitados.
 - Destruir efectos elimina sus suscripciones; cargar un mapa no reutiliza contenedores destruidos.
 - Los assets antiguos permanecen disponibles como respaldo, sin llamadas desde el render.
+
+## Controles de fuego a cualquier zoom
+
+- Aplicar escala minima visual compartida a trazos, manivelas e hit testing sin cambiar zona, escala fisica ni radio de luz.
+- Para fuego circular: manivela naranja del fuego a la derecha; manivela amarilla de luz arriba. Priorizar la manivela mas cercana antes del aro mas cercano para distinguir radios iguales.
+- No introducir aros de resize para fuego pintado ni marcos naranjas en sus celdas.
+- Los controles siguen privados de DM y el fuego figura en el arbol lateral de Efectos (spec 06).
+- Zoom/pan no reinicia fases ni reconstruye el atlas de animacion.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

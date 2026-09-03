@@ -336,3 +336,27 @@ Requisitos:
 - El panel lateral izquierdo incluye el arbol de anotaciones con buscador, grupos por tipo, seleccion, edicion, bloqueo, `Ir a` y accion de highlight para areas.
 - Al seleccionar un pin o area se abre el sidebar y aparecen sus acciones contextuales.
 - Ocultar la capa no elimina datos ni oculta el arbol izquierdo.
+
+## Arbol de objetos del DM
+
+- Agregar `Objetos` en la parte superior del panel izquierdo, con grupos desplegables `Efectos` y `Areas`, iconos y conteos.
+- Efectos incluye luces puntuales/conicas, fuego, luz dinamica, agua y oscuridad magica. Areas incluye circulos, conos, rectangulos, mediciones y caminos.
+- Cada hoja muestra tipo e identificador estable. Incluir objetos ocultos con indicador de ojo cerrado, sin volverlos visibles al seleccionarlos.
+- Permitir buscar por texto, seleccionar desde la hoja, centrar la camara del DM mediante icono y borrar mediante papelera. Los nombres largos se truncan con tooltip.
+- Seleccionar abre las propiedades existentes del sidebar derecho y vuelve a la herramienta de seleccion. Centrar no cambia zoom ni mueve la camara del jugador.
+- Borrar actua sobre la coleccion/id de esa hoja aunque otro objeto este seleccionado. Solo limpiar la seleccion si se borra el seleccionado.
+- Delete/Backspace sobre una hoja enfocada borra esa hoja y no propaga la accion al canvas.
+- El arbol tiene ramas visibles, botones accesibles por teclado y scroll dentro del panel. No hay multiseleccion ni reordenamiento en esta entrega.
+- Filtros, expansion y seleccion son estado local, no datos nuevos del archivo ni de Player View. Tokens, entidades y anotaciones conservan sus listados existentes.
+- Grilla no ofrece un control para reducir su cobertura: es siempre extendida al viewport segun spec 04. Conserva los controles de visibilidad y calibracion.
+
+## Selector de grosor de grilla
+
+- Mostrar `Grosor de lineas` debajo de Opacidad con dos opciones visibles: `Delgadas` y `Gruesas (3x)`.
+- Usar botones segmentados con estado `aria-pressed`, foco de teclado y un icono de trazo que refleje cada grosor.
+- Una sola opcion activa, delgadas por defecto; el selector no depende de `Ajustar grilla` ni del bloqueo de zoom.
+- Cambiarlo actualiza solo `scene.grid.lineWidth`; detalles y persistencia en specs 04 y 03. Mantener el look and feel y evitar desbordes del panel.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

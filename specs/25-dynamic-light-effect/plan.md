@@ -106,3 +106,10 @@
 6. Mostrar la manivela solo cuando la apertura sea menor a `360°`.
 7. Guardar el preview de direccion en `previewEffects` y publicar `onDynamicLightDirectionChange` solo al finalizar el drag.
 8. No invalidar niebla, capas de efectos ni estado React durante cada movimiento de la manivela.
+
+## Manivela legible y arbol
+
+- [x] Pasar zoom a geometria de orientacion e hit testing.
+- [x] Mantener radios fisicos, cache de iluminacion y reloj existentes.
+- [x] Incluir luz dinamica en el indice de objetos.
+- [x] Extension de manivela y arbol aceptada por el usuario para 1.9.0.

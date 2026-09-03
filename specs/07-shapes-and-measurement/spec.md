@@ -559,3 +559,14 @@ Cada punto debe guardar una posicion estable en espacio de mundo o una referenci
 - Considerar tests unitarios para sumar segmentos y reaccionar a cambios de unidad/regla diagonal.
 - Mantener el renderer como adaptador visual: el modelo de path no debe depender de PixiJS.
 - Si la edicion completa de puntos requiere mas trabajo que el MVP, implementar primero seleccion, persistencia y distancia, dejando la edicion de handles como subtarea explicita del plan.
+
+## Acceso desde el arbol lateral
+
+- Las formas y mediciones persistidas aparecen bajo Areas en el arbol de Objetos de spec 06.
+- Seleccionar abre sus propiedades; centrar mueve solo la camara del DM sin cambiar zoom. Papelera o Delete/Backspace enfocado elimina la hoja indicada.
+- Mantener los controles y labels ya compensados por zoom-out; luces y efectos reutilizan ahora la misma escala visual.
+- No cambiar reglas de medicion, snap ni datos persistidos de las formas.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

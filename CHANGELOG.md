@@ -10,6 +10,29 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.9.0] - 2026-09-02
+
+### Added
+
+- Arbol lateral de efectos y areas con busqueda, seleccion, centrado y borrado individual.
+- Grilla siempre extendida al viewport en DM y jugador, sin opcion para limitarla al mapa y sin alterar calibracion o escala de imagen.
+- Selector de lineas delgadas (default) o gruesas (triple grosor), persistido en la escena y compartido con jugador; cambiarlo solo reconstruye la grilla.
+
+### Fixed
+
+- Controles e hit testing de efectos legibles durante zoom-out, como las herramientas de area.
+- Manivelas separadas para radio de fuego y luz, incluso con radios coincidentes.
+
+### Performance
+
+- Grilla visible con overscan reutilizable, presupuesto de lineas y sin ampliar las texturas de niebla/oscuridad.
+
+### Notes
+
+- Funcionalidad aceptada para cierre en main. Compatibilidad con escenas V1 conservada; archivos sin grosor de grilla cargan con lineas delgadas.
+- Verificacion: 326 tests, typecheck y lint correctos; revision visual del arbol, controles y grosores en navegador. No se repitio un smoke nativo completo de dialogos y dos ventanas Electron en este cierre.
+- Se conservan los GIF de fuego antiguos sin referencias desde el render; sigue vigente la nota de uso personal/licencia del asset Fiya2 de 1.8.0.
+
 ## [1.8.0] - 2026-09-02
 
 ### Changed

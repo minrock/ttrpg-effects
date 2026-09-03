@@ -25,6 +25,12 @@ const token: SceneToken = {
 };
 
 describe("player window view rules", () => {
+  it("shares cell calibration without an extension toggle in the player snapshot", () => {
+    const scene = createDefaultScene();
+    const grid = { ...scene.grid, cellSizeWorld: 57, lineWidth: 3 as const };
+    expect(createPlayerSceneSnapshot({ ...scene, grid }).grid).toEqual(grid);
+  });
+
   it("uses blocking fog for players and a local preview flag for the DM", () => {
     expect(deriveFogPresentation("player", false)).toBe("player-blocking");
     expect(deriveFogPresentation("dm", false)).toBe("dm-hidden");

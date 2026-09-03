@@ -106,3 +106,14 @@ El efecto se guarda en `effects` con `kind: "dynamic-light"` y los campos necesa
 - La manivela rota en tiempo real el halo visible y las mascaras de oscuridad/darkvision de forma coincidente.
 - Guardar y cargar conserva apertura y direccion; las luces antiguas siguen siendo circulares completas.
 - El menu ofrece `Clonar luz` solo cuando el clic derecho apunta a una luz dinamica y el clon reproduce todas sus propiedades salvo id y posicion.
+
+## Usabilidad de la manivela de orientacion
+
+- Para aperturas menores a 360 grados, manivela y trazos mantienen la escala visual minima de areas (spec 01).
+- El aro conserva un minimo de 52 px a zoom-out; el hit testing usa el mismo radio y escala.
+- No alterar radios de luz fuerte/tenue ni fuente de una celda, y no agregar una manivela a luces completas donde no existia.
+- Incluir luces dinamicas en el arbol de Efectos para seleccion/centrado/borrado. Ningun control editorial aparece en Player View.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

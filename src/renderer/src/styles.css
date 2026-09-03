@@ -4702,3 +4702,128 @@ body {
     bottom: auto;
   }
 }
+
+.scene-object-tree,
+.scene-object-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.scene-object-tree > li > ul {
+  margin-left: 7px;
+  padding-left: 8px;
+  border-left: 1px solid var(--editor-border);
+}
+
+.scene-object-group,
+.scene-object-select,
+.scene-object-action {
+  border: 0;
+  color: var(--editor-text);
+  background: transparent;
+}
+
+.scene-object-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 2px;
+  text-align: left;
+}
+
+.scene-object-group small {
+  margin-left: auto;
+  opacity: 0.6;
+}
+
+.scene-object-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px 24px;
+  align-items: center;
+  gap: 2px;
+  min-height: 32px;
+  border-radius: 4px;
+}
+
+.scene-object-row.is-selected {
+  background: #ffd16620;
+  box-shadow: inset 2px 0 var(--editor-accent);
+}
+
+.scene-object-select {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 3px;
+  text-align: left;
+  font-size: 12px;
+}
+
+.scene-object-select span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-object-select svg {
+  flex-shrink: 0;
+}
+
+.scene-object-action {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+}
+
+.scene-object-action:hover,
+.scene-object-select:hover {
+  color: var(--editor-accent);
+  background: #ffffff0b;
+}
+
+.scene-object-tree button:focus-visible {
+  outline: 1px solid var(--editor-accent);
+  outline-offset: -1px;
+}
+
+.grid-line-width-control {
+  display: grid;
+  gap: 6px;
+}
+
+.grid-line-width-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.grid-line-width-options button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+.grid-line-width-options svg {
+  flex-shrink: 0;
+}
+
+.grid-line-width-options button:focus-visible {
+  outline: 2px solid var(--editor-accent);
+  outline-offset: 1px;
+}
+
+.grid-line-width-options button.is-active:hover:not(:disabled) {
+  border-color: var(--editor-accent);
+  color: var(--editor-accent);
+  background: rgb(240 185 92 / 18%);
+}

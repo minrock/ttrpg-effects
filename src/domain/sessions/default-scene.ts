@@ -22,6 +22,7 @@ export function createDefaultScene(): SceneDocument {
       locked: true,
       cellSizeWorld: 100,
       opacity: 0.35,
+      lineWidth: 1,
       unit: "ft",
       distancePerCell: 5,
       metricDistancePerCell: 1.5

@@ -67,20 +67,12 @@ Requerimientos:
 - Poder ajustar escala/opacidad.
 - Idealmente emitir o asociarse a una luz calida.
 
-Decision posterior:
+Implementacion vigente:
 
-- efectos de fuego usa un GIF interno generado para el proyecto, servido desde `/effects/area-fire.gif`.
-- El fuego puede ser circular o pintado como cuadrados de grilla con un pincel circular.
-- El fuego circular usa un unico GIF escalado al diametro del circulo y enmascarado por su geometria.
-- El fuego pintado agrupa celdas contiguas; cada region contigua usa un unico GIF escalado a su bounding box y enmascarado por las celdas.
-- El GIF se renderiza con alpha `0.65 * opacity` para dejar ver parcialmente el mapa debajo.
-- La luz asociada sigue revelando oscuridad.
-- El fuego no renderiza emojis.
-
-Fuente de asset:
-
-- Asset interno generado para el proyecto: `src/renderer/public/effects/area-fire.gif`.
-- No se usa asset externo ni licencia de terceros para el fuego actual.
+- Fuego circular o pintado por celdas, sin emojis; iluminacion asociada independiente de la decoracion animada.
+- Render y presupuesto de llamas completos definidos en spec 10: atlas Fiya2 compartido, sin recortar las llamas en bordes y con variacion estable de distribucion/fase.
+- El antiguo `area-fire.gif` se conserva como respaldo, sin llamadas desde el renderer.
+- La licencia del GIF Fiya2 solicitado no esta confirmada para redistribucion. Consultar `assets/effects/fiya2-preview.md` antes de distribuir builds publicos.
 
 ### Criterios de aceptacion
 
@@ -222,3 +214,15 @@ Hoy la edición de tamaño de luces no es tan directa como la de las formas. Est
 - Mantener la lógica de cálculo en PixiViewport o extraer helper puro si empieza a repetirse demasiado.
 - Usar `onLightRadiusChange` o un callback equivalente hacia React para actualizar `SceneLight.radius`.
 - Evitar duplicar reglas de luz en el renderer si ya existen helpers para `SceneLight`.
+
+## Controles de luz legibles con zoom-out
+
+- Luces puntuales y conicas usan la misma escala minima visual de las herramientas de area (spec 01).
+- Escalar manivela de radio/longitud, trazos y tolerancia de seleccion. Conservar radio, longitud, unidades y mascaras en coordenadas de mundo.
+- La manivela de orientacion conica mantiene radio minimo visual de 72 px a zoom-out y hit testing coherente.
+- Los controles solo aparecen para el objeto seleccionado en DM; Player View conserva exclusivamente la iluminacion.
+- Ambas luces aparecen en el arbol de Efectos de spec 06 para seleccionar, localizar y borrar.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

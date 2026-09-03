@@ -182,3 +182,16 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Validar `mapAnnotations` con Zod y defaults vacios para escenas anteriores.
 - Incluir pines y areas en deteccion de contenido y serializacion normal de escena.
 - Mantener highlights y preferencias de visibilidad fuera del documento persistido.
+
+## Campo compatible de grilla
+
+- [x] Eliminar `grid.extendToViewport` del modelo/default/schema; Zod descarta el campo obsoleto al cargar.
+- [x] Cubrir round trip y lectura de escena antigua manteniendo deteccion de escena vacia.
+- [x] Cierre autorizado para 1.9.0 con compatibilidad cubierta por pruebas de serializacion; no se repitieron dialogos nativos.
+
+## Campo compatible de grosor
+
+- [x] Validar `lineWidth` con union literal 1/3 y default 1 dentro del schema compartido.
+- [x] Usar serializacion y canales de guardado existentes, sin nuevo IPC ni version incompatible.
+- [x] Probar defaults antiguos, round trip en gruesas, valores invalidos y deteccion de contenido.
+- [x] Cierre de grosor autorizado para 1.9.0 con round trip automatizado; sin afirmar un smoke nativo adicional.

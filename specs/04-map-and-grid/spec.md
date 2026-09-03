@@ -316,3 +316,37 @@ Añadir después de la opción existente `"dnd5e-default"`.
 | `src/domain/measurement/measurement.ts` | Añadir `measureCellsAlternating`, caso en `measureCells`, lógica en `measurePathDistance` |
 | `src/domain/measurement/measurement.test.ts` | Añadir tests para el nuevo modo |
 | `src/renderer/src/App.tsx` | Añadir `<option>` en el selector de diagonal |
+
+## Extension de la grilla al viewport
+
+### Objetivo y comportamiento
+
+- La grilla siempre cubre el viewport navegable, incluso fuera del mapa, siguiendo la camara de cada ventana.
+- No ofrecer switch ni modo para limitarla al mapa. `Ajustar grilla` sigue controlando solo la calibracion; `Activar grilla` conserva la visibilidad global.
+- No modificar `cellSizeWorld`, unidades, distancia por casilla, escala de imagen, posicion del mapa ni zoom. La alineacion permanece anclada al mismo origen mundial.
+- No persistir una opcion de extension. Escenas antiguas, incluso con `grid.extendToViewport: false` de la prueba anterior, usan siempre grilla extendida e ignoran ese campo obsoleto.
+- Compartir la calibracion con Player View, manteniendo sus camaras independientes y el mismo comportamiento extendido.
+
+### Rendimiento y aceptacion
+
+- Generar lineas solo para la region visible mas margen de cache (doble ancho/alto del viewport).
+- Reutilizar geometria durante paneos dentro de ese margen y reemplazarla al salir, cambiar escala de dibujo o estilo.
+- Presupuesto maximo de 2048 lineas. Solo al excederlo en zoom-out extremo, dibujar lineas principales en multiplos de 2 de la celda; la medicion y el snap siguen usando la celda real.
+- No extender los bounds ni las RenderTextures de niebla/oscuridad. Solo la grilla cubre el viewport.
+- Navegar o recibir configuracion identica no debe reconstruir efectos, tokens ni mascaras.
+- Guardar/cargar y abrir Player View conservan el estado y tamano de celda. Una escena vacia antigua debe seguir detectandose como vacia.
+
+## Grosor de lineas
+
+- Agregar en Grilla un selector segmentado con `Delgadas` y `Gruesas (3x)`, junto al control de opacidad y siempre disponible sin activar calibracion.
+- `Delgadas` mantiene el trazo actual: ancho base 1. `Gruesas (3x)` usa ancho 3, exactamente triple a igualdad de zoom/opacidad.
+- El grosor sigue la misma transformacion de camara del trazo actual; no implementar compensacion de zoom independiente ni alterar la separacion entre lineas.
+- Nuevas escenas y archivos antiguos sin el campo usan `Delgadas` por defecto. Persistir `grid.lineWidth` con valores permitidos 1 o 3.
+- El cambio se refleja en DM y Player View mediante el estado compartido. Conservar controles de mostrar/ocultar, opacidad y calibracion, y la cobertura siempre extendida.
+- No cambiar tamano de casillas, unidades, snap, mediciones, escala de imagen ni camara. Aplicar un preset tampoco debe resetear el grosor.
+- Incluir grosor en la clave del cache visual. Cambiarlo invalida solo la geometria de grilla, libera el trazo anterior y no reconstruye luces, efectos, tokens o mascaras.
+- Criterios: alternar entre ambos estilos, comprobar relacion 3:1, guardar/cargar con gruesas, abrir jugador y volver a delgadas sin alterar la escena ni acumular Graphics.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

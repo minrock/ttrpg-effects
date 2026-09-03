@@ -42,5 +42,6 @@ describe("grid rules", () => {
       distancePerCell: preset.distancePerCell,
       metricDistancePerCell: preset.metricDistancePerCell
     });
+    expect(applyGridPreset({ ...grid, lineWidth: 3 }, preset).lineWidth).toBe(3);
   });
 });

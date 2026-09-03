@@ -1,6 +1,6 @@
 # Plan - Efectos de Fuego
 
-Estado: implementado y aceptado, version 1.8.0.
+Estado: implementado y aceptado, controles actualizados en version 1.9.0.
 
 ## Arquitectura
 
@@ -31,3 +31,11 @@ Estado: implementado y aceptado, version 1.8.0.
 ## Verificacion de futuras reproducciones
 
 Ejecutar `pnpm typecheck`, `pnpm lint`, `pnpm test` y `pnpm build`. Revisar mapas grandes en ambas ventanas: sprites completos, distribucion estable, zoom/pan, opacidad cero y borrado repetido. Las pruebas de asignaciones no sustituyen medir FPS/VRAM en la maquina de proyeccion.
+
+## Usabilidad de fuego seleccionado
+
+- [x] Escalar visualmente controles e hit testing con el helper de areas.
+- [x] Separar manivelas de zona/luz en ejes distintos y resolver el objetivo por proximidad.
+- [x] Cubrir radios coincidentes a multiples zooms en `effect-control-geometry.test.ts`.
+- [x] Integrar seleccion, centrado y borrado en el arbol de objetos.
+- [x] Extension de controles aceptada expresamente por el usuario para cierre 1.9.0.

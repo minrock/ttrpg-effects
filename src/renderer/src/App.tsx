@@ -27,6 +27,7 @@ import {
   Map as MapIcon,
   MapPin,
   Monitor,
+  Minus,
   Moon,
   Save,
   Shapes,
@@ -165,6 +166,7 @@ import type { TacticalElementKind } from "../../domain/tools/tactical-elements";
 import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
 import type { PixiContextMenuRequest } from "../../render/pixi/PixiViewport";
 import { DmAsidePanel } from "./components/aside/DmAsidePanel";
+import { listSceneObjects, removeSceneObject, type SceneObjectEntry } from "../../domain/sessions/scene-objects";
 import { DmDarknessStatusBadge } from "./components/DmDarknessStatusBadge";
 import type { SceneAside } from "../../domain/sessions/scene-aside";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
@@ -495,6 +497,20 @@ export function App(): JSX.Element {
 
   const handleElementSelect = useCallback((elementId: string | null) => {
     setInteraction((current) => selectElement(current, elementId));
+  }, []);
+
+  const sceneObjects = useMemo(() => listSceneObjects(scene.lights, scene.effects, scene.shapes), [scene.lights, scene.effects, scene.shapes]);
+  const handleSelectSceneObject = useCallback((entry: SceneObjectEntry) => {
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), entry.id));
+    setIsSidebarVisible(true);
+  }, []);
+  const handleLocateSceneObject = useCallback((entry: SceneObjectEntry) => {
+    viewportHandleRef.current?.centerOnWorldPoint(entry.center);
+    handleSelectSceneObject(entry);
+  }, [handleSelectSceneObject]);
+  const handleDeleteSceneObject = useCallback((entry: SceneObjectEntry) => {
+    setScene((current) => removeSceneObject(current, entry));
+    setInteraction((current) => current.selectedElementId === entry.id ? deleteSelectedElement(current) : current);
   }, []);
 
   const refreshPlayerCameraControl = useCallback((statusOverride?: PlayerCameraSyncStatus): void => {
@@ -3009,6 +3025,10 @@ export function App(): JSX.Element {
       </aside>
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}${isAsidePanelVisible ? "" : " is-aside-hidden"}`}>
         <DmAsidePanel
+          objects={sceneObjects}
+          onSelectObject={handleSelectSceneObject}
+          onLocateObject={handleLocateSceneObject}
+          onDeleteObject={handleDeleteSceneObject}
           aside={sceneAside}
           monsterTemplates={monsterTemplates}
           annotations={scene.mapAnnotations}
@@ -3892,6 +3912,26 @@ export function App(): JSX.Element {
                 onChange={(event) => handleGridOpacityChange(event.currentTarget.valueAsNumber)}
               />
             </label>
+            <div className="grid-line-width-control">
+              <span>Grosor de lineas</span>
+              <div className="grid-line-width-options" role="group" aria-label="Grosor de lineas de grilla">
+                {([1, 3] as const).map((lineWidth) => (
+                  <button
+                    key={lineWidth}
+                    type="button"
+                    className={(scene.grid.lineWidth ?? 1) === lineWidth ? "is-active" : ""}
+                    aria-pressed={(scene.grid.lineWidth ?? 1) === lineWidth}
+                    onClick={() => setScene((current) => current.grid.lineWidth === lineWidth ? current : ({
+                      ...current,
+                      grid: { ...current.grid, lineWidth }
+                    }))}
+                  >
+                    <Minus size={18} strokeWidth={lineWidth} aria-hidden="true" />
+                    {lineWidth === 1 ? "Delgadas" : "Gruesas (3x)"}
+                  </button>
+                ))}
+              </div>
+            </div>
             {isGridAdjustMode ? (
               <label>
                 Celda

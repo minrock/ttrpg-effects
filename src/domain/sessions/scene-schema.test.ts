@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultScene } from "./default-scene";
+import { hasSceneContent } from "./scene-content";
 import {
   detectOutdatedSceneFields,
   parseSceneDocument,
@@ -8,6 +9,29 @@ import {
 } from "./scene-schema";
 
 describe("scene document schema", () => {
+  it("loads older grid settings with thin lines and keeps an empty scene empty", () => {
+    const scene = createDefaultScene();
+    const grid = Object.fromEntries(Object.entries(scene.grid).filter(([key]) => key !== "lineWidth"));
+    const restored = parseSceneDocument({ ...scene, grid });
+    expect(restored.grid.lineWidth).toBe(1);
+    expect(hasSceneContent(restored)).toBe(false);
+  });
+
+  it("persists thick grid lines without changing map scale or calibration", () => {
+    const scene = createDefaultScene();
+    const updated = { ...scene, grid: { ...scene.grid, lineWidth: 3 as const } };
+    const restored = parseSceneJson(serializeSceneDocument(updated));
+    expect(restored).toEqual(updated);
+    expect(hasSceneContent(restored)).toBe(true);
+  });
+
+  it("rejects unsupported grid line widths", () => {
+    const scene = createDefaultScene();
+    for (const lineWidth of [0, 2, 4, -1, "3", null]) {
+      expect(() => parseSceneDocument({ ...scene, grid: { ...scene.grid, lineWidth } })).toThrow();
+    }
+  });
+
   it("accepts the default scene", () => {
     expect(parseSceneDocument(createDefaultScene())).toEqual(createDefaultScene());
   });

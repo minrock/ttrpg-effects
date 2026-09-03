@@ -1002,3 +1002,10 @@ export function measurePathDistance(
 - [x] `pnpm lint` ejecutado.
 - [x] `pnpm build` ejecutado.
 - [ ] Smoke/manual test realizado.
+
+## Integracion con arbol de objetos
+
+- [x] Indexar circulo, cono, rectangulo, medicion y camino en Areas.
+- [x] Derivar centro en mundo y reutilizar seleccion/propiedades existentes.
+- [x] Probar centro de formas y borrado dirigido sin tocar otras colecciones.
+- [x] Flujo de seleccion/centrado/borrado aceptado para 1.9.0.

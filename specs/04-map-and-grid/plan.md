@@ -629,3 +629,36 @@ Línea ~1757, después de `<option value="dnd5e-default">D&D 5e</option>`:
 - [x] `pnpm typecheck` ejecutado.
 - [x] `pnpm test` ejecutado.
 - [ ] Smoke test manual.
+
+## Extension de grilla al viewport
+
+Estado: implementado y aceptado para cierre 1.9.0.
+
+- [x] Hacer que la grilla cubra siempre el viewport, sin campo de extension en SceneGrid ni schema.
+- [x] Retirar switch y rama de dibujo limitado; ignorar el campo obsoleto al cargar escenas de prueba.
+- [x] Extraer ventana de dibujo, overscan y presupuesto de lineas a `domain/grid/grid-window.ts`.
+- [x] Cachear la geometria en PixiViewport y actualizarla al navegar sin acumular Graphics.
+- [x] Separar limite visual de grilla de los bounds de texturas de niebla/oscuridad.
+- [x] Evitar invalidar capas ajenas cuando se recibe configuracion de grilla identica.
+- [x] Cubrir inicio extendido, coordenadas lejanas, zoom extremo, reutilizacion, escenas antiguas, round trip y snapshot de jugador.
+- [x] Aceptacion y merge autorizados por el usuario para 1.9.0.
+
+Verificacion reproducible: iniciar o cargar una escena, hacer pan fuera de la imagen y zoom-out, guardar/cargar y abrir jugador. Confirmar cobertura automatica sin switch, casillas calibradas, ausencia de huecos al navegar y memoria de mascaras estable. Pruebas en `grid-window.test.ts`, `grid-render-cache.test.ts` y `player-window.test.ts`.
+
+Validacion de rama (2026-09-02): typecheck, lint, 322 tests y build correctos con grilla siempre extendida. Regresiones de inicio, paneo lejano y carga sin opcion de minimizar cubiertas. En navegador se confirma ausencia del switch de extension, conservando calibracion y canvas. Cierre autorizado por el usuario; no se repitio un smoke nativo completo de dialogos y dos ventanas Electron.
+
+## Grosor delgado o triple
+
+Estado: implementado y aceptado para cierre 1.9.0.
+
+- [x] Agregar `SceneGrid.lineWidth: 1 | 3`, default 1 y validacion Zod compatible con archivos sin campo.
+- [x] Mantener el orden de propiedades del default/schema para no marcar como ocupada una escena vacia antigua.
+- [x] Agregar selector segmentado accesible en Grilla con muestra de trazo Lucide y estado presionado.
+- [x] Usar `lineWidth` en el stroke y en la clave del cache de PixiViewport.
+- [x] Limitar invalidacion a grilla cuando solo cambia grosor; conservar cache durante pan y reutilizarlo al repetir la opcion.
+- [x] Cubrir default antiguo, rechazo de valores distintos de 1/3, round trip, deteccion de cambios, snapshot de jugador y trazo Pixi de ancho 1/3.
+- [x] Aceptacion y merge autorizados por el usuario para 1.9.0.
+
+Verificacion: probar ambos botones a igual zoom/opacidad, guardar con gruesas, cargar de nuevo y abrir Player View. Revisar `scene-schema.test.ts`, `grid-render-cache.test.ts` y `player-window.test.ts`.
+
+Validacion (2026-09-02): 326 tests, typecheck, lint y build correctos. Comparacion visual en navegador de delgadas/gruesas realizada sin errores de consola. Round trip y snapshot de jugador cubiertos automaticamente. Aceptado por el usuario para 1.9.0; sin un smoke nativo adicional de dos ventanas.

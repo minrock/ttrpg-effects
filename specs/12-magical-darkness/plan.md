@@ -266,3 +266,9 @@ export interface SceneMagicalDarknessEffect {
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## Control escalable y arbol
+
+- [x] Aplicar escala visual al control de radio y tolerancia de hit testing.
+- [x] Incluir el efecto en el arbol de objetos de spec 06.
+- [x] Extension de controles aceptada para 1.9.0 sin modificar cobertura de oscuridad magica.

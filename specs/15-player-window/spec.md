@@ -266,3 +266,15 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Player View nunca recibe pines, areas ni su contenido Markdown dentro del snapshot de escena.
 - El DM puede publicar un highlight efimero de 5 segundos con solo id, tipo y celdas.
 - Los highlights aparecen sobre fog, admiten convivencia multiple y no se retienen al abrir tarde Player View.
+
+## Grilla extendida y controles privados
+
+- Player View recibe la misma calibracion del DM y siempre genera grilla extendida para su propia camara, sin opcion para limitarla al mapa.
+- No recibe arbol de objetos ni manivelas editoriales.
+- Centrar desde el arbol modifica solo la camara del DM; no equivale al control de camara de jugador.
+- La extension no aumenta las texturas de fog/oscuridad.
+- Recibir `grid.lineWidth` con la escena: delgadas (1) o gruesas (3), editable solo por DM. Aplicar al abrir jugador y en cambios posteriores sin modificar camara o calibracion; el ancho observado mantiene la proporcion 3:1 al mismo zoom.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

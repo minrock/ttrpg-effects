@@ -354,3 +354,11 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## Usabilidad de controles de luz
+
+- [x] Pasar zoom a dibujo de resize/orientacion y aplicar `getAreaToolUiScale`.
+- [x] Actualizar hit tests de radio y orientacion con la misma escala.
+- [x] Incorporar ambos tipos al arbol lateral sin duplicar datos.
+- [x] Probar clicks dentro/fuera del handle a distintos zooms.
+- [x] Extension de controles aceptada por el usuario para 1.9.0; cobertura de hit testing automatizada.

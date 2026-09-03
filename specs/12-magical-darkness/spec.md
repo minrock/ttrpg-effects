@@ -242,3 +242,13 @@ Si por compatibilidad conviene mantener una union de efectos con campos comparti
 - Reutilizar el panel contextual de propiedades del sidebar.
 - Mantener negro fijo para evitar controles innecesarios.
 - Si el sistema actual de efectos asume `kind: "fire"` unicamente, convertir `SceneEffect` en union discriminada antes de implementar.
+
+## Usabilidad del control de radio
+
+- La manivela, el trazo de seleccion y su hit testing conservan un minimo visual con zoom-out, compartido con herramientas de area (spec 01).
+- No modificar por zoom el radio real, opacidad ni borde negro del efecto.
+- Incluir oscuridad magica en el arbol de Efectos; el control permanece exclusivo de DM.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.

@@ -27,6 +27,7 @@ export interface SceneGrid {
   readonly locked: boolean;
   readonly cellSizeWorld: number;
   readonly opacity: number;
+  readonly lineWidth: 1 | 3;
   readonly unit: DistanceUnit;
   readonly distancePerCell: number;
   readonly metricDistancePerCell: number;

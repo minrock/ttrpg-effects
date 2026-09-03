@@ -62,6 +62,8 @@ import {
 import type { SceneLinkValidationStatus } from "../../domain/annotations/scene-navigation-links";
 import type { PlayerCameraControlViewState } from "../../domain/player/player-camera-control";
 import { getAreaToolUiScale } from "./area-tool-screen-scale";
+import { getFireResizeTarget } from "./effect-control-geometry";
+import { getGridWindow, gridWindowCoversView, type GridWindow } from "../../domain/grid/grid-window";
 import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-pattern-animation";
 import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
 
@@ -187,6 +189,7 @@ export class PixiViewport {
   private camera: CameraState = createCameraState();
   private map: MapImageState | null = null;
   private grid: SceneGrid | null = null;
+  private gridWindowCache: { readonly window: GridWindow; readonly style: string } | null = null;
   private settings: SceneSettings | null = null;
   private darkness: SceneDarkness | null = null;
   private fogOfWar: SceneFogOfWar | null = null;
@@ -696,9 +699,15 @@ export class PixiViewport {
   }
 
   setGrid(grid: SceneGrid): void {
+    const previous = this.grid;
     const fireTileSizeChanged = this.grid?.cellSizeWorld !== grid.cellSizeWorld;
     this.grid = grid;
     this.drawGrid();
+    // Line width only affects drawGrid; identical geometry needs no new GPU masks.
+    if (previous && previous.enabled === grid.enabled && previous.locked === grid.locked
+      && previous.cellSizeWorld === grid.cellSizeWorld && previous.opacity === grid.opacity
+      && previous.unit === grid.unit && previous.distancePerCell === grid.distancePerCell
+      && previous.metricDistancePerCell === grid.metricDistancePerCell) return;
     this.drawDarkvisionLayer();
     this.scheduleDarknessRedraw();
     this.scheduleFogOfWarRedraw();
@@ -873,15 +882,24 @@ export class PixiViewport {
 
   private drawGrid(): void {
     const layer = this.getLayer("grid");
-    clearContainerChildren(layer);
-
     if (this.grid === null || !this.grid.enabled) {
+      if (layer.children.length) clearContainerChildren(layer);
+      this.gridWindowCache = null;
       return;
     }
 
+    const viewport = this.getViewportSize();
+    const next = getGridWindow(this.camera, viewport, this.grid.cellSizeWorld);
+    const lineWidth = this.grid.lineWidth ?? 1;
+    const style = `${this.grid.cellSizeWorld}:${this.grid.opacity}:${lineWidth}`;
+    if (this.gridWindowCache?.style === style && this.gridWindowCache.window.step === next.step
+      && layer.children.length > 0 && gridWindowCoversView(this.gridWindowCache.window, this.camera, viewport)) return;
+    clearContainerChildren(layer);
+    this.gridWindowCache = { window: next, style };
+    const bounds = next.bounds;
+    if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return;
     const grid = new Graphics();
-    const cellSize = this.grid.cellSizeWorld;
-    const bounds = this.getGridBounds();
+    const cellSize = next.step;
     const startX = Math.floor(bounds.left / cellSize) * cellSize;
     const endX = Math.ceil(bounds.right / cellSize) * cellSize;
     const startY = Math.floor(bounds.top / cellSize) * cellSize;
@@ -899,7 +917,7 @@ export class PixiViewport {
         .lineTo(bounds.right, y);
     }
 
-    grid.stroke({ color: 0xd9e5df, width: 1, alpha: this.grid.opacity });
+    grid.stroke({ color: 0xd9e5df, width: lineWidth, alpha: this.grid.opacity });
     layer.addChild(grid);
   }
 
@@ -1854,6 +1872,7 @@ export class PixiViewport {
       viewport.width / 2 - this.camera.center.x * this.camera.zoom,
       viewport.height / 2 - this.camera.center.y * this.camera.zoom
     );
+    this.drawGrid();
     this.updateMapInformationPinLabelScale();
     this.updatePlayerCameraControlScale();
     if (shouldRefreshAreaToolUi) {
@@ -2259,13 +2278,13 @@ export class PixiViewport {
       );
 
       if (selectedConeLight !== undefined) {
-        selectionLayer.addChild(drawConeRotationHandle(selectedConeLight));
+        selectionLayer.addChild(drawConeRotationHandle(selectedConeLight, this.camera.zoom));
       }
 
       const selectedLight = this.getRenderableLights().find((light) => light.id === this.selectedElementId);
 
       if (selectedLight !== undefined && selectedLight.visible) {
-        selectionLayer.addChild(drawLightResizeHandle(selectedLight));
+        selectionLayer.addChild(drawLightResizeHandle(selectedLight, this.camera.zoom));
       }
 
       const selectedFireEffect = this.getRenderableEffects().find(
@@ -2274,7 +2293,7 @@ export class PixiViewport {
       );
 
       if (selectedFireEffect !== undefined) {
-        selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect));
+        selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect, this.camera.zoom));
       }
 
       const selectedDynamicLight = this.getRenderableEffects().find(
@@ -2288,7 +2307,7 @@ export class PixiViewport {
         this.grid !== null
       ) {
         selectionLayer.addChild(
-          drawDynamicLightDirectionHandle(selectedDynamicLight, this.grid.cellSizeWorld)
+          drawDynamicLightDirectionHandle(selectedDynamicLight, this.grid.cellSizeWorld, this.camera.zoom)
         );
       }
 
@@ -2298,7 +2317,7 @@ export class PixiViewport {
       );
 
       if (selectedMagicalDarkness !== undefined) {
-        selectionLayer.addChild(drawMagicalDarknessResizeHandle(selectedMagicalDarkness));
+        selectionLayer.addChild(drawMagicalDarknessResizeHandle(selectedMagicalDarkness, this.camera.zoom));
       }
 
       const selectedWater = this.getRenderableEffects().find(
@@ -2306,7 +2325,7 @@ export class PixiViewport {
       );
 
       if (selectedWater !== undefined) {
-        selectionLayer.addChild(drawWaterRotationHandles(selectedWater));
+        selectionLayer.addChild(drawWaterRotationHandles(selectedWater, this.camera.zoom));
       }
 
       const selectedCircleShape = this.getRenderableShapes().find(
@@ -2958,7 +2977,8 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const distance = Math.hypot(worldPoint.x - light.position.x, worldPoint.y - light.position.y);
 
-    return distance >= CONE_ROTATION_RING_RADIUS - 16 && distance <= CONE_ROTATION_RING_RADIUS + 18
+    const uiScale = getAreaToolUiScale(this.camera.zoom);
+    return Math.abs(distance - CONE_ROTATION_RING_RADIUS * uiScale) <= 18 * uiScale
       ? light.id
       : null;
   }
@@ -2973,7 +2993,7 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const handle = getLightResizeHandlePosition(light);
 
-    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18
+    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18 * getAreaToolUiScale(this.camera.zoom)
       ? light.id
       : null;
   }
@@ -3025,10 +3045,7 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    const radius = getFireVisualRadius(selectedFire);
-    const distance = Math.hypot(worldPoint.x - selectedFire.position.x, worldPoint.y - selectedFire.position.y);
-
-    return distance >= radius - 16 && distance <= radius + 18 ? selectedFire.id : null;
+    return getFireResizeTarget(selectedFire, worldPoint, this.camera.zoom) === "fire" ? selectedFire.id : null;
   }
 
   private hitTestFireLightResizeHandle(screenPoint: ScreenPoint): string | null {
@@ -3039,11 +3056,7 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    const distance = Math.hypot(worldPoint.x - selectedFire.position.x, worldPoint.y - selectedFire.position.y);
-
-    return distance >= selectedFire.lightRadius - 16 && distance <= selectedFire.lightRadius + 18
-      ? selectedFire.id
-      : null;
+    return getFireResizeTarget(selectedFire, worldPoint, this.camera.zoom) === "light" ? selectedFire.id : null;
   }
 
   private hitTestMagicalDarknessResizeHandle(screenPoint: ScreenPoint): string | null {
@@ -3059,8 +3072,7 @@ export class PixiViewport {
       worldPoint.y - selectedMagicalDarkness.position.y
     );
 
-    return distance >= selectedMagicalDarkness.radius - 16 &&
-      distance <= selectedMagicalDarkness.radius + 18
+    return Math.abs(distance - selectedMagicalDarkness.radius) <= 18 * getAreaToolUiScale(this.camera.zoom)
       ? selectedMagicalDarkness.id
       : null;
   }
@@ -3073,13 +3085,13 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    const ringRadius = getDynamicLightDirectionRingRadius(this.grid?.cellSizeWorld ?? 100);
+    const ringRadius = getDynamicLightDirectionRingRadius(this.grid?.cellSizeWorld ?? 100, this.camera.zoom);
     const distance = Math.hypot(
       worldPoint.x - selectedDynamicLight.position.x,
       worldPoint.y - selectedDynamicLight.position.y
     );
 
-    return distance >= ringRadius - 16 && distance <= ringRadius + 18
+    return Math.abs(distance - ringRadius) <= 18 * getAreaToolUiScale(this.camera.zoom)
       ? selectedDynamicLight.id
       : null;
   }
@@ -3364,9 +3376,9 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    const handle = getWaterLineRotationHandlePosition(effect);
+    const handle = getWaterLineRotationHandlePosition(effect, this.camera.zoom);
 
-    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18
+    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18 * getAreaToolUiScale(this.camera.zoom)
       ? effect.id
       : null;
   }
@@ -3386,9 +3398,9 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    const handle = getWaterPatternRotationHandlePosition(effect);
+    const handle = getWaterPatternRotationHandlePosition(effect, this.camera.zoom);
 
-    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18
+    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18 * getAreaToolUiScale(this.camera.zoom)
       ? effect.id
       : null;
   }
@@ -6214,75 +6226,79 @@ function drawPathPointHandles(shape: SceneShape, cellSizeWorld: number, cameraZo
   return graphic;
 }
 
-function drawConeRotationHandle(light: SceneLight): Graphics {
+function drawConeRotationHandle(light: SceneLight, cameraZoom: number): Graphics {
+  const uiScale = getAreaToolUiScale(cameraZoom);
   const angle = (light.direction * Math.PI) / 180;
-  const handleX = light.position.x + Math.cos(angle) * CONE_ROTATION_RING_RADIUS;
-  const handleY = light.position.y + Math.sin(angle) * CONE_ROTATION_RING_RADIUS;
+  const handleX = light.position.x + Math.cos(angle) * (CONE_ROTATION_RING_RADIUS * uiScale);
+  const handleY = light.position.y + Math.sin(angle) * (CONE_ROTATION_RING_RADIUS * uiScale);
 
   return new Graphics()
-    .circle(light.position.x, light.position.y, CONE_ROTATION_RING_RADIUS)
-    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.75 })
+    .circle(light.position.x, light.position.y, (CONE_ROTATION_RING_RADIUS * uiScale))
+    .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.75 })
     .moveTo(light.position.x, light.position.y)
     .lineTo(handleX, handleY)
-    .stroke({ color: 0xfff0a8, width: 3, alpha: 0.85 })
-    .circle(handleX, handleY, 8)
+    .stroke({ color: 0xfff0a8, width: 3 * uiScale, alpha: 0.85 })
+    .circle(handleX, handleY, 8 * uiScale)
     .fill({ color: 0xfff0a8, alpha: 0.95 });
 }
 
 function drawDynamicLightDirectionHandle(
   effect: SceneDynamicLightEffect,
-  cellSizeWorld: number
+  cellSizeWorld: number,
+  cameraZoom: number
 ): Graphics {
-  const ringRadius = getDynamicLightDirectionRingRadius(cellSizeWorld);
+  const uiScale = getAreaToolUiScale(cameraZoom);
+  const ringRadius = getDynamicLightDirectionRingRadius(cellSizeWorld, cameraZoom);
   const angle = (effect.direction * Math.PI) / 180;
   const handleX = effect.position.x + Math.cos(angle) * ringRadius;
   const handleY = effect.position.y + Math.sin(angle) * ringRadius;
 
   return new Graphics()
     .circle(effect.position.x, effect.position.y, ringRadius)
-    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.75 })
+    .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.75 })
     .moveTo(effect.position.x, effect.position.y)
     .lineTo(handleX, handleY)
-    .stroke({ color: 0xfff0a8, width: 3, alpha: 0.85 })
-    .circle(handleX, handleY, 9)
+    .stroke({ color: 0xfff0a8, width: 3 * uiScale, alpha: 0.85 })
+    .circle(handleX, handleY, 9 * uiScale)
     .fill({ color: 0x101315, alpha: 0.92 })
-    .circle(handleX, handleY, 6)
+    .circle(handleX, handleY, 6 * uiScale)
     .fill({ color: 0xfff0a8, alpha: 0.98 });
 }
 
-function getDynamicLightDirectionRingRadius(cellSizeWorld: number): number {
-  return Math.max(52, cellSizeWorld * 0.72);
+function getDynamicLightDirectionRingRadius(cellSizeWorld: number, cameraZoom = 1): number {
+  return Math.max(52 * getAreaToolUiScale(cameraZoom), cellSizeWorld * 0.72);
 }
 
-function drawWaterRotationHandles(effect: SceneWaterEffect): Graphics {
-  const lineRadius = getWaterLineRotationRadius(effect);
-  const patternRadius = getWaterPatternRotationRadius(effect);
-  const lineHandle = getWaterLineRotationHandlePosition(effect);
-  const patternHandle = getWaterPatternRotationHandlePosition(effect);
+function drawWaterRotationHandles(effect: SceneWaterEffect, cameraZoom: number): Graphics {
+  const uiScale = getAreaToolUiScale(cameraZoom);
+  const lineRadius = getWaterLineRotationRadius(effect, cameraZoom);
+  const patternRadius = getWaterPatternRotationRadius(effect, cameraZoom);
+  const lineHandle = getWaterLineRotationHandlePosition(effect, cameraZoom);
+  const patternHandle = getWaterPatternRotationHandlePosition(effect, cameraZoom);
 
   return new Graphics()
     .circle(effect.position.x, effect.position.y, lineRadius)
-    .stroke({ color: 0xfff0a8, width: 2, alpha: 0.74 })
+    .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.74 })
     .moveTo(effect.position.x, effect.position.y)
     .lineTo(lineHandle.x, lineHandle.y)
-    .stroke({ color: 0xfff0a8, width: 3, alpha: 0.82 })
-    .circle(lineHandle.x, lineHandle.y, 11)
+    .stroke({ color: 0xfff0a8, width: 3 * uiScale, alpha: 0.82 })
+    .circle(lineHandle.x, lineHandle.y, 11 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(lineHandle.x, lineHandle.y, 7)
+    .circle(lineHandle.x, lineHandle.y, 7 * uiScale)
     .fill({ color: 0xfff0a8, alpha: 0.95 })
     .circle(effect.position.x, effect.position.y, patternRadius)
-    .stroke({ color: 0x7adcf0, width: 2, alpha: 0.72 })
+    .stroke({ color: 0x7adcf0, width: 2 * uiScale, alpha: 0.72 })
     .moveTo(effect.position.x, effect.position.y)
     .lineTo(patternHandle.x, patternHandle.y)
-    .stroke({ color: 0x7adcf0, width: 3, alpha: 0.82 })
-    .circle(patternHandle.x, patternHandle.y, 11)
+    .stroke({ color: 0x7adcf0, width: 3 * uiScale, alpha: 0.82 })
+    .circle(patternHandle.x, patternHandle.y, 11 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(patternHandle.x, patternHandle.y, 7)
+    .circle(patternHandle.x, patternHandle.y, 7 * uiScale)
     .fill({ color: 0xc7f7ff, alpha: 0.95 });
 }
 
-function getWaterLineRotationHandlePosition(effect: SceneWaterEffect): WorldPoint {
-  const radius = getWaterLineRotationRadius(effect);
+function getWaterLineRotationHandlePosition(effect: SceneWaterEffect, cameraZoom = 1): WorldPoint {
+  const radius = getWaterLineRotationRadius(effect, cameraZoom);
   const angle = (effect.lineRotation * Math.PI) / 180;
 
   return {
@@ -6291,8 +6307,8 @@ function getWaterLineRotationHandlePosition(effect: SceneWaterEffect): WorldPoin
   };
 }
 
-function getWaterPatternRotationHandlePosition(effect: SceneWaterEffect): WorldPoint {
-  const radius = getWaterPatternRotationRadius(effect);
+function getWaterPatternRotationHandlePosition(effect: SceneWaterEffect, cameraZoom = 1): WorldPoint {
+  const radius = getWaterPatternRotationRadius(effect, cameraZoom);
   const angle = (effect.patternRotation * Math.PI) / 180;
 
   return {
@@ -6301,40 +6317,41 @@ function getWaterPatternRotationHandlePosition(effect: SceneWaterEffect): WorldP
   };
 }
 
-function getWaterLineRotationRadius(effect: SceneWaterEffect): number {
+function getWaterLineRotationRadius(effect: SceneWaterEffect, cameraZoom = 1): number {
   if (effect.variant === "river") {
-    return Math.max(54, effect.width * 0.7 + 24);
+    return Math.max(54 * getAreaToolUiScale(cameraZoom), effect.width * 0.7 + 24 * getAreaToolUiScale(cameraZoom));
   }
 
   const bounds = getWaterBounds(effect);
   const maxDimension = Math.max(bounds.right - bounds.left, bounds.bottom - bounds.top);
 
-  return Math.max(72, Math.min(260, maxDimension * 0.25));
+  return Math.max(72 * getAreaToolUiScale(cameraZoom), Math.min(260, maxDimension * 0.25));
 }
 
-function getWaterPatternRotationRadius(effect: SceneWaterEffect): number {
-  return getWaterLineRotationRadius(effect) + 42;
+function getWaterPatternRotationRadius(effect: SceneWaterEffect, cameraZoom = 1): number {
+  return getWaterLineRotationRadius(effect, cameraZoom) + 42 * getAreaToolUiScale(cameraZoom);
 }
 
-function drawLightResizeHandle(light: SceneLight): Graphics {
+function drawLightResizeHandle(light: SceneLight, cameraZoom: number): Graphics {
+  const uiScale = getAreaToolUiScale(cameraZoom);
   const handle = getLightResizeHandlePosition(light);
   const graphic = new Graphics();
 
   if (light.kind === "point") {
     graphic
       .circle(light.position.x, light.position.y, light.radius)
-      .stroke({ color: 0xfff0a8, width: 2, alpha: 0.78 });
+      .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.78 });
   } else {
     graphic
       .moveTo(light.position.x, light.position.y)
       .lineTo(handle.x, handle.y)
-      .stroke({ color: 0xfff0a8, width: 2, alpha: 0.72 });
+      .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.72 });
   }
 
   return graphic
-    .circle(handle.x, handle.y, 11)
+    .circle(handle.x, handle.y, 11 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(handle.x, handle.y, 7)
+    .circle(handle.x, handle.y, 7 * uiScale)
     .fill({ color: 0xfff0a8, alpha: 0.95 });
 }
 
@@ -6354,7 +6371,8 @@ function getLightResizeHandlePosition(light: SceneLight): { x: number; y: number
   };
 }
 
-function drawFireResizeHandles(effect: SceneFireEffect): Graphics {
+function drawFireResizeHandles(effect: SceneFireEffect, cameraZoom: number): Graphics {
+  const uiScale = getAreaToolUiScale(cameraZoom);
   const graphic = new Graphics();
 
   if (effect.zone.kind === "cells") {
@@ -6365,32 +6383,33 @@ function drawFireResizeHandles(effect: SceneFireEffect): Graphics {
 
   graphic
     .circle(effect.position.x, effect.position.y, fireRadius)
-    .stroke({ color: 0xff8a38, width: 3, alpha: 0.9 })
-    .circle(effect.position.x + fireRadius, effect.position.y, 9)
+    .stroke({ color: 0xff8a38, width: 3 * uiScale, alpha: 0.9 })
+    .circle(effect.position.x + fireRadius, effect.position.y, 9 * uiScale)
     .fill({ color: 0x101315, alpha: 0.9 })
-    .circle(effect.position.x + fireRadius, effect.position.y, 6)
+    .circle(effect.position.x + fireRadius, effect.position.y, 6 * uiScale)
     .fill({ color: 0xff8a38, alpha: 0.95 });
 
   if (effect.emitsLight) {
     graphic
       .circle(effect.position.x, effect.position.y, effect.lightRadius)
-      .stroke({ color: 0xfff0a8, width: 2, alpha: 0.78 })
-      .circle(effect.position.x + effect.lightRadius, effect.position.y, 10)
+      .stroke({ color: 0xfff0a8, width: 2 * uiScale, alpha: 0.78 })
+      .circle(effect.position.x, effect.position.y - effect.lightRadius, 10 * uiScale)
       .fill({ color: 0x101315, alpha: 0.9 })
-      .circle(effect.position.x + effect.lightRadius, effect.position.y, 7)
+      .circle(effect.position.x, effect.position.y - effect.lightRadius, 7 * uiScale)
       .fill({ color: 0xfff0a8, alpha: 0.95 });
   }
 
   return graphic;
 }
 
-function drawMagicalDarknessResizeHandle(effect: SceneMagicalDarknessEffect): Graphics {
+function drawMagicalDarknessResizeHandle(effect: SceneMagicalDarknessEffect, cameraZoom: number): Graphics {
+  const uiScale = getAreaToolUiScale(cameraZoom);
   return new Graphics()
     .circle(effect.position.x, effect.position.y, effect.radius)
-    .stroke({ color: 0x111315, width: 4, alpha: 0.92 })
-    .circle(effect.position.x + effect.radius, effect.position.y, 10)
+    .stroke({ color: 0x111315, width: 4 * uiScale, alpha: 0.92 })
+    .circle(effect.position.x + effect.radius, effect.position.y, 10 * uiScale)
     .fill({ color: 0xf4f1e8, alpha: 0.9 })
-    .circle(effect.position.x + effect.radius, effect.position.y, 6)
+    .circle(effect.position.x + effect.radius, effect.position.y, 6 * uiScale)
     .fill({ color: 0x111315, alpha: 0.95 });
 }
 

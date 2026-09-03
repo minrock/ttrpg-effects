@@ -319,6 +319,7 @@ export const sceneDocumentV1Schema = z.object({
     locked: z.boolean(),
     cellSizeWorld: positiveNumber,
     opacity,
+    lineWidth: z.union([z.literal(1), z.literal(3)]).default(1),
     unit: z.enum(["ft", "m"]),
     distancePerCell: positiveNumber,
     metricDistancePerCell: positiveNumber

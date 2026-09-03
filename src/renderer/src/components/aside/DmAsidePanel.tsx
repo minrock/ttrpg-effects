@@ -32,8 +32,14 @@ import { PlayerCharacterSection } from "./PlayerCharacterSection";
 import type { MapAnnotation, MapAnnotations } from "../../../../domain/annotations/map-annotations";
 import { MapAnnotationsTree } from "../annotations/MapAnnotationsTree";
 import type { SceneLinkValidationStatus } from "../../../../domain/annotations/scene-navigation-links";
+import type { SceneObjectEntry } from "../../../../domain/sessions/scene-objects";
+import { SceneObjectsTree } from "./SceneObjectsTree";
 
 interface DmAsidePanelProps {
+  readonly objects: readonly SceneObjectEntry[];
+  readonly onSelectObject: (entry: SceneObjectEntry) => void;
+  readonly onLocateObject: (entry: SceneObjectEntry) => void;
+  readonly onDeleteObject: (entry: SceneObjectEntry) => void;
   readonly aside: SceneAside;
   readonly monsterTemplates: readonly MonsterTemplate[];
   readonly annotations: MapAnnotations;
@@ -48,9 +54,10 @@ interface DmAsidePanelProps {
   readonly hidden?: boolean;
 }
 
-type SectionKey = "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
+type SectionKey = "objects" | "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
 
 export function DmAsidePanel({
+  objects, onSelectObject, onLocateObject, onDeleteObject,
   aside,
   monsterTemplates,
   annotations,
@@ -65,7 +72,7 @@ export function DmAsidePanel({
   hidden
 }: DmAsidePanelProps): JSX.Element {
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
-    new Set<SectionKey>(["annotations", "monsters", "npcs", "playerCharacters", "notes"])
+    new Set<SectionKey>(["objects", "annotations", "monsters", "npcs", "playerCharacters", "notes"])
   );
 
   const toggleSection = useCallback((key: SectionKey) => {
@@ -128,6 +135,9 @@ export function DmAsidePanel({
       </div>
 
       <div className="dm-aside-content">
+        <AccordionSection title="Objetos" icon={Diamond} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={objects.length} onToggle={toggleSection}>
+          <SceneObjectsTree objects={objects} selectedElementId={selectedElementId} onSelect={onSelectObject} onLocate={onLocateObject} onDelete={onDeleteObject} />
+        </AccordionSection>
         <AccordionSection
           title="Anotaciones"
           icon={Diamond}

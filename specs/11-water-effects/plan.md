@@ -201,3 +201,10 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## Controles de agua y arbol
+
+- [x] Usar zoom en radios minimos, gap, manivelas y hit tests de ambas rotaciones.
+- [x] Conservar la geometria de mundo y el cache animado.
+- [x] Incluir agua en el indice lateral derivado.
+- [x] Extension de manivelas aceptada para 1.9.0; no se afirma un smoke nativo nuevo de agua.
