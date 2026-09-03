@@ -1,5 +1,21 @@
 # Plan - Sidebar y Propiedades
 
+## Borrado en arbol de anotaciones
+
+- [x] Propagar `onDeleteInformationArea` desde App por DmAsidePanel y conectar `onDeleteArea` en MapAnnotationsTree.
+- [x] Agregar icono Trash2, tooltip y estado disabled para bloqueo; mantener nombre legible separando acciones.
+- [x] Manejar ambas teclas por fila y probar que la accion no borra otra seleccion ni interfiere con el buscador.
+- [x] Aceptacion del usuario para 1.10.0, junto con el ajuste descrito en plan 22.
+
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Agregar botones accesibles con aria-pressed e iconos Grid3X3/Hexagon, usando estilos del selector de grosor.
+- [x] Conectar `scene.grid.layout`, conservar presets y deshabilitar solo el selector de diagonales cuando no aplica.
+- [x] Verificar visualmente el selector en navegador y reutilizacion del cache al cambiar estilo.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener sidebar y propiedades, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Menú Lateral Derecho de Controles

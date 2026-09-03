@@ -1,5 +1,15 @@
 # Spec - Motor Visual y Capas de Render
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- La capa grid soporta cuadrados o hexagonos regulares definidos en spec 04; conserva orden de capas y camaras.
+- Hexagonal usa un Graphics con aristas compartidas dibujadas una sola vez, overscan y limite de 8192 celdas de dibujo. El LOD solo afecta la guia visual, nunca snap/mediciones.
+- Incluir layout en firmas de grilla y etiquetas. Alternar solo layout no invalida mascaras de visibilidad, atlas ni texturas de tokens. Pinturas guardadas usan su layout propio.
+- Reutilizar geometria de celdas para rellenos, hit testing, culling y mascaras, sin crear un sprite/Graphics de grilla por hexagono.
+
+
 Este documento describe de forma unificada la funcionalidad de motor visual y capas de render, consolidando el alcance funcional vigente en el proyecto.
 
 ## Motor Visual y Capas de Render

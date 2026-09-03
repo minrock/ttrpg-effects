@@ -13,6 +13,31 @@ import {
 
 const grid = { cellSizeWorld: 100 };
 
+describe("hex shape interaction", () => {
+  const hexGrid = { ...grid, layout: "hexagonal" as const };
+  it("creates and moves shapes at upper-left vertices while measurements use centers", () => {
+    const circle = createTacticalShape({ id: "c", kind: "circle", position: { x: 0, y: 0 }, grid: hexGrid, settings: { snapToGrid: true } });
+    expect(circle.points[0].x).toBeCloseTo(-50);
+    expect(circle.points[0].y).toBeCloseTo(-100 / (2 * Math.sqrt(3)));
+    expect(moveShape(circle, circle.points[0], hexGrid).points).toEqual(circle.points);
+    const line = createTacticalShape({ id: "m", kind: "measurement", position: { x: 8, y: 9 }, grid: hexGrid, settings: { snapToGrid: false } });
+    expect(line.points).toEqual([{ x: 0, y: 0 }, { x: 300, y: 0 }]);
+    const updated = setLinearShapeEnd(line, { x: 52, y: 90 }, hexGrid);
+    expect(updated.points[1].x).toBeCloseTo(50);
+    expect(updated.points[1].y).toBeCloseTo(50 * Math.sqrt(3));
+    const moved = moveShape(updated, { x: 97, y: 3 }, hexGrid);
+    expect(moved.points[0]).toEqual({ x: 100, y: 0 });
+  });
+  it("moves an entire path by a hex-lattice translation", () => {
+    const path = createPathShape({ id: "p", points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] });
+    const moved = moveShape(path, { x: 52, y: 88 }, hexGrid);
+    expect(moved.points[0].x).toBeCloseTo(50);
+    expect(moved.points[1].x).toBeCloseTo(150);
+    expect(moved.points[0].y).toBeCloseTo(50 * Math.sqrt(3));
+    expect(moved.points[1].y).toBeCloseTo(moved.points[0].y);
+  });
+});
+
 describe("tactical shapes", () => {
   it("creates measurement freely even when snap is enabled", () => {
     expect(

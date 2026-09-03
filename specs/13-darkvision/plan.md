@@ -1,5 +1,13 @@
 # Plan - Vision en la Oscuridad
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Integrar drawGridCell/getGridCellRings en buildDarkvisionColorMask y layout en firmas de celdas.
+- [x] Mantener invalidacion por cambios reales de fuego, no por cambios de topologia de grilla.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener vision en la oscuridad, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Visión en la Oscuridad

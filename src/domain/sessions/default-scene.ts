@@ -23,6 +23,7 @@ export function createDefaultScene(): SceneDocument {
       cellSizeWorld: 100,
       opacity: 0.35,
       lineWidth: 1,
+      layout: "square",
       unit: "ft",
       distancePerCell: 5,
       metricDistancePerCell: 1.5

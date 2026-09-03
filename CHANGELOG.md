@@ -10,6 +10,26 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [1.10.0] - 2026-09-02
+
+### Fixed
+
+- Borrado de areas de informacion por ID actual desde Backspace/Delete y nueva papelera en el arbol, sin eliminar otra seleccion. Conservar bloqueo y edicion de texto.
+
+### Added
+
+- Grilla hexagonal seleccionable, con snap al vertice superior izquierdo, mediciones/caminos entre centros y pintado de fuego y anotaciones por hexagono.
+- Persistencia de layout y geometria por celda, compartida con Player View; escenas antiguas conservan grilla y celdas cuadradas.
+
+### Performance
+
+- Geometria hexagonal compartida, aristas sin duplicados, cache de viewport y presupuesto de dibujo; alternar layout no reconstruye mascaras ni recarga assets.
+
+### Notes
+
+- Feature y ajuste de borrado aceptados para cierre en main como version minor 1.10.0. Compatibilidad de lectura con escenas V1 conservada; pinturas existentes mantienen su geometria.
+- Specs y planes de grilla, render, persistencia, mediciones, fuego, anotaciones e integraciones actualizados. Verificacion: 350 tests, typecheck, lint y build correctos; smoke visual en navegador, sin repetir un smoke nativo completo de dos ventanas.
+
 ## [1.9.0] - 2026-09-02
 
 ### Added

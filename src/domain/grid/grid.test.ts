@@ -43,5 +43,6 @@ describe("grid rules", () => {
       metricDistancePerCell: preset.metricDistancePerCell
     });
     expect(applyGridPreset({ ...grid, lineWidth: 3 }, preset).lineWidth).toBe(3);
+    expect(applyGridPreset({ ...grid, layout: "hexagonal" }, preset).layout).toBe("hexagonal");
   });
 });

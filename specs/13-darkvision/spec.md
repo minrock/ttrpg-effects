@@ -1,5 +1,14 @@
 # Spec - Vision en la Oscuridad
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Si hay fuego por celdas hexagonales, la recuperacion de color usa hexagonos y sus coronas de luz, no rectangulos circunscritos.
+- Usar layout persistido por celda, aunque la grilla actual cambie. Conservar el orden de capas y las restricciones de niebla/oscuridad magica.
+- Alternar topologia de la guia visual no regenera la mascara de color porque no altera la geometria iluminada guardada.
+
+
 Este documento describe de forma unificada la funcionalidad de vision en la oscuridad, consolidando el alcance funcional vigente en el proyecto.
 
 ## Visión en la Oscuridad

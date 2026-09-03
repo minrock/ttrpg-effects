@@ -1,5 +1,14 @@
 # Plan - Persistencia y Formato de Escena
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Extender SceneGrid, defaults y Zod con layout; compartir `gridCellSchema` entre fuego y anotaciones.
+- [x] Cubrir archivo antiguo sin layout, escena vacia, valores invalidos y round trip mixto cuadrado/hexagonal en `scene-schema.test.ts`.
+- [x] Conservar layout en transformaciones y payloads sanitizados de highlight, sin contenido privado.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener persistencia y formato de escena, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Formato de Sesion

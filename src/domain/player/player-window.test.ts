@@ -27,7 +27,7 @@ const token: SceneToken = {
 describe("player window view rules", () => {
   it("shares cell calibration without an extension toggle in the player snapshot", () => {
     const scene = createDefaultScene();
-    const grid = { ...scene.grid, cellSizeWorld: 57, lineWidth: 3 as const };
+    const grid = { ...scene.grid, cellSizeWorld: 57, lineWidth: 3 as const, layout: "hexagonal" as const };
     expect(createPlayerSceneSnapshot({ ...scene, grid }).grid).toEqual(grid);
   });
 

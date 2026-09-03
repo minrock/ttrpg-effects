@@ -46,6 +46,7 @@ interface DmAsidePanelProps {
   readonly selectedElementId: string | null;
   readonly onChange: (aside: SceneAside) => void;
   readonly onSelectAnnotation: (annotation: MapAnnotation) => void;
+  readonly onDeleteInformationArea: (areaId: string) => void;
   readonly onGoToAnnotation: (annotation: MapAnnotation) => void;
   readonly onEditAnnotation: (annotation: MapAnnotation) => void;
   readonly onToggleAnnotationLock: (annotation: MapAnnotation) => void;
@@ -64,6 +65,7 @@ export function DmAsidePanel({
   selectedElementId,
   onChange,
   onSelectAnnotation,
+  onDeleteInformationArea,
   onGoToAnnotation,
   onEditAnnotation,
   onToggleAnnotationLock,
@@ -151,6 +153,7 @@ export function DmAsidePanel({
             annotations={annotations}
             selectedElementId={selectedElementId}
             onSelect={onSelectAnnotation}
+            onDeleteArea={onDeleteInformationArea}
             onGoTo={onGoToAnnotation}
             onEdit={onEditAnnotation}
             onToggleLock={onToggleAnnotationLock}

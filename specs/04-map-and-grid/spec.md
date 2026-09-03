@@ -1,18 +1,56 @@
 # Spec - Mapa y Grilla
 
+## Grilla hexagonal - version 1.10.0
+
+Estado: implementada y aceptada por el usuario el 2026-09-02 para cierre 1.10.0 y merge de `feature/hexagonal-grid` a main. Incluye borrado de areas por teclado y arbol (spec 22).
+
+### Geometria y controles
+
+- Selector segmentado `Cuadrada` / `Hexagonal` en Grilla, sin necesidad de activar calibracion. No quitar la opcion cuadrada ni cambiar el default de escenas nuevas/antiguas.
+- Hexagonos regulares con vertice arriba, filas alternas desplazadas media celda y centro de referencia en (0,0) mundo.
+- `cellSizeWorld` mide el ancho entre los lados verticales opuestos y la distancia entre centros vecinos. Radio = ancho / sqrt(3); alto = 2 * radio; paso entre filas = ancho * sqrt(3) / 2.
+- Conservar grilla siempre extendida, opacidad, grosores 1/3, unidad, presets y calibracion. Cambiar layout no mueve mapa, camaras ni objetos existentes; los presets conservan layout.
+- DM y Player View comparten layout/calibracion, aunque mantengan camaras independientes.
+
+### Snap, medicion y pintado
+
+- Cuando una herramienta usa snap general, ajustar su ancla al vertice superior izquierdo real del hexagono bajo el cursor, no a la esquina de su bounding box. Rectangulos ajustan su esquina superior izquierda; las herramientas de movimiento libre siguen libres.
+- Lineas de medicion y puntos de Path/Camino se crean y editan en centros de hexagonos. Distancia = numero minimo de pasos entre celdas vecinas, multiplicado por ft/m por celda. Los seis vecinos cuestan un paso.
+- Las reglas de diagonales cuadradas no aplican en hexagonal: deshabilitar ese selector y conservar su valor para volver a cuadrada.
+- Cambiar grilla recalcula etiquetas sin reubicar puntos historicos; al editar cada punto se ajusta al centro vigente, igual que al recalibrar una escena cuadrada.
+- Fuego pintado y areas de informacion ocupan hexagonos completos. Relleno, contorno, seleccion y mascaras deben coincidir con los seis lados. La niebla sigue siendo un pincel libre, no se discretiza.
+- Cada celda pintada guarda su propia geometria. No convertir automaticamente cuadrados existentes al cambiar layout ni convertir hexagonos guardados al volver a cuadrada.
+
+### Persistencia y rendimiento
+
+- Persistir `grid.layout: square | hexagonal`, default `square`. Guardar `layout: hexagonal` en cada celda hexagonal junto a x/y/size; una celda sin layout significa cuadrada, independientemente de la grilla actual.
+- x/y siguen siendo el origen del bounding box en mundo. Trasladar un area conserva layout y vertices relativos. Sin cambio incompatible de formato V1 ni guardado de objetos Pixi.
+- Usar geometria pura compartida y `honeycomb-grid` para conversion punto/cubo y distancia. Referencia: [Honeycomb](https://abbekeultjes.nl/honeycomb/guide/point-to-hex.html).
+- Dibujar una sola Graphics para la grilla, sin un objeto por hexagono y sin duplicar aristas compartidas. Cache de ventana visible con overscan.
+- Limitar a 8192 celdas de dibujo (tres aristas propias por celda). Solo si se excede, duplicar el paso de la malla visual hasta entrar en presupuesto; es una guia hexagonal mas gruesa, no nuevas celdas logicas. Snap, pintura y medidas conservan la resolucion real.
+- Cambiar solo layout invalida grilla y etiquetas/seleccion; no reconstruye texturas de niebla/oscuridad ni recarga tokens/atlas de efectos.
+
+### Aceptacion
+
+- Probar los seis vecinos, coordenadas negativas y el vertice superior izquierdo con snap repetido sin desplazamientos acumulados.
+- Crear, mover y editar lineas/caminos; verificar ft/m y volver a cuadrada recuperando reglas anteriores.
+- Pintar y mover fuego y terrenos/trampas; comprobar luz brillante en primera corona de seis vecinos, tenue en segunda y contornos sin aristas internas.
+- Guardar/cargar y abrir Player View conserva grilla y geometria; escenas antiguas conservan cuadrados y la escena vacia sigue detectandose vacia.
+- Pan/zoom amplio no acumula Graphics ni amplia mascaras. El cierre fue autorizado por el usuario; ver alcance de pruebas realizadas en el plan.
+
 Este documento describe de forma unificada la funcionalidad de mapa y grilla, consolidando el alcance funcional vigente en el proyecto.
 
 ## Carga de Mapa y Calibracion de Grilla
 
 ### Objetivo
 
-Permitir cargar una imagen de mapa, mostrarla en el lienzo, superponer una grilla cuadrada y calibrar el tamano fisico de las casillas para usar minis reales sobre la proyeccion.
+Permitir cargar una imagen de mapa, mostrarla en el lienzo, superponer una grilla cuadrada o hexagonal y calibrar el tamano fisico de las casillas para usar minis reales sobre la proyeccion.
 
 ### Alcance
 
 - Cargar PNG, JPG/JPEG, WEBP y HEIC.
 - Mostrar mapa en el lienzo.
-- Crear grilla cuadrada.
+- Elegir grilla cuadrada o hexagonal desde el sidebar.
 - Ajustar opacidad de grilla.
 - Activar un modo `Ajustar grilla` desde el sidebar derecho o con shortcut `Cmd+G` en macOS / `Ctrl+G` en Windows/Linux.
 - Calibrar por arrastre solo cuando `Ajustar grilla` esta activo.
@@ -80,7 +118,7 @@ Presets iniciales:
 - Modelar por separado escala del mapa, escala de camara y tamano de celda.
 - Normalizar `map.scale` a un rango seguro para evitar mapas invisibles o gigantes.
 - El margen externo debe permitir centrar esquinas o zonas fuera de la imagen.
-- La grilla del MVP es cuadrada, sin hexagonos.
+- La grilla cuadrada sigue siendo el valor inicial; la variante hexagonal se define en la extension anterior.
 
 ## Ajuste de Posicion del Mapa
 
@@ -331,7 +369,7 @@ Añadir después de la opción existente `"dnd5e-default"`.
 
 - Generar lineas solo para la region visible mas margen de cache (doble ancho/alto del viewport).
 - Reutilizar geometria durante paneos dentro de ese margen y reemplazarla al salir, cambiar escala de dibujo o estilo.
-- Presupuesto maximo de 2048 lineas. Solo al excederlo en zoom-out extremo, dibujar lineas principales en multiplos de 2 de la celda; la medicion y el snap siguen usando la celda real.
+- Presupuesto de 2048 lineas para grilla cuadrada; la variante hexagonal usa su presupuesto de celdas descrito arriba. En zoom-out extremo se reduce el detalle visual sin modificar la celda logica.
 - No extender los bounds ni las RenderTextures de niebla/oscuridad. Solo la grilla cubre el viewport.
 - Navegar o recibir configuracion identica no debe reconstruir efectos, tokens ni mascaras.
 - Guardar/cargar y abrir Player View conservan el estado y tamano de celda. Una escena vacia antigua debe seguir detectandose como vacia.

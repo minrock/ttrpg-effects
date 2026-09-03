@@ -1,5 +1,13 @@
 # Plan - Efectos de Agua
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Pasar SceneGrid completo al helper compartido `snapScreenPointToCellCenter` utilizado al trazar agua.
+- [x] Mantener pipeline de agua y presupuestos de sprites sin cambios; conversion de centros cubierta por pruebas de grilla.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener efectos de agua, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Aguas, rios y cuerpos de agua

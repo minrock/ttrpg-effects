@@ -1,5 +1,6 @@
 import type { SceneGrid, SceneToken } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
+import { snapWorldPoint } from "../measurement/measurement";
 
 export const tokenSizes = ["tiny", "small", "medium", "large", "huge", "gargantuan"] as const;
 
@@ -87,6 +88,7 @@ export function snapTokenToGrid(
   footprintCells: TokenFootprintCells
 ): WorldPoint {
   const cellSize = grid.cellSizeWorld;
+  if (grid.layout === "hexagonal") return snapWorldPoint(point, grid);
   const topLeftColumn = Math.floor(point.x / cellSize);
   const topLeftRow = Math.floor(point.y / cellSize);
   const offset = (footprintCells * cellSize) / 2;

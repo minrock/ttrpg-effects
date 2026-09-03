@@ -1,5 +1,16 @@
 # Spec - Persistencia y Formato de Escena
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Agregar `grid.layout: square | hexagonal`, default square al cargar documentos antiguos y crear escenas nuevas.
+- Celdas de fuego y areas de informacion agregan `layout?: square | hexagonal`; ausente significa cuadrada incluso si grid.layout es hexagonal. Guardar explicitamente hexagonal en celdas nuevas de esa forma.
+- Conservar x/y/size mundiales; x/y son el origen del bounding box. Traslacion, serializacion e IPC conservan layout por celda.
+- Mantener formato V1 y lectura de archivos previos; no reinterpretar geometria historica ni convertirla al alternar grilla. Rechazar layout desconocido.
+- Preservar deteccion de escena vacia al aplicar defaults. No serializar vertices derivados ni recursos de render.
+
+
 Este documento describe de forma unificada la funcionalidad de persistencia y formato de escena, consolidando el alcance funcional vigente en el proyecto.
 
 ## Formato de Sesion

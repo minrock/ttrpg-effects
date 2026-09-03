@@ -99,6 +99,13 @@ const fogOfWarSchema = z.object({
   obstacles: z.array(fogObstacleSchema)
 });
 
+const gridCellSchema = z.object({
+  x: finiteNumber,
+  y: finiteNumber,
+  size: positiveNumber,
+  layout: z.enum(["square", "hexagonal"]).optional()
+});
+
 const fireZoneSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("circle"),
@@ -109,13 +116,7 @@ const fireZoneSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("cells"),
     radius: positiveNumber.default(50),
-    cells: z.array(
-      z.object({
-        x: finiteNumber,
-        y: finiteNumber,
-        size: positiveNumber
-      })
-    ).min(1)
+    cells: z.array(gridCellSchema).min(1)
   })
 ]);
 
@@ -234,12 +235,6 @@ const labelSchema = z.object({
     .default(() => ({ ...defaultSceneLabelStyle.shadow }))
 });
 
-const informationAreaCellSchema = z.object({
-  x: finiteNumber,
-  y: finiteNumber,
-  size: positiveNumber
-});
-
 const mapInformationPinSchema = z.object({
   id: z.string().trim().min(1),
   kind: z.literal("room-pin"),
@@ -255,7 +250,7 @@ const mapInformationAreaSchema = z.object({
   areaType: z.enum(["terrain", "trap"]),
   name: z.string().trim().max(120),
   description: z.string().max(100_000),
-  cells: z.array(informationAreaCellSchema).min(1),
+  cells: z.array(gridCellSchema).min(1),
   locked: z.boolean().default(false)
 });
 
@@ -320,6 +315,7 @@ export const sceneDocumentV1Schema = z.object({
     cellSizeWorld: positiveNumber,
     opacity,
     lineWidth: z.union([z.literal(1), z.literal(3)]).default(1),
+    layout: z.enum(["square", "hexagonal"]).default("square"),
     unit: z.enum(["ft", "m"]),
     distancePerCell: positiveNumber,
     metricDistancePerCell: positiveNumber

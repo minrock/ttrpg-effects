@@ -44,6 +44,9 @@ importers:
       electron-vite:
         specifier: ^4.0.0
         version: 4.0.1(vite@7.3.3(@types/node@24.12.4)(jiti@2.7.0))
+      honeycomb-grid:
+        specifier: ^4.1.5
+        version: 4.1.5
       lucide-react:
         specifier: ^1.34.0
         version: 1.34.0(react@19.2.6)
@@ -1911,6 +1914,10 @@ packages:
   hasown@2.0.3:
     resolution: {integrity: sha512-ej4AhfhfL2Q2zpMmLo7U1Uv9+PyhIZpgQLGT1F9miIGmiCJIoCgSmczFdrc97mWT4kVY72KA+WnnhJ5pghSvSg==}
     engines: {node: '>= 0.4'}
+
+  honeycomb-grid@4.1.5:
+    resolution: {integrity: sha512-VrnQwu5dHuzqK3wFhLD9EURmLSyEWb0teiHhDJq6WdK0MrFsEtKNYT1HLzXOLe2X1acU8Y9hhK7wWfIiGK1G5w==}
+    engines: {node: '>=16'}
 
   hosted-git-info@4.1.0:
     resolution: {integrity: sha512-kyCuEOWjJqZuDbRHzL8V93NzQhwIB71oFWSyzVo+KPZI+pnQPPxucdkrOZvkLRnrf5URsQM+IJ09Dw29cRALIA==}
@@ -4765,6 +4772,8 @@ snapshots:
   hasown@2.0.3:
     dependencies:
       function-bind: 1.1.2
+
+  honeycomb-grid@4.1.5: {}
 
   hosted-git-info@4.1.0:
     dependencies:

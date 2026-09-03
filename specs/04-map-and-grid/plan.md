@@ -1,12 +1,36 @@
 # Plan - Mapa y Grilla
 
+## Extension hexagonal - cierre 1.10.0
+
+Rama de implementacion: `feature/hexagonal-grid`. Extension aceptada el 2026-09-02 para commit, merge a main y version 1.10.0. No forma parte del cierre historico 1.9.0.
+
+- [x] Agregar `GridLayout`, default/schema y selector segmentado, conservando presets, grosor y deteccion de escena vacia.
+- [x] Incorporar `honeycomb-grid` 4.1.5 (MIT, sin dependencias de runtime) para rounding cubico y distancia; encapsularlo en `domain/grid/hex-grid.ts`.
+- [x] Centralizar celdas, vertices, centros, vecinos, coronas, contornos y hit testing en `domain/grid/grid-cell.ts`.
+- [x] Adaptar `grid-window.ts` con presupuesto de 8192 hexagonos visibles con margen; generador de tres aristas propias y cache de un solo Graphics.
+- [x] Adaptar snap al vertice superior izquierdo; mediciones/caminos al centro; mantener movimientos libres y datos historicos.
+- [x] Pasar la geometria completa a preview y confirmacion de herramientas, tokens, agua y apuntador.
+- [x] Adaptar fuego, luces derivadas, darkvision y anotaciones al poligono persistido por celda; sin conversion implicita al cambiar layout.
+- [x] Incluir layout en firmas relevantes, sin invalidacion de mascaras ni cargas de assets al alternar solo la topologia.
+- [x] Agregar regresiones de dominio, schema/round trip, snapshot jugador, cache Pixi y render de fuego.
+- [x] Aceptacion del usuario para cierre de la funcionalidad y del ajuste de borrado de areas.
+- [x] Version 1.10.0, changelog y documentacion actualizados; commit y merge a main expresamente autorizados.
+
+Pruebas reproducibles: `hex-grid.test.ts`, `measurement.test.ts`, `shapes.test.ts`, `tokens.test.ts`, `map-annotations.test.ts`, `scene-schema.test.ts`, `player-window.test.ts`, `grid-render-cache.test.ts` y `fire-pattern-render.test.ts`. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` antes de entregar.
+
+Validacion de rama (2026-09-02): 343 tests en 48 archivos, typecheck, lint y build correctos. Build advierte sobre directivas `use client` ignoradas de Radix/Lucide, sin impedir compilacion. Smoke en navegador: selector y grosores, camino de 15 ft centrado, fuego por hexagonos, area de informacion guardada y trasladada, y conservacion de su forma al alternar topologia; sin errores de consola. Guardado nativo/recarga y DM + Player View completos quedan para prueba del usuario; schema y snapshot estan cubiertos automaticamente.
+
+Validacion final con borrado de areas: 350 tests en 49 archivos, typecheck, lint y build correctos. Papelera, Backspace sobre canvas, bloqueo y aislamiento por ID verificados (detalle en plan 22). El usuario autoriza cierre 1.10.0; no se declara un smoke nativo adicional de guardado/recarga y dos ventanas. Generar instaladores macOS desde main mediante `./scripts/build-dmg.sh`, que toma version de package.json. Mantener pendientes historicos ajenos a este cambio sin marcar como ejecutados.
+
+Smoke de esta extension: alternar Cuadrada/Hexagonal; crear camino de tres pasos y comprobar 15 ft / 4.5 m; pintar fuego y terreno, moverlos y verificar vertices/coronas; cambiar grosor; pan/zoom fuera del mapa; guardar y abrir en jugador sin acciones adicionales del DM. La niebla mantiene su trazo libre y sus texturas acotadas al viewport. Documentacion relacionada: specs/planes 01, 03, 05, 06, 07, 08, 10, 11, 13, 14, 15, 17 y 22.
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener mapa y grilla, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Carga de Mapa y Calibracion de Grilla
 
 ### 1. Resumen
 
-- **Objetivo:** Permitir cargar una imagen de mapa, renderizarla en PixiJS, superponer una grilla cuadrada configurable y calibrar el tamano fisico de casilla por arrastre o valor numerico.
+- **Objetivo:** Permitir cargar una imagen de mapa, renderizarla en PixiJS, superponer una grilla cuadrada o hexagonal configurable y calibrar el tamano fisico de casilla por arrastre o valor numerico.
 - **Estado:** Implementado
 - **Prioridad:** Alta
 - **Dependencias:** bootstrap de la app, motor visual, persistencia de escena, interaccion y navegacion, PixiJS viewport, IPC/preload seguro, formato `.ttrpgscene`, dialogos nativos.
@@ -19,7 +43,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Aceptar PNG, JPG/JPEG, WEBP y HEIC cuando el runtime lo soporte.
 - Mostrar mapa centrado en el lienzo PixiJS.
 - Persistir `map.imagePath`, `map.position`, `map.scale` y configuracion de grilla en el estado de escena.
-- Dibujar grilla cuadrada sobre el mapa.
+- Dibujar grilla cuadrada o hexagonal sobre el mapa.
 - Encender/apagar grilla.
 - Ajustar opacidad de grilla.
 - Ajustar `cellSizeWorld` por valor numerico.
@@ -36,7 +60,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 
 #### Fuera de alcance
 
-- Grillas hexagonales.
+- Otras topologias u orientaciones hexagonales distintas de vertice arriba.
 - Calibracion avanzada multi-punto.
 - Correccion de perspectiva.
 - Conversion interna HEIC garantizada en todas las plataformas.
@@ -130,7 +154,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - Cargar textura con `Assets.load(imageUrl)` y crear sprite con `new Sprite(texture)` (API canonica PixiJS v8).
 - Liberar textura anterior con `Assets.unload(url)` al cambiar imagen.
 - Renderizar mapa centrado en capa `map`.
-- Renderizar grilla cuadrada en capa `grid` con opacidad configurable.
+- Renderizar la geometria elegida en capa `grid` con opacidad configurable.
 - Implementar handle/overlay de calibracion por arrastre visible/interactivo solo en modo `Ajustar grilla`.
 - Dibujar el handle de calibracion en la capa de seleccion para quedar por encima de niebla/oscuridad.
 - Respetar bloqueo de zoom/escala en rueda.
@@ -197,7 +221,7 @@ La API `Sprite.from(htmlImageElement, skipCache)` herencia de v7 no crea correct
 - El usuario puede cargar una imagen valida PNG/JPG/JPEG/WEBP.
 - HEIC muestra soporte real si carga, o error recuperable claro si no es viable.
 - El mapa aparece centrado en el lienzo.
-- La grilla cuadrada aparece sobre el mapa.
+- La grilla cuadrada o hexagonal aparece sobre el mapa.
 - El usuario puede cambiar opacidad de grilla.
 - El usuario puede activar `Ajustar grilla` con switch en sidebar.
 - El usuario puede activar `Ajustar grilla` con `Cmd+G`/`Ctrl+G`.

@@ -13,10 +13,19 @@ const grid: SceneGrid = {
   cellSizeWorld: 100,
   opacity: 0.35,
   lineWidth: 1,
+  layout: "square",
   unit: "ft",
   distancePerCell: 5,
   metricDistancePerCell: 1.5
 };
+
+it("snaps a token anchor to the upper-left hex vertex without changing its footprint", () => {
+  for (const footprint of [1, 2, 3, 4] as const) {
+    const point = snapTokenToGrid({ x: 0, y: 0 }, { ...grid, layout: "hexagonal" }, footprint);
+    expect(point.x).toBeCloseTo(-grid.cellSizeWorld / 2);
+    expect(point.y).toBeCloseTo(-grid.cellSizeWorld / (2 * Math.sqrt(3)));
+  }
+});
 
 describe("tokens", () => {
   it("maps DnD token sizes to grid footprints", () => {

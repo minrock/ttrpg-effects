@@ -1,5 +1,26 @@
 # Spec - Pines y Areas de Informacion del Mapa
 
+## Borrado de areas desde mapa y arbol
+
+- Backspace y Delete eliminan el area seleccionada en el mapa, tanto cuadrada como hexagonal, sin depender de una seleccion anterior del callback.
+- Cada terreno/trampa del arbol incorpora una papelera Lucide con tooltip y nombre accesible. La accion elimina esa fila por ID aunque otro objeto este seleccionado; no requiere seleccionar primero ni abrir un modal.
+- Con foco en una fila de area, Backspace/Delete eliminan esa fila y no propagan el evento al borrado global. No interceptar edicion en buscadores, campos o WYSIWYG.
+- Conservar la proteccion existente: un area bloqueada debe desbloquearse antes de borrar. Deshabilitar su papelera con tooltip explicativo y dar feedback si se intenta por teclado.
+- Eliminar limpia la seleccion/propiedades si correspondian al area borrada, retira su geometria y actualiza el arbol/estado guardable. No modificar otros objetos, pines ni conexiones.
+- Mantener titulo legible y controles en una segunda linea de cada area para no comprimir el nombre con la nueva accion.
+- Cambio aceptado por el usuario el 2026-09-02 para cierre 1.10.0 y merge a main.
+
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Area de informacion rasteriza cada trazo a las celdas de la grilla activa: cuadrados o hexagonos completos. Interpolar el trazo para no dejar huecos por movimientos rapidos.
+- Persistir layout por celda con x/y/size mundial; traslacion conserva forma. Cambiar grilla no convierte anotaciones ya guardadas.
+- Preview, relleno, contorno exterior y hit testing usan geometria real, sin bordes internos entre hexagonos contiguos ni seleccion en esquinas vacias del bounding box.
+- Highlight de 5 s en Player View conserva geometria hexagonal y colores de terreno/trampa; payload permite layout validado y nunca incluye nombre/contenido privado.
+- Pines de habitacion, links, WYSIWYG y arbol de anotaciones no cambian.
+
+
 Este documento define la funcionalidad para guardar informacion contextual directamente sobre posiciones y areas del mapa, visible para el DM y persistente dentro de la escena.
 
 ## Estado

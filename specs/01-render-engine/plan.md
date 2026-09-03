@@ -1,5 +1,14 @@
 # Plan - Motor Visual y Capas de Render
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Integrar `getHexGridSegments`/`getGridWindow` y cache por layout, paso, opacidad y grosor en PixiViewport.
+- [x] Usar helpers GridCell en fuego, anotaciones, oscuridad y darkvision; firmas incluyen layout por celda.
+- [x] Agregar regresiones de presupuesto y cache en `hex-grid.test.ts`, `grid-render-cache.test.ts` y `fire-pattern-render.test.ts`.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener motor visual y capas de render, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Motor Visual y Capas de Render

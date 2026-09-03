@@ -6,6 +6,39 @@ import { createDefaultScene } from "../../domain/sessions/default-scene";
 interface Harness { drawGrid(): void; getGridBounds(): unknown; camera: { center: { x: number; y: number }; zoom: number } }
 
 describe("grid render cache", () => {
+  it("invalidates grid and measurement visuals on layout changes, but no GPU visibility masks", () => {
+    const layer = new Container();
+    const grid = createDefaultScene().grid;
+    const drawDarkvisionLayer = vi.fn();
+    const drawShapesAndMeasurementsLayer = vi.fn();
+    const drawSelectionLayer = vi.fn();
+    const viewport = Object.assign(Object.create(PixiViewport.prototype) as Pick<PixiViewport, "setGrid"> & Harness, {
+      grid, gridWindowCache: null, layers: new Map([["grid", layer]]),
+      camera: { center: { x: 0, y: 0 }, zoom: 1 },
+      app: { renderer: { width: 1000, height: 800 } },
+      drawDarkvisionLayer, drawShapesAndMeasurementsLayer, drawSelectionLayer
+    });
+    viewport.setGrid(grid);
+    const square = layer.children[0];
+    const hexGrid = { ...grid, layout: "hexagonal" as const };
+    viewport.setGrid(hexGrid);
+    const hex = layer.children[0];
+    expect(square?.destroyed).toBe(true);
+    expect(hex).not.toBe(square);
+    expect(drawShapesAndMeasurementsLayer).toHaveBeenCalledOnce();
+    expect(drawSelectionLayer).toHaveBeenCalledOnce();
+    expect(drawDarkvisionLayer).not.toHaveBeenCalled();
+    viewport.setGrid({ ...hexGrid });
+    viewport.camera.center.x = 80;
+    viewport.drawGrid();
+    expect(layer.children[0]).toBe(hex);
+    viewport.camera.center.x = -50000;
+    viewport.drawGrid();
+    expect(hex?.destroyed).toBe(true);
+    expect(layer.children).toHaveLength(1);
+    layer.destroy({ children: true });
+  });
+
   it("updates only the grid for line width changes and reuses the new geometry", () => {
     const layer = new Container();
     const scene = createDefaultScene();

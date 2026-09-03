@@ -1,5 +1,15 @@
 # Spec - Navegacion e Interaccion
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Con grilla hexagonal, el snap general de las herramientas que lo usan apunta al vertice superior izquierdo real de la celda bajo el cursor (spec 04).
+- Mediciones y Path/Camino usan centros como excepcion; tokens usan el ancla general. Rectangulos ajustan su esquina superior izquierda.
+- Preview y confirmacion usan la misma geometria, sin salto adicional por aplicar snap dos veces. Pan con Space, ajuste de mapa y movimientos libres de efectos/anotaciones no cambian.
+- Cambiar topologia no reposiciona objetos existentes; al editar se aplica la regla vigente.
+
+
 Este documento describe de forma unificada la funcionalidad de navegacion e interaccion, consolidando el alcance funcional vigente en el proyecto.
 
 ## Modelo de Interaccion

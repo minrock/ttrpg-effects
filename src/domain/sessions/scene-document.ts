@@ -1,10 +1,12 @@
 import type { SceneAside } from "./scene-aside";
 import type { CombatTracker } from "../combat/combat-tracker";
 import type { MapAnnotations } from "../annotations/map-annotations";
+import type { GridCell } from "../grid/grid-cell";
 
 export const SCENE_DOCUMENT_VERSION = 1;
 
 export type DistanceUnit = "ft" | "m";
+export type GridLayout = "square" | "hexagonal";
 export type DiagonalMode = "dnd5e-default" | "dnd5e-alternating" | "manhattan" | "euclidean";
 
 export interface SceneMap {
@@ -28,6 +30,7 @@ export interface SceneGrid {
   readonly cellSizeWorld: number;
   readonly opacity: number;
   readonly lineWidth: 1 | 3;
+  readonly layout: GridLayout;
   readonly unit: DistanceUnit;
   readonly distancePerCell: number;
   readonly metricDistancePerCell: number;
@@ -204,11 +207,7 @@ export type SceneFireZone =
   | {
       readonly kind: "cells";
       readonly radius: number;
-      readonly cells: ReadonlyArray<{
-        readonly x: number;
-        readonly y: number;
-        readonly size: number;
-      }>;
+      readonly cells: readonly GridCell[];
     };
 
 export interface SceneShape {

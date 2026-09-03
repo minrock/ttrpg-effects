@@ -1,5 +1,5 @@
 import { useMemo, useState, type JSX, type ReactNode } from "react";
-import { Search } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import {
   searchMapAnnotations,
   type MapAnnotation,
@@ -16,6 +16,7 @@ interface MapAnnotationsTreeProps {
   readonly onEdit: (annotation: MapAnnotation) => void;
   readonly onToggleLock: (annotation: MapAnnotation) => void;
   readonly onHighlightArea: (areaId: string) => void;
+  readonly onDeleteArea: (areaId: string) => void;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
 }
 
@@ -27,6 +28,7 @@ export function MapAnnotationsTree({
   onEdit,
   onToggleLock,
   onHighlightArea,
+  onDeleteArea,
   sceneLinkStatuses = {}
 }: MapAnnotationsTreeProps): JSX.Element {
   const [query, setQuery] = useState("");
@@ -71,6 +73,7 @@ export function MapAnnotationsTree({
                 key={area.id}
                 annotation={area}
                 selected={selectedElementId === area.id}
+                onDeleteArea={onDeleteArea}
                 onSelect={onSelect}
                 onGoTo={onGoTo}
                 onEdit={onEdit}
@@ -85,6 +88,7 @@ export function MapAnnotationsTree({
                 key={area.id}
                 annotation={area}
                 selected={selectedElementId === area.id}
+                onDeleteArea={onDeleteArea}
                 onSelect={onSelect}
                 onGoTo={onGoTo}
                 onEdit={onEdit}
@@ -150,6 +154,7 @@ function AnnotationLeaf({
   onEdit,
   onToggleLock,
   onHighlightArea,
+  onDeleteArea,
   sceneLinkStatus
 }: {
   readonly annotation: MapAnnotation;
@@ -159,12 +164,25 @@ function AnnotationLeaf({
   readonly onEdit: (annotation: MapAnnotation) => void;
   readonly onToggleLock: (annotation: MapAnnotation) => void;
   readonly onHighlightArea: (areaId: string) => void;
+  readonly onDeleteArea?: (areaId: string) => void;
   readonly sceneLinkStatus?: SceneLinkValidationStatus;
 }): JSX.Element {
   const label = getAnnotationLabel(annotation);
 
   return (
-    <li className={`annotation-tree__leaf${selected ? " is-selected" : ""}${sceneLinkStatus?.state === "broken" ? " is-broken" : ""}`} role="treeitem" aria-selected={selected}>
+    <li
+      className={`annotation-tree__leaf${annotation.kind === "information-area" ? " is-area" : ""}${selected ? " is-selected" : ""}${sceneLinkStatus?.state === "broken" ? " is-broken" : ""}`}
+      role="treeitem"
+      aria-selected={selected}
+      onKeyDown={(event) => {
+        if (annotation.kind !== "information-area" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (event.key === "Backspace" || event.key === "Delete") {
+          event.preventDefault();
+          event.stopPropagation();
+          onDeleteArea?.(annotation.id);
+        }
+      }}
+    >
       <button type="button" className="annotation-tree__leaf-main" onClick={() => onSelect(annotation)}>
         <span aria-hidden="true">{annotation.kind === "room-pin" ? "◆" : annotation.kind === "scene-link" ? "◎" : annotation.areaType === "terrain" ? "▧" : "▲"}</span>
         <span>{label}</span>
@@ -190,6 +208,17 @@ function AnnotationLeaf({
         >
           {annotation.locked ? "▣" : "▢"}
         </button>
+        {annotation.kind === "information-area" ? (
+          <button
+            type="button"
+            title={annotation.locked ? "Desbloquea el area antes de eliminarla" : "Eliminar area"}
+            aria-label={`Eliminar ${label}`}
+            disabled={annotation.locked}
+            onClick={() => onDeleteArea?.(annotation.id)}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
     </li>
   );

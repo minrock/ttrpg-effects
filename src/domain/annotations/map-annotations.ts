@@ -1,6 +1,7 @@
 import type { SceneDocument } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import type { MapSceneLinkMarker } from "./scene-navigation-links";
+import { getGridCellAtPoint, getGridCellHeight, getGridCellKey, resolveGridGeometry, type GridCell, type GridGeometryInput } from "../grid/grid-cell";
 
 export const INFORMATION_AREA_HIGHLIGHT_DURATION_MS = 5_000 as const;
 export const TERRAIN_INFORMATION_AREA_COLOR = "#6b7d32";
@@ -17,11 +18,7 @@ export interface MapInformationPin {
   readonly locked: boolean;
 }
 
-export interface InformationAreaCell {
-  readonly x: number;
-  readonly y: number;
-  readonly size: number;
-}
+export type InformationAreaCell = GridCell;
 
 export interface MapInformationArea {
   readonly id: string;
@@ -64,7 +61,7 @@ export function deduplicateInformationAreaCells(
 
   for (const cell of cells) {
     if (!isFiniteCell(cell)) continue;
-    uniqueCells.set(getInformationAreaCellKey(cell), cell);
+    uniqueCells.set(getGridCellKey(cell), cell);
   }
 
   return [...uniqueCells.values()];
@@ -72,8 +69,10 @@ export function deduplicateInformationAreaCells(
 
 export function rasterizeInformationAreaStroke(
   points: readonly WorldPoint[],
-  cellSizeWorld: number
+  input: GridGeometryInput
 ): readonly InformationAreaCell[] {
+  const grid = resolveGridGeometry(input);
+  const cellSizeWorld = grid.cellSizeWorld;
   if (!Number.isFinite(cellSizeWorld) || cellSizeWorld <= 0 || points.length === 0) {
     return [];
   }
@@ -81,13 +80,7 @@ export function rasterizeInformationAreaStroke(
   const cells: InformationAreaCell[] = [];
   const addPoint = (point: WorldPoint): void => {
     if (!isFinitePoint(point)) return;
-    const column = Math.floor(point.x / cellSizeWorld);
-    const row = Math.floor(point.y / cellSizeWorld);
-    cells.push({
-      x: column * cellSizeWorld,
-      y: row * cellSizeWorld,
-      size: cellSizeWorld
-    });
+    cells.push(getGridCellAtPoint(point, grid));
   };
 
   const firstPoint = points[0];
@@ -142,7 +135,7 @@ export function getMapAnnotationCenter(annotation: MapAnnotation): WorldPoint {
     left = Math.min(left, cell.x);
     right = Math.max(right, cell.x + cell.size);
     top = Math.min(top, cell.y);
-    bottom = Math.max(bottom, cell.y + cell.size);
+    bottom = Math.max(bottom, cell.y + getGridCellHeight(cell));
   }
 
   return { x: (left + right) / 2, y: (top + bottom) / 2 };
@@ -183,6 +176,18 @@ export function canTransformMapAnnotation(annotation: MapAnnotation): boolean {
 
 export function canDeleteMapAnnotation(annotation: MapAnnotation): boolean {
   return !annotation.locked;
+}
+
+export function removeInformationArea(scene: SceneDocument, areaId: string): SceneDocument {
+  const area = scene.mapAnnotations.areas.find((candidate) => candidate.id === areaId);
+  if (area === undefined || !canDeleteMapAnnotation(area)) return scene;
+  return {
+    ...scene,
+    mapAnnotations: {
+      ...scene.mapAnnotations,
+      areas: scene.mapAnnotations.areas.filter((candidate) => candidate.id !== areaId)
+    }
+  };
 }
 
 export function createInformationAreaHighlightBroadcast(
@@ -235,7 +240,10 @@ export function sanitizeInformationAreaHighlightBroadcast(
     id: candidate.id,
     areaId: candidate.areaId,
     areaType: candidate.areaType,
-    cells: candidate.cells.map((cell) => ({ x: cell.x, y: cell.y, size: cell.size })),
+    cells: candidate.cells.map((cell) => ({
+      x: cell.x, y: cell.y, size: cell.size,
+      ...(cell.layout === undefined ? {} : { layout: cell.layout })
+    })),
     durationMs: INFORMATION_AREA_HIGHLIGHT_DURATION_MS
   };
 }
@@ -246,10 +254,6 @@ function normalizeSearchText(value: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLocaleLowerCase();
-}
-
-function getInformationAreaCellKey(cell: InformationAreaCell): string {
-  return `${cell.x}:${cell.y}:${cell.size}`;
 }
 
 function isFinitePoint(point: WorldPoint): boolean {
@@ -266,6 +270,7 @@ function isFiniteCell(value: unknown): value is InformationAreaCell {
     Number.isFinite(cell.y) &&
     typeof cell.size === "number" &&
     Number.isFinite(cell.size) &&
-    cell.size > 0
+    cell.size > 0 &&
+    (cell.layout === undefined || cell.layout === "square" || cell.layout === "hexagonal")
   );
 }

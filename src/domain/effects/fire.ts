@@ -1,6 +1,7 @@
 import { clampPositive, clampUnit, normalizeHexColor } from "../lighting/lights";
 import type { SceneFireEffect } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
+import { getGridCellHeight, getGridCellKey, type GridCell } from "../grid/grid-cell";
 
 export type EffectKind = "fire";
 export type FireCircleMode = "closed" | "open";
@@ -18,11 +19,7 @@ export type FireZone =
       readonly cells: readonly FireCell[];
     };
 
-export interface FireCell {
-  readonly x: number;
-  readonly y: number;
-  readonly size: number;
-}
+export type FireCell = GridCell;
 
 export type AnimatedFireEffect = SceneFireEffect;
 
@@ -111,11 +108,12 @@ export function createCellFireZone(cells: readonly FireCell[], radius = 25): Fir
     assertFinitePoint(cell);
     const size = clampPositive(cell.size, 1);
     const normalized = {
+      ...(cell.layout === undefined ? {} : { layout: cell.layout }),
       x: cell.x,
       y: cell.y,
       size
     };
-    uniqueCells.set(getCellKey(normalized), normalized);
+    uniqueCells.set(getGridCellKey(normalized), normalized);
   }
 
   if (uniqueCells.size === 0) {
@@ -156,7 +154,7 @@ export function getFireZoneBounds(
   }
 
   const xs = effect.zone.cells.flatMap((cell) => [cell.x, cell.x + cell.size]);
-  const ys = effect.zone.cells.flatMap((cell) => [cell.y, cell.y + cell.size]);
+  const ys = effect.zone.cells.flatMap((cell) => [cell.y, cell.y + getGridCellHeight(cell)]);
 
   return {
     left: Math.min(...xs),
@@ -194,15 +192,12 @@ function translateCellZone(zone: FireZone, from: WorldPoint, to: WorldPoint): Fi
     kind: "cells",
     radius: zone.radius,
     cells: zone.cells.map((cell) => ({
+      ...cell,
       x: cell.x + dx,
       y: cell.y + dy,
       size: cell.size
     }))
   };
-}
-
-function getCellKey(cell: FireCell): string {
-  return `${cell.x}:${cell.y}:${cell.size}`;
 }
 
 function assertId(id: string): void {

@@ -9,6 +9,36 @@ import {
 } from "./scene-schema";
 
 describe("scene document schema", () => {
+  it("defaults old grids to square without marking an empty scene as occupied", () => {
+    const scene = createDefaultScene();
+    const grid = Object.fromEntries(Object.entries(scene.grid).filter(([key]) => key !== "layout" && key !== "lineWidth"));
+    const restored = parseSceneDocument({ ...scene, grid });
+    expect(restored.grid).toEqual(scene.grid);
+    expect(hasSceneContent(restored)).toBe(false);
+    expect(() => parseSceneDocument({ ...scene, grid: { ...grid, layout: "triangle" } })).toThrow();
+  });
+
+  it("preserves hex grids and the independent geometry of painted cells through save/load", () => {
+    const scene = createDefaultScene();
+    const cell = { x: -50, y: -100 / Math.sqrt(3), size: 100, layout: "hexagonal" as const };
+    const updated = {
+      ...scene,
+      grid: { ...scene.grid, layout: "hexagonal" as const, lineWidth: 3 as const },
+      effects: [{
+        id: "f", kind: "fire" as const, position: { x: 0, y: 0 }, scale: 1, opacity: 0.68,
+        color: "#ff3030", visible: true, emitsLight: true, lightRadius: 150,
+        zone: { kind: "cells" as const, radius: 25, cells: [cell, { x: 200, y: 0, size: 100 }] }
+      }],
+      mapAnnotations: { ...scene.mapAnnotations, areas: [{
+        id: "a", kind: "information-area" as const, areaType: "trap" as const,
+        name: "Hex", description: "", locked: false, cells: [cell]
+      }] }
+    };
+    expect(parseSceneJson(serializeSceneDocument(updated))).toEqual(updated);
+    const squareAgain = { ...updated, grid: scene.grid };
+    expect(parseSceneJson(serializeSceneDocument(squareAgain)).effects).toEqual(updated.effects);
+  });
+
   it("loads older grid settings with thin lines and keeps an empty scene empty", () => {
     const scene = createDefaultScene();
     const grid = Object.fromEntries(Object.entries(scene.grid).filter(([key]) => key !== "lineWidth"));

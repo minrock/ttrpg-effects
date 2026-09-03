@@ -1,5 +1,14 @@
 # Spec - Efectos de Agua
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- El punto de trazo que usa snap al centro se ajusta al centro de la celda elegida, cuadrada o hexagonal, segun spec 04.
+- Rios y cuerpos de agua siguen siendo lineas/poligonos continuos: no se convierten en pintado de hexagonos. Ancho, union por proximidad, texturas, rotacion, hue y saturacion mantienen comportamiento.
+- Cambiar de grilla no mueve agua ya guardada ni cambia sus puntos/mascaras.
+
+
 Este documento describe de forma unificada la funcionalidad de efectos de agua, consolidando el alcance funcional vigente en el proyecto.
 
 ## Aguas, rios y cuerpos de agua

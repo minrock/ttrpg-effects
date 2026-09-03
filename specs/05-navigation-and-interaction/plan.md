@@ -1,5 +1,14 @@
 # Plan - Navegacion e Interaccion
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Pasar GridGeometry completo en creacion y arrastres, no solo cellSizeWorld.
+- [x] Ajustar preview hexagonal en PixiViewport y confirmacion en App con helpers puros compartidos.
+- [x] Probar idempotencia de vertices, coordenadas negativas, movimiento de formas/path y tokens.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener navegacion e interaccion, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Modelo de Interaccion

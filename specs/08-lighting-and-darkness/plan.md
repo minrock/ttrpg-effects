@@ -1,5 +1,14 @@
 # Plan - Luces y Oscuridad
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Reutilizar `getGridCellRings` y `drawGridCell` en drawFireLight y buildFireLightEraseGraphicScreen.
+- [x] Transformar x/y/size a pantalla conservando layout; culling usa altura hexagonal real.
+- [x] Cubrir vecinos/traslacion y render de fuego; alternar solo grid.layout no regenera mascaras.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener luces y oscuridad, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Iluminacion, Oscuridad y Fuego Animado

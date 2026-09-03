@@ -1,5 +1,14 @@
 # Spec - Ventana de Jugador
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Player View recibe grid.layout con el estado de escena y dibuja la misma topologia, tamano mundial y grosor que DM desde el primer snapshot; cada camara conserva su pan/zoom.
+- Celdas hexagonales de fuego y highlights temporales de areas conservan su layout propio. No transmitir contenido privado de anotaciones.
+- El cambio no introduce canales IPC por celda ni sincronizacion por frame; seguir usando snapshot/diff y eventos ligeros existentes.
+
+
 Este documento describe de forma unificada la funcionalidad de ventana de jugador, consolidando el alcance funcional vigente en el proyecto.
 
 ## Ventana de jugador

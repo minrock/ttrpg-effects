@@ -1,5 +1,14 @@
 # Plan - Tokens y Minis Virtuales
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Extender snapTokenToGrid con rama hexagonal usando snapWorldPoint; conservar rama cuadrada y footprint.
+- [x] Aplicar la misma regla al preview de arrastre y probar todos los tamanos en tokens.test.ts.
+- [x] Evitar recargar texturas/mascaras de tokens cuando solo cambia grid.layout.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener tokens y minis virtuales, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Minis virtuales y marcadores futuros
@@ -70,7 +79,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
   - `getTokenFootprintCells(size)` devuelve 1, 2, 3 o 4 segun la tabla del spec.
   - `assignTokenBadge(tokens, tokenName)` calcula el siguiente badge estable para tokens repetidos con el mismo nombre.
   - `sortTokensByOrder(tokens)` mantiene orden visual y persistido.
-  - `snapTokenToGrid(point, grid, footprintCells)` centra el token sobre la celda o bloque de celdas correspondiente.
+  - `snapTokenToGrid(point, grid, footprintCells)` centra el token sobre la celda o bloque en grilla cuadrada; en hexagonal ajusta su ancla al vertice superior izquierdo.
 - **Coordenadas / unidades:** La posicion se guarda en coordenadas de mundo. El tamano visual se calcula desde `grid.cellSizeWorld * footprintCells`, no desde pixeles de pantalla.
 - **Errores de dominio:** Rechazar tamanos desconocidos, posiciones no finitas, colores invalidos y tokens sin id o sin imagen cuando el flujo exige imagen.
 

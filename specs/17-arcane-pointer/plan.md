@@ -1,5 +1,13 @@
 # Plan - Apuntador Arcano
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Pasar grid completo al snap a centro comun en PixiViewport; mantener broadcast de coordenadas mundiales.
+- [x] Cubrir centros positivos/negativos con hex-grid.test.ts; conservar animacion y recursos existentes.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener apuntador arcano, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Apuntador arcano

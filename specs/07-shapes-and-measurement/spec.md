@@ -1,5 +1,17 @@
 # Spec - Figuras y Medicion
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- En hexagonal, el snap general opcional coloca el ancla en el vertice superior izquierdo; para rectangulos se ajusta su esquina. No convertir circulos/conos/rectangulos en hexagonos.
+- Lineas de medicion se crean, mueven y editan entre centros de hexagonos, incluso con Snap desactivado. Su posicion libre anterior sigue aplicando a grilla cuadrada.
+- Path/Camino mantiene puntos centrados al crear/editar; trasladar un camino desplaza sus puntos en bloque desde el primer centro.
+- La distancia hexagonal cuenta el minimo de pasos entre seis vecinos (coordenadas cubicas) y suma los tramos; aplicar ft/m por casilla. Ignorar diagonales cuadradas y reactivar su regla al volver a cuadrada.
+- Actualizar etiquetas al cambiar unidad, calibracion o layout. Cambiar grilla no reubica puntos historicos: sus medidas usan los centros de las celdas que contienen los puntos; la siguiente edicion los ajusta a los centros vigentes.
+- Conservar controls visibles al zoom-out, etiquetas, emojis, seleccion y guardado existentes.
+
+
 Este documento describe de forma unificada la funcionalidad de figuras y medicion, consolidando el alcance funcional vigente en el proyecto.
 
 ## Herramientas Tacticas y Medicion

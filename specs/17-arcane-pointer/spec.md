@@ -1,5 +1,14 @@
 # Spec - Apuntador Arcano
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- El click sigue centrando el apuntador en la celda seleccionada. En grilla hexagonal se usa su centro real, no el de un cuadrado auxiliar.
+- Imagen circular, duracion de 4 s, tamanos 1/2/3/4 y sincronizacion permanecen. En hexagonal el diametro base es un multiplo del ancho entre lados opuestos, conservando el factor visual extra.
+- No convertir el apuntador en poligono ni agregar controles a Player View.
+
+
 Este documento describe de forma unificada la funcionalidad de apuntador arcano, consolidando el alcance funcional vigente en el proyecto.
 
 ## Apuntador arcano

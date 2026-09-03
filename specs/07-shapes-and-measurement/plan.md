@@ -1,5 +1,15 @@
 # Plan - Figuras y Medicion
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Extender `MeasurementSettings`, snap general y snap a centro con GridGeometry; usar Honeycomb para distancia.
+- [x] Pasar grid completo a createTacticalShape, moveShape, movePathPoint, setLinearShapeEnd y rotateLinearShape; mismos helpers en preview/commit.
+- [x] Incluir layout en firma de etiquetas y actualizar al alternarlo sin invalidar mascaras.
+- [x] Probar seis vecinos, sumatoria ft/m, diagonales ignoradas en hexagonal, vertices y movimiento entre centros. Verificar camino visual en navegador.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener figuras y medicion, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Herramientas Tacticas y Medicion

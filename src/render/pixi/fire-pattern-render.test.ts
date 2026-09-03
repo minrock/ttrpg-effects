@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Container, Texture, TextureSource, Sprite } from "pixi.js";
 import { createAnimatedFireEffect } from "../../domain/effects/fire";
+import { createCellFireZone, updateAnimatedFireEffect } from "../../domain/effects/fire";
+import { getGridCellAtPoint, getGridCellHeight, getGridCellCenter, isPointInGridCell } from "../../domain/grid/grid-cell";
 import type { SceneFireEffect } from "../../domain/sessions/scene-document";
 import { PixiViewport } from "./PixiViewport";
 import { FirePatternAnimation } from "./fire-pattern-animation";
@@ -46,6 +48,32 @@ function createHarness() {
 afterEach(() => { for (const dispose of cleanup.splice(0).reverse()) dispose(); });
 
 describe("fire pattern render cache", () => {
+  it("keeps hex masks, anchors and animation budget when a painted fire is moved", () => {
+    const { viewport, animation } = createHarness();
+    const cell = getGridCellAtPoint({ x: 0, y: 0 }, { cellSizeWorld: 100, layout: "hexagonal" });
+    const effect = updateAnimatedFireEffect(createAnimatedFireEffect("hex", { x: 0, y: 0 }), { zone: createCellFireZone([cell]) });
+    const moved = updateAnimatedFireEffect(effect, { position: { x: 123, y: -57 } });
+    if (moved.zone.kind !== "cells") throw new Error("Expected painted fire");
+    const movedCell = moved.zone.cells[0];
+    expect(movedCell.layout).toBe("hexagonal");
+    expect(getGridCellCenter(movedCell).x).toBeCloseTo(123);
+    expect(getGridCellCenter(movedCell).y).toBeCloseTo(-57);
+    for (const flame of createFireFlameLayout(moved, 100)) expect(isPointInGridCell(flame, movedCell)).toBe(true);
+    viewport.effects = [effect];
+    viewport.drawEffectsLayer();
+    const original = viewport.effectRenderCache.get("hex")!.container;
+    viewport.effects = [moved];
+    viewport.drawEffectsLayer();
+    expect(original.destroyed).toBe(true);
+    const container = viewport.effectRenderCache.get("hex")!.container;
+    const glow = container.children[0]!.children[0]!;
+    expect(glow.width).toBeCloseTo(100);
+    expect(glow.height).toBeCloseTo(getGridCellHeight(movedCell));
+    expect(animation.spriteCount).toBe(createFireFlameLayout(moved, 100).length);
+    viewport.drawEffectsLayer();
+    expect(viewport.effectRenderCache.get("hex")!.container).toBe(container);
+  });
+
   it("keeps the same geometry and sprites through repeated unchanged redraws", () => {
     const { viewport, animation } = createHarness();
     viewport.drawEffectsLayer();

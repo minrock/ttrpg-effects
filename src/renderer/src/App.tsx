@@ -23,6 +23,7 @@ import {
   FilePlus,
   FolderOpen,
   Grid3X3,
+  Hexagon,
   Lock,
   Map as MapIcon,
   MapPin,
@@ -53,6 +54,7 @@ import {
   setZoomLocked
 } from "../../domain/interaction/interaction-state";
 import { applyGridPreset, gridPresets, setGridCellSize, setGridOpacity } from "../../domain/grid/grid";
+import { getGridCellKey } from "../../domain/grid/grid-cell";
 import {
   createAnimatedFireEffect,
   createCellFireZone,
@@ -181,6 +183,7 @@ import { CombatSetupModal } from "./components/combat/CombatSetupModal";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import {
   canDeleteMapAnnotation,
+  removeInformationArea,
   createInformationAreaHighlightBroadcast,
   getMapAnnotationCenter,
   translateInformationArea,
@@ -496,6 +499,7 @@ export function App(): JSX.Element {
   }, [interaction.contextMenu]);
 
   const handleElementSelect = useCallback((elementId: string | null) => {
+    selectedElementIdRef.current = elementId;
     setInteraction((current) => selectElement(current, elementId));
   }, []);
 
@@ -768,7 +772,21 @@ export function App(): JSX.Element {
   }, []);
 
   const handleSelectMapAnnotation = useCallback((annotation: MapAnnotation): void => {
+    selectedElementIdRef.current = annotation.id;
     setInteraction((current) => selectElement(setActiveTool(current, "select"), annotation.id));
+  }, []);
+
+  const handleDeleteInformationArea = useCallback((areaId: string): void => {
+    const area = sceneRef.current.mapAnnotations.areas.find((candidate) => candidate.id === areaId);
+    if (area === undefined) return;
+    if (!canDeleteMapAnnotation(area)) {
+      setFeedback("Desbloquea el area antes de eliminarla.");
+      return;
+    }
+    setScene((current) => removeInformationArea(current, areaId));
+    setInteraction((current) => current.selectedElementId === areaId ? deleteSelectedElement(current) : current);
+    setMapAnnotationModal((current) => current?.id === areaId ? null : current);
+    if (selectedElementIdRef.current === areaId) selectedElementIdRef.current = null;
   }, []);
 
   const handleGoToMapAnnotation = useCallback((annotation: MapAnnotation): void => {
@@ -1091,6 +1109,11 @@ export function App(): JSX.Element {
 
   const handleDeleteSelectedElement = useCallback(() => {
     const selectedId = selectedElementIdRef.current;
+    if (selectedId === null) return;
+    if (sceneRef.current.mapAnnotations.areas.some((area) => area.id === selectedId)) {
+      handleDeleteInformationArea(selectedId);
+      return;
+    }
     const selectedAnnotation =
       sceneRef.current.mapAnnotations.pins.find((pin) => pin.id === selectedId) ??
       sceneRef.current.mapAnnotations.areas.find((area) => area.id === selectedId) ??
@@ -1116,36 +1139,28 @@ export function App(): JSX.Element {
     }
 
     setScene((current) => {
-      if (interaction.selectedElementId === null) {
-        return current;
-      }
-
       return {
         ...current,
-        lights: current.lights.filter((light) => light.id !== interaction.selectedElementId),
-        effects: current.effects.filter((effect) => effect.id !== interaction.selectedElementId),
-        shapes: current.shapes.filter((shape) => shape.id !== interaction.selectedElementId),
-        tokens: current.tokens.filter((token) => token.id !== interaction.selectedElementId),
-        labels: current.labels.filter((label) => label.id !== interaction.selectedElementId),
+        lights: current.lights.filter((light) => light.id !== selectedId),
+        effects: current.effects.filter((effect) => effect.id !== selectedId),
+        shapes: current.shapes.filter((shape) => shape.id !== selectedId),
+        tokens: current.tokens.filter((token) => token.id !== selectedId),
+        labels: current.labels.filter((label) => label.id !== selectedId),
         mapAnnotations: {
           ...current.mapAnnotations,
-          pins: current.mapAnnotations.pins.filter((pin) => pin.id !== interaction.selectedElementId),
-          areas: current.mapAnnotations.areas.filter((area) => area.id !== interaction.selectedElementId),
-          sceneLinks: current.mapAnnotations.sceneLinks.filter((marker) => marker.id !== interaction.selectedElementId)
+          pins: current.mapAnnotations.pins.filter((pin) => pin.id !== selectedId),
+          areas: current.mapAnnotations.areas,
+          sceneLinks: current.mapAnnotations.sceneLinks.filter((marker) => marker.id !== selectedId)
         }
       };
     });
     setTokenImageUrls((current) => {
-      if (interaction.selectedElementId === null) {
-        return current;
-      }
-
       const next = { ...current };
-      delete next[interaction.selectedElementId];
+      delete next[selectedId];
       return next;
     });
-    setInteraction((current) => deleteSelectedElement(current));
-  }, [interaction.selectedElementId]);
+    setInteraction((current) => current.selectedElementId === selectedId ? deleteSelectedElement(current) : current);
+  }, [handleDeleteInformationArea, interaction.selectedElementId]);
 
   const handleCloseContextMenu = (): void => {
     setInteraction((current) => closeContextMenu(current));
@@ -1989,7 +2004,7 @@ export function App(): JSX.Element {
           ? moveShape(
               shape,
               { x, y },
-              current.settings.snapToGrid ? current.grid.cellSizeWorld : undefined
+              current.settings.snapToGrid || (current.grid.layout === "hexagonal" && shape.type === "measurement") ? current.grid : undefined
             )
           : shape
       ),
@@ -2076,7 +2091,7 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       shapes: current.shapes.map((shape) =>
-        shape.id === elementId ? setLinearShapeEnd(shape, { x, y }) : shape
+        shape.id === elementId ? setLinearShapeEnd(shape, { x, y }, current.grid) : shape
       )
     }));
   }, []);
@@ -2085,7 +2100,7 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       shapes: current.shapes.map((shape) =>
-        shape.id === elementId ? movePathPoint(shape, pointIndex, { x, y }, current.grid.cellSizeWorld) : shape
+        shape.id === elementId ? movePathPoint(shape, pointIndex, { x, y }, current.grid) : shape
       )
     }));
   }, []);
@@ -2094,7 +2109,7 @@ export function App(): JSX.Element {
     setScene((current) => ({
       ...current,
       shapes: current.shapes.map((shape) =>
-        shape.id === elementId ? moveShape(shape, { x, y }, current.grid.cellSizeWorld) : shape
+        shape.id === elementId ? moveShape(shape, { x, y }, current.grid) : shape
       )
     }));
   }, []);
@@ -2143,7 +2158,7 @@ export function App(): JSX.Element {
       shapes: current.shapes.map((shape) => {
         if (shape.id !== elementId) return shape;
         if (shape.type === "cone") return updateShape(shape, { direction });
-        return rotateLinearShape(shape, direction);
+        return rotateLinearShape(shape, direction, current.grid);
       })
     }));
   }, []);
@@ -2875,7 +2890,6 @@ export function App(): JSX.Element {
           <img className="toolbar-logo" src={logoUrl} alt="" />
           <div>
             <h1>{appInfo.name}</h1>
-            <p>Motor visual listo</p>
           </div>
         </div>
         <div className="scene-actions" aria-label="Acciones de escena">
@@ -3035,6 +3049,7 @@ export function App(): JSX.Element {
           selectedElementId={interaction.selectedElementId}
           onChange={setSceneAside}
           onSelectAnnotation={handleSelectMapAnnotation}
+          onDeleteInformationArea={handleDeleteInformationArea}
           onGoToAnnotation={handleGoToMapAnnotation}
           onEditAnnotation={handleEditMapAnnotation}
           onToggleAnnotationLock={handleToggleMapAnnotationLock}
@@ -3912,6 +3927,26 @@ export function App(): JSX.Element {
                 onChange={(event) => handleGridOpacityChange(event.currentTarget.valueAsNumber)}
               />
             </label>
+            <div className="grid-layout-control">
+              <span>Forma de grilla</span>
+              <div className="grid-layout-options" role="group" aria-label="Forma de grilla">
+                {(["square", "hexagonal"] as const).map((layout) => (
+                  <button
+                    key={layout}
+                    type="button"
+                    className={scene.grid.layout === layout ? "is-active" : ""}
+                    aria-pressed={scene.grid.layout === layout}
+                    onClick={() => setScene((current) => current.grid.layout === layout ? current : ({
+                      ...current,
+                      grid: { ...current.grid, layout }
+                    }))}
+                  >
+                    {layout === "square" ? <Grid3X3 size={18} aria-hidden="true" /> : <Hexagon size={18} aria-hidden="true" />}
+                    {layout === "square" ? "Cuadrada" : "Hexagonal"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="grid-line-width-control">
               <span>Grosor de lineas</span>
               <div className="grid-line-width-options" role="group" aria-label="Grosor de lineas de grilla">
@@ -3996,6 +4031,8 @@ export function App(): JSX.Element {
               <select
                 aria-label="Modo de diagonal"
                 value={scene.settings.diagonalMode}
+                disabled={scene.grid.layout === "hexagonal"}
+                title={scene.grid.layout === "hexagonal" ? "En hexagonos se mide entre centros por celdas vecinas" : undefined}
                 onChange={(event) =>
                   handleDiagonalModeChange(event.currentTarget.value as SceneDocument["settings"]["diagonalMode"])
                 }
@@ -4498,7 +4535,7 @@ function mergeFireCells(existing: readonly FireCell[], incoming: readonly FireCe
   const cells = new Map<string, FireCell>();
 
   for (const cell of [...existing, ...incoming]) {
-    cells.set(`${cell.x}:${cell.y}:${cell.size}`, cell);
+    cells.set(getGridCellKey(cell), cell);
   }
 
   return [...cells.values()];

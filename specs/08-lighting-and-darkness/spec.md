@@ -1,5 +1,14 @@
 # Spec - Luces y Oscuridad
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- La luz del fuego pintado debe seguir la geometria persistida de cada celda: cuatro vecinos para cuadrados, seis para hexagonos (specs 04 y 10).
+- Relleno de luz y mascara que perfora oscuridad usan el mismo poligono, incluidos traslacion, pan y zoom. No usar bounding boxes cuadrados como mascara hexagonal.
+- Luces puntuales/conicas/dinamicas mantienen geometria continua, controles y movimiento libre; la grilla no cambia su forma. No alterar orden de capas ni permitir que las luces perforen niebla u oscuridad magica.
+
+
 Este documento describe de forma unificada la funcionalidad de luces y oscuridad, consolidando el alcance funcional vigente en el proyecto.
 
 ## Iluminacion, Oscuridad y Fuego Animado

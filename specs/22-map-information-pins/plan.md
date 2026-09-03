@@ -1,5 +1,29 @@
 # Plan - Pines y Areas de Informacion del Mapa
 
+## Borrado de areas - cierre 1.10.0
+
+- [x] Extraer `removeInformationArea(scene, id)` al dominio; preservar referencias de colecciones ajenas y rechazar ids inexistentes/areas bloqueadas.
+- [x] Unificar teclado y arbol en `handleDeleteInformationArea`; resolver seleccion actual por ref y capturar un ID estable antes de actualizar estado.
+- [x] Limpiar solo seleccion/modal pertenecientes al area eliminada, conservando otra seleccion activa.
+- [x] Propagar callback de borrado por DmAsidePanel a MapAnnotationsTree; papelera en terrenos/trampas y teclado por fila sin bubbling.
+- [x] Mantener restricciones de bloqueo y campos editables; separar titulo y acciones para legibilidad.
+- [x] Agregar regresiones de dominio y componente para ambas teclas, ambos tipos, borrado dirigido, bloqueo y buscador.
+- [x] Aceptacion del usuario el 2026-09-02 para commit y merge a main en 1.10.0.
+
+Verificar: crear area, seleccionar desde canvas y pulsar Backspace/Delete; crear otra y borrarla desde papelera sin seleccionarla; confirmar que un objeto seleccionado distinto permanece. Bloquear area y comprobar proteccion, desbloquear y borrar. Guardar/recargar debe mantener la ausencia del area.
+
+Validacion (2026-09-02): 350 tests en 49 archivos, typecheck, lint y build correctos. Smoke en navegador de Backspace desde canvas, papelera y bloquear/desbloquear realizado, sin errores de consola. Ambas teclas y borrado dirigido desde fila cubiertos en `MapAnnotationsTree.test.tsx`; aislamiento de colecciones y bloqueo en `map-annotations.test.ts`. Cierre autorizado para 1.10.0; sin afirmar ejecucion adicional de round trip nativo.
+
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Reutilizar GridCell en InformationAreaCell, rasterizar con GridGeometry y deduplicar por geometria/layout.
+- [x] Actualizar centro/bounds, renderer de area y seleccion con helpers compartidos, incluyendo aristas exteriores sin duplicados.
+- [x] Preservar/validar layout en schema, traslacion y highlight; pruebas en map-annotations.test.ts y scene-schema.test.ts.
+- [x] Verificar visualmente en navegador trazo y contorno hexagonal guardado.
+
+
 Este documento describe el plan tecnico para implementar pines privados de habitacion, areas informativas del DM, un indice navegable de anotaciones y highlights temporales en la ventana del jugador.
 
 ## 1. Resumen

@@ -1,5 +1,15 @@
 # Plan - Efectos de Fuego
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Tipar FireCell como GridCell, preservar layout en creacion/traslacion y deduplicar con clave estable.
+- [x] Reemplazar enumeracion cuadrada del pincel por getGridCellsInBrush y coronas por getGridCellRings.
+- [x] Actualizar mascaras, culling, seleccion y distribucion de anclas dentro del hexagono; no nuevos GIF/tickers.
+- [x] Probar conservacion de forma, seis/doce vecinos, hit testing, render y reutilizacion/liberacion de recursos.
+
+
 Estado: implementado y aceptado, controles actualizados en version 1.9.0.
 
 ## Arquitectura

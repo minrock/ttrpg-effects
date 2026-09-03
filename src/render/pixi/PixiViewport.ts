@@ -33,7 +33,8 @@ import {
   measurePathDistance,
   snapWorldPointToCellCenter
 } from "../../domain/measurement/measurement";
-import { getShapeAnchor, getShapeEndPoint } from "../../domain/shapes/shapes";
+import { getShapeAnchor, getShapeEndPoint, moveShape, rotateLinearShape } from "../../domain/shapes/shapes";
+import { snapTokenToGrid } from "../../domain/tokens/tokens";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
 import type { FireCell } from "../../domain/effects/fire";
 import {
@@ -64,6 +65,8 @@ import type { PlayerCameraControlViewState } from "../../domain/player/player-ca
 import { getAreaToolUiScale } from "./area-tool-screen-scale";
 import { getFireResizeTarget } from "./effect-control-geometry";
 import { getGridWindow, gridWindowCoversView, type GridWindow } from "../../domain/grid/grid-window";
+import { getHexGridSegments } from "../../domain/grid/hex-grid";
+import { getGridCellBoundary, getGridCellHeight, getGridCellKey, getGridCellRings, getGridCellVertices, getGridCellsInBrush, isPointInGridCell, type GridCell } from "../../domain/grid/grid-cell";
 import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-pattern-animation";
 import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
 
@@ -703,11 +706,17 @@ export class PixiViewport {
     const fireTileSizeChanged = this.grid?.cellSizeWorld !== grid.cellSizeWorld;
     this.grid = grid;
     this.drawGrid();
-    // Line width only affects drawGrid; identical geometry needs no new GPU masks.
+    // Grid layout changes measurement rules, but not stored cell geometry or masks.
     if (previous && previous.enabled === grid.enabled && previous.locked === grid.locked
       && previous.cellSizeWorld === grid.cellSizeWorld && previous.opacity === grid.opacity
       && previous.unit === grid.unit && previous.distancePerCell === grid.distancePerCell
-      && previous.metricDistancePerCell === grid.metricDistancePerCell) return;
+      && previous.metricDistancePerCell === grid.metricDistancePerCell) {
+      if (previous.layout !== grid.layout) {
+        this.drawShapesAndMeasurementsLayer();
+        this.drawSelectionLayer();
+      }
+      return;
+    }
     this.drawDarkvisionLayer();
     this.scheduleDarknessRedraw();
     this.scheduleFogOfWarRedraw();
@@ -889,9 +898,10 @@ export class PixiViewport {
     }
 
     const viewport = this.getViewportSize();
-    const next = getGridWindow(this.camera, viewport, this.grid.cellSizeWorld);
+    const layout = this.grid.layout ?? "square";
+    const next = getGridWindow(this.camera, viewport, this.grid.cellSizeWorld, layout);
     const lineWidth = this.grid.lineWidth ?? 1;
-    const style = `${this.grid.cellSizeWorld}:${this.grid.opacity}:${lineWidth}`;
+    const style = `${this.grid.cellSizeWorld}:${this.grid.opacity}:${lineWidth}:${layout}`;
     if (this.gridWindowCache?.style === style && this.gridWindowCache.window.step === next.step
       && layer.children.length > 0 && gridWindowCoversView(this.gridWindowCache.window, this.camera, viewport)) return;
     clearContainerChildren(layer);
@@ -900,21 +910,22 @@ export class PixiViewport {
     if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return;
     const grid = new Graphics();
     const cellSize = next.step;
-    const startX = Math.floor(bounds.left / cellSize) * cellSize;
-    const endX = Math.ceil(bounds.right / cellSize) * cellSize;
-    const startY = Math.floor(bounds.top / cellSize) * cellSize;
-    const endY = Math.ceil(bounds.bottom / cellSize) * cellSize;
+    if (layout === "hexagonal") {
+      for (const [x1, y1, x2, y2] of getHexGridSegments(bounds, cellSize)) {
+        grid.moveTo(x1, y1).lineTo(x2, y2);
+      }
+    } else {
+      const startX = Math.floor(bounds.left / cellSize) * cellSize;
+      const endX = Math.ceil(bounds.right / cellSize) * cellSize;
+      const startY = Math.floor(bounds.top / cellSize) * cellSize;
+      const endY = Math.ceil(bounds.bottom / cellSize) * cellSize;
 
-    for (let x = startX; x <= endX; x += cellSize) {
-      grid
-        .moveTo(x, bounds.top)
-        .lineTo(x, bounds.bottom);
-    }
-
-    for (let y = startY; y <= endY; y += cellSize) {
-      grid
-        .moveTo(bounds.left, y)
-        .lineTo(bounds.right, y);
+      for (let x = startX; x <= endX; x += cellSize) {
+        grid.moveTo(x, bounds.top).lineTo(x, bounds.bottom);
+      }
+      for (let y = startY; y <= endY; y += cellSize) {
+        grid.moveTo(bounds.left, y).lineTo(bounds.right, y);
+      }
     }
 
     grid.stroke({ color: 0xd9e5df, width: lineWidth, alpha: this.grid.opacity });
@@ -961,7 +972,7 @@ export class PixiViewport {
       (effect): effect is SceneFireEffect =>
         isVisibleLightEmittingFireEffect(effect) &&
         (effect.zone.kind === "cells"
-          ? effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, cell.size, viewportBounds))
+          ? effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, getGridCellHeight(cell), viewportBounds))
           : isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds))
     );
     const activeDynamicLights = this.getRenderableEffects().filter(
@@ -1518,7 +1529,7 @@ export class PixiViewport {
       this.informationAreaStrokePoints.push(worldPoint);
       const cells = rasterizeInformationAreaStroke(
         this.informationAreaStrokePoints,
-        this.grid?.cellSizeWorld ?? 100
+        this.grid ?? 100
       );
       this.informationAreaStrokePoints = [];
       this.drawSelectionLayer();
@@ -1606,6 +1617,16 @@ export class PixiViewport {
       return;
     }
 
+    if (this.grid?.layout === "hexagonal") {
+      const shape = this.shapes.find((candidate) => candidate.id === elementId);
+      const token = this.tokens.find((candidate) => candidate.id === elementId);
+      if (shape && (this.settings?.snapToGrid || shape.type === "measurement" || shape.type === "path")) {
+        targetPosition = getShapeAnchor(moveShape(shape, targetPosition, this.grid));
+      } else if (token) {
+        targetPosition = snapTokenToGrid(targetPosition, this.grid, token.footprintCells);
+      }
+    }
+
     const dx = targetPosition.x - startPosition.x;
     const dy = targetPosition.y - startPosition.y;
 
@@ -1682,12 +1703,7 @@ export class PixiViewport {
       return;
     }
 
-    const dx = x - firstPoint.x;
-    const dy = y - firstPoint.y;
-    this.previewShapes.set(elementId, {
-      ...shape,
-      points: shape.points.map((point) => ({ x: point.x + dx, y: point.y + dy }))
-    });
+    this.previewShapes.set(elementId, moveShape(shape, { x, y }, this.grid ?? undefined));
     this.drawShapePreviewLayers();
   }
 
@@ -1917,7 +1933,7 @@ export class PixiViewport {
       return worldPoint;
     }
 
-    return snapWorldPointToCellCenter(worldPoint, this.grid.cellSizeWorld);
+    return snapWorldPointToCellCenter(worldPoint, this.grid);
   }
 
   private drawInteractiveElements(): void {
@@ -2387,7 +2403,7 @@ export class PixiViewport {
     if (this.isInformationAreaMode && this.informationAreaStrokePoints.length > 0) {
       const cells = rasterizeInformationAreaStroke(
         this.informationAreaStrokePoints,
-        this.grid?.cellSizeWorld ?? 100
+        this.grid ?? 100
       );
       selectionLayer.addChild(drawInformationAreaCells(cells, "#fff0a8", 0.28, 2));
     }
@@ -2837,38 +2853,8 @@ export class PixiViewport {
     }
 
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
-    const cellSize = this.grid.cellSizeWorld;
     const radius = this.getFirePaintRadius();
-    const startColumn = Math.floor((worldPoint.x - radius) / cellSize);
-    const endColumn = Math.floor((worldPoint.x + radius) / cellSize);
-    const startRow = Math.floor((worldPoint.y - radius) / cellSize);
-    const endRow = Math.floor((worldPoint.y + radius) / cellSize);
-    const cells: FireCell[] = [];
-
-    for (let row = startRow; row <= endRow; row += 1) {
-      for (let column = startColumn; column <= endColumn; column += 1) {
-        const x = column * cellSize;
-        const y = row * cellSize;
-        const centerX = x + cellSize / 2;
-        const centerY = y + cellSize / 2;
-
-        if (Math.hypot(centerX - worldPoint.x, centerY - worldPoint.y) <= radius) {
-          cells.push({ x, y, size: cellSize });
-        }
-      }
-    }
-
-    if (cells.length === 0) {
-      const column = Math.floor(worldPoint.x / cellSize);
-      const row = Math.floor(worldPoint.y / cellSize);
-      cells.push({
-        x: column * cellSize,
-        y: row * cellSize,
-        size: cellSize
-      });
-    }
-
-    return cells;
+    return getGridCellsInBrush(worldPoint, radius, this.grid);
   }
 
   private getFirePaintRadius(): number {
@@ -2913,6 +2899,14 @@ export class PixiViewport {
           return element.id;
         }
         continue;
+      }
+
+      if (element.kind === "fire") {
+        const fire = this.effects.find((effect) => effect.id === element.id && effect.kind === "fire");
+        if (fire?.kind === "fire" && fire.zone.kind === "cells") {
+          if (fire.zone.cells.some((cell) => isPointInGridCell(worldPoint, cell))) return element.id;
+          continue;
+        }
       }
 
       const radius = element.hitRadius ?? getHitRadius(element.kind);
@@ -3244,7 +3238,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.grid?.layout === "hexagonal" ? this.snapScreenPointToCellCenter(screenPoint) : screenToWorld(screenPoint, this.camera, this.getViewportSize());
     this.previewShapes.set(elementId, { ...shape, points: [shape.points[0], worldPoint] });
     this.drawShapePreviewLayers();
   }
@@ -3274,7 +3268,7 @@ export class PixiViewport {
     const anchor = getShapeAnchor(shape);
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const direction = (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
-    this.previewShapes.set(elementId, { ...shape, direction });
+    this.previewShapes.set(elementId, { ...rotateLinearShape(shape, direction, this.grid ?? undefined), direction });
     this.drawShapePreviewLayers();
   }
 
@@ -3992,8 +3986,8 @@ const waterFilterCache = new Map<string, ColorMatrixFilter>();
 const fireCellRingCache = new Map<
   string,
   {
-    bright: Array<{ x: number; y: number; size: number }>;
-    dim: Array<{ x: number; y: number; size: number }>;
+    bright: GridCell[];
+    dim: GridCell[];
   }
 >();
 
@@ -4090,6 +4084,7 @@ function getShapeRenderSignature(shape: SceneShape, grid: SceneGrid, settings: S
     shape.direction ?? "",
     shape.angle ?? "",
     grid.cellSizeWorld,
+    grid.layout,
     grid.unit,
     grid.distancePerCell,
     grid.metricDistancePerCell,
@@ -4300,7 +4295,7 @@ function getMagicalDarknessSignature(effects: readonly SceneEffect[]): string {
 }
 
 function getFireCellPaintKey(cell: FireCell): string {
-  return `${cell.x}:${cell.y}:${cell.size}`;
+  return getGridCellKey(cell);
 }
 
 function getTokenLayerSignature(
@@ -4438,13 +4433,14 @@ function isRectNearViewport(
   );
 }
 
-function hashCells(cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]): number {
+function hashCells(cells: readonly GridCell[]): number {
   let hash = 2166136261;
 
   for (const cell of cells) {
     hash = hashNumber(hash, cell.x);
     hash = hashNumber(hash, cell.y);
     hash = hashNumber(hash, cell.size);
+    hash = hashNumber(hash, cell.layout === "hexagonal" ? 1 : 0);
   }
 
   return hash >>> 0;
@@ -5122,8 +5118,7 @@ function buildFireLightEraseGraphicScreen(
 
     for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
       const sc = worldToScreen(cell.x, cell.y, camera, viewport);
-      graphic
-        .rect(sc.x, sc.y, cell.size * zoom, cell.size * zoom)
+      drawGridCell(graphic, { ...cell, x: sc.x, y: sc.y, size: cell.size * zoom })
         .fill({ color: 0xffffff, alpha: 1 });
     }
 
@@ -5232,8 +5227,7 @@ function buildDarkvisionColorMask(
       const { bright, dim } = computeCellRings(effect.zone.cells);
 
       for (const cell of [...effect.zone.cells, ...bright, ...dim]) {
-        graphic
-          .rect(cell.x, cell.y, cell.size, cell.size)
+        drawGridCell(graphic, cell)
           .fill({ color: 0xffffff, alpha: 1 });
       }
     } else {
@@ -5656,14 +5650,12 @@ function drawFireLight(effect: SceneFireEffect): Graphics {
     const { bright, dim } = computeCellRings(effect.zone.cells);
 
     for (const cell of dim) {
-      graphic
-        .rect(cell.x, cell.y, cell.size, cell.size)
+      drawGridCell(graphic, cell)
         .fill({ color: 0xffa54f, alpha: 0.08 * effect.opacity });
     }
 
     for (const cell of [...effect.zone.cells, ...bright]) {
-      graphic
-        .rect(cell.x, cell.y, cell.size, cell.size)
+      drawGridCell(graphic, cell)
         .fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
     }
 
@@ -5779,10 +5771,10 @@ function createDynamicLightRenderState(
 }
 
 function computeCellRings(
-  cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]
+  cells: readonly GridCell[]
 ): {
-  bright: Array<{ x: number; y: number; size: number }>;
-  dim: Array<{ x: number; y: number; size: number }>;
+  bright: GridCell[];
+  dim: GridCell[];
 } {
   if (cells.length === 0) return { bright: [], dim: [] };
   const cacheKey = `${cells.length}:${hashCells(cells)}`;
@@ -5792,47 +5784,7 @@ function computeCellRings(
     return cached;
   }
 
-  const cellSize = cells[0].size;
-  const origin = getFireCellGridOrigin(cells);
-  const cellsByIndex = new Map(cells.map((cell) => [getFireCellIndexKey(cell, origin), cell] as const));
-  const fireSet = new Set(cellsByIndex.keys());
-  const brightSet = new Map<string, { x: number; y: number; size: number }>();
-
-  for (const cell of cells) {
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      const neighbor = getFireCellIndex(cell, origin);
-      const key = `${neighbor.x + dx}:${neighbor.y + dy}`;
-      if (!fireSet.has(key)) {
-        brightSet.set(key, {
-          x: cell.x + dx * cellSize,
-          y: cell.y + dy * cellSize,
-          size: cellSize
-        });
-      }
-    }
-  }
-
-  const dimSet = new Map<string, { x: number; y: number; size: number }>();
-
-  for (const brightCell of brightSet.values()) {
-    const brightIndex = getFireCellIndex(brightCell, origin);
-
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-      const key = `${brightIndex.x + dx}:${brightIndex.y + dy}`;
-      if (!fireSet.has(key) && !brightSet.has(key)) {
-        dimSet.set(key, {
-          x: brightCell.x + dx * cellSize,
-          y: brightCell.y + dy * cellSize,
-          size: cellSize
-        });
-      }
-    }
-  }
-
-  const result = {
-    bright: [...brightSet.values()],
-    dim: [...dimSet.values()]
-  };
+  const result = getGridCellRings(cells);
 
   if (fireCellRingCache.size > 200) {
     fireCellRingCache.clear();
@@ -5890,32 +5842,9 @@ function addFirePattern(
   container.addChild(pattern);
 }
 
-function getFireCellGridOrigin(cells: readonly { readonly x: number; readonly y: number; readonly size: number }[]): {
-  readonly x: number;
-  readonly y: number;
-} {
-  return {
-    x: Math.min(...cells.map((cell) => cell.x)),
-    y: Math.min(...cells.map((cell) => cell.y))
-  };
-}
-
-function getFireCellIndex(
-  cell: { readonly x: number; readonly y: number; readonly size: number },
-  origin: { readonly x: number; readonly y: number }
-): { readonly x: number; readonly y: number } {
-  return {
-    x: Math.round((cell.x - origin.x) / cell.size),
-    y: Math.round((cell.y - origin.y) / cell.size)
-  };
-}
-
-function getFireCellIndexKey(
-  cell: { readonly x: number; readonly y: number; readonly size: number },
-  origin: { readonly x: number; readonly y: number }
-): string {
-  const index = getFireCellIndex(cell, origin);
-  return `${index.x}:${index.y}`;
+function drawGridCell(graphic: Graphics, cell: GridCell): Graphics {
+  if (cell.layout !== "hexagonal") return graphic.rect(cell.x, cell.y, cell.size, cell.size);
+  return graphic.poly(getGridCellVertices(cell).flatMap((point) => [point.x, point.y]), true);
 }
 
 function drawFireZoneMask(effect: SceneFireEffect): Graphics {
@@ -5937,7 +5866,7 @@ function drawFireZoneMask(effect: SceneFireEffect): Graphics {
   }
 
   for (const cell of effect.zone.cells) {
-    mask.rect(cell.x, cell.y, cell.size, cell.size).fill({ color: 0xffffff, alpha: 1 });
+    drawGridCell(mask, cell).fill({ color: 0xffffff, alpha: 1 });
   }
 
   return mask;
@@ -6049,27 +5978,11 @@ function drawInformationAreaCells(
   const fill = new Graphics();
   const outline = new Graphics();
   const parsedColor = parseHexColor(color);
-  const keys = new Set(cells.map((cell) => `${cell.x}:${cell.y}:${cell.size}`));
-
   for (const cell of cells) {
-    fill.rect(cell.x, cell.y, cell.size, cell.size).fill({ color: parsedColor, alpha: fillAlpha });
-    const left = cell.x;
-    const right = cell.x + cell.size;
-    const top = cell.y;
-    const bottom = cell.y + cell.size;
-
-    if (!keys.has(`${cell.x}:${cell.y - cell.size}:${cell.size}`)) {
-      outline.moveTo(left, top).lineTo(right, top);
-    }
-    if (!keys.has(`${cell.x + cell.size}:${cell.y}:${cell.size}`)) {
-      outline.moveTo(right, top).lineTo(right, bottom);
-    }
-    if (!keys.has(`${cell.x}:${cell.y + cell.size}:${cell.size}`)) {
-      outline.moveTo(right, bottom).lineTo(left, bottom);
-    }
-    if (!keys.has(`${cell.x - cell.size}:${cell.y}:${cell.size}`)) {
-      outline.moveTo(left, bottom).lineTo(left, top);
-    }
+    drawGridCell(fill, cell).fill({ color: parsedColor, alpha: fillAlpha });
+  }
+  for (const [from, to] of getGridCellBoundary(cells)) {
+    outline.moveTo(from.x, from.y).lineTo(to.x, to.y);
   }
 
   if (strokeWidth > 0 && cells.length > 0) {
@@ -6605,13 +6518,7 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
 }
 
 function hitTestInformationArea(cells: readonly InformationAreaCell[], point: WorldPoint): boolean {
-  return cells.some(
-    (cell) =>
-      point.x >= cell.x &&
-      point.x <= cell.x + cell.size &&
-      point.y >= cell.y &&
-      point.y <= cell.y + cell.size
-  );
+  return cells.some((cell) => isPointInGridCell(point, cell));
 }
 
 function getLabelHitRadius(label: SceneLabel): number {

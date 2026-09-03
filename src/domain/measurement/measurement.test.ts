@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { getGridCellAtPoint, getGridCellCenter, getGridCellNeighbors } from "../grid/grid-cell";
+import { createDefaultScene } from "../sessions/default-scene";
 import {
   formatDistance,
   measureCells,
@@ -146,5 +148,22 @@ describe("measurement", () => {
       expect(measureCellsAlternating(2, 3, 0)).toEqual({ cells: 4, diagonals: 2 });
       expect(measureCellsAlternating(2, 3, 2)).toEqual({ cells: 4, diagonals: 2 });
     });
+  });
+});
+describe("hex measurements", () => {
+  const hexGrid = { ...createDefaultScene().grid, layout: "hexagonal" as const };
+  const cell = getGridCellAtPoint({ x: 0, y: 0 }, hexGrid);
+  it("uses centers and six-neighbor steps instead of square diagonal rules", () => {
+    for (const diagonalMode of ["dnd5e-default", "dnd5e-alternating", "manhattan", "euclidean"] as const) {
+      for (const neighbor of getGridCellNeighbors(cell)) {
+        expect(measureDistance({ x: 8, y: 2 }, getGridCellCenter(neighbor), { grid: hexGrid, diagonalMode })).toMatchObject({ cells: 1, label: "5 ft" });
+      }
+      expect(measureDistance({ x: -10, y: 10 }, { x: 20, y: -10 }, { grid: hexGrid, diagonalMode }).cells).toBe(0);
+    }
+  });
+  it("sums center-to-center segments in both units without alternating penalties", () => {
+    const points = [{ x: 0, y: 0 }, { x: 50, y: Math.sqrt(3) * 50 }, { x: 100, y: Math.sqrt(3) * 100 }];
+    expect(measurePathDistance(points, { grid: hexGrid, diagonalMode: "dnd5e-alternating" }).label).toBe("10 ft");
+    expect(measurePathDistance(points, { grid: { ...hexGrid, unit: "m" }, diagonalMode: "manhattan" }).label).toBe("3 m");
   });
 });

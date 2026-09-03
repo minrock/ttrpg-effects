@@ -1,7 +1,8 @@
-import type { SceneGrid, SceneShape, SceneSettings } from "../sessions/scene-document";
+import type { SceneShape, SceneSettings } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import { snapWorldPoint, snapWorldPointToCellCenter } from "../measurement/measurement";
 import { getSelectedShapeEmojis, serializeShapeEmojis } from "./shape-emojis";
+import { resolveGridGeometry, type GridGeometry, type GridGeometryInput } from "../grid/grid-cell";
 
 export type TacticalShapeKind = "measurement" | "circle" | "cone" | "rectangle" | "path";
 
@@ -9,7 +10,7 @@ export interface CreateShapeOptions {
   readonly id: string;
   readonly kind: TacticalShapeKind;
   readonly position: WorldPoint;
-  readonly grid: Pick<SceneGrid, "cellSizeWorld">;
+  readonly grid: GridGeometry;
   readonly settings: Pick<SceneSettings, "snapToGrid">;
 }
 
@@ -30,9 +31,10 @@ export function createTacticalShape({
   settings
 }: CreateShapeOptions): SceneShape {
   assertId(id);
-  const origin =
-    settings.snapToGrid && kind !== "measurement"
-      ? snapWorldPoint(position, grid.cellSizeWorld)
+  const origin = kind === "measurement" && grid.layout === "hexagonal"
+    ? snapWorldPointToCellCenter(position, grid)
+    : settings.snapToGrid && kind !== "measurement"
+      ? snapWorldPoint(position, grid)
       : position;
   assertFinitePoint(origin);
 
@@ -64,7 +66,7 @@ export function createTacticalShape({
       const height = grid.cellSizeWorld * 2;
       let anchor: WorldPoint;
       if (settings.snapToGrid) {
-        const topLeft = snapWorldPoint(position, grid.cellSizeWorld);
+        const topLeft = snapWorldPoint(position, grid);
         anchor = { x: topLeft.x + width / 2, y: topLeft.y + height / 2 };
       } else {
         anchor = position;
@@ -74,7 +76,7 @@ export function createTacticalShape({
     case "path":
       return createPathShape({
         id,
-        points: [snapWorldPointToCellCenter(position, grid.cellSizeWorld)]
+        points: [snapWorldPointToCellCenter(position, grid)]
       });
   }
 }
@@ -91,8 +93,9 @@ export function createPathShape({ id, points }: CreatePathShapeOptions): SceneSh
   return shape;
 }
 
-export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: number): SceneShape {
-  const shouldSnap = snapCellSize !== undefined && shape.type !== "measurement";
+export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: GridGeometryInput): SceneShape {
+  const hexagonal = snapCellSize !== undefined && resolveGridGeometry(snapCellSize).layout === "hexagonal";
+  const shouldSnap = snapCellSize !== undefined && (shape.type !== "measurement" || hexagonal);
   let nextAnchor: WorldPoint;
 
   if (shouldSnap && shape.type === "rectangle" && shape.width !== undefined && shape.height !== undefined) {
@@ -100,7 +103,7 @@ export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?
     const halfH = shape.height / 2;
     const snappedCorner = snapWorldPoint({ x: position.x - halfW, y: position.y - halfH }, snapCellSize!);
     nextAnchor = { x: snappedCorner.x + halfW, y: snappedCorner.y + halfH };
-  } else if (shouldSnap && shape.type === "path") {
+  } else if (shouldSnap && (shape.type === "path" || shape.type === "measurement")) {
     nextAnchor = snapWorldPointToCellCenter(position, snapCellSize);
   } else {
     nextAnchor = shouldSnap ? snapWorldPoint(position, snapCellSize) : position;
@@ -118,7 +121,7 @@ export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?
   };
 }
 
-export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint): SceneShape {
+export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint, grid?: GridGeometry): SceneShape {
   if (shape.type !== "measurement") {
     return shape;
   }
@@ -126,7 +129,9 @@ export function setLinearShapeEnd(shape: SceneShape, endPoint: WorldPoint): Scen
   assertFinitePoint(endPoint);
 
   return updateShape(shape, {
-    points: [getShapeAnchor(shape), endPoint]
+    points: grid?.layout === "hexagonal"
+      ? [snapWorldPointToCellCenter(getShapeAnchor(shape), grid), snapWorldPointToCellCenter(endPoint, grid)]
+      : [getShapeAnchor(shape), endPoint]
   });
 }
 
@@ -134,7 +139,7 @@ export function movePathPoint(
   shape: SceneShape,
   pointIndex: number,
   nextPoint: WorldPoint,
-  cellSizeWorld?: number
+  cellSizeWorld?: GridGeometryInput
 ): SceneShape {
   if (shape.type !== "path") {
     return shape;
@@ -158,7 +163,7 @@ export function movePathPoint(
   return updateShape(shape, { points });
 }
 
-export function rotateLinearShape(shape: SceneShape, direction: number): SceneShape {
+export function rotateLinearShape(shape: SceneShape, direction: number, grid?: GridGeometry): SceneShape {
   if (shape.type !== "measurement") {
     return shape;
   }
@@ -176,7 +181,7 @@ export function rotateLinearShape(shape: SceneShape, direction: number): SceneSh
   return setLinearShapeEnd(shape, {
     x: anchor.x + Math.cos(radians) * length,
     y: anchor.y + Math.sin(radians) * length
-  });
+  }, grid);
 }
 
 export function updateShape(shape: SceneShape, patch: ShapePatch): SceneShape {

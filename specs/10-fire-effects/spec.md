@@ -1,5 +1,16 @@
 # Spec - Efectos de Fuego
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Pintar fuego con grid.layout hexagonal agrega hexagonos completos; la variante cuadrada sigue disponible. Si ningun centro entra en el pincel, incluir la celda bajo el cursor.
+- Guardar layout por celda junto a x/y/size; ausente significa cuadrada. Mover o recargar conserva la forma, incluso al cambiar la grilla global.
+- Luz brillante en celdas pintadas y primera corona de vecinos (cuatro en cuadrada, seis en hexagonal); tenue en segunda corona, sin repetir celdas del fuego o de la primera corona.
+- Rellenos, mascaras de iluminacion/darkvision y seleccion usan los seis vertices. El area seleccionable no incluye las esquinas vacias del bounding box.
+- No recortar llamas decorativas: siguen completas, aleatorias y con el atlas/presupuestos existentes. Solo brillo de suelo y area fisica siguen el poligono. No agregar marcos naranjas.
+
+
 Estado: implementado y aceptado, controles actualizados en version 1.9.0.
 
 ## Objetivo
@@ -30,7 +41,7 @@ Representar fuego circular, anillos y celdas pintadas mediante llamas animadas c
 
 ## Iluminacion y persistencia
 
-- El fuego y las celdas cardinalmente adyacentes reciben luz brillante; la siguiente corona recibe luz tenue, excluyendo fuego y luz brillante de otros fuegos.
+- El fuego y las celdas vecinas por lado (cuatro en cuadrada, seis en hexagonal) reciben luz brillante; la siguiente corona recibe luz tenue, excluyendo fuego y luz brillante de otros fuegos.
 - La luz revela oscuridad normal y recupera color en darkvision. No perfora niebla ni oscuridad magica.
 - Conservar el orden de capas canonico; los efectos permanecen debajo de niebla y herramientas de area.
 - Guardar id, kind fire, posicion mundial, zona circle/cells, celdas y radio de pincel, escala, opacidad, color, visibilidad, emision y radio de luz.

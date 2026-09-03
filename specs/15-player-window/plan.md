@@ -1,5 +1,14 @@
 # Plan - Ventana de Jugador
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- [x] Cubrir grid.layout en player-window.test.ts y conservar default square mediante schema compartido.
+- [x] Propagar layout de celdas en serializacion y validar el evento de highlight; render comun de hexagonos.
+- [x] Mantener protocolo de assets y cache/invalidador de Pixi por viewport sin nuevas cargas al alternar grilla.
+
+
 Este documento describe de forma unificada el plan tecnico para implementar y mantener ventana de jugador, consolidando los pasos y criterios vigentes en el proyecto.
 
 ## Ventana de jugador

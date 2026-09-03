@@ -2107,7 +2107,18 @@ body {
   gap: 1px;
 }
 
+.annotation-tree__leaf.is-area {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.annotation-tree__leaf.is-area .annotation-tree__actions {
+  justify-content: flex-end;
+}
+
 .annotation-tree__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 23px;
   min-width: 23px;
   min-height: 23px;
@@ -4791,17 +4802,20 @@ body {
   outline-offset: -1px;
 }
 
+.grid-layout-control,
 .grid-line-width-control {
   display: grid;
   gap: 6px;
 }
 
+.grid-layout-options,
 .grid-line-width-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
 }
 
+.grid-layout-options button,
 .grid-line-width-options button {
   display: flex;
   align-items: center;
@@ -4813,15 +4827,18 @@ body {
   border-radius: 4px;
 }
 
+.grid-layout-options svg,
 .grid-line-width-options svg {
   flex-shrink: 0;
 }
 
+.grid-layout-options button:focus-visible,
 .grid-line-width-options button:focus-visible {
   outline: 2px solid var(--editor-accent);
   outline-offset: 1px;
 }
 
+.grid-layout-options button.is-active:hover:not(:disabled),
 .grid-line-width-options button.is-active:hover:not(:disabled) {
   border-color: var(--editor-accent);
   color: var(--editor-accent);

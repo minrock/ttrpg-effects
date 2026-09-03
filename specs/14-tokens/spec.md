@@ -1,5 +1,14 @@
 # Spec - Tokens y Minis Virtuales
 
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- En hexagonal, snap del ancla/posicion del token al vertice superior izquierdo real del hexagono bajo el cursor, conforme a la regla solicitada en spec 04. Preview y confirmacion deben coincidir.
+- No alterar imagen circular ni radio de seleccion; tamanos 1/2/3/4 siguen siendo multiplos de cellSizeWorld (ancho entre lados opuestos en hexagonal), no un nuevo sistema de empaquetado de minis por hexagonos.
+- En cuadrada se conserva centrado sobre el bloque 1x1/2x2/3x3/4x4. Cambiar layout no mueve tokens existentes. Protocolo de imagen, visibilidad y propiedades siguen iguales.
+
+
 Este documento describe de forma unificada la funcionalidad de tokens y minis virtuales, consolidando el alcance funcional vigente en el proyecto.
 
 ## Minis Virtuales y Marcadores Futuros

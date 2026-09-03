@@ -1,5 +1,6 @@
 import type { FireCell } from "../../domain/effects/fire";
 import type { SceneFireEffect } from "../../domain/sessions/scene-document";
+import { getGridCellCenter } from "../../domain/grid/grid-cell";
 
 export const MAX_FIRE_FLAMES_PER_EFFECT = 256;
 export const MAX_FIRE_FLAMES_PER_VIEWPORT = 2048;
@@ -64,7 +65,14 @@ export function createFireFlameLayout(
       for (let index = 0; index < count; index++) {
         const cell = cells[Math.min(cells.length - 1, Math.floor((index + random()) * cells.length / count))]!;
         // Keep anchors in painted cells, but allow the complete flame to overhang.
-        add(cell.x + cell.size * (0.15 + random() * 0.7), cell.y + cell.size * (0.15 + random() * 0.7), width);
+        if (cell.layout === "hexagonal") {
+          const center = getGridCellCenter(cell);
+          const angle = random() * Math.PI * 2;
+          const radius = Math.sqrt(random()) * cell.size * 0.45;
+          add(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius, width);
+        } else {
+          add(cell.x + cell.size * (0.15 + random() * 0.7), cell.y + cell.size * (0.15 + random() * 0.7), width);
+        }
       }
     }
   }

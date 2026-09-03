@@ -1,5 +1,19 @@
 # Spec - Sidebar y Propiedades
 
+## Borrado en arbol de anotaciones
+
+Las filas de terrenos/trampas incluyen una papelera con tooltip y accion por ID, independiente de la seleccion del mapa. Backspace/Delete con foco en la fila usa esa misma accion sin propagacion al canvas. Areas bloqueadas conservan proteccion y tooltip para desbloquear; buscadores y editores conservan su borrado de texto. Titulo y acciones van en dos lineas para mantener legibilidad. Contrato y pruebas en spec/plan 22; aceptado para cierre 1.10.0 el 2026-09-02.
+
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- Agregar selector segmentado con iconos Lucide y opciones Cuadrada/Hexagonal dentro de Grilla, junto a opacidad y grosor; disponible sin activar Ajustar grilla.
+- Mantener sidebar, acordeones, controles de calibracion y grilla siempre extendida.
+- En Figuras, deshabilitar Diagonal en modo hexagonal con tooltip que indique medicion entre centros vecinos. Conservar la regla elegida al regresar a cuadrada.
+- Cambiar topologia actualiza el estado compartido, no la escala de imagen ni la camara.
+
+
 Este documento describe de forma unificada la funcionalidad de sidebar y propiedades, consolidando el alcance funcional vigente en el proyecto.
 
 ## Menú Lateral Derecho de Controles
