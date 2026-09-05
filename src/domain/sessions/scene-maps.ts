@@ -2,6 +2,12 @@ import type { MapAnnotations } from "../annotations/map-annotations";
 import { createDefaultMapAnnotations } from "../annotations/map-annotations";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
 import { DEFAULT_COMPASS_ORIENTATION, type CompassOrientation } from "../map/compass-orientation";
+import {
+  DEFAULT_MAP_BACKGROUND_COLOR,
+  isMapBackgroundColor,
+  normalizeMapBackgroundColor,
+  type MapBackgroundColor
+} from "../map/map-background";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { createDefaultSceneAside } from "./scene-aside";
 import {
@@ -83,13 +89,14 @@ export function createDefaultMapPayload(): ActiveMapPayload {
 }
 
 export function createDefaultSceneMap(
-  input: Partial<Pick<SceneMapDocument, "id" | "name" | "compassOrientation">> & Partial<ActiveMapPayload> = {}
+  input: Partial<Pick<SceneMapDocument, "id" | "name" | "compassOrientation" | "backgroundColor">> & Partial<ActiveMapPayload> = {}
 ): SceneMapDocument {
   const payload = { ...createDefaultMapPayload(), ...input };
   return {
     id: input.id ?? "map-1",
     name: input.name ?? "Mapa 1",
     compassOrientation: input.compassOrientation ?? DEFAULT_COMPASS_ORIENTATION,
+    backgroundColor: input.backgroundColor ?? DEFAULT_MAP_BACKGROUND_COLOR,
     map: payload.map,
     camera: payload.camera,
     grid: payload.grid,
@@ -114,6 +121,7 @@ export function createEmptyScene(): SceneDocument {
     id: "",
     name: "",
     compassOrientation: DEFAULT_COMPASS_ORIENTATION,
+    backgroundColor: DEFAULT_MAP_BACKGROUND_COLOR,
     sceneAside: createDefaultSceneAside(),
     combatTracker: createDefaultCombatTracker(),
     ...payload
@@ -133,6 +141,7 @@ export function createSceneMapFromLegacyScene(scene: SceneDocumentV1, id = "map-
     id,
     name,
     compassOrientation: DEFAULT_COMPASS_ORIENTATION,
+    backgroundColor: DEFAULT_MAP_BACKGROUND_COLOR,
     map: scene.map,
     camera: scene.camera,
     grid: scene.grid,
@@ -160,6 +169,25 @@ export function setActiveMapCompassOrientation(
       map.id === synced.activeMapId ? { ...map, compassOrientation: orientation } : map
     ),
     compassOrientation: orientation
+  });
+}
+
+export function setActiveMapBackgroundColor(
+  scene: SceneDocument,
+  backgroundColor: MapBackgroundColor
+): SceneDocument {
+  if (scene.activeMapId === null) return scene;
+  if (!isMapBackgroundColor(backgroundColor)) {
+    throw new Error("Color de fondo de mapa invalido.");
+  }
+  const normalized = normalizeMapBackgroundColor(backgroundColor);
+  const synced = syncActiveMapFromRuntimeFields(scene);
+  return syncRuntimeFieldsFromActiveMap({
+    ...synced,
+    maps: synced.maps.map((map) =>
+      map.id === synced.activeMapId ? { ...map, backgroundColor: normalized } : map
+    ),
+    backgroundColor: normalized
   });
 }
 
@@ -196,6 +224,7 @@ export function syncActiveMapFromRuntimeFields(scene: SceneDocument): SceneDocum
   const synced: SceneMapDocument = {
     ...active,
     compassOrientation: scene.compassOrientation,
+    backgroundColor: scene.backgroundColor,
     map: scene.map,
     camera: scene.camera,
     grid: scene.grid,
@@ -300,6 +329,7 @@ export function hasSceneMapContent(map: SceneMapDocument): boolean {
     map.mapAnnotations.pins.length > 0 ||
     map.mapAnnotations.areas.length > 0 ||
     map.mapAnnotations.sceneLinks.length > 0 ||
+    map.backgroundColor !== defaults.backgroundColor ||
     map.fogOfWar.revealedAreas.length > 0 ||
     map.fogOfWar.obstacles.length > 0 ||
     JSON.stringify(map.grid) !== JSON.stringify(defaults.grid) ||

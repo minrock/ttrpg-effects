@@ -10,6 +10,7 @@ import { createDefaultFogOfWar } from "../vision/vision";
 import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
 import { DEFAULT_COMPASS_ORIENTATION, compassOrientations } from "../map/compass-orientation";
+import { DEFAULT_MAP_BACKGROUND_COLOR } from "../map/map-background";
 import { sanitizeMapScale } from "../map/map-image";
 import { migrateSceneDocument, syncActiveMapFromRuntimeFields, syncRuntimeFieldsFromActiveMap } from "./scene-maps";
 
@@ -17,6 +18,7 @@ const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
 const opacity = finiteNumber.min(0).max(1);
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Expected hex color like #000000");
+const normalizedHexColor = hexColor.transform((color) => color.toLocaleLowerCase());
 
 const worldPointSchema = z.object({
   x: finiteNumber,
@@ -464,6 +466,7 @@ const sceneMapDocumentSchema = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1).max(120),
   compassOrientation: compassOrientationSchema.default(DEFAULT_COMPASS_ORIENTATION),
+  backgroundColor: normalizedHexColor.default(DEFAULT_MAP_BACKGROUND_COLOR),
   map: sceneDocumentV1Schema.shape.map,
   camera: sceneDocumentV1Schema.shape.camera,
   grid: sceneDocumentV1Schema.shape.grid,
@@ -485,6 +488,7 @@ export const sceneDocumentV2Schema = z.object({
   id: z.string().default(""),
   name: z.string().default(""),
   compassOrientation: compassOrientationSchema.default(DEFAULT_COMPASS_ORIENTATION).optional(),
+  backgroundColor: normalizedHexColor.default(DEFAULT_MAP_BACKGROUND_COLOR).optional(),
   sceneAside: sceneDocumentV1Schema.shape.sceneAside,
   combatTracker: sceneDocumentV1Schema.shape.combatTracker,
   map: sceneDocumentV1Schema.shape.map.optional(),
@@ -525,6 +529,7 @@ export const sceneDocumentV2Schema = z.object({
     id: active?.id ?? scene.id,
     name: active?.name ?? scene.name,
     compassOrientation: active?.compassOrientation ?? scene.compassOrientation ?? DEFAULT_COMPASS_ORIENTATION,
+    backgroundColor: active?.backgroundColor ?? scene.backgroundColor ?? DEFAULT_MAP_BACKGROUND_COLOR,
     sceneAside: scene.sceneAside,
     combatTracker: scene.combatTracker,
     ...(hasRuntimeFields ? {
@@ -650,7 +655,7 @@ export function serializeSceneDocument(scene: SceneDocument): string {
   if (syncedScene.maps.length === 0) {
     throw new Error("Agrega al menos un mapa antes de guardar la escena.");
   }
-  const { map, camera, grid, darkness, fogOfWar, settings, lights, effects, shapes, tokens, labels, mapAnnotations, compassOrientation, ...persistedScene } = syncedScene;
+  const { map, camera, grid, darkness, fogOfWar, settings, lights, effects, shapes, tokens, labels, mapAnnotations, compassOrientation, backgroundColor, ...persistedScene } = syncedScene;
   void map;
   void camera;
   void grid;
@@ -664,5 +669,6 @@ export function serializeSceneDocument(scene: SceneDocument): string {
   void labels;
   void mapAnnotations;
   void compassOrientation;
+  void backgroundColor;
   return `${JSON.stringify(persistedScene, null, 2)}\n`;
 }

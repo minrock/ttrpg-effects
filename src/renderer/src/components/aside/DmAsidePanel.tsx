@@ -12,6 +12,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
+import { DEFAULT_MAP_BACKGROUND_COLOR } from "../../../../domain/map/map-background";
 import type { SceneMapDocument } from "../../../../domain/sessions/scene-document";
 import type { SceneAside, SceneMonster, SceneNpc, SceneNote, ScenePlayerCharacter } from "../../../../domain/sessions/scene-aside";
 import {
@@ -43,6 +44,8 @@ interface DmAsidePanelProps {
   readonly objects: readonly SceneObjectEntry[];
   readonly maps: readonly SceneMapDocument[];
   readonly activeMapId: string | null;
+  readonly backgroundColor: string;
+  readonly onBackgroundColorChange: (color: string) => void;
   readonly onSelectMap: (mapId: string) => void;
   readonly onRenameMap: (mapId: string, name: string) => void;
   readonly onReorderMaps: (mapIds: readonly string[]) => void;
@@ -74,6 +77,8 @@ export function DmAsidePanel({
   objects,
   maps,
   activeMapId,
+  backgroundColor,
+  onBackgroundColorChange,
   onSelectMap,
   onRenameMap,
   onReorderMaps,
@@ -240,6 +245,38 @@ export function DmAsidePanel({
           </>
         ) : (
           <>
+            <section className="map-settings-panel" aria-label="Ajustes de mapa">
+              <div className="map-settings-panel__header">
+                <Map aria-hidden="true" />
+                <span>Mapa</span>
+              </div>
+              <label className="map-background-control">
+                <span>Fondo</span>
+                <span className="map-background-picker">
+                  <span
+                    className="map-background-picker__swatch"
+                    style={{ backgroundColor }}
+                    aria-hidden="true"
+                  />
+                  <span className="map-background-picker__value">{backgroundColor}</span>
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    disabled={activeMapId === null}
+                    onChange={(event) => onBackgroundColorChange(event.currentTarget.value)}
+                    aria-label="Color de fondo infinito"
+                  />
+                </span>
+              </label>
+              <button
+                type="button"
+                className="map-background-reset"
+                disabled={activeMapId === null || backgroundColor === DEFAULT_MAP_BACKGROUND_COLOR}
+                onClick={() => onBackgroundColorChange(DEFAULT_MAP_BACKGROUND_COLOR)}
+              >
+                Reset
+              </button>
+            </section>
             <AccordionSection title="Objetos" icon={Diamond} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={objects.length} onToggle={toggleSection}>
               <SceneObjectsTree objects={objects} selectedElementId={selectedElementId} onSelect={onSelectObject} onLocate={onLocateObject} onDelete={onDeleteObject} />
             </AccordionSection>

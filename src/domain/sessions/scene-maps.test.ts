@@ -7,6 +7,7 @@ import {
   createEmptyScene,
   hasSceneMapContent,
   removeSceneMap,
+  setActiveMapBackgroundColor,
   setActiveMapCompassOrientation,
   setActiveSceneMap,
   syncActiveMapFromRuntimeFields
@@ -68,5 +69,17 @@ describe("scene map document helpers", () => {
     expect(orientedSecond.maps.find((map) => map.id === "map-1")?.compassOrientation).toBe(90);
     expect(orientedSecond.maps.find((map) => map.id === "map-2")?.compassOrientation).toBe(180);
     expect(setActiveSceneMap(orientedSecond, "map-1").compassOrientation).toBe(90);
+  });
+
+  it("stores background color per active map", () => {
+    const first = createDefaultSceneMap({ id: "map-1", name: "Entrada" });
+    const second = createDefaultSceneMap({ id: "map-2", name: "Cripta" });
+    const scene = setActiveSceneMap(addSceneMap(addSceneMap(createEmptyScene(), first), second), "map-1");
+    const coloredFirst = setActiveMapBackgroundColor(scene, "#224466");
+    const coloredSecond = setActiveMapBackgroundColor(setActiveSceneMap(coloredFirst, "map-2"), "#662244");
+
+    expect(coloredSecond.maps.find((map) => map.id === "map-1")?.backgroundColor).toBe("#224466");
+    expect(coloredSecond.maps.find((map) => map.id === "map-2")?.backgroundColor).toBe("#662244");
+    expect(setActiveSceneMap(coloredSecond, "map-1").backgroundColor).toBe("#224466");
   });
 });

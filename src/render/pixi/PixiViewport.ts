@@ -14,6 +14,7 @@ import type { TacticalElement } from "../../domain/tools/tactical-elements";
 import type { MapImageState } from "../../domain/map/map-image";
 import type { CompassOrientation } from "../../domain/map/compass-orientation";
 import { DEFAULT_COMPASS_ORIENTATION, getPlayerViewRotationDegrees } from "../../domain/map/compass-orientation";
+import { DEFAULT_MAP_BACKGROUND_COLOR, type MapBackgroundColor } from "../../domain/map/map-background";
 import type {
   SceneDarkness,
   SceneDynamicLightEffect,
@@ -236,6 +237,7 @@ export class PixiViewport {
   private isInformationAreaMode = false;
   private arcanePointerCreatureSize: ArcanePointerCreatureSize = "medium";
   private compassOrientation: CompassOrientation = DEFAULT_COMPASS_ORIENTATION;
+  private backgroundColor: MapBackgroundColor = DEFAULT_MAP_BACKGROUND_COLOR;
   private viewRole: ViewportViewRole = "dm";
   private isReadOnly = false;
   private fogPresentation: FogPresentation = "dm-preview";
@@ -490,6 +492,12 @@ export class PixiViewport {
     if (this.compassOrientation === compassOrientation) return;
     this.compassOrientation = compassOrientation;
     this.applyCamera(false);
+  }
+
+  setBackgroundColor(backgroundColor: MapBackgroundColor): void {
+    if (this.backgroundColor === backgroundColor) return;
+    this.backgroundColor = backgroundColor;
+    this.drawBackgroundLayer();
   }
 
   setViewRole(viewRole: ViewportViewRole): void {
@@ -881,10 +889,11 @@ export class PixiViewport {
 
   private drawBackgroundLayer(): void {
     const layer = this.getLayer("background");
+    clearContainerChildren(layer);
     layer.addChild(
       new Graphics()
         .rect(-2400, -2400, 4800, 4800)
-        .fill({ color: 0x15181a })
+        .fill({ color: parseHexColor(this.backgroundColor) })
         .rect(-1800, -1800, 3600, 3600)
         .stroke({ color: 0x293034, width: 4, alpha: 0.8 })
     );

@@ -10,6 +10,17 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.2.1] - 2026-09-05
+
+### Added
+
+- Color de fondo infinito configurable por mapa desde el panel izquierdo, con swatch estilizado y reset al color default.
+
+### Fixed
+
+- Escenas antiguas y mapas sin color de fondo cargan con el default `#15181a`, manteniendo compatibilidad hacia adelante.
+- Player View recibe el color del mapa activo y renderiza el mismo fondo infinito que el DM.
+
 ## [2.2.0] - 2026-09-05
 
 ### Added

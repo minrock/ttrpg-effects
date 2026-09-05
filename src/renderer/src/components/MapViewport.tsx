@@ -20,6 +20,7 @@ import type {
 import type { FireCell } from "../../../domain/effects/fire";
 import type { CompassOrientation } from "../../../domain/map/compass-orientation";
 import { DEFAULT_COMPASS_ORIENTATION } from "../../../domain/map/compass-orientation";
+import { DEFAULT_MAP_BACKGROUND_COLOR, type MapBackgroundColor } from "../../../domain/map/map-background";
 import type { ArcanePointerCreatureSize } from "../../../domain/pointer/arcane-pointer";
 import type {
   ArcanePointerBroadcast,
@@ -64,6 +65,7 @@ interface MapViewportProps {
   readonly labels: readonly SceneLabel[];
   readonly mapAnnotations: MapAnnotations;
   readonly compassOrientation?: CompassOrientation;
+  readonly backgroundColor?: MapBackgroundColor;
   readonly showCompass?: boolean;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
   readonly showMapAnnotations: boolean;
@@ -149,6 +151,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   labels,
   mapAnnotations,
   compassOrientation = DEFAULT_COMPASS_ORIENTATION,
+  backgroundColor = DEFAULT_MAP_BACKGROUND_COLOR,
   showCompass = false,
   sceneLinkStatuses = {},
   showMapAnnotations,
@@ -222,9 +225,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const viewportRef = useRef<PixiViewport | null>(null);
   const mapRef = useRef(map);
   const compassOrientationRef = useRef(compassOrientation);
+  const backgroundColorRef = useRef(backgroundColor);
   const playerCameraControlStateRef = useRef<PlayerCameraControlViewState | null>(null);
   mapRef.current = map;
   compassOrientationRef.current = compassOrientation;
+  backgroundColorRef.current = backgroundColor;
 
   useImperativeHandle(ref, () => ({
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
@@ -310,6 +315,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setLabels(labels);
       createdViewport.setMapAnnotations(mapAnnotations);
       createdViewport.setCompassOrientation(compassOrientationRef.current);
+      createdViewport.setBackgroundColor(backgroundColorRef.current);
       createdViewport.setSceneLinkStatuses(sceneLinkStatuses);
       createdViewport.setShowMapAnnotations(showMapAnnotations);
       createdViewport.setSelectedElementId(selectedElementId);
@@ -401,6 +407,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setCompassOrientation(compassOrientation);
   }, [compassOrientation]);
+
+  useEffect(() => {
+    viewportRef.current?.setBackgroundColor(backgroundColor);
+  }, [backgroundColor]);
 
   useEffect(() => {
     viewportRef.current?.setSceneLinkStatuses(sceneLinkStatuses);
