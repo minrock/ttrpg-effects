@@ -3,6 +3,8 @@ import {
   ChevronDown,
   ChevronRight,
   Diamond,
+  Layers,
+  Map,
   Skull,
   StickyNote,
   UserRound,
@@ -10,6 +12,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
+import type { SceneMapDocument } from "../../../../domain/sessions/scene-document";
 import type { SceneAside, SceneMonster, SceneNpc, SceneNote, ScenePlayerCharacter } from "../../../../domain/sessions/scene-aside";
 import {
   addPlayerCharacter,
@@ -34,9 +37,18 @@ import { MapAnnotationsTree } from "../annotations/MapAnnotationsTree";
 import type { SceneLinkValidationStatus } from "../../../../domain/annotations/scene-navigation-links";
 import type { SceneObjectEntry } from "../../../../domain/sessions/scene-objects";
 import { SceneObjectsTree } from "./SceneObjectsTree";
+import { SceneMapsSection } from "./SceneMapsSection";
 
 interface DmAsidePanelProps {
   readonly objects: readonly SceneObjectEntry[];
+  readonly maps: readonly SceneMapDocument[];
+  readonly activeMapId: string | null;
+  readonly onSelectMap: (mapId: string) => void;
+  readonly onRenameMap: (mapId: string, name: string) => void;
+  readonly onReorderMaps: (mapIds: readonly string[]) => void;
+  readonly onDeleteMap: (mapId: string) => void;
+  readonly onAddMap: () => void;
+  readonly onImportSceneAsMap: () => void;
   readonly onSelectObject: (entry: SceneObjectEntry) => void;
   readonly onLocateObject: (entry: SceneObjectEntry) => void;
   readonly onDeleteObject: (entry: SceneObjectEntry) => void;
@@ -56,9 +68,21 @@ interface DmAsidePanelProps {
 }
 
 type SectionKey = "objects" | "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
+type AsideTab = "scene" | "map";
 
 export function DmAsidePanel({
-  objects, onSelectObject, onLocateObject, onDeleteObject,
+  objects,
+  maps,
+  activeMapId,
+  onSelectMap,
+  onRenameMap,
+  onReorderMaps,
+  onDeleteMap,
+  onAddMap,
+  onImportSceneAsMap,
+  onSelectObject,
+  onLocateObject,
+  onDeleteObject,
   aside,
   monsterTemplates,
   annotations,
@@ -73,6 +97,7 @@ export function DmAsidePanel({
   sceneLinkStatuses = {},
   hidden
 }: DmAsidePanelProps): JSX.Element {
+  const [activeTab, setActiveTab] = useState<AsideTab>("scene");
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
     new Set<SectionKey>(["objects", "annotations", "monsters", "npcs", "playerCharacters", "notes"])
   );
@@ -135,103 +160,112 @@ export function DmAsidePanel({
       <div className="dm-aside-header">
         <span className="dm-aside-title">Escena</span>
       </div>
+      <div className="dm-aside-tabs" role="tablist" aria-label="Contenido del panel izquierdo">
+        <button type="button" role="tab" aria-selected={activeTab === "scene"} className={activeTab === "scene" ? "is-active" : ""} onClick={() => setActiveTab("scene")}>
+          <Layers aria-hidden="true" />
+          Escena
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "map"} className={activeTab === "map" ? "is-active" : ""} onClick={() => setActiveTab("map")}>
+          <Map aria-hidden="true" />
+          Mapa
+        </button>
+      </div>
 
       <div className="dm-aside-content">
-        <AccordionSection title="Objetos" icon={Diamond} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={objects.length} onToggle={toggleSection}>
-          <SceneObjectsTree objects={objects} selectedElementId={selectedElementId} onSelect={onSelectObject} onLocate={onLocateObject} onDelete={onDeleteObject} />
-        </AccordionSection>
-        <AccordionSection
-          title="Anotaciones"
-          icon={Diamond}
-          tone="annotation"
-          sectionKey="annotations"
-          open={openSections.has("annotations")}
-          badge={annotations.pins.length + annotations.areas.length + annotations.sceneLinks.length}
-          onToggle={toggleSection}
-        >
-          <MapAnnotationsTree
-            annotations={annotations}
-            selectedElementId={selectedElementId}
-            onSelect={onSelectAnnotation}
-            onDeleteArea={onDeleteInformationArea}
-            onGoTo={onGoToAnnotation}
-            onEdit={onEditAnnotation}
-            onToggleLock={onToggleAnnotationLock}
-            onHighlightArea={onHighlightInformationArea}
-            sceneLinkStatuses={sceneLinkStatuses}
-          />
-        </AccordionSection>
-
-        <AccordionSection
-          title="Monstruos"
-          icon={Skull}
-          tone="monster"
-          sectionKey="monsters"
-          open={openSections.has("monsters")}
-          badge={aside.monsters.length}
-          onToggle={toggleSection}
-        >
-          <MonsterSection
-            monsters={aside.monsters}
-            templates={monsterTemplates}
-            onAdd={handleAddMonster}
-            onUpdate={handleUpdateMonster}
-            onRemove={handleRemoveMonster}
-            onToggleVisibility={handleToggleMonsterVisibility}
-          />
-        </AccordionSection>
-
-        <AccordionSection
-          title="NPCs"
-          icon={UserRound}
-          tone="npc"
-          sectionKey="npcs"
-          open={openSections.has("npcs")}
-          badge={aside.npcs.length}
-          onToggle={toggleSection}
-        >
-          <NpcSection
-            npcs={aside.npcs}
-            onAdd={handleAddNpc}
-            onUpdate={handleUpdateNpc}
-            onRemove={handleRemoveNpc}
-            onToggleVisibility={handleToggleNpcVisibility}
-          />
-        </AccordionSection>
-
-        <AccordionSection
-          title="Personajes"
-          icon={UsersRound}
-          tone="player"
-          sectionKey="playerCharacters"
-          open={openSections.has("playerCharacters")}
-          badge={aside.playerCharacters.length}
-          onToggle={toggleSection}
-        >
-          <PlayerCharacterSection
-            characters={aside.playerCharacters}
-            onAdd={handleAddPlayerCharacter}
-            onUpdate={handleUpdatePlayerCharacter}
-            onRemove={handleRemovePlayerCharacter}
-          />
-        </AccordionSection>
-
-        <AccordionSection
-          title="Notas"
-          icon={StickyNote}
-          tone="note"
-          sectionKey="notes"
-          open={openSections.has("notes")}
-          badge={aside.notes.length}
-          onToggle={toggleSection}
-        >
-          <NotesSection
-            notes={aside.notes}
-            onAdd={handleAddNote}
-            onUpdate={handleUpdateNote}
-            onRemove={handleRemoveNote}
-          />
-        </AccordionSection>
+        {activeTab === "scene" ? (
+          <>
+            <AccordionSection title="Mapas" icon={Map} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={maps.length} onToggle={toggleSection}>
+              <SceneMapsSection
+                maps={maps}
+                activeMapId={activeMapId}
+                onSelect={onSelectMap}
+                onRename={onRenameMap}
+                onReorder={onReorderMaps}
+                onDelete={onDeleteMap}
+                onAddMap={onAddMap}
+                onImportScene={onImportSceneAsMap}
+              />
+            </AccordionSection>
+            <AccordionSection
+              title="Monstruos"
+              icon={Skull}
+              tone="monster"
+              sectionKey="monsters"
+              open={openSections.has("monsters")}
+              badge={aside.monsters.length}
+              onToggle={toggleSection}
+            >
+              <MonsterSection
+                monsters={aside.monsters}
+                templates={monsterTemplates}
+                onAdd={handleAddMonster}
+                onUpdate={handleUpdateMonster}
+                onRemove={handleRemoveMonster}
+                onToggleVisibility={handleToggleMonsterVisibility}
+              />
+            </AccordionSection>
+            <AccordionSection title="NPCs" icon={UserRound} tone="npc" sectionKey="npcs" open={openSections.has("npcs")} badge={aside.npcs.length} onToggle={toggleSection}>
+              <NpcSection
+                npcs={aside.npcs}
+                onAdd={handleAddNpc}
+                onUpdate={handleUpdateNpc}
+                onRemove={handleRemoveNpc}
+                onToggleVisibility={handleToggleNpcVisibility}
+              />
+            </AccordionSection>
+            <AccordionSection
+              title="Personajes"
+              icon={UsersRound}
+              tone="player"
+              sectionKey="playerCharacters"
+              open={openSections.has("playerCharacters")}
+              badge={aside.playerCharacters.length}
+              onToggle={toggleSection}
+            >
+              <PlayerCharacterSection
+                characters={aside.playerCharacters}
+                onAdd={handleAddPlayerCharacter}
+                onUpdate={handleUpdatePlayerCharacter}
+                onRemove={handleRemovePlayerCharacter}
+              />
+            </AccordionSection>
+            <AccordionSection title="Notas" icon={StickyNote} tone="note" sectionKey="notes" open={openSections.has("notes")} badge={aside.notes.length} onToggle={toggleSection}>
+              <NotesSection
+                notes={aside.notes}
+                onAdd={handleAddNote}
+                onUpdate={handleUpdateNote}
+                onRemove={handleRemoveNote}
+              />
+            </AccordionSection>
+          </>
+        ) : (
+          <>
+            <AccordionSection title="Objetos" icon={Diamond} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={objects.length} onToggle={toggleSection}>
+              <SceneObjectsTree objects={objects} selectedElementId={selectedElementId} onSelect={onSelectObject} onLocate={onLocateObject} onDelete={onDeleteObject} />
+            </AccordionSection>
+            <AccordionSection
+              title="Anotaciones"
+              icon={Diamond}
+              tone="annotation"
+              sectionKey="annotations"
+              open={openSections.has("annotations")}
+              badge={annotations.pins.length + annotations.areas.length + annotations.sceneLinks.length}
+              onToggle={toggleSection}
+            >
+              <MapAnnotationsTree
+                annotations={annotations}
+                selectedElementId={selectedElementId}
+                onSelect={onSelectAnnotation}
+                onDeleteArea={onDeleteInformationArea}
+                onGoTo={onGoToAnnotation}
+                onEdit={onEditAnnotation}
+                onToggleLock={onToggleAnnotationLock}
+                onHighlightArea={onHighlightInformationArea}
+                sceneLinkStatuses={sceneLinkStatuses}
+              />
+            </AccordionSection>
+          </>
+        )}
       </div>
     </aside>
   );

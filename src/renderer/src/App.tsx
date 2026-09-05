@@ -25,8 +25,6 @@ import {
   FolderOpen,
   Grid3X3,
   Hexagon,
-  Lock,
-  Map as MapIcon,
   MapPin,
   Monitor,
   Minus,
@@ -35,10 +33,9 @@ import {
   Shapes,
   Sparkles,
   Swords,
+  LocateFixed,
   ZoomIn,
   ZoomOut,
-  LocateFixed,
-  Unlock,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -106,7 +103,20 @@ import {
 } from "../../domain/map/map-image";
 import { formatDistance, measureDistance, measurePathDistance } from "../../domain/measurement/measurement";
 import { hasSceneContent } from "../../domain/sessions/scene-content";
-import { createDefaultScene } from "../../domain/sessions/default-scene";
+import { createDefaultSceneMapDocument } from "../../domain/sessions/default-scene";
+import {
+  addSceneMap,
+  getNextSceneMapId,
+  getNextSceneMapName,
+  hasSceneMapContent,
+  removeSceneMap,
+  renameSceneMap,
+  reorderSceneMaps,
+  setActiveSceneMap,
+  createEmptyScene,
+  syncActiveMapFromRuntimeFields,
+  syncRuntimeFieldsFromActiveMap
+} from "../../domain/sessions/scene-maps";
 import type {
   SceneDocument,
   SceneDynamicLightEffect,
@@ -193,6 +203,7 @@ import {
   type MapInformationArea,
   type MapInformationPin
 } from "../../domain/annotations/map-annotations";
+import { resolveInternalSceneLinkNavigationTarget } from "../../domain/annotations/internal-scene-link-navigation";
 import {
   MapAnnotationModal,
   type MapAnnotationModalDraft
@@ -246,7 +257,7 @@ export function App(): JSX.Element {
     } catch {
       sessionStorage.removeItem("ttrpg:session-scene");
     }
-    return createDefaultScene();
+    return createEmptyScene();
   });
   const sceneRef = useRef(scene);
   const setScene = useCallback((nextScene: SetStateAction<SceneDocument>): void => {
@@ -254,8 +265,9 @@ export function App(): JSX.Element {
       typeof nextScene === "function"
         ? (nextScene as (currentScene: SceneDocument) => SceneDocument)(sceneRef.current)
         : nextScene;
-    sceneRef.current = resolvedScene;
-    setSceneState(resolvedScene);
+    const syncedScene = syncRuntimeFieldsFromActiveMap(syncActiveMapFromRuntimeFields(resolvedScene));
+    sceneRef.current = syncedScene;
+    setSceneState(syncedScene);
   }, []);
   const [sceneAside, setSceneAside] = useState<SceneAside>(() =>
     (scene.sceneAside) ?? createDefaultSceneAside()
@@ -411,7 +423,7 @@ export function App(): JSX.Element {
         setMapImageUrl(url);
       }
     });
-  }, []);
+  }, [scene.map.imagePath, mapImageUrl]);
 
   useEffect(() => {
     if (window.ttrpg === undefined || scene.tokens.length === 0) {
@@ -953,6 +965,33 @@ export function App(): JSX.Element {
   }
 
   async function handleNavigateSceneLink(marker: MapSceneLinkMarker): Promise<void> {
+    const internalTarget = resolveInternalSceneLinkNavigationTarget(sceneRef.current, marker);
+    if (marker.connection?.peer.mapId !== undefined) {
+      if (internalTarget === null) {
+        setFeedback("La conexion interna ya no encuentra el mapa destino.");
+        setSceneLinkModalId(marker.id);
+        return;
+      }
+
+      const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
+      playerCameraRef.current = internalTarget.camera;
+      dmCameraRef.current = internalTarget.camera;
+      effectivePlayerCameraRef.current = null;
+      acknowledgedPlayerCameraCommandRevisionRef.current = null;
+      playerCameraSyncKeyRef.current = nextCameraSyncKey;
+      setPlayerCameraSyncKey(nextCameraSyncKey);
+      setMapImageUrl(null);
+      setTokenImageUrls({});
+      setScene((current) => setActiveSceneMap(current, internalTarget.mapId));
+      setSceneLinkModalId(null);
+      window.requestAnimationFrame(() => {
+        viewportHandleRef.current?.centerOnWorldPoint(internalTarget.marker.position);
+      });
+      sendPlayerCameraCommand("scene-change");
+      setFeedback(`Mapa "${internalTarget.mapName}" cargado desde conexion interna.`);
+      return;
+    }
+
     if (window.ttrpg === undefined) {
       setSceneLinkModalId(marker.id);
       return;
@@ -1166,17 +1205,6 @@ export function App(): JSX.Element {
     setInteraction((current) => closeContextMenu(current));
   };
 
-  const handleToggleZoomLock = (): void => {
-    setInteraction((current) => setZoomLocked(current, !current.isZoomLocked));
-    setScene((current) => ({
-      ...current,
-      grid: {
-        ...current.grid,
-        locked: !current.grid.locked
-      }
-    }));
-  };
-
   const mapState = useMemo<MapImageState | null>(
     () =>
       scene.map.imagePath !== null && mapImageUrl !== null
@@ -1195,7 +1223,7 @@ export function App(): JSX.Element {
     [scene, interaction.elements.length]
   );
 
-  const sceneWithAside = useMemo(() => ({ ...scene, sceneAside }), [scene, sceneAside]);
+  const sceneWithAside = useMemo(() => syncActiveMapFromRuntimeFields({ ...scene, sceneAside }), [scene, sceneAside]);
   const playerSceneSnapshot = useMemo(() => createPlayerSceneSnapshot(sceneWithAside), [sceneWithAside]);
 
   const playerWindowSnapshot = useMemo<PlayerWindowSnapshot>(
@@ -1332,7 +1360,7 @@ export function App(): JSX.Element {
   }
 
   const resetToNewScene = useCallback((): void => {
-    const defaultScene = createDefaultScene();
+    const defaultScene = createEmptyScene();
     sessionStorage.removeItem("ttrpg:session-scene");
     setScene(defaultScene);
     setSceneAside(createDefaultSceneAside());
@@ -1836,7 +1864,7 @@ export function App(): JSX.Element {
     };
   }, [runSceneOperation]);
 
-  async function handleOpenMapImage(): Promise<void> {
+  async function handleAddSceneMap(): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
 
@@ -1847,27 +1875,102 @@ export function App(): JSX.Element {
       }
 
       const result = await window.ttrpg.openMapImage();
-
       if (!result.ok) {
         setFeedback(result.error);
         return;
       }
 
       const nextMap = createMapImageState(result.imagePath, result.imageUrl);
-      setMapImageUrl(nextMap.imageUrl);
-      setArcanePointerResetKey((current) => current + 1);
-      setScene((current) => ({
-        ...current,
+      const currentScene = syncActiveMapFromRuntimeFields(sceneRef.current);
+      const mapDocument = createDefaultSceneMapDocument({
+        id: getNextSceneMapId(currentScene),
+        name: getNextSceneMapName(currentScene),
         map: {
           imagePath: nextMap.imagePath,
           position: nextMap.position,
           scale: nextMap.scale
         }
-      }));
-      setFeedback("Mapa cargado");
+      });
+
+      setMapImageUrl(nextMap.imageUrl);
+      setTokenImageUrls({});
+      setScene((current) => addSceneMap(current, mapDocument, true));
+      setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
+      setFeedback(`${mapDocument.name} agregado a la escena`);
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function handleImportSceneAsMap(): Promise<void> {
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return;
+    }
+
+    setIsBusy(true);
+    setWarnings([]);
+
+    try {
+      const previousFilePath = currentFilePath;
+      const result = await window.ttrpg.importSceneAsMap(createSceneSavePayload(sceneRef.current, sceneAside));
+      if (!result.ok) {
+        setFeedback(result.error);
+        return;
+      }
+
+      setScene(result.scene);
+      setSceneAside(result.scene.sceneAside);
+      setMapImageUrl(result.mapImageUrl ?? null);
+      setTokenImageUrls(result.tokenImageUrls ?? {});
+      setCurrentFilePath(previousFilePath);
+      setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
+      syncSceneEntityCounters(result.scene);
+      setFeedback("Mapa importado a la escena");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function handleSelectSceneMap(mapId: string): void {
+    try {
+      setMapImageUrl(null);
+      setTokenImageUrls({});
+      setScene((current) => setActiveSceneMap(current, mapId));
+      setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
+      setArcanePointerResetKey((current) => current + 1);
+      setInformationAreaHighlightResetKey((current) => current + 1);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo seleccionar el mapa.");
+    }
+  }
+
+  function handleRenameSceneMap(mapId: string, name: string): void {
+    setScene((current) => renameSceneMap(current, mapId, name));
+  }
+
+  function handleReorderSceneMaps(mapIds: readonly string[]): void {
+    setScene((current) => reorderSceneMaps(current, mapIds));
+  }
+
+  function handleDeleteSceneMap(mapId: string): void {
+    const syncedScene = syncActiveMapFromRuntimeFields(sceneRef.current);
+    const map = syncedScene.maps.find((candidate) => candidate.id === mapId);
+    if (map === undefined) return;
+    if (syncedScene.maps.length === 1) {
+      setFeedback("La escena debe conservar al menos un mapa para poder guardarse.");
+      return;
+    }
+    if (hasSceneMapContent(map) && !window.confirm(`Eliminar "${map.name}" y todo su contenido de mapa?`)) {
+      return;
+    }
+    if (syncedScene.activeMapId === mapId) {
+      setMapImageUrl(null);
+      setTokenImageUrls({});
+    }
+    setScene((current) => removeSceneMap(current, mapId));
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
+    setFeedback("Mapa eliminado");
   }
 
   function handleGridVisibilityChange(): void {
@@ -2894,19 +2997,6 @@ export function App(): JSX.Element {
         </div>
         <div className="scene-actions" aria-label="Acciones de escena">
           <div className="scene-actions__group scene-actions__group--tools">
-            <button type="button" onClick={handleOpenMapImage} disabled={isBusy}>
-              <MapIcon size={15} aria-hidden="true" />
-              Cargar mapa
-            </button>
-            <button
-              type="button"
-              className={interaction.isZoomLocked ? "is-active" : ""}
-              onClick={handleToggleZoomLock}
-              aria-pressed={interaction.isZoomLocked}
-            >
-              {interaction.isZoomLocked ? <Lock size={15} aria-hidden="true" /> : <Unlock size={15} aria-hidden="true" />}
-              {interaction.isZoomLocked ? "Zoom bloqueado" : "Bloquear zoom"}
-            </button>
             <button
               type="button"
               className={interaction.activeTool === "arcane-pointer" ? "is-active" : ""}
@@ -3014,7 +3104,8 @@ export function App(): JSX.Element {
       )}
       <aside className="scene-status" aria-label="Estado de escena">
         <span className="scene-status__primary">{feedback}</span>
-        <span>{scene.map.imagePath ?? "Sin mapa"}</span>
+        <span>{scene.activeMapId === null ? "Sin mapas" : `${scene.name ?? "Mapa activo"} (${scene.maps.length})`}</span>
+        <span>{scene.map.imagePath ?? "Sin mapa cargado"}</span>
         <span>{currentFilePath ?? "Sin archivo seleccionado"}</span>
         <span>
           {scene.shapes.length +
@@ -3040,6 +3131,14 @@ export function App(): JSX.Element {
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}${isAsidePanelVisible ? "" : " is-aside-hidden"}`}>
         <DmAsidePanel
           objects={sceneObjects}
+          maps={scene.maps}
+          activeMapId={scene.activeMapId}
+          onSelectMap={handleSelectSceneMap}
+          onRenameMap={handleRenameSceneMap}
+          onReorderMaps={handleReorderSceneMaps}
+          onDeleteMap={handleDeleteSceneMap}
+          onAddMap={() => void handleAddSceneMap()}
+          onImportSceneAsMap={() => void handleImportSceneAsMap()}
           onSelectObject={handleSelectSceneObject}
           onLocateObject={handleLocateSceneObject}
           onDeleteObject={handleDeleteSceneObject}
@@ -4639,15 +4738,17 @@ function getSceneObjectIds(scene: SceneDocument): readonly string[] {
 }
 
 function createSceneSavePayload(scene: SceneDocument, sceneAside: SceneAside): SceneDocument {
-  return {
-    ...scene,
+  const syncedScene = syncActiveMapFromRuntimeFields(scene);
+  const saveScene = {
+    ...syncedScene,
     sceneAside,
-    effects: scene.effects.map((effect) =>
+    effects: syncedScene.effects.map((effect) =>
       effect.kind === "dynamic-light"
-        ? createDynamicLightSavePayload(effect, scene.grid.cellSizeWorld)
+        ? createDynamicLightSavePayload(effect, syncedScene.grid.cellSizeWorld)
         : effect
     )
   };
+  return syncActiveMapFromRuntimeFields(saveScene);
 }
 
 function sameTokenName(left: string, right: string): boolean {

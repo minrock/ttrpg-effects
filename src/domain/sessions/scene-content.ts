@@ -1,30 +1,32 @@
 import { createDefaultScene } from "./default-scene";
-import type { SceneDocument } from "./scene-document";
+import type { AnySceneDocument } from "./scene-document";
+import { migrateSceneDocument, syncActiveMapFromRuntimeFields } from "./scene-maps";
 
 export function hasSceneContent(
-  scene: SceneDocument,
+  scene: AnySceneDocument,
   tacticalElementsCount = 0
 ): boolean {
+  const syncedScene = syncActiveMapFromRuntimeFields(migrateSceneDocument(scene));
   const defaultScene = createDefaultScene();
 
   return (
-    scene.map.imagePath !== null ||
-    scene.lights.length > 0 ||
-    scene.effects.length > 0 ||
-    scene.shapes.length > 0 ||
-    scene.tokens.length > 0 ||
-    scene.labels.length > 0 ||
-    scene.mapAnnotations.pins.length > 0 ||
-    scene.mapAnnotations.areas.length > 0 ||
-    scene.mapAnnotations.sceneLinks.length > 0 ||
-    scene.combatTracker.active ||
+    syncedScene.map.imagePath !== null ||
+    syncedScene.lights.length > 0 ||
+    syncedScene.effects.length > 0 ||
+    syncedScene.shapes.length > 0 ||
+    syncedScene.tokens.length > 0 ||
+    syncedScene.labels.length > 0 ||
+    syncedScene.mapAnnotations.pins.length > 0 ||
+    syncedScene.mapAnnotations.areas.length > 0 ||
+    syncedScene.mapAnnotations.sceneLinks.length > 0 ||
+    syncedScene.combatTracker.active ||
     tacticalElementsCount > 0 ||
-    scene.fogOfWar.revealedAreas.length > 0 ||
-    scene.fogOfWar.obstacles.length > 0 ||
-    !isSameValue(scene.grid, defaultScene.grid) ||
-    !isSameValue(scene.darkness, defaultScene.darkness) ||
-    !isSameValue(scene.fogOfWar, defaultScene.fogOfWar) ||
-    !isSameValue(scene.settings, defaultScene.settings)
+    syncedScene.fogOfWar.revealedAreas.length > 0 ||
+    syncedScene.fogOfWar.obstacles.length > 0 ||
+    !isSameValue(syncedScene.grid, defaultScene.grid) ||
+    !isSameValue(syncedScene.darkness, defaultScene.darkness) ||
+    !isSameValue(syncedScene.fogOfWar, defaultScene.fogOfWar) ||
+    !isSameValue(syncedScene.settings, defaultScene.settings)
   );
 }
 

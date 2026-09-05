@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultScene } from "./default-scene";
 import { hasSceneContent } from "./scene-content";
+import { LEGACY_SCENE_DOCUMENT_VERSION, SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
+import { syncActiveMapFromRuntimeFields } from "./scene-maps";
 import {
   detectOutdatedSceneFields,
   parseSceneDocument,
   parseSceneJson,
   serializeSceneDocument
 } from "./scene-schema";
+
+function createLegacyScene(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const { maps, activeMapId, id, name, ...legacyScene } = createDefaultScene();
+  void maps;
+  void activeMapId;
+  void id;
+  void name;
+  return {
+    ...legacyScene,
+    version: LEGACY_SCENE_DOCUMENT_VERSION,
+    ...overrides
+  };
+}
+
+function expectSyncedScene(scene: unknown): void {
+  expect(parseSceneDocument(scene)).toEqual(syncActiveMapFromRuntimeFields(scene as SceneDocument));
+}
 
 describe("scene document schema", () => {
   it("defaults old grids to square without marking an empty scene as occupied", () => {
@@ -34,7 +53,7 @@ describe("scene document schema", () => {
         name: "Hex", description: "", locked: false, cells: [cell]
       }] }
     };
-    expect(parseSceneJson(serializeSceneDocument(updated))).toEqual(updated);
+    expect(parseSceneJson(serializeSceneDocument(updated))).toEqual(syncActiveMapFromRuntimeFields(updated));
     const squareAgain = { ...updated, grid: scene.grid };
     expect(parseSceneJson(serializeSceneDocument(squareAgain)).effects).toEqual(updated.effects);
   });
@@ -51,7 +70,7 @@ describe("scene document schema", () => {
     const scene = createDefaultScene();
     const updated = { ...scene, grid: { ...scene.grid, lineWidth: 3 as const } };
     const restored = parseSceneJson(serializeSceneDocument(updated));
-    expect(restored).toEqual(updated);
+    expect(restored).toEqual(syncActiveMapFromRuntimeFields(updated));
     expect(hasSceneContent(restored)).toBe(true);
   });
 
@@ -66,10 +85,10 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(createDefaultScene())).toEqual(createDefaultScene());
   });
 
-  it("serializes scene JSON with version 1", () => {
+  it("serializes scene JSON with version 2", () => {
     const serialized = serializeSceneDocument(createDefaultScene());
 
-    expect(JSON.parse(serialized)).toMatchObject({ version: 1 });
+    expect(JSON.parse(serialized)).toMatchObject({ version: SCENE_DOCUMENT_VERSION });
   });
 
   it("rejects incompatible versions", () => {
@@ -102,7 +121,7 @@ describe("scene document schema", () => {
 
   it("adds darkvision disabled to older v1 scenes", () => {
     const legacyScene = {
-      ...createDefaultScene(),
+      ...createLegacyScene(),
       darkness: {
         enabled: true,
         opacity: 0.65,
@@ -115,7 +134,7 @@ describe("scene document schema", () => {
 
   it("adds an inactive combat tracker to older v1 scenes", () => {
     const legacyScene = Object.fromEntries(
-      Object.entries(createDefaultScene()).filter(([key]) => key !== "combatTracker")
+      Object.entries(createLegacyScene()).filter(([key]) => key !== "combatTracker")
     );
 
     expect(parseSceneDocument(legacyScene).combatTracker).toEqual({
@@ -127,7 +146,7 @@ describe("scene document schema", () => {
   });
 
   it("adds empty map annotations to older v1 scenes and reports the missing field", () => {
-    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    const legacyScene = { ...createLegacyScene() };
     delete legacyScene.mapAnnotations;
 
     expect(parseSceneDocument(legacyScene).mapAnnotations).toEqual({ pins: [], areas: [], sceneLinks: [] });
@@ -163,7 +182,7 @@ describe("scene document schema", () => {
   });
 
   it("defaults scene links for annotation documents saved before spec 23", () => {
-    const legacyScene = createDefaultScene() as unknown as Record<string, unknown>;
+    const legacyScene = createLegacyScene();
     legacyScene.mapAnnotations = { pins: [], areas: [] };
 
     expect(parseSceneDocument(legacyScene).mapAnnotations.sceneLinks).toEqual([]);
@@ -241,7 +260,7 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("adds a default circular zone to older fire effects", () => {
@@ -298,7 +317,7 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("accepts magical darkness effects", () => {
@@ -316,7 +335,7 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("accepts dynamic light effects", () => {
@@ -342,8 +361,8 @@ describe("scene document schema", () => {
     };
 
     const parsedScene = parseSceneDocument(scene);
-    expect(parsedScene).toEqual(scene);
-    expect(parseSceneJson(serializeSceneDocument(parsedScene))).toEqual(scene);
+    expect(parsedScene).toEqual(syncActiveMapFromRuntimeFields(scene as SceneDocument));
+    expect(parseSceneJson(serializeSceneDocument(parsedScene))).toEqual(parsedScene);
   });
 
   it("defaults legacy dynamic lights to a full aperture", () => {
@@ -432,7 +451,7 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("accepts tactical shapes with optional dimensions", () => {
@@ -480,7 +499,7 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("accepts virtual tokens in scenes", () => {
@@ -503,11 +522,11 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("adds empty tokens to older v1 scenes", () => {
-    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    const legacyScene = createLegacyScene();
     delete legacyScene.tokens;
 
     expect(parseSceneDocument(legacyScene).tokens).toEqual([]);
@@ -556,11 +575,11 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("adds empty labels to older v1 scenes", () => {
-    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    const legacyScene = createLegacyScene();
     delete legacyScene.labels;
 
     expect(parseSceneDocument(legacyScene).labels).toEqual([]);
@@ -604,7 +623,7 @@ describe("scene document schema", () => {
       ]
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("keeps older tactical shapes without emojis valid", () => {
@@ -653,7 +672,7 @@ describe("scene document schema", () => {
   });
 
   it("adds default fog of war data to older v1 scenes", () => {
-    const legacyScene = { ...createDefaultScene() } as Record<string, unknown>;
+    const legacyScene = createLegacyScene();
     delete legacyScene.fogOfWar;
 
     expect(parseSceneDocument(legacyScene)).toMatchObject({
@@ -699,7 +718,7 @@ describe("scene document schema", () => {
       }
     };
 
-    expect(parseSceneDocument(scene)).toEqual(scene);
+    expectSyncedScene(scene);
   });
 
   it("preserves monster template ids in the DM aside", () => {

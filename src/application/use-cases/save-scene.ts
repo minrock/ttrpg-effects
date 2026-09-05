@@ -1,12 +1,17 @@
 import type { SceneFileStorage } from "../services/scene-file-storage";
 import type { SceneDocument, SceneOperationResult } from "../../domain/sessions/scene-document";
 import { serializeSceneDocument } from "../../domain/sessions/scene-schema";
+import { canSaveScene } from "../../domain/sessions/scene-maps";
 
 export async function saveSceneUseCase(
   storage: SceneFileStorage,
   scene: SceneDocument,
   options?: { readonly suggestedFilePath?: string | null }
 ): Promise<SceneOperationResult> {
+  if (!canSaveScene(scene)) {
+    return { ok: false, error: "Agrega al menos un mapa antes de guardar la escena." };
+  }
+
   try {
     const json = serializeSceneDocument(scene);
     const filePath = await storage.saveSceneJson(json, options);
@@ -39,6 +44,9 @@ export async function saveSceneToPathUseCase(
 ): Promise<SceneOperationResult> {
   if (storage.replaceSceneJsonFiles === undefined) {
     return { ok: false, error: "El guardado directo de escenas no esta disponible." };
+  }
+  if (!canSaveScene(scene)) {
+    return { ok: false, error: "Agrega al menos un mapa antes de guardar la escena." };
   }
 
   try {

@@ -3,6 +3,7 @@ import { getGridWindow, gridWindowCoversView, MAX_GRID_LINES } from "./grid-wind
 import { createDefaultScene } from "../sessions/default-scene";
 import { sceneDocumentV1Schema } from "../sessions/scene-schema";
 import { hasSceneContent } from "../sessions/scene-content";
+import { LEGACY_SCENE_DOCUMENT_VERSION } from "../sessions/scene-document";
 const viewport = { width: 1400, height: 900 };
 const camera = { center: { x: 0, y: 0 }, zoom: 1 };
 
@@ -31,8 +32,17 @@ describe("extended grid", () => {
   });
   it("loads old scenes and ignores the obsolete extension toggle", () => {
     const scene = createDefaultScene();
+    const { maps, activeMapId, id, name, ...legacyScene } = scene;
+    void maps;
+    void activeMapId;
+    void id;
+    void name;
     for (const grid of [scene.grid, { ...scene.grid, extendToViewport: false }, { ...scene.grid, extendToViewport: true }]) {
-      const restored = sceneDocumentV1Schema.parse(JSON.parse(JSON.stringify({ ...scene, grid })));
+      const restored = sceneDocumentV1Schema.parse(JSON.parse(JSON.stringify({
+        ...legacyScene,
+        version: LEGACY_SCENE_DOCUMENT_VERSION,
+        grid
+      })));
       expect(restored.grid).toEqual(scene.grid);
       expect(restored.grid).not.toHaveProperty("extendToViewport");
       expect(hasSceneContent(restored)).toBe(false);

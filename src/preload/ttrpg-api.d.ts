@@ -51,6 +51,7 @@ export interface TtrpgApi {
   ) => Promise<SceneOperationResult>;
   saveSceneToPath: (scene: SceneDocument, filePath: string) => Promise<SceneOperationResult>;
   loadScene: () => Promise<SceneOperationResult>;
+  importSceneAsMap: (scene: SceneDocument) => Promise<SceneOperationResult>;
   selectSceneLinkTargetFile: () => Promise<
     { readonly ok: true; readonly filePath: string | null } | { readonly ok: false; readonly error: string }
   >;

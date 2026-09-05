@@ -5,6 +5,7 @@ export type SceneLinkRole = "origin" | "destination";
 export interface SceneLinkEndpointReference {
   readonly scenePath: string;
   readonly markerId: string;
+  readonly mapId?: string;
 }
 
 export interface SceneLinkConnection {
@@ -167,10 +168,18 @@ export function replaceSceneLinkMarker(
   return markers.map((candidate) => candidate.id === marker.id ? marker : candidate);
 }
 
+export function createSceneLinkEndpoint(
+  scenePath: string,
+  markerId: string,
+  mapId?: string
+): SceneLinkEndpointReference {
+  return mapId === undefined ? { scenePath, markerId } : { scenePath, markerId, mapId };
+}
+
 function endpoint(scenePath: string, markerId: string): SceneLinkEndpointReference {
-  return { scenePath, markerId };
+  return createSceneLinkEndpoint(scenePath, markerId);
 }
 
 function sameEndpoint(left: SceneLinkEndpointReference, right: SceneLinkEndpointReference): boolean {
-  return left.scenePath === right.scenePath && left.markerId === right.markerId;
+  return left.scenePath === right.scenePath && left.markerId === right.markerId && left.mapId === right.mapId;
 }

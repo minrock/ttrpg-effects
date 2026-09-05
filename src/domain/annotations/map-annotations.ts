@@ -204,9 +204,15 @@ export function createInformationAreaHighlightBroadcast(
 }
 
 export function stripPrivateMapAnnotationsForPlayer(scene: SceneDocument): SceneDocument {
+  const emptyAnnotations = createDefaultMapAnnotations();
   return {
     ...scene,
-    mapAnnotations: createDefaultMapAnnotations()
+    mapAnnotations: emptyAnnotations,
+    maps: scene.maps.map((map) => ({
+      ...map,
+      labels: [],
+      mapAnnotations: emptyAnnotations
+    }))
   };
 }
 

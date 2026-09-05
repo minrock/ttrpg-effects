@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("ttrpg", {
   saveSceneToPath: (scene: unknown, filePath: string) =>
     ipcRenderer.invoke("scene:save-to-path", { scene, filePath }),
   loadScene: () => ipcRenderer.invoke("scene:load"),
+  importSceneAsMap: (scene: unknown) => ipcRenderer.invoke("scene:import-as-map", scene),
   selectSceneLinkTargetFile: () => ipcRenderer.invoke("scene-link:select-target-file"),
   listSceneLinkCandidates: (filePath: string) => ipcRenderer.invoke("scene-link:list-candidates", filePath),
   connectSceneLink: (request: unknown) => ipcRenderer.invoke("scene-link:connect", request),
