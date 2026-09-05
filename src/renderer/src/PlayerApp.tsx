@@ -12,10 +12,12 @@ import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
   sanitizePlayerCameraCommand,
+  type PlayerViewportReport,
   type PlayerCameraReportOrigin
 } from "../../domain/player/player-camera-control";
 
 export function PlayerApp(): JSX.Element {
+  const shellRef = useRef<HTMLElement | null>(null);
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
@@ -34,6 +36,8 @@ export function PlayerApp(): JSX.Element {
     useState<InformationAreaHighlightBroadcast | null>(null);
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const latestPlayerCameraRef = useRef(camera);
+  const latestPlayerViewportRef = useRef<PlayerViewportReport | null>(null);
+  const activeMapIdRef = useRef(scene.activeMapId);
   const lastCameraCommandRevisionRef = useRef(-1);
   const acknowledgedCameraCommandRevisionRef = useRef<number | null>(null);
   const cameraReportRevisionRef = useRef(0);
@@ -44,7 +48,9 @@ export function PlayerApp(): JSX.Element {
     readonly camera: ViewportCameraSnapshot;
     readonly origin: PlayerCameraReportOrigin;
     readonly final: boolean;
+    readonly viewport: PlayerViewportReport | null;
   } | null>(null);
+  activeMapIdRef.current = scene.activeMapId;
 
   const flushPlayerCameraReport = useCallback((): void => {
     if (cameraReportTimerRef.current !== null) {
@@ -69,7 +75,8 @@ export function PlayerApp(): JSX.Element {
       acknowledgedCommandRevision: acknowledgedCameraCommandRevisionRef.current,
       camera: pending.camera,
       origin: pending.origin,
-      final: pending.final
+      final: pending.final,
+      ...(pending.viewport === null ? {} : { viewport: pending.viewport })
     }).finally(() => {
       isCameraReportInFlightRef.current = false;
       if (
@@ -90,7 +97,12 @@ export function PlayerApp(): JSX.Element {
     ): void => {
       const normalized = normalizeCameraSnapshot(nextCamera);
       latestPlayerCameraRef.current = normalized;
-      pendingCameraReportRef.current = { camera: normalized, origin, final };
+      pendingCameraReportRef.current = {
+        camera: normalized,
+        origin,
+        final,
+        viewport: latestPlayerViewportRef.current
+      };
       if (final) {
         flushPlayerCameraReport();
         return;
@@ -101,6 +113,30 @@ export function PlayerApp(): JSX.Element {
     },
     [flushPlayerCameraReport]
   );
+
+  const updatePlayerViewportReport = useCallback((): void => {
+    const bounds = shellRef.current?.getBoundingClientRect();
+    const width = Math.max(1, Math.floor(bounds?.width ?? window.innerWidth));
+    const height = Math.max(1, Math.floor(bounds?.height ?? window.innerHeight));
+    const nextViewport: PlayerViewportReport = {
+      width,
+      height,
+      devicePixelRatio: window.devicePixelRatio > 0 ? window.devicePixelRatio : 1,
+      orientation: width >= height ? "landscape" : "portrait",
+      ...(activeMapIdRef.current === null ? {} : { mapId: activeMapIdRef.current })
+    };
+    const current = latestPlayerViewportRef.current;
+    latestPlayerViewportRef.current = nextViewport;
+    if (
+      current === null ||
+      current.width !== nextViewport.width ||
+      current.height !== nextViewport.height ||
+      current.devicePixelRatio !== nextViewport.devicePixelRatio ||
+      current.mapId !== nextViewport.mapId
+    ) {
+      queuePlayerCameraReport(latestPlayerCameraRef.current, "local-navigation", true);
+    }
+  }, [queuePlayerCameraReport]);
 
   const applyPlayerCameraCommand = useCallback(
     (value: unknown): void => {
@@ -205,6 +241,27 @@ export function PlayerApp(): JSX.Element {
     };
   }, [applyPlayerCameraCommand, applySnapshot]);
 
+  useEffect(() => {
+    updatePlayerViewportReport();
+    const target = shellRef.current;
+    if (target === null || typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updatePlayerViewportReport);
+      return () => window.removeEventListener("resize", updatePlayerViewportReport);
+    }
+
+    const observer = new ResizeObserver(updatePlayerViewportReport);
+    observer.observe(target);
+    window.addEventListener("resize", updatePlayerViewportReport);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updatePlayerViewportReport);
+    };
+  }, [updatePlayerViewportReport]);
+
+  useEffect(() => {
+    updatePlayerViewportReport();
+  }, [scene.activeMapId, updatePlayerViewportReport]);
+
   const mapState = useMemo<MapImageState | null>(
     () =>
       scene.map.imagePath !== null && mapImageUrl !== null
@@ -250,7 +307,7 @@ export function PlayerApp(): JSX.Element {
   }, [isHydrated, isViewportReady, queuePlayerCameraReport]);
 
   return (
-    <main className="player-shell" aria-label="TTRPG Effects jugador">
+    <main ref={shellRef} className="player-shell" aria-label="TTRPG Effects jugador">
       {isHydrated ? (
         <MapViewport
           map={mapState}

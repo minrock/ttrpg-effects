@@ -1,4 +1,5 @@
 import { clampZoom } from "../map/camera";
+import { normalizeCompassOrientation, type CompassOrientation } from "../map/compass-orientation";
 import {
   normalizeCameraSnapshot,
   type ViewportCameraSnapshot
@@ -38,6 +39,29 @@ export interface PlayerCameraReport {
   readonly camera: ViewportCameraSnapshot;
   readonly origin: PlayerCameraReportOrigin;
   readonly final: boolean;
+  readonly viewport?: PlayerViewportReport;
+}
+
+export type PlayerViewportOrientation = "landscape" | "portrait";
+
+export interface PlayerViewportReport {
+  readonly width: number;
+  readonly height: number;
+  readonly devicePixelRatio: number;
+  readonly orientation: PlayerViewportOrientation;
+  readonly mapId?: string;
+}
+
+export interface PlayerViewportPreview {
+  readonly center: ViewportCameraSnapshot["center"];
+  readonly width: number;
+  readonly height: number;
+  readonly corners: readonly [
+    ViewportCameraSnapshot["center"],
+    ViewportCameraSnapshot["center"],
+    ViewportCameraSnapshot["center"],
+    ViewportCameraSnapshot["center"]
+  ];
 }
 
 export interface PlayerCameraSyncInput {
@@ -52,7 +76,19 @@ export interface PlayerCameraControlViewState {
   readonly primaryCamera: ViewportCameraSnapshot;
   readonly effectiveCamera: ViewportCameraSnapshot | null;
   readonly status: PlayerCameraSyncStatus;
+  readonly viewport?: PlayerViewportReport;
+  readonly primaryPreview?: PlayerViewportPreviewState;
 }
+
+export interface PlayerViewportPreviewState {
+  readonly visible: boolean;
+  readonly fading: boolean;
+}
+
+export type PlayerViewportPreviewVisibilityInput = Pick<
+  PlayerCameraControlViewState,
+  "effectiveCamera" | "status" | "viewport"
+>;
 
 export function sanitizePlayerCameraCommand(value: unknown): PlayerCameraCommand | null {
   if (!isRecord(value) || !isNonNegativeInteger(value.revision) || !isCommandReason(value.reason)) {
@@ -87,12 +123,49 @@ export function sanitizePlayerCameraReport(value: unknown): PlayerCameraReport |
     return null;
   }
 
+  const viewport = sanitizePlayerViewportReport(value.viewport);
   return {
     reportRevision: value.reportRevision,
     acknowledgedCommandRevision: value.acknowledgedCommandRevision,
     camera,
     origin: value.origin,
-    final: value.final
+    final: value.final,
+    ...(viewport === null ? {} : { viewport })
+  };
+}
+
+export function sanitizePlayerViewportReport(value: unknown): PlayerViewportReport | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  if (
+    typeof value.width !== "number" ||
+    !Number.isFinite(value.width) ||
+    value.width <= 0 ||
+    typeof value.height !== "number" ||
+    !Number.isFinite(value.height) ||
+    value.height <= 0
+  ) {
+    return null;
+  }
+
+  const width = Math.max(1, Math.floor(value.width));
+  const height = Math.max(1, Math.floor(value.height));
+  const devicePixelRatio =
+    typeof value.devicePixelRatio === "number" &&
+    Number.isFinite(value.devicePixelRatio) &&
+    value.devicePixelRatio > 0
+      ? value.devicePixelRatio
+      : 1;
+  const mapId = typeof value.mapId === "string" && value.mapId.trim() !== "" ? value.mapId : undefined;
+
+  return {
+    width,
+    height,
+    devicePixelRatio,
+    orientation: width >= height ? "landscape" : "portrait",
+    ...(mapId === undefined ? {} : { mapId })
   };
 }
 
@@ -161,6 +234,67 @@ export function zoomPlayerCamera(
   return {
     center: normalized.center,
     zoom: clampZoom(normalized.zoom * factor)
+  };
+}
+
+export function calculatePlayerViewportPreview(
+  camera: ViewportCameraSnapshot,
+  viewport: PlayerViewportReport,
+  compassOrientation: CompassOrientation
+): PlayerViewportPreview {
+  const normalizedCamera = normalizeCameraSnapshot(camera);
+  const normalizedViewport = sanitizePlayerViewportReport(viewport) ?? {
+    width: 1,
+    height: 1,
+    devicePixelRatio: 1,
+    orientation: "landscape" as const
+  };
+  const width = normalizedViewport.width / normalizedCamera.zoom;
+  const height = normalizedViewport.height / normalizedCamera.zoom;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const rotationRadians = normalizeCompassOrientation(compassOrientation) * (Math.PI / 180);
+  const offsets = [
+    { x: -halfWidth, y: -halfHeight },
+    { x: halfWidth, y: -halfHeight },
+    { x: halfWidth, y: halfHeight },
+    { x: -halfWidth, y: halfHeight }
+  ] as const;
+  const corners = offsets.map((offset) => rotateOffsetAroundCenter(normalizedCamera.center, offset, rotationRadians));
+
+  return {
+    center: normalizedCamera.center,
+    width,
+    height,
+    corners: [corners[0], corners[1], corners[2], corners[3]]
+  };
+}
+
+export function shouldShowPrimaryViewportPreview({
+  status,
+  viewport
+}: PlayerViewportPreviewVisibilityInput): boolean {
+  return viewport !== undefined && status !== "desynchronized" && status !== "closed";
+}
+
+export function shouldShowAuxiliaryViewportPreview({
+  effectiveCamera,
+  status,
+  viewport
+}: PlayerViewportPreviewVisibilityInput): boolean {
+  return viewport !== undefined && effectiveCamera !== null && status === "desynchronized";
+}
+
+function rotateOffsetAroundCenter(
+  center: ViewportCameraSnapshot["center"],
+  offset: ViewportCameraSnapshot["center"],
+  radians: number
+): ViewportCameraSnapshot["center"] {
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  return {
+    x: center.x + offset.x * cos - offset.y * sin,
+    y: center.y + offset.x * sin + offset.y * cos
   };
 }
 

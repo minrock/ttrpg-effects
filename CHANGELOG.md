@@ -10,6 +10,18 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.3.0] - 2026-09-05
+
+### Added
+
+- Preview del viewport real de Player View sobre el canvas del DM al mover la camara principal del jugador.
+- Marco auxiliar azul permanente cuando Player View esta desincronizada, representando el area real que ven los jugadores.
+- Reporte efimero del tamano, orientacion y mapa activo de Player View para calcular el encuadre visible.
+
+### Changed
+
+- El preview de camara considera zoom, aspect ratio y orientacion de brujula para coincidir con la vista proyectada.
+
 ## [2.2.3] - 2026-09-05
 
 ### Changed
