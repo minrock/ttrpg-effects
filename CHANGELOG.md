@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.2.0] - 2026-09-05
+
+### Added
+
+- Brujula por mapa con orientacion cardinal en pasos de 90 grados y control dedicado en el panel derecho del DM.
+- Overlay de brujula en el canvas del DM usando `assets/compass/compass.png`.
+- Toggle discreto en Player View para mostrar u ocultar la brujula, manteniendola siempre con el norte hacia arriba.
+
+### Changed
+
+- Player View rota la presentacion completa del mapa y sus capas tacticas para mantener el norte configurado hacia arriba.
+- Las mascaras de niebla de guerra y oscuridad cubren correctamente la vista al rotar el mapa proyectado.
+
 ## [2.1.1] - 2026-09-04
 
 ### Fixed

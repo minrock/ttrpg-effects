@@ -1,6 +1,7 @@
 import type { MapAnnotations } from "../annotations/map-annotations";
 import { createDefaultMapAnnotations } from "../annotations/map-annotations";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
+import { DEFAULT_COMPASS_ORIENTATION, type CompassOrientation } from "../map/compass-orientation";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { createDefaultSceneAside } from "./scene-aside";
 import {
@@ -82,12 +83,13 @@ export function createDefaultMapPayload(): ActiveMapPayload {
 }
 
 export function createDefaultSceneMap(
-  input: Partial<Pick<SceneMapDocument, "id" | "name">> & Partial<ActiveMapPayload> = {}
+  input: Partial<Pick<SceneMapDocument, "id" | "name" | "compassOrientation">> & Partial<ActiveMapPayload> = {}
 ): SceneMapDocument {
   const payload = { ...createDefaultMapPayload(), ...input };
   return {
     id: input.id ?? "map-1",
     name: input.name ?? "Mapa 1",
+    compassOrientation: input.compassOrientation ?? DEFAULT_COMPASS_ORIENTATION,
     map: payload.map,
     camera: payload.camera,
     grid: payload.grid,
@@ -111,6 +113,7 @@ export function createEmptyScene(): SceneDocument {
     activeMapId: null,
     id: "",
     name: "",
+    compassOrientation: DEFAULT_COMPASS_ORIENTATION,
     sceneAside: createDefaultSceneAside(),
     combatTracker: createDefaultCombatTracker(),
     ...payload
@@ -129,6 +132,7 @@ export function createSceneMapFromLegacyScene(scene: SceneDocumentV1, id = "map-
   return {
     id,
     name,
+    compassOrientation: DEFAULT_COMPASS_ORIENTATION,
     map: scene.map,
     camera: scene.camera,
     grid: scene.grid,
@@ -142,6 +146,21 @@ export function createSceneMapFromLegacyScene(scene: SceneDocumentV1, id = "map-
     labels: scene.labels,
     mapAnnotations: scene.mapAnnotations
   };
+}
+
+export function setActiveMapCompassOrientation(
+  scene: SceneDocument,
+  orientation: CompassOrientation
+): SceneDocument {
+  if (scene.activeMapId === null) return scene;
+  const synced = syncActiveMapFromRuntimeFields(scene);
+  return syncRuntimeFieldsFromActiveMap({
+    ...synced,
+    maps: synced.maps.map((map) =>
+      map.id === synced.activeMapId ? { ...map, compassOrientation: orientation } : map
+    ),
+    compassOrientation: orientation
+  });
 }
 
 export function migrateSceneDocument(scene: AnySceneDocument): SceneDocument {
@@ -176,6 +195,7 @@ export function syncActiveMapFromRuntimeFields(scene: SceneDocument): SceneDocum
 
   const synced: SceneMapDocument = {
     ...active,
+    compassOrientation: scene.compassOrientation,
     map: scene.map,
     camera: scene.camera,
     grid: scene.grid,

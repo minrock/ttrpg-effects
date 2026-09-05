@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Lock, Unlock } from "lucide-react";
+import { Compass, Lock, Unlock } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { getTokensForRole, normalizeCameraSnapshot, type ArcanePointerBroadcast, type PlayerWindowSnapshot, type ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { sortTokensByOrder } from "../../domain/tokens/tokens";
@@ -28,6 +28,7 @@ export function PlayerApp(): JSX.Element {
   const [isHydrated, setIsHydrated] = useState(false);
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [isZoomLocked, setIsZoomLocked] = useState(true);
+  const [showCompass, setShowCompass] = useState(false);
   const [arcanePointerEvent, setArcanePointerEvent] = useState<ArcanePointerBroadcast | null>(null);
   const [informationAreaHighlightEvent, setInformationAreaHighlightEvent] =
     useState<InformationAreaHighlightBroadcast | null>(null);
@@ -264,6 +265,8 @@ export function PlayerApp(): JSX.Element {
           tokens={renderedTokens}
           labels={[]}
           mapAnnotations={{ pins: [], areas: [], sceneLinks: [] }}
+          compassOrientation={scene.compassOrientation}
+          showCompass={showCompass}
           showMapAnnotations={false}
           selectedElementId={null}
           isZoomLocked={isZoomLocked}
@@ -339,16 +342,31 @@ export function PlayerApp(): JSX.Element {
           <span>{isHydrated ? "Preparando mapa y efectos..." : "Sincronizando escena..."}</span>
         </div>
       )}
-      <button
-        className={`player-zoom-lock${isZoomLocked ? " is-locked" : ""}`}
-        type="button"
-        tabIndex={-1}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setIsZoomLocked((current) => !current)}
-      >
-        {isZoomLocked ? <Lock aria-hidden="true" size={15} /> : <Unlock aria-hidden="true" size={15} />}
-        <span>{isZoomLocked ? "Zoom bloqueado" : "Zoom desbloqueado"}</span>
-      </button>
+      <div className="player-controls" aria-label="Controles de vista de jugador">
+        <button
+          className={`player-control-button${isZoomLocked ? " is-locked" : ""}`}
+          type="button"
+          tabIndex={-1}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setIsZoomLocked((current) => !current)}
+          title={isZoomLocked ? "Desbloquear zoom local" : "Bloquear zoom local"}
+        >
+          {isZoomLocked ? <Lock aria-hidden="true" size={15} /> : <Unlock aria-hidden="true" size={15} />}
+          <span>{isZoomLocked ? "Zoom bloqueado" : "Zoom desbloqueado"}</span>
+        </button>
+        <button
+          className={`player-control-button${showCompass ? " is-active" : ""}`}
+          type="button"
+          tabIndex={-1}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setShowCompass((current) => !current)}
+          title={showCompass ? "Ocultar brujula" : "Mostrar brujula"}
+          aria-pressed={showCompass}
+        >
+          <Compass aria-hidden="true" size={15} />
+          <span>{showCompass ? "Brujula visible" : "Brujula oculta"}</span>
+        </button>
+      </div>
     </main>
   );
 }

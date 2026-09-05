@@ -91,6 +91,33 @@ describe("scene document schema", () => {
     expect(JSON.parse(serialized)).toMatchObject({ version: SCENE_DOCUMENT_VERSION });
   });
 
+  it("defaults missing map compass orientation to north up", () => {
+    const scene = createDefaultScene();
+    const mapWithoutCompass = Object.fromEntries(
+      Object.entries(scene.maps[0]).filter(([key]) => key !== "compassOrientation")
+    );
+    const parsed = parseSceneDocument({
+      ...scene,
+      maps: [mapWithoutCompass]
+    });
+
+    expect(parsed.compassOrientation).toBe(0);
+    expect(parsed.maps[0]?.compassOrientation).toBe(0);
+  });
+
+  it("persists compass orientation inside maps without duplicating it at the root", () => {
+    const scene = {
+      ...createDefaultScene(),
+      compassOrientation: 90 as const,
+      maps: [{ ...createDefaultScene().maps[0], compassOrientation: 90 as const }]
+    };
+    const json = JSON.parse(serializeSceneDocument(scene)) as Record<string, unknown>;
+
+    expect(json.compassOrientation).toBeUndefined();
+    expect((json.maps as Array<{ compassOrientation: number }>)[0]?.compassOrientation).toBe(90);
+    expect(parseSceneDocument(json).compassOrientation).toBe(90);
+  });
+
   it("rejects incompatible versions", () => {
     expect(() => parseSceneDocument({ ...createDefaultScene(), version: 999 })).toThrow();
   });

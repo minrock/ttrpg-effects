@@ -18,6 +18,8 @@ import type {
   SceneShape
 } from "../../../domain/sessions/scene-document";
 import type { FireCell } from "../../../domain/effects/fire";
+import type { CompassOrientation } from "../../../domain/map/compass-orientation";
+import { DEFAULT_COMPASS_ORIENTATION } from "../../../domain/map/compass-orientation";
 import type { ArcanePointerCreatureSize } from "../../../domain/pointer/arcane-pointer";
 import type {
   ArcanePointerBroadcast,
@@ -33,6 +35,7 @@ import type {
 } from "../../../domain/annotations/map-annotations";
 import type { SceneLinkValidationStatus } from "../../../domain/annotations/scene-navigation-links";
 import type { PlayerCameraControlViewState } from "../../../domain/player/player-camera-control";
+import { CompassOverlay } from "./CompassOverlay";
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
@@ -60,6 +63,8 @@ interface MapViewportProps {
   readonly tokens: readonly RenderSceneToken[];
   readonly labels: readonly SceneLabel[];
   readonly mapAnnotations: MapAnnotations;
+  readonly compassOrientation?: CompassOrientation;
+  readonly showCompass?: boolean;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
   readonly showMapAnnotations: boolean;
   readonly selectedElementId: string | null;
@@ -143,6 +148,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   tokens,
   labels,
   mapAnnotations,
+  compassOrientation = DEFAULT_COMPASS_ORIENTATION,
+  showCompass = false,
   sceneLinkStatuses = {},
   showMapAnnotations,
   selectedElementId,
@@ -214,8 +221,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
   const mapRef = useRef(map);
+  const compassOrientationRef = useRef(compassOrientation);
   const playerCameraControlStateRef = useRef<PlayerCameraControlViewState | null>(null);
   mapRef.current = map;
+  compassOrientationRef.current = compassOrientation;
 
   useImperativeHandle(ref, () => ({
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
@@ -300,6 +309,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setTokens(tokens);
       createdViewport.setLabels(labels);
       createdViewport.setMapAnnotations(mapAnnotations);
+      createdViewport.setCompassOrientation(compassOrientationRef.current);
       createdViewport.setSceneLinkStatuses(sceneLinkStatuses);
       createdViewport.setShowMapAnnotations(showMapAnnotations);
       createdViewport.setSelectedElementId(selectedElementId);
@@ -387,6 +397,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setMapAnnotations(mapAnnotations);
   }, [mapAnnotations]);
+
+  useEffect(() => {
+    viewportRef.current?.setCompassOrientation(compassOrientation);
+  }, [compassOrientation]);
 
   useEffect(() => {
     viewportRef.current?.setSceneLinkStatuses(sceneLinkStatuses);
@@ -513,6 +527,12 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       aria-label="Lienzo del mapa"
     >
       {isReadOnly ? null : <NavigationLegend />}
+      {showCompass && map !== null ? (
+        <CompassOverlay
+          orientation={viewRole === "player" ? DEFAULT_COMPASS_ORIENTATION : compassOrientation}
+          variant={viewRole === "player" ? "player" : "dm"}
+        />
+      ) : null}
       {overlay}
     </div>
   );
