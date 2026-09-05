@@ -118,6 +118,40 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(json).compassOrientation).toBe(90);
   });
 
+  it("defaults missing map background color and persists it inside maps", () => {
+    const scene = createDefaultScene();
+    const mapWithoutBackground = Object.fromEntries(
+      Object.entries(scene.maps[0]).filter(([key]) => key !== "backgroundColor")
+    );
+    const parsed = parseSceneDocument({
+      ...scene,
+      maps: [mapWithoutBackground]
+    });
+
+    expect(parsed.backgroundColor).toBe("#15181a");
+    expect(parsed.maps[0]?.backgroundColor).toBe("#15181a");
+
+    const colored = {
+      ...parsed,
+      backgroundColor: "#334455",
+      maps: [{ ...parsed.maps[0], backgroundColor: "#334455" }]
+    };
+    const json = JSON.parse(serializeSceneDocument(colored)) as Record<string, unknown>;
+
+    expect(json.backgroundColor).toBeUndefined();
+    expect((json.maps as Array<{ backgroundColor: string }>)[0]?.backgroundColor).toBe("#334455");
+    expect(parseSceneDocument(json).backgroundColor).toBe("#334455");
+  });
+
+  it("rejects invalid map background colors", () => {
+    const scene = createDefaultScene();
+
+    expect(() => parseSceneDocument({
+      ...scene,
+      maps: [{ ...scene.maps[0], backgroundColor: "transparent" }]
+    })).toThrow();
+  });
+
   it("rejects incompatible versions", () => {
     expect(() => parseSceneDocument({ ...createDefaultScene(), version: 999 })).toThrow();
   });

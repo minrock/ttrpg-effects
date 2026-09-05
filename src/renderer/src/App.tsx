@@ -113,6 +113,7 @@ import {
   removeSceneMap,
   renameSceneMap,
   reorderSceneMaps,
+  setActiveMapBackgroundColor,
   setActiveMapCompassOrientation,
   setActiveSceneMap,
   createEmptyScene,
@@ -2033,6 +2034,12 @@ export function App(): JSX.Element {
     );
   }
 
+  function handleMapBackgroundColorChange(backgroundColor: string): void {
+    setScene((current) =>
+      current.backgroundColor === backgroundColor ? current : setActiveMapBackgroundColor(current, backgroundColor)
+    );
+  }
+
   function handleDarknessEnabledChange(): void {
     setScene((current) => ({
       ...current,
@@ -3180,6 +3187,8 @@ export function App(): JSX.Element {
           objects={sceneObjects}
           maps={scene.maps}
           activeMapId={scene.activeMapId}
+          backgroundColor={scene.backgroundColor}
+          onBackgroundColorChange={handleMapBackgroundColorChange}
           onSelectMap={handleSelectSceneMap}
           onRenameMap={handleRenameSceneMap}
           onReorderMaps={handleReorderSceneMaps}
@@ -3228,6 +3237,7 @@ export function App(): JSX.Element {
           mapAnnotations={scene.mapAnnotations}
           sceneLinkStatuses={sceneLinkStatuses}
           showMapAnnotations={showMapAnnotations}
+          backgroundColor={scene.backgroundColor}
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}

@@ -266,6 +266,7 @@ export function PlayerApp(): JSX.Element {
           labels={[]}
           mapAnnotations={{ pins: [], areas: [], sceneLinks: [] }}
           compassOrientation={scene.compassOrientation}
+          backgroundColor={scene.backgroundColor}
           showCompass={showCompass}
           showMapAnnotations={false}
           selectedElementId={null}
