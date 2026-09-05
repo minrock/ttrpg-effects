@@ -10,6 +10,13 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.2.3] - 2026-09-05
+
+### Changed
+
+- Los botones para crear pin de habitacion, area de informacion y conexion de escena pasan al arbol de anotaciones del panel izquierdo, debajo del buscador y en disposicion vertical de ancho completo.
+- El panel derecho de anotaciones queda enfocado en la visibilidad, evitando duplicar acciones de creacion.
+
 ## [2.2.2] - 2026-09-05
 
 ### Changed

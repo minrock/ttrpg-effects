@@ -20,6 +20,7 @@ describe("MapAnnotationsTree deletion", () => {
   let container: HTMLDivElement;
   let root: Root;
   const onDeleteArea = vi.fn(), onSelect = vi.fn(), onEdit = vi.fn(), onHighlightArea = vi.fn();
+  const onStartPin = vi.fn(), onStartArea = vi.fn(), onStartSceneLink = vi.fn();
 
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -27,8 +28,27 @@ describe("MapAnnotationsTree deletion", () => {
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    act(() => root.render(<MapAnnotationsTree annotations={annotations} selectedElementId="pin" onSelect={onSelect} onEdit={onEdit} onDeleteArea={onDeleteArea} onGoTo={vi.fn()} onToggleLock={vi.fn()} onHighlightArea={onHighlightArea} />));
+    renderTree();
   });
+
+  function renderTree(activeTool = "select"): void {
+    act(() => root.render(
+      <MapAnnotationsTree
+        annotations={annotations}
+        selectedElementId="pin"
+        onSelect={onSelect}
+        onEdit={onEdit}
+        onDeleteArea={onDeleteArea}
+        onGoTo={vi.fn()}
+        onToggleLock={vi.fn()}
+        onHighlightArea={onHighlightArea}
+        activeTool={activeTool}
+        onStartPin={onStartPin}
+        onStartArea={onStartArea}
+        onStartSceneLink={onStartSceneLink}
+      />
+    ));
+  }
 
   afterEach(() => {
     act(() => root.unmount());
@@ -74,5 +94,25 @@ describe("MapAnnotationsTree deletion", () => {
     act(() => input?.dispatchEvent(event));
     expect(event.defaultPrevented).toBe(false);
     expect(onDeleteArea).not.toHaveBeenCalled();
+  });
+
+  it("shows creation actions below search and routes them to annotation tools", () => {
+    renderTree("information-area");
+
+    const buttons = [...container.querySelectorAll<HTMLButtonElement>(".annotation-tree-create-actions button")];
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      "Pin de habitacion",
+      "Area de informacion",
+      "Conexion de escena"
+    ]);
+    expect(buttons[1]?.classList.contains("is-active")).toBe(true);
+
+    act(() => buttons[0]?.click());
+    act(() => buttons[1]?.click());
+    act(() => buttons[2]?.click());
+
+    expect(onStartPin).toHaveBeenCalledOnce();
+    expect(onStartArea).toHaveBeenCalledOnce();
+    expect(onStartSceneLink).toHaveBeenCalledOnce();
   });
 });

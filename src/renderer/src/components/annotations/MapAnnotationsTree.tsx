@@ -1,5 +1,5 @@
 import { useMemo, useState, type JSX, type ReactNode } from "react";
-import { Search, Trash2 } from "lucide-react";
+import { Link2, MapPin, ScanSearch, Search, Trash2 } from "lucide-react";
 import {
   searchMapAnnotations,
   type MapAnnotation,
@@ -17,6 +17,10 @@ interface MapAnnotationsTreeProps {
   readonly onToggleLock: (annotation: MapAnnotation) => void;
   readonly onHighlightArea: (areaId: string) => void;
   readonly onDeleteArea: (areaId: string) => void;
+  readonly activeTool: string;
+  readonly onStartPin: () => void;
+  readonly onStartArea: () => void;
+  readonly onStartSceneLink: () => void;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
 }
 
@@ -29,6 +33,10 @@ export function MapAnnotationsTree({
   onToggleLock,
   onHighlightArea,
   onDeleteArea,
+  activeTool,
+  onStartPin,
+  onStartArea,
+  onStartSceneLink,
   sceneLinkStatuses = {}
 }: MapAnnotationsTreeProps): JSX.Element {
   const [query, setQuery] = useState("");
@@ -51,6 +59,20 @@ export function MapAnnotationsTree({
           aria-label="Buscar anotaciones"
         />
       </label>
+      <div className="annotation-tree-create-actions" aria-label="Crear anotaciones">
+        <button type="button" className={activeTool === "room-pin" ? "is-active" : ""} onClick={onStartPin}>
+          <MapPin size={15} aria-hidden="true" />
+          <span>Pin de habitacion</span>
+        </button>
+        <button type="button" className={activeTool === "information-area" ? "is-active" : ""} onClick={onStartArea}>
+          <ScanSearch size={15} aria-hidden="true" />
+          <span>Area de informacion</span>
+        </button>
+        <button type="button" className={activeTool === "scene-link" ? "is-active" : ""} onClick={onStartSceneLink}>
+          <Link2 size={15} aria-hidden="true" />
+          <span>Conexion de escena</span>
+        </button>
+      </div>
       <ul className="annotation-tree" role="tree" aria-label="Arbol de anotaciones">
         <AnnotationBranch label="Habitaciones" icon="◆" count={pins.length}>
           {pins.map((pin) => (
