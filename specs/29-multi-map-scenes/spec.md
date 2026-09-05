@@ -306,7 +306,12 @@ Los links actuales que apuntan a otros archivos de escena pueden evolucionar par
 ### En nueva escena multi-mapa
 
 - Un link sobre el mapa puede apuntar a otro mapa dentro de la misma escena.
+- El modal de nueva conexion no abre archivos externos; lista los mapas ya cargados en la escena, excluyendo el mapa activo.
+- Al seleccionar un mapa destino, el modal muestra sus puntos de conexion y permite elegir solamente puntos libres.
+- Guardar la conexion crea ambos extremos de forma reciproca usando `mapId` internos.
+- Despues de conectar o desligar, la escena actual se guarda en background. Si la escena aun no tiene ruta, se solicita guardarla una vez.
 - Activar el link cambia el mapa activo.
+- Activar el link mueve la camara del DM y del jugador al punto de conexion del mapa destino.
 - El link debe conservar una referencia estable al mapa destino.
 - Si el destino ya no existe, el link queda marcado como roto de forma recuperable.
 

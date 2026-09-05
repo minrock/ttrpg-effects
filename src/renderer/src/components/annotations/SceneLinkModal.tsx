@@ -1,8 +1,8 @@
 import { useState, type JSX } from "react";
 import { ExternalLink, Link2, MapPinned, Save, Unlink, X } from "lucide-react";
+import type { InternalSceneLinkCandidateMap } from "../../../../domain/annotations/internal-scene-links";
 import type {
   MapSceneLinkMarker,
-  SceneLinkCandidateFile,
   SceneLinkValidationStatus
 } from "../../../../domain/annotations/scene-navigation-links";
 
@@ -10,8 +10,9 @@ interface SceneLinkModalProps {
   readonly marker: MapSceneLinkMarker;
   readonly status: SceneLinkValidationStatus;
   readonly currentScenePath: string | null;
+  readonly candidateMaps: readonly InternalSceneLinkCandidateMap[];
   readonly onRename: (name: string) => Promise<boolean>;
-  readonly onConnect: (targetScenePath: string, targetMarkerId: string) => Promise<boolean>;
+  readonly onConnect: (targetMapId: string, targetMarkerId: string) => Promise<boolean>;
   readonly onDisconnect: () => Promise<boolean>;
   readonly onNavigate: () => Promise<void>;
   readonly onClose: () => void;
@@ -21,6 +22,7 @@ export function SceneLinkModal({
   marker,
   status,
   currentScenePath,
+  candidateMaps,
   onRename,
   onConnect,
   onDisconnect,
@@ -28,44 +30,19 @@ export function SceneLinkModal({
   onClose
 }: SceneLinkModalProps): JSX.Element {
   const [name, setName] = useState(marker.name);
-  const [candidate, setCandidate] = useState<SceneLinkCandidateFile | null>(null);
-  const [selectedMarkerId, setSelectedMarkerId] = useState("");
+  const [selectedMapId, setSelectedMapId] = useState(candidateMaps[0]?.id ?? "");
+  const [selectedMarkerId, setSelectedMarkerId] = useState(candidateMaps[0]?.markers.find((item) => item.available)?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const chooseTargetFile = async (): Promise<void> => {
-    if (window.ttrpg === undefined) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const selected = await window.ttrpg.selectSceneLinkTargetFile();
-      if (!selected.ok) {
-        setError(selected.error);
-        return;
-      }
-      if (selected.filePath === null) return;
-      if (selected.filePath === currentScenePath) {
-        setError("Selecciona una escena diferente a la actual.");
-        return;
-      }
-      const listed = await window.ttrpg.listSceneLinkCandidates(selected.filePath);
-      if (!listed.ok) {
-        setError(listed.error);
-        return;
-      }
-      setCandidate(listed.candidate);
-      setSelectedMarkerId(listed.candidate.markers.find((item) => item.available)?.id ?? "");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const selectedMap = candidateMaps.find((map) => map.id === selectedMapId) ?? null;
+  const availableMarkers = selectedMap?.markers.filter((item) => item.available) ?? [];
 
   const connect = async (): Promise<void> => {
-    if (candidate === null || selectedMarkerId === "") return;
+    if (selectedMapId === "" || selectedMarkerId === "") return;
     setBusy(true);
     setError(null);
     try {
-      if (await onConnect(candidate.filePath, selectedMarkerId)) onClose();
+      if (await onConnect(selectedMapId, selectedMarkerId)) onClose();
     } finally {
       setBusy(false);
     }
@@ -137,7 +114,8 @@ export function SceneLinkModal({
               <div>
                 <strong>{statusLabel(status)}</strong>
                 {status.state === "broken" ? <span>{status.message}</span> : null}
-                {marker.connection !== null ? <span>{marker.connection.peer.scenePath}</span> : null}
+                {marker.connection?.peer.mapId !== undefined ? <span>Mapa interno conectado</span> : null}
+                {marker.connection !== null && marker.connection.peer.mapId === undefined ? <span>{marker.connection.peer.scenePath}</span> : null}
               </div>
             </div>
           </section>
@@ -146,7 +124,7 @@ export function SceneLinkModal({
             <div className="scene-link-panel__heading">
               <div>
                 <small>Destino</small>
-                <h3>Escena y punto de entrada</h3>
+                <h3>Mapa y punto de entrada</h3>
               </div>
               <Link2 aria-hidden="true" />
             </div>
@@ -155,32 +133,46 @@ export function SceneLinkModal({
               <p className="sidebar-hint">La escena se guardara antes de configurar la conexion.</p>
             ) : null}
 
-            <button type="button" className="scene-link-file-button" onClick={() => void chooseTargetFile()} disabled={busy}>
-              {marker.connection === null ? "Elegir escena destino" : "Reconfigurar conexion"}
-            </button>
-
-            {candidate !== null ? (
+            {candidateMaps.length === 0 ? (
+              <p className="sidebar-hint">Agrega otro mapa a la escena para poder enlazar este punto.</p>
+            ) : (
               <div className="scene-link-candidates">
-                <strong>{fileName(candidate.filePath)}</strong>
-                {candidate.markers.length === 0 ? <p>No hay puntos de conexion en esta escena.</p> : (
-                  <label>
-                    Punto de entrada
-                    <select value={selectedMarkerId} onChange={(event) => setSelectedMarkerId(event.currentTarget.value)}>
-                      <option value="">Selecciona un punto</option>
-                      {candidate.markers.map((item) => (
-                        <option key={item.id} value={item.id} disabled={!item.available}>
-                          {item.name}{item.available ? "" : " (ocupado)"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <label>
+                  Mapa destino
+                  <select
+                    value={selectedMapId}
+                    onChange={(event) => {
+                      const nextMapId = event.currentTarget.value;
+                      const nextMap = candidateMaps.find((map) => map.id === nextMapId);
+                      setSelectedMapId(nextMapId);
+                      setSelectedMarkerId(nextMap?.markers.find((item) => item.available)?.id ?? "");
+                    }}
+                  >
+                    {candidateMaps.map((map) => (
+                      <option key={map.id} value={map.id}>{map.name}</option>
+                    ))}
+                  </select>
+                </label>
+                {selectedMap === null || selectedMap.markers.length === 0 ? <p>No hay puntos de conexion en este mapa.</p> : (
+                <label>
+                  Punto de entrada
+                  <select value={selectedMarkerId} onChange={(event) => setSelectedMarkerId(event.currentTarget.value)}>
+                    <option value="">Selecciona un punto</option>
+                    {selectedMap.markers.map((item) => (
+                      <option key={item.id} value={item.id} disabled={!item.available}>
+                        {item.name}{item.available ? "" : " (ocupado)"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 )}
                 <button type="button" className="is-primary" onClick={() => void connect()} disabled={busy || selectedMarkerId === ""}>
                   <Link2 aria-hidden="true" />
                   Conectar habitaciones
                 </button>
+                {selectedMap !== null && availableMarkers.length === 0 ? <p>No hay puntos libres en este mapa.</p> : null}
               </div>
-            ) : null}
+            )}
           </section>
         </div>
 
@@ -193,7 +185,7 @@ export function SceneLinkModal({
               <>
                 <button type="button" onClick={() => void onNavigate()} disabled={busy}>
                   <ExternalLink aria-hidden="true" />
-                  Abrir escena
+                  Ir al mapa
                 </button>
                 <button
                   type="button"
@@ -221,8 +213,4 @@ function statusLabel(status: SceneLinkValidationStatus): string {
     case "valid": return "Conexion valida";
     case "broken": return "Conexion rota";
   }
-}
-
-function fileName(filePath: string): string {
-  return filePath.replaceAll("\\", "/").split("/").pop() ?? filePath;
 }
