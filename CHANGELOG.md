@@ -10,6 +10,14 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.1.1] - 2026-09-04
+
+### Fixed
+
+- El modal para crear conexiones ahora enlaza contra mapas ya cargados dentro de la escena, sin abrir archivos externos.
+- Las conexiones internas entre mapas se guardan en background y se pueden desligar de ambos lados manteniendo la escena consistente.
+- Specs y plan de escenas multi-mapa actualizados para reflejar el flujo interno de conexiones.
+
 ## [2.1.0] - 2026-09-04
 
 ### Added

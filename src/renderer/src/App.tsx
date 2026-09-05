@@ -205,6 +205,11 @@ import {
 } from "../../domain/annotations/map-annotations";
 import { resolveInternalSceneLinkNavigationTarget } from "../../domain/annotations/internal-scene-link-navigation";
 import {
+  connectInternalSceneLink,
+  disconnectInternalSceneLink,
+  listInternalSceneLinkCandidateMaps
+} from "../../domain/annotations/internal-scene-links";
+import {
   MapAnnotationModal,
   type MapAnnotationModalDraft
 } from "./components/annotations/MapAnnotationModal";
@@ -906,35 +911,59 @@ export function App(): JSX.Element {
     return saved.filePath;
   }
 
+  async function saveSceneSnapshotInBackground(
+    sceneSnapshot: SceneDocument,
+    successMessage: string,
+    targetScenePath?: string
+  ): Promise<boolean> {
+    if (window.ttrpg === undefined) {
+      setFeedback("La API de preload no esta disponible.");
+      return false;
+    }
+
+    const scenePath = targetScenePath ?? currentFilePath ?? await persistCurrentSceneForSceneLink();
+    if (scenePath === null) return false;
+
+    const saved = await window.ttrpg.saveSceneToPath(createSceneSavePayload(sceneSnapshot, sceneAside), scenePath);
+    if (!saved.ok) {
+      setFeedback(saved.error);
+      return false;
+    }
+
+    setCurrentFilePath(saved.filePath);
+    lastSavedSceneJsonRef.current = JSON.stringify({ ...sceneSnapshot, sceneAside });
+    setFeedback(successMessage);
+    return true;
+  }
+
   async function handleConnectSceneLink(
     marker: MapSceneLinkMarker,
-    targetScenePath: string,
+    targetMapId: string,
     targetMarkerId: string
   ): Promise<boolean> {
-    if (window.ttrpg === undefined) return false;
-    const sourceScenePath = await persistCurrentSceneForSceneLink();
-    if (sourceScenePath === null) return false;
+    const sourceMapId = sceneRef.current.activeMapId;
+    if (sourceMapId === null) {
+      setFeedback("Selecciona un mapa antes de crear una conexion.");
+      return false;
+    }
 
     setIsBusy(true);
     try {
-      const result = await window.ttrpg.connectSceneLink({
-        sourceScenePath,
+      const scenePath = currentFilePath ?? await persistCurrentSceneForSceneLink();
+      if (scenePath === null) return false;
+      const nextScene = connectInternalSceneLink(sceneRef.current, {
+        sourceMapId,
         sourceMarkerId: marker.id,
-        targetScenePath,
-        targetMarkerId
+        targetMapId,
+        targetMarkerId,
+        scenePath,
+        connectionId: globalThis.crypto.randomUUID()
       });
-      if (!result.ok) {
-        setFeedback(result.error);
-        return false;
-      }
-      setScene((current) => ({ ...current, mapAnnotations: result.mapAnnotations }));
-      lastSavedSceneJsonRef.current = JSON.stringify({
-        ...sceneRef.current,
-        mapAnnotations: result.mapAnnotations,
-        sceneAside
-      });
-      setFeedback(result.warning ?? "Conexion reciproca guardada.");
-      return true;
+      setScene(nextScene);
+      return await saveSceneSnapshotInBackground(nextScene, "Conexion interna guardada.", scenePath);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo crear la conexion interna.");
+      return false;
     } finally {
       setIsBusy(false);
     }
@@ -946,6 +975,11 @@ export function App(): JSX.Element {
     if (scenePath === null) return false;
     setIsBusy(true);
     try {
+      if (marker.connection?.peer.mapId !== undefined && sceneRef.current.activeMapId !== null) {
+        const nextScene = disconnectInternalSceneLink(sceneRef.current, sceneRef.current.activeMapId, marker.id);
+        setScene(nextScene);
+        return await saveSceneSnapshotInBackground(nextScene, "Conexion interna desligada.");
+      }
       const result = await window.ttrpg.disconnectSceneLink({ scenePath, markerId: marker.id });
       if (!result.ok) {
         setFeedback(result.error);
@@ -2680,6 +2714,10 @@ export function App(): JSX.Element {
   const sceneLinkModalMarker = sceneLinkModalId === null
     ? undefined
     : scene.mapAnnotations.sceneLinks.find((marker) => marker.id === sceneLinkModalId);
+  const sceneLinkCandidateMaps = useMemo(
+    () => listInternalSceneLinkCandidateMaps(scene, scene.activeMapId),
+    [scene]
+  );
   const selectedMeasurement =
     selectedShape?.type === "measurement"
       ? measureDistance(selectedShape.points[0], selectedShape.points[1], {
@@ -4518,9 +4556,10 @@ export function App(): JSX.Element {
             sceneLinkModalMarker.connection === null ? { state: "unlinked" } : { state: "validating" }
           )}
           currentScenePath={currentFilePath}
+          candidateMaps={sceneLinkCandidateMaps}
           onRename={(name) => handleRenameSceneLink(sceneLinkModalMarker.id, name)}
-          onConnect={(targetScenePath, targetMarkerId) =>
-            handleConnectSceneLink(sceneLinkModalMarker, targetScenePath, targetMarkerId)
+          onConnect={(targetMapId, targetMarkerId) =>
+            handleConnectSceneLink(sceneLinkModalMarker, targetMapId, targetMarkerId)
           }
           onDisconnect={() => handleDisconnectSceneLink(sceneLinkModalMarker)}
           onNavigate={() => handleNavigateSceneLink(sceneLinkModalMarker)}

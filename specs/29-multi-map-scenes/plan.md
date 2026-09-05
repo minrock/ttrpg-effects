@@ -44,6 +44,7 @@
 - **IPC / Electron:** Reutilizar `scene:load`, `scene:save`, `scene:save-to-path`; agregar una accion especifica para importar `.ttrpgscene` a la escena actual si el renderer necesita dialogo nativo separado. No exponer `fs` ni IPC generico.
 - **Render / PixiJS:** `MapViewport` sigue recibiendo solo el mapa activo. No renderiza mapas inactivos. Cambiar de mapa alimenta props nuevas sin duplicar listeners ni crear viewports paralelos.
 - **Links:** Introducir destino interno opcional por `mapId`; conservar conexiones legacy por ruta durante migracion/importacion. La migracion recursiva tendra limite de profundidad/cantidad y un set de rutas normalizadas visitadas.
+- **Modal de conexiones:** Crear conexiones nuevas solo contra mapas internos ya cargados. El modal del renderer lista mapas distintos al activo y luego los puntos libres de ese mapa; no invoca selector de archivos para conexiones nuevas.
 - **Dependencias nuevas:** Ninguna esperada.
 
 ## 4. Diseno de dominio
@@ -135,6 +136,7 @@
   - remapea ids;
   - opcionalmente sigue conexiones legacy con limite.
 - Actualizar use cases de scene navigation links para soportar carga interna por `mapId` y legacy por archivo.
+- Agregar helpers puros para listar candidatos internos, conectar marcadores entre mapas, desligar ambos extremos y mantener el mapa activo sincronizado.
 
 ### `infrastructure`
 
@@ -178,6 +180,7 @@
   - `SceneMapsSection` para listar, seleccionar, renombrar, ordenar, eliminar y agregar mapas;
   - `DmAsideTabs` o evolucion de `DmAsidePanel` con tabs horizontales;
   - separar secciones `SceneAsideTab` y `MapAsideTab`.
+- Actualizar `SceneLinkModal` para mostrar mapas internos y puntos libres; remover el flujo de seleccion de archivo para conexiones nuevas.
 - `DmAsidePanel`:
   - tab `Escena`: mapas, notas, monstruos, NPCs, personajes;
   - tab `Mapa`: objetos y anotaciones del mapa activo.
