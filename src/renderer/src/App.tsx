@@ -163,7 +163,8 @@ import {
   shouldApplyPlayerCameraReport,
   zoomPlayerCamera,
   type PlayerCameraCommandReason,
-  type PlayerCameraSyncStatus
+  type PlayerCameraSyncStatus,
+  type PlayerViewportReport
 } from "../../domain/player/player-camera-control";
 import {
   ALLOWED_SHAPE_EMOJIS,
@@ -323,6 +324,7 @@ export function App(): JSX.Element {
   );
   const dmCameraRef = useRef<ViewportCameraSnapshot>(playerCameraRef.current);
   const effectivePlayerCameraRef = useRef<ViewportCameraSnapshot | null>(null);
+  const effectivePlayerViewportRef = useRef<PlayerViewportReport | null>(null);
   const playerCameraCommandRevisionRef = useRef(0);
   const pendingPlayerCameraCommandRevisionRef = useRef<number | null>(null);
   const acknowledgedPlayerCameraCommandRevisionRef = useRef<number | null>(null);
@@ -556,7 +558,8 @@ export function App(): JSX.Element {
     viewportHandleRef.current?.setPlayerCameraControlState({
       primaryCamera: playerCameraRef.current,
       effectiveCamera: effectivePlayerCameraRef.current,
-      status
+      status,
+      viewport: effectivePlayerViewportRef.current ?? undefined
     });
   }, []);
 
@@ -1019,6 +1022,7 @@ export function App(): JSX.Element {
       playerCameraRef.current = internalTarget.camera;
       dmCameraRef.current = internalTarget.camera;
       effectivePlayerCameraRef.current = null;
+      effectivePlayerViewportRef.current = null;
       acknowledgedPlayerCameraCommandRevisionRef.current = null;
       playerCameraSyncKeyRef.current = nextCameraSyncKey;
       setPlayerCameraSyncKey(nextCameraSyncKey);
@@ -1298,6 +1302,7 @@ export function App(): JSX.Element {
       isPlayerWindowOpenRef.current = false;
       setIsPlayerWindowOpen(false);
       effectivePlayerCameraRef.current = null;
+      effectivePlayerViewportRef.current = null;
       pendingPlayerCameraCommandRevisionRef.current = null;
       acknowledgedPlayerCameraCommandRevisionRef.current = null;
       refreshPlayerCameraControl("closed");
@@ -1309,6 +1314,10 @@ export function App(): JSX.Element {
 
       lastPlayerCameraReportRevisionRef.current = report.reportRevision;
       effectivePlayerCameraRef.current = normalizeCameraSnapshot(report.camera);
+      effectivePlayerViewportRef.current =
+        report.viewport?.mapId === undefined || report.viewport.mapId === sceneRef.current.activeMapId
+          ? report.viewport ?? null
+          : null;
       if (report.acknowledgedCommandRevision !== null) {
         acknowledgedPlayerCameraCommandRevisionRef.current = Math.max(
           acknowledgedPlayerCameraCommandRevisionRef.current ?? -1,
@@ -1320,6 +1329,7 @@ export function App(): JSX.Element {
     const unsubscribePlayerReady = window.ttrpg?.onPlayerWindowReady(() => {
       lastPlayerCameraReportRevisionRef.current = -1;
       effectivePlayerCameraRef.current = null;
+      effectivePlayerViewportRef.current = null;
       acknowledgedPlayerCameraCommandRevisionRef.current = null;
       if (isPlayerWindowOpenRef.current) {
         sendPlayerCameraCommand("open");
@@ -1412,6 +1422,7 @@ export function App(): JSX.Element {
     });
     dmCameraRef.current = playerCameraRef.current;
     effectivePlayerCameraRef.current = null;
+    effectivePlayerViewportRef.current = null;
     acknowledgedPlayerCameraCommandRevisionRef.current = null;
     setPlayerCameraSyncKey((current) => current + 1);
     setMapImageUrl(null);
@@ -1857,6 +1868,7 @@ export function App(): JSX.Element {
         playerCameraRef.current = playerCamera;
         dmCameraRef.current = loadedCamera;
         effectivePlayerCameraRef.current = null;
+        effectivePlayerViewportRef.current = null;
         acknowledgedPlayerCameraCommandRevisionRef.current = null;
         playerCameraSyncKeyRef.current = nextCameraSyncKey;
         setPlayerCameraSyncKey(nextCameraSyncKey);
