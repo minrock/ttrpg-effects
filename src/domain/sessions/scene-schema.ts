@@ -9,6 +9,7 @@ import {
 import { createDefaultFogOfWar } from "../vision/vision";
 import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
+import { DEFAULT_COMPASS_ORIENTATION, compassOrientations } from "../map/compass-orientation";
 import { sanitizeMapScale } from "../map/map-image";
 import { migrateSceneDocument, syncActiveMapFromRuntimeFields, syncRuntimeFieldsFromActiveMap } from "./scene-maps";
 
@@ -26,6 +27,12 @@ const emojiSchema = z.string().trim().min(1).max(32).optional();
 const tokenSizeSchema = z.enum(["tiny", "small", "medium", "large", "huge", "gargantuan"]);
 const tokenFootprintSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]);
 const labelFontSchema = z.enum(systemLabelFonts);
+const compassOrientationSchema = z.union([
+  z.literal(compassOrientations[0]),
+  z.literal(compassOrientations[1]),
+  z.literal(compassOrientations[2]),
+  z.literal(compassOrientations[3])
+]);
 
 const linearShapeSchema = z.object({
   id: z.string().min(1),
@@ -456,6 +463,7 @@ export const sceneDocumentV1Schema = z.object({
 const sceneMapDocumentSchema = z.object({
   id: z.string().trim().min(1),
   name: z.string().trim().min(1).max(120),
+  compassOrientation: compassOrientationSchema.default(DEFAULT_COMPASS_ORIENTATION),
   map: sceneDocumentV1Schema.shape.map,
   camera: sceneDocumentV1Schema.shape.camera,
   grid: sceneDocumentV1Schema.shape.grid,
@@ -476,6 +484,7 @@ export const sceneDocumentV2Schema = z.object({
   activeMapId: z.string().trim().min(1).nullable(),
   id: z.string().default(""),
   name: z.string().default(""),
+  compassOrientation: compassOrientationSchema.default(DEFAULT_COMPASS_ORIENTATION).optional(),
   sceneAside: sceneDocumentV1Schema.shape.sceneAside,
   combatTracker: sceneDocumentV1Schema.shape.combatTracker,
   map: sceneDocumentV1Schema.shape.map.optional(),
@@ -515,6 +524,7 @@ export const sceneDocumentV2Schema = z.object({
     activeMapId,
     id: active?.id ?? scene.id,
     name: active?.name ?? scene.name,
+    compassOrientation: active?.compassOrientation ?? scene.compassOrientation ?? DEFAULT_COMPASS_ORIENTATION,
     sceneAside: scene.sceneAside,
     combatTracker: scene.combatTracker,
     ...(hasRuntimeFields ? {
@@ -640,7 +650,7 @@ export function serializeSceneDocument(scene: SceneDocument): string {
   if (syncedScene.maps.length === 0) {
     throw new Error("Agrega al menos un mapa antes de guardar la escena.");
   }
-  const { map, camera, grid, darkness, fogOfWar, settings, lights, effects, shapes, tokens, labels, mapAnnotations, ...persistedScene } = syncedScene;
+  const { map, camera, grid, darkness, fogOfWar, settings, lights, effects, shapes, tokens, labels, mapAnnotations, compassOrientation, ...persistedScene } = syncedScene;
   void map;
   void camera;
   void grid;
@@ -653,5 +663,6 @@ export function serializeSceneDocument(scene: SceneDocument): string {
   void tokens;
   void labels;
   void mapAnnotations;
+  void compassOrientation;
   return `${JSON.stringify(persistedScene, null, 2)}\n`;
 }

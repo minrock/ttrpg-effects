@@ -7,6 +7,7 @@ import {
   createEmptyScene,
   hasSceneMapContent,
   removeSceneMap,
+  setActiveMapCompassOrientation,
   setActiveSceneMap,
   syncActiveMapFromRuntimeFields
 } from "./scene-maps";
@@ -55,5 +56,17 @@ describe("scene map document helpers", () => {
   it("detects meaningful content inside a map", () => {
     expect(hasSceneMapContent(createDefaultScene().maps[0])).toBe(false);
     expect(hasSceneMapContent(createDefaultSceneMap({ map: { imagePath: "/maps/a.png", position: { x: 0, y: 0 }, scale: 1 } }))).toBe(true);
+  });
+
+  it("stores compass orientation per active map", () => {
+    const first = createDefaultSceneMap({ id: "map-1", name: "Entrada" });
+    const second = createDefaultSceneMap({ id: "map-2", name: "Cripta" });
+    const scene = setActiveSceneMap(addSceneMap(addSceneMap(createEmptyScene(), first), second), "map-1");
+    const orientedFirst = setActiveMapCompassOrientation(scene, 90);
+    const orientedSecond = setActiveMapCompassOrientation(setActiveSceneMap(orientedFirst, "map-2"), 180);
+
+    expect(orientedSecond.maps.find((map) => map.id === "map-1")?.compassOrientation).toBe(90);
+    expect(orientedSecond.maps.find((map) => map.id === "map-2")?.compassOrientation).toBe(180);
+    expect(setActiveSceneMap(orientedSecond, "map-1").compassOrientation).toBe(90);
   });
 });

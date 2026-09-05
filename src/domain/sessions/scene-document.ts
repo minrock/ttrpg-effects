@@ -2,6 +2,7 @@ import type { SceneAside } from "./scene-aside";
 import type { CombatTracker } from "../combat/combat-tracker";
 import type { MapAnnotations } from "../annotations/map-annotations";
 import type { GridCell } from "../grid/grid-cell";
+import type { CompassOrientation } from "../map/compass-orientation";
 
 export const LEGACY_SCENE_DOCUMENT_VERSION = 1;
 export const SCENE_DOCUMENT_VERSION = 2;
@@ -264,6 +265,7 @@ export interface SceneLabel {
 export interface SceneMapDocument {
   readonly id: string;
   readonly name: string;
+  readonly compassOrientation: CompassOrientation;
   readonly map: SceneMap;
   readonly camera: SceneCamera;
   readonly grid: SceneGrid;

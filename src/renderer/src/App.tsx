@@ -19,6 +19,7 @@ import * as Switch from "@radix-ui/react-switch";
 import {
   CircleDot,
   Camera,
+  Compass,
   CloudFog,
   Crosshair,
   FilePlus,
@@ -112,11 +113,13 @@ import {
   removeSceneMap,
   renameSceneMap,
   reorderSceneMaps,
+  setActiveMapCompassOrientation,
   setActiveSceneMap,
   createEmptyScene,
   syncActiveMapFromRuntimeFields,
   syncRuntimeFieldsFromActiveMap
 } from "../../domain/sessions/scene-maps";
+import { compassOrientations, getCompassLabel, type CompassOrientation } from "../../domain/map/compass-orientation";
 import type {
   SceneDocument,
   SceneDynamicLightEffect,
@@ -2024,6 +2027,12 @@ export function App(): JSX.Element {
     }));
   }
 
+  function handleCompassOrientationChange(orientation: CompassOrientation): void {
+    setScene((current) =>
+      current.compassOrientation === orientation ? current : setActiveMapCompassOrientation(current, orientation)
+    );
+  }
+
   function handleDarknessEnabledChange(): void {
     setScene((current) => ({
       ...current,
@@ -3279,6 +3288,8 @@ export function App(): JSX.Element {
           onInformationAreaPaint={handleInformationAreaPaint}
           onInformationAreaHighlight={handleInformationAreaHighlight}
           onMapAnnotationPreview={handleMapAnnotationPreviewById}
+          compassOrientation={scene.compassOrientation}
+          showCompass={mapState !== null}
           overlay={<DmDarknessStatusBadge darkness={scene.darkness} />}
         />
         <CombatTurnBar
@@ -4053,6 +4064,25 @@ export function App(): JSX.Element {
                 </button>
               </div>
             ) : null}
+            <div className="compass-control">
+              <span>Orientacion norte</span>
+              <div className="compass-options" role="group" aria-label="Orientacion de brujula">
+                {compassOrientations.map((orientation) => (
+                  <button
+                    key={orientation}
+                    type="button"
+                    className={scene.compassOrientation === orientation ? "is-active" : ""}
+                    aria-pressed={scene.compassOrientation === orientation}
+                    onClick={() => handleCompassOrientationChange(orientation)}
+                    disabled={mapState === null}
+                    title={`Norte hacia ${getCompassLabel(orientation)}`}
+                  >
+                    <Compass size={16} aria-hidden="true" style={{ transform: `rotate(${orientation}deg)` }} />
+                    {getCompassLabel(orientation)}
+                  </button>
+                ))}
+              </div>
+            </div>
             <label>
               Opacidad
               <input

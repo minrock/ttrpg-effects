@@ -1,6 +1,7 @@
 import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, Text, type Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
+  clampZoom,
   createCameraState,
   panCamera,
   screenToWorld,
@@ -11,6 +12,8 @@ import { renderLayerNames, type RenderLayerName } from "../../domain/map/render-
 import type { ScreenPoint, ViewportSize, WorldPoint } from "../../domain/shared/coordinates";
 import type { TacticalElement } from "../../domain/tools/tactical-elements";
 import type { MapImageState } from "../../domain/map/map-image";
+import type { CompassOrientation } from "../../domain/map/compass-orientation";
+import { DEFAULT_COMPASS_ORIENTATION, getPlayerViewRotationDegrees } from "../../domain/map/compass-orientation";
 import type {
   SceneDarkness,
   SceneDynamicLightEffect,
@@ -232,6 +235,7 @@ export class PixiViewport {
   private isSceneLinkMode = false;
   private isInformationAreaMode = false;
   private arcanePointerCreatureSize: ArcanePointerCreatureSize = "medium";
+  private compassOrientation: CompassOrientation = DEFAULT_COMPASS_ORIENTATION;
   private viewRole: ViewportViewRole = "dm";
   private isReadOnly = false;
   private fogPresentation: FogPresentation = "dm-preview";
@@ -482,9 +486,16 @@ export class PixiViewport {
     this.arcanePointerCreatureSize = arcanePointerCreatureSize;
   }
 
+  setCompassOrientation(compassOrientation: CompassOrientation): void {
+    if (this.compassOrientation === compassOrientation) return;
+    this.compassOrientation = compassOrientation;
+    this.applyCamera(false);
+  }
+
   setViewRole(viewRole: ViewportViewRole): void {
     if (this.viewRole === viewRole) return;
     this.viewRole = viewRole;
+    this.applyCamera(false);
     // Darkness and darkvision are player-only: redraw immediately so the DM
     // canvas clears them the moment the role is applied.
     this.scheduleDarknessRedraw();
@@ -950,10 +961,11 @@ export class PixiViewport {
     }
 
     const viewport = this.getViewportSize();
-    const { width: w, height: h } = viewport;
+    const renderViewport = getMaskRenderViewport(viewport, this.getPresentationRotationRadians());
+    const { width: w, height: h } = renderViewport;
     if (w <= 0 || h <= 0) { return; }
     const zoom = this.camera.zoom;
-    const viewportBounds = getViewportWorldBounds(this.camera, viewport);
+    const viewportBounds = getViewportWorldBounds(this.camera, renderViewport);
 
     const rt = this.getDarknessRenderTexture(w, h);
 
@@ -987,10 +999,10 @@ export class PixiViewport {
     if (activeLights.length > 0 || activeFireEffects.length > 0 || activeDynamicLights.length > 0) {
       const eraseContainer = new Container();
       for (const light of activeLights) {
-        eraseContainer.addChild(buildLightEraseGraphicScreen(light, this.camera, viewport));
+        eraseContainer.addChild(buildLightEraseGraphicScreen(light, this.camera, renderViewport));
       }
       for (const effect of activeFireEffects) {
-        eraseContainer.addChild(buildFireLightEraseGraphicScreen(effect, this.camera, viewport));
+        eraseContainer.addChild(buildFireLightEraseGraphicScreen(effect, this.camera, renderViewport));
       }
       for (const effect of activeDynamicLights) {
         eraseContainer.addChild(
@@ -998,7 +1010,7 @@ export class PixiViewport {
             effect,
             this.grid?.cellSizeWorld ?? 100,
             this.camera,
-            viewport
+            renderViewport
           )
         );
       }
@@ -1464,10 +1476,28 @@ export class PixiViewport {
       this.updatePathMovePreview(elementId, x, y);
     } else if (this.dragState.mode === "pan") {
       this.app.canvas.style.cursor = "grabbing";
-      this.camera = panCamera(this.camera, {
+      const delta = {
         x: nextPoint.x - this.dragState.lastPoint.x,
         y: nextPoint.y - this.dragState.lastPoint.y
-      });
+      };
+      if (this.getPresentationRotationRadians() === 0) {
+        this.camera = panCamera(this.camera, delta);
+      } else {
+        const rotation = -this.getPresentationRotationRadians();
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        const worldDelta = {
+          x: delta.x * cos - delta.y * sin,
+          y: delta.x * sin + delta.y * cos
+        };
+        this.camera = {
+          ...this.camera,
+          center: {
+            x: this.camera.center.x - worldDelta.x / this.camera.zoom,
+            y: this.camera.center.y - worldDelta.y / this.camera.zoom
+          }
+        };
+      }
       this.applyCamera();
     }
 
@@ -1818,12 +1848,26 @@ export class PixiViewport {
     }
 
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-    this.camera = zoomCameraAtScreenPoint(
-      this.camera,
-      this.getViewportSize(),
-      this.eventToScreenPoint(event),
-      this.camera.zoom * zoomFactor
-    );
+    const screenPoint = this.eventToScreenPoint(event);
+    if (this.getPresentationRotationRadians() === 0) {
+      this.camera = zoomCameraAtScreenPoint(
+        this.camera,
+        this.getViewportSize(),
+        screenPoint,
+        this.camera.zoom * zoomFactor
+      );
+    } else {
+      const nextZoom = clampZoom(this.camera.zoom * zoomFactor);
+      const anchoredWorldPoint = this.screenToWorldPoint(screenPoint);
+      const rotatedOffset = this.getUnrotatedScreenOffset(screenPoint);
+      this.camera = {
+        center: {
+          x: anchoredWorldPoint.x - rotatedOffset.x / nextZoom,
+          y: anchoredWorldPoint.y - rotatedOffset.y / nextZoom
+        },
+        zoom: nextZoom
+      };
+    }
     this.applyCamera();
     if (this.cameraInteractionEndTimer !== null) {
       window.clearTimeout(this.cameraInteractionEndTimer);
@@ -1883,11 +1927,11 @@ export class PixiViewport {
   private applyCamera(emit = true): void {
     const viewport = this.getViewportSize();
     const shouldRefreshAreaToolUi = Math.abs(this.areaToolUiZoom - this.camera.zoom) > 0.0001;
+    const rotation = this.getPresentationRotationRadians();
     this.world.scale.set(this.camera.zoom);
-    this.world.position.set(
-      viewport.width / 2 - this.camera.center.x * this.camera.zoom,
-      viewport.height / 2 - this.camera.center.y * this.camera.zoom
-    );
+    this.world.rotation = rotation;
+    this.world.pivot.set(this.camera.center.x, this.camera.center.y);
+    this.world.position.set(viewport.width / 2, viewport.height / 2);
     this.drawGrid();
     this.updateMapInformationPinLabelScale();
     this.updatePlayerCameraControlScale();
@@ -1902,6 +1946,37 @@ export class PixiViewport {
     this.cancelScheduledDarknessRedraw();
     this.drawDarknessLayer();
     this.scheduleFogOfWarRedraw();
+  }
+
+  private getPresentationRotationRadians(): number {
+    if (this.viewRole !== "player") {
+      return 0;
+    }
+    return getPlayerViewRotationDegrees(this.compassOrientation) * (Math.PI / 180);
+  }
+
+  private screenToWorldPoint(screenPoint: ScreenPoint): WorldPoint {
+    if (this.getPresentationRotationRadians() === 0) {
+      return screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    }
+    const offset = this.getUnrotatedScreenOffset(screenPoint);
+    return {
+      x: this.camera.center.x + offset.x / this.camera.zoom,
+      y: this.camera.center.y + offset.y / this.camera.zoom
+    };
+  }
+
+  private getUnrotatedScreenOffset(screenPoint: ScreenPoint): ScreenPoint {
+    const viewport = this.getViewportSize();
+    const dx = screenPoint.x - viewport.width / 2;
+    const dy = screenPoint.y - viewport.height / 2;
+    const rotation = -this.getPresentationRotationRadians();
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    return {
+      x: dx * cos - dy * sin,
+      y: dx * sin + dy * cos
+    };
   }
 
   private getViewportSize(): ViewportSize {
@@ -2589,10 +2664,11 @@ export class PixiViewport {
     }
 
     const viewport = this.getViewportSize();
-    const { width, height } = viewport;
+    const renderViewport = getMaskRenderViewport(viewport, this.getPresentationRotationRadians());
+    const { width, height } = renderViewport;
     if (width <= 0 || height <= 0) { return; }
     const zoom = this.camera.zoom;
-    const viewportBounds = getViewportWorldBounds(this.camera, viewport);
+    const viewportBounds = getViewportWorldBounds(this.camera, renderViewport);
     const fogTexture = this.getFogOfWarRenderTexture(width, height);
 
     const fogColor = this.fogPresentation === "player-blocking"
@@ -2630,12 +2706,12 @@ export class PixiViewport {
 
       for (const area of reveals) {
         if (area.kind === "circle") {
-          const sc = worldToScreen(area.center.x, area.center.y, this.camera, viewport);
+          const sc = worldToScreen(area.center.x, area.center.y, this.camera, renderViewport);
           revealGraphic.circle(sc.x, sc.y, area.radius * zoom);
           revealGraphic.fill({ color: 0xffffff, alpha: 1 });
           hasRevealGeometry = true;
         } else if (area.kind === "stroke") {
-          drawStrokeRevealShapeScreen(revealGraphic, area.points, area.radius * zoom, this.camera, viewport);
+          drawStrokeRevealShapeScreen(revealGraphic, area.points, area.radius * zoom, this.camera, renderViewport);
           hasRevealGeometry = true;
         }
       }
@@ -5044,6 +5120,14 @@ function worldToScreen(
     x: (worldX - camera.center.x) * camera.zoom + viewport.width / 2,
     y: (worldY - camera.center.y) * camera.zoom + viewport.height / 2
   };
+}
+
+function getMaskRenderViewport(viewport: ViewportSize, rotationRadians: number): ViewportSize {
+  if (rotationRadians === 0) {
+    return viewport;
+  }
+  const side = Math.ceil(Math.hypot(viewport.width, viewport.height));
+  return { width: side, height: side };
 }
 
 function buildPlayerCameraControl(color: number, isVirtual: boolean): Container {
