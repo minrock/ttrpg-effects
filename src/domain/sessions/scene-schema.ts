@@ -1,9 +1,16 @@
 import { z } from "zod";
-import { SCENE_DOCUMENT_VERSION, type SceneDocument } from "./scene-document";
+import {
+  LEGACY_SCENE_DOCUMENT_VERSION,
+  SCENE_DOCUMENT_VERSION,
+  type SceneDocument,
+  type SceneDocumentV1,
+  type SceneMapDocument
+} from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
 import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
 import { sanitizeMapScale } from "../map/map-image";
+import { migrateSceneDocument, syncActiveMapFromRuntimeFields, syncRuntimeFieldsFromActiveMap } from "./scene-maps";
 
 const finiteNumber = z.number().finite();
 const positiveNumber = finiteNumber.positive();
@@ -256,7 +263,8 @@ const mapInformationAreaSchema = z.object({
 
 const sceneLinkEndpointSchema = z.object({
   scenePath: z.string().min(1),
-  markerId: z.string().min(1)
+  markerId: z.string().min(1),
+  mapId: z.string().min(1).optional()
 });
 
 const sceneLinkConnectionSchema = z.object({
@@ -298,7 +306,7 @@ const combatTrackerSchema = z.object({
 });
 
 export const sceneDocumentV1Schema = z.object({
-  version: z.literal(SCENE_DOCUMENT_VERSION),
+  version: z.literal(LEGACY_SCENE_DOCUMENT_VERSION),
   map: z.object({
     imagePath: z.string().min(1).nullable(),
     position: worldPointSchema,
@@ -445,13 +453,101 @@ export const sceneDocumentV1Schema = z.object({
   }))
 });
 
+const sceneMapDocumentSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z.string().trim().min(1).max(120),
+  map: sceneDocumentV1Schema.shape.map,
+  camera: sceneDocumentV1Schema.shape.camera,
+  grid: sceneDocumentV1Schema.shape.grid,
+  darkness: sceneDocumentV1Schema.shape.darkness,
+  fogOfWar: sceneDocumentV1Schema.shape.fogOfWar,
+  settings: sceneDocumentV1Schema.shape.settings,
+  lights: sceneDocumentV1Schema.shape.lights,
+  effects: sceneDocumentV1Schema.shape.effects,
+  shapes: sceneDocumentV1Schema.shape.shapes,
+  tokens: sceneDocumentV1Schema.shape.tokens,
+  labels: sceneDocumentV1Schema.shape.labels,
+  mapAnnotations: sceneDocumentV1Schema.shape.mapAnnotations
+}) satisfies z.ZodType<SceneMapDocument>;
+
+export const sceneDocumentV2Schema = z.object({
+  version: z.literal(SCENE_DOCUMENT_VERSION),
+  maps: z.array(sceneMapDocumentSchema),
+  activeMapId: z.string().trim().min(1).nullable(),
+  id: z.string().default(""),
+  name: z.string().default(""),
+  sceneAside: sceneDocumentV1Schema.shape.sceneAside,
+  combatTracker: sceneDocumentV1Schema.shape.combatTracker,
+  map: sceneDocumentV1Schema.shape.map.optional(),
+  camera: sceneDocumentV1Schema.shape.camera.optional(),
+  grid: sceneDocumentV1Schema.shape.grid.optional(),
+  darkness: sceneDocumentV1Schema.shape.darkness.optional(),
+  fogOfWar: sceneDocumentV1Schema.shape.fogOfWar.optional(),
+  settings: sceneDocumentV1Schema.shape.settings.optional(),
+  lights: sceneDocumentV1Schema.shape.lights.optional(),
+  effects: sceneDocumentV1Schema.shape.effects.optional(),
+  shapes: sceneDocumentV1Schema.shape.shapes.optional(),
+  tokens: sceneDocumentV1Schema.shape.tokens.optional(),
+  labels: sceneDocumentV1Schema.shape.labels.optional(),
+  mapAnnotations: sceneDocumentV1Schema.shape.mapAnnotations.optional()
+}).transform((scene) => {
+  const activeMapId =
+    scene.activeMapId !== null && scene.maps.some((map) => map.id === scene.activeMapId)
+      ? scene.activeMapId
+      : scene.maps[0]?.id ?? null;
+  const active = activeMapId === null ? null : scene.maps.find((map) => map.id === activeMapId) ?? null;
+  const hasRuntimeFields =
+    scene.map !== undefined &&
+    scene.camera !== undefined &&
+    scene.grid !== undefined &&
+    scene.darkness !== undefined &&
+    scene.fogOfWar !== undefined &&
+    scene.settings !== undefined &&
+    scene.lights !== undefined &&
+    scene.effects !== undefined &&
+    scene.shapes !== undefined &&
+    scene.tokens !== undefined &&
+    scene.labels !== undefined &&
+    scene.mapAnnotations !== undefined;
+  const parsedScene = {
+    version: SCENE_DOCUMENT_VERSION,
+    maps: scene.maps,
+    activeMapId,
+    id: active?.id ?? scene.id,
+    name: active?.name ?? scene.name,
+    sceneAside: scene.sceneAside,
+    combatTracker: scene.combatTracker,
+    ...(hasRuntimeFields ? {
+      map: scene.map,
+      camera: scene.camera,
+      grid: scene.grid,
+      darkness: scene.darkness,
+      fogOfWar: scene.fogOfWar,
+      settings: scene.settings,
+      lights: scene.lights,
+      effects: scene.effects,
+      shapes: scene.shapes,
+      tokens: scene.tokens,
+      labels: scene.labels,
+      mapAnnotations: scene.mapAnnotations
+    } : active)
+  } as SceneDocument;
+  return hasRuntimeFields
+    ? syncRuntimeFieldsFromActiveMap(syncActiveMapFromRuntimeFields(parsedScene))
+    : syncRuntimeFieldsFromActiveMap(parsedScene);
+}) satisfies z.ZodType<SceneDocument>;
+
 function stringifyAbilityScore(value: string | number | null): string {
   if (value === null) return "";
   return String(value).trim();
 }
 
 export function parseSceneDocument(input: unknown): SceneDocument {
-  return sceneDocumentV1Schema.parse(input);
+  const record = typeof input === "object" && input !== null ? input as { readonly version?: unknown } : null;
+  if (record?.version === SCENE_DOCUMENT_VERSION) {
+    return sceneDocumentV2Schema.parse(input);
+  }
+  return migrateSceneDocument(sceneDocumentV1Schema.parse(input) as SceneDocumentV1);
 }
 
 /**
@@ -468,6 +564,8 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
   if (typeof rawJson !== "object" || rawJson === null) return [];
   const obj = rawJson as Record<string, unknown>;
   const missing: string[] = [];
+  const isCurrentMultiMapFormat = obj["version"] === SCENE_DOCUMENT_VERSION && Array.isArray(obj["maps"]);
+  if (!isCurrentMultiMapFormat) missing.push("maps");
   // Added in spec 26 (DM aside panel)
   if (!("sceneAside" in obj)) missing.push("sceneAside");
   else {
@@ -481,13 +579,29 @@ export function detectOutdatedSceneFields(rawJson: unknown): readonly string[] {
     }
   }
   // Added in spec 28 (DM-only map labels)
-  if (!("labels" in obj)) missing.push("labels");
+  if (isCurrentMultiMapFormat) {
+    const maps = obj["maps"] as readonly unknown[];
+    if (maps.some((map) => typeof map === "object" && map !== null && !("labels" in map))) {
+      missing.push("maps.labels");
+    }
+  } else if (!("labels" in obj)) missing.push("labels");
   // Added in spec 20 (combat turn tracker)
   if (!("combatTracker" in obj)) missing.push("combatTracker");
   // Added in spec 22 (map information pins and areas)
-  if (!("mapAnnotations" in obj)) missing.push("mapAnnotations");
+  const topLevelMapAnnotations = obj["mapAnnotations"];
+  if (isCurrentMultiMapFormat) {
+    const maps = obj["maps"] as readonly unknown[];
+    const hasMissingMapAnnotations = maps.some((map) => typeof map === "object" && map !== null && !("mapAnnotations" in map));
+    const hasMissingSceneLinks = maps.some((map) => {
+      if (typeof map !== "object" || map === null || !("mapAnnotations" in map)) return false;
+      const mapAnnotations = (map as Record<string, unknown>)["mapAnnotations"];
+      return typeof mapAnnotations === "object" && mapAnnotations !== null && !("sceneLinks" in mapAnnotations);
+    });
+    if (hasMissingMapAnnotations) missing.push("maps.mapAnnotations");
+    if (hasMissingSceneLinks) missing.push("maps.mapAnnotations.sceneLinks");
+  } else if (!("mapAnnotations" in obj)) missing.push("mapAnnotations");
   else {
-    const mapAnnotations = obj["mapAnnotations"];
+    const mapAnnotations = topLevelMapAnnotations;
     if (
       typeof mapAnnotations === "object" &&
       mapAnnotations !== null &&
@@ -522,6 +636,22 @@ export function parseSceneJson(json: string): SceneDocument {
 }
 
 export function serializeSceneDocument(scene: SceneDocument): string {
-  const validScene = parseSceneDocument(scene);
-  return `${JSON.stringify(validScene, null, 2)}\n`;
+  const syncedScene = syncActiveMapFromRuntimeFields(parseSceneDocument(scene));
+  if (syncedScene.maps.length === 0) {
+    throw new Error("Agrega al menos un mapa antes de guardar la escena.");
+  }
+  const { map, camera, grid, darkness, fogOfWar, settings, lights, effects, shapes, tokens, labels, mapAnnotations, ...persistedScene } = syncedScene;
+  void map;
+  void camera;
+  void grid;
+  void darkness;
+  void fogOfWar;
+  void settings;
+  void lights;
+  void effects;
+  void shapes;
+  void tokens;
+  void labels;
+  void mapAnnotations;
+  return `${JSON.stringify(persistedScene, null, 2)}\n`;
 }

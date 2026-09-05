@@ -1,5 +1,6 @@
 import { ipcMain } from "electron";
 import type { SceneFileStorage } from "../../application/services/scene-file-storage";
+import { importSceneMapUseCase } from "../../application/use-cases/import-scene-map";
 import { loadSceneUseCase } from "../../application/use-cases/load-scene";
 import { saveSceneToPathUseCase, saveSceneUseCase } from "../../application/use-cases/save-scene";
 import { parseSceneDocument } from "../../domain/sessions/scene-schema";
@@ -51,6 +52,18 @@ export function registerSceneIpc(storage: SceneFileStorage, options: SceneIpcOpt
     }
 
     return result;
+  });
+
+  ipcMain.handle("scene:import-as-map", async (_event, payload: unknown) => {
+    try {
+      const scene = parseSceneDocument(payload);
+      return await importSceneMapUseCase(storage, scene);
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "Payload de importacion invalido."
+      };
+    }
   });
 }
 

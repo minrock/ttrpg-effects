@@ -36,7 +36,7 @@ export function createInitialInteractionState(): InteractionState {
     activeTool: "select",
     contextMenu: null,
     selectedElementId: null,
-    isZoomLocked: true,
+    isZoomLocked: false,
     isMapAdjustMode: false,
     elements: []
   };

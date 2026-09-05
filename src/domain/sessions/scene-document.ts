@@ -3,7 +3,8 @@ import type { CombatTracker } from "../combat/combat-tracker";
 import type { MapAnnotations } from "../annotations/map-annotations";
 import type { GridCell } from "../grid/grid-cell";
 
-export const SCENE_DOCUMENT_VERSION = 1;
+export const LEGACY_SCENE_DOCUMENT_VERSION = 1;
+export const SCENE_DOCUMENT_VERSION = 2;
 
 export type DistanceUnit = "ft" | "m";
 export type GridLayout = "square" | "hexagonal";
@@ -260,8 +261,25 @@ export interface SceneLabel {
   };
 }
 
+export interface SceneMapDocument {
+  readonly id: string;
+  readonly name: string;
+  readonly map: SceneMap;
+  readonly camera: SceneCamera;
+  readonly grid: SceneGrid;
+  readonly darkness: SceneDarkness;
+  readonly fogOfWar: SceneFogOfWar;
+  readonly settings: SceneSettings;
+  readonly lights: readonly SceneLight[];
+  readonly effects: readonly SceneEffect[];
+  readonly shapes: readonly SceneShape[];
+  readonly tokens: readonly SceneToken[];
+  readonly labels: readonly SceneLabel[];
+  readonly mapAnnotations: MapAnnotations;
+}
+
 export interface SceneDocumentV1 {
-  readonly version: typeof SCENE_DOCUMENT_VERSION;
+  readonly version: typeof LEGACY_SCENE_DOCUMENT_VERSION;
   readonly map: SceneMap;
   readonly camera: SceneCamera;
   readonly grid: SceneGrid;
@@ -278,7 +296,16 @@ export interface SceneDocumentV1 {
   readonly combatTracker: CombatTracker;
 }
 
-export type SceneDocument = SceneDocumentV1;
+export interface SceneDocumentV2 extends SceneMapDocument {
+  readonly version: typeof SCENE_DOCUMENT_VERSION;
+  readonly maps: readonly SceneMapDocument[];
+  readonly activeMapId: string | null;
+  readonly sceneAside: SceneAside;
+  readonly combatTracker: CombatTracker;
+}
+
+export type SceneDocument = SceneDocumentV2;
+export type AnySceneDocument = SceneDocumentV1 | SceneDocumentV2;
 
 export interface SceneWarning {
   readonly code: "map-image-missing" | "scene-format-outdated";
@@ -292,6 +319,7 @@ export interface SceneOperationSuccess {
   readonly filePath: string;
   readonly mapImageUrl?: string;
   readonly tokenImageUrls?: Readonly<Record<string, string>>;
+  readonly mapImageUrls?: Readonly<Record<string, string>>;
   readonly warnings: readonly SceneWarning[];
 }
 

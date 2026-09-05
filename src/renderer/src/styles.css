@@ -1543,9 +1543,170 @@ body {
   text-transform: uppercase;
 }
 
+.dm-aside-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid rgb(244 241 232 / 10%);
+  background: #171b1d;
+  flex-shrink: 0;
+}
+
+.dm-aside-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid rgb(244 241 232 / 10%);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 3%);
+  color: #b9b2a3;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.dm-aside-tabs button:hover {
+  border-color: rgb(255 210 138 / 25%);
+  color: #f4f1e8;
+}
+
+.dm-aside-tabs button.is-active {
+  border-color: rgb(255 210 138 / 42%);
+  background: rgb(255 210 138 / 12%);
+  color: #ffd28a;
+}
+
+.dm-aside-tabs svg {
+  width: 14px;
+  height: 14px;
+}
+
 .dm-aside-content {
   overflow-y: auto;
   flex: 1;
+}
+
+.scene-maps-section {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+}
+
+.scene-maps-actions {
+  display: grid;
+  gap: 6px;
+}
+
+.scene-maps-actions button,
+.scene-map-list button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 1px solid rgb(244 241 232 / 12%);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 4%);
+  color: #d9d8d2;
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.scene-maps-actions button:hover,
+.scene-map-list button:hover:not(:disabled) {
+  border-color: rgb(255 210 138 / 30%);
+  background: rgb(255 210 138 / 10%);
+}
+
+.scene-map-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-map-list li {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr) auto;
+  gap: 5px;
+  align-items: center;
+  padding: 5px;
+  border: 1px solid rgb(244 241 232 / 8%);
+  border-radius: 6px;
+  background: rgb(0 0 0 / 12%);
+}
+
+.scene-map-list li.is-dragging {
+  opacity: 0.52;
+}
+
+.scene-map-list li.is-drop-target {
+  border-color: rgb(122 191 255 / 48%);
+  background: rgb(122 191 255 / 10%);
+}
+
+.scene-map-list li.is-active {
+  border-color: rgb(255 210 138 / 34%);
+  background: rgb(255 210 138 / 9%);
+}
+
+.scene-map-list__drag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(244 241 232 / 38%);
+  cursor: grab;
+}
+
+.scene-map-list li:active .scene-map-list__drag {
+  cursor: grabbing;
+}
+
+.scene-map-list input {
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 5px 6px;
+  background: transparent;
+  color: #f4f1e8;
+  font: inherit;
+  font-size: 0.74rem;
+  outline: none;
+}
+
+.scene-map-list input:focus {
+  border-color: rgb(255 210 138 / 38%);
+  background: rgb(0 0 0 / 20%);
+}
+
+.scene-map-list__actions {
+  display: inline-grid;
+  grid-template-columns: 24px;
+  gap: 3px;
+}
+
+.scene-map-list__actions button,
+.scene-map-list__select {
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+
+.scene-map-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.scene-map-list svg,
+.scene-maps-actions svg {
+  width: 13px;
+  height: 13px;
 }
 
 .dm-aside-accordion {

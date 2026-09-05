@@ -2,12 +2,21 @@ import { describe, expect, it } from "vitest";
 import type { SceneFileStorage } from "../services/scene-file-storage";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { serializeSceneDocument } from "../../domain/sessions/scene-schema";
+import { createDefaultSceneMap } from "../../domain/sessions/scene-maps";
 import {
   createDynamicLightEffect,
   createDynamicLightSavePayload
 } from "../../domain/effects/dynamic-light";
+import { SCENE_DOCUMENT_VERSION, type SceneMapDocument } from "../../domain/sessions/scene-document";
 import { loadSceneUseCase } from "./load-scene";
 import { saveSceneToPathUseCase, saveSceneUseCase } from "./save-scene";
+
+function firstSavedMap(json: string): SceneMapDocument {
+  const savedScene = JSON.parse(json) as { maps: SceneMapDocument[] };
+  const map = savedScene.maps[0];
+  if (map === undefined) throw new Error("Expected saved scene to include a map.");
+  return map;
+}
 
 describe("scene use cases", () => {
   it("saves valid scene JSON through storage", async () => {
@@ -24,7 +33,7 @@ describe("scene use cases", () => {
     const result = await saveSceneUseCase(storage, createDefaultScene());
 
     expect(result).toMatchObject({ ok: true, filePath: "/tmp/example.ttrpgscene" });
-    expect(JSON.parse(savedJson)).toMatchObject({ version: 1 });
+    expect(JSON.parse(savedJson)).toMatchObject({ version: SCENE_DOCUMENT_VERSION });
   });
 
   it("persists dynamic lights inside scene JSON", async () => {
@@ -46,9 +55,9 @@ describe("scene use cases", () => {
     const result = await saveSceneUseCase(storage, scene);
 
     expect(result).toMatchObject({ ok: true, filePath: "/tmp/dynamic-light.ttrpgscene" });
-    const savedScene = JSON.parse(savedJson) as { effects: Array<Record<string, unknown>> };
-    expect(savedScene).toMatchObject({ effects: [dynamicLight] });
-    expect(savedScene.effects[0]).not.toHaveProperty("radius");
+    const savedMap = firstSavedMap(savedJson);
+    expect(savedMap).toMatchObject({ effects: [dynamicLight] });
+    expect(savedMap.effects[0]).not.toHaveProperty("radius");
   });
 
   it("saves virtual tokens inside scene JSON", async () => {
@@ -83,7 +92,7 @@ describe("scene use cases", () => {
     const result = await saveSceneUseCase(storage, scene);
 
     expect(result).toMatchObject({ ok: true, filePath: "/tmp/example.ttrpgscene" });
-    expect(JSON.parse(savedJson)).toMatchObject({
+    expect(firstSavedMap(savedJson)).toMatchObject({
       tokens: [
         {
           id: "token-1",
@@ -146,7 +155,7 @@ describe("scene use cases", () => {
     expect(dialogInvoked).toBe(false);
     expect(updates).toHaveLength(1);
     expect(updates[0]?.filePath).toBe("/tmp/current-scene.ttrpgscene");
-    expect(JSON.parse(updates[0]?.json ?? "")).toMatchObject({ version: 1 });
+    expect(JSON.parse(updates[0]?.json ?? "")).toMatchObject({ version: SCENE_DOCUMENT_VERSION });
   });
 
   it("loads a scene and reports missing map image as a warning", async () => {
@@ -305,6 +314,41 @@ describe("scene use cases", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.warnings.some((w) => w.code === "scene-format-outdated")).toBe(false);
+  });
+
+  it("opens current-format scenes on the first map in scene order", async () => {
+    const firstMap = createDefaultSceneMap({
+      id: "map-1",
+      name: "Entrada",
+      camera: { x: 10, y: 20, zoom: 1.25 }
+    });
+    const secondMap = createDefaultSceneMap({
+      id: "map-2",
+      name: "Cripta",
+      camera: { x: 900, y: 800, zoom: 0.5 }
+    });
+    const scene = {
+      ...createDefaultScene(),
+      maps: [firstMap, secondMap],
+      activeMapId: "map-2",
+      ...secondMap
+    };
+    const storage: SceneFileStorage = {
+      saveSceneJson: async () => null,
+      loadSceneJson: async () => ({
+        filePath: "/tmp/current.ttrpgscene",
+        json: serializeSceneDocument(scene)
+      }),
+      fileExists: async () => true
+    };
+
+    const result = await loadSceneUseCase(storage);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.scene.activeMapId).toBe("map-1");
+    expect(result.scene.name).toBe("Entrada");
+    expect(result.scene.camera).toEqual(firstMap.camera);
   });
 
   it("reports a scene-format-outdated warning when playerCharacters is absent from sceneAside", async () => {

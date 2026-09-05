@@ -1,6 +1,8 @@
 import type { SceneFileStorage } from "../services/scene-file-storage";
 import type { SceneOperationResult, SceneWarning } from "../../domain/sessions/scene-document";
-import { detectOutdatedSceneFields, parseSceneJson } from "../../domain/sessions/scene-schema";
+import { detectOutdatedSceneFields } from "../../domain/sessions/scene-schema";
+import { loadLinkedLegacySceneGraph } from "./linked-legacy-scenes";
+import { setActiveSceneMap } from "../../domain/sessions/scene-maps";
 
 export async function loadSceneUseCase(
   storage: SceneFileStorage,
@@ -31,26 +33,12 @@ export async function loadSceneUseCase(
       rawJson = null;
     }
 
-    const scene = parseSceneJson(loadedFile.json);
-    const warnings: SceneWarning[] = [];
-
-    if (scene.map.imagePath !== null && !(await storage.fileExists(scene.map.imagePath))) {
-      warnings.push({
-        code: "map-image-missing",
-        message: "La imagen local del mapa no existe. La escena se cargo sin bloquear la app.",
-        path: scene.map.imagePath
-      });
-    }
-
-    for (const token of scene.tokens) {
-      if (!(await storage.fileExists(token.imagePath))) {
-        warnings.push({
-          code: "map-image-missing",
-          message: `La imagen local del token "${token.name}" no existe. La escena se cargo sin bloquear la app.`,
-          path: token.imagePath
-        });
-      }
-    }
+    const loadedScene = await loadLinkedLegacySceneGraph(storage, loadedFile);
+    const openedScene =
+      loadedScene.scene.maps[0] === undefined
+        ? loadedScene.scene
+        : setActiveSceneMap(loadedScene.scene, loadedScene.scene.maps[0].id);
+    const warnings: SceneWarning[] = [...loadedScene.warnings];
 
     // Detect whether the file was saved with an older version of the schema.
     const outdatedFields = detectOutdatedSceneFields(rawJson);
@@ -62,29 +50,13 @@ export async function loadSceneUseCase(
       });
     }
 
-    const mapImageUrl =
-      scene.map.imagePath !== null &&
-      !warnings.some((warning) => warning.path === scene.map.imagePath) &&
-      storage.getMapImageUrl !== undefined
-        ? await storage.getMapImageUrl(scene.map.imagePath)
-        : undefined;
-    const tokenImageUrlEntries = await Promise.all(
-      scene.tokens.map(async (token) => {
-        if (storage.getTokenImageUrl === undefined || !(await storage.fileExists(token.imagePath))) {
-          return null;
-        }
-
-        return [token.id, await storage.getTokenImageUrl(token.imagePath)] as const;
-      })
-    );
-    const tokenImageUrls = Object.fromEntries(tokenImageUrlEntries.filter((entry): entry is readonly [string, string] => entry !== null));
-
     return {
       ok: true,
-      scene,
+      scene: openedScene,
       filePath: loadedFile.filePath,
-      mapImageUrl,
-      tokenImageUrls,
+      mapImageUrl: loadedScene.mapImageUrls[openedScene.id],
+      mapImageUrls: loadedScene.mapImageUrls,
+      tokenImageUrls: loadedScene.tokenImageUrls,
       warnings
     };
   } catch (error) {

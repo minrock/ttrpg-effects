@@ -216,6 +216,9 @@ export async function validateSceneLinks(
         return [marker.id, { state: "unlinked" } satisfies SceneLinkValidationStatus] as const;
       }
       const peer = marker.connection.peer;
+      if (peer.mapId !== undefined) {
+        return [marker.id, { state: "valid" } satisfies SceneLinkValidationStatus] as const;
+      }
       try {
         const remoteScenePromise = cache.get(peer.scenePath) ?? readScene(storage, peer.scenePath);
         cache.set(peer.scenePath, remoteScenePromise);

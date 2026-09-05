@@ -85,6 +85,25 @@ describe("scene navigation link use cases", () => {
     });
   });
 
+  it("treats migrated internal map links as valid without reading external files", async () => {
+    const storage = createStorage([]);
+    const validation = await validateSceneLinks(storage, {
+      scenePath: pathA,
+      markers: [{
+        ...marker("scene-link-a", "Salida", 10, 20),
+        connection: {
+          connectionId: "connection-1",
+          role: "origin",
+          origin: { scenePath: pathA, markerId: "scene-link-a", mapId: "map-1" },
+          destination: { scenePath: pathA, markerId: "scene-link-b", mapId: "map-2" },
+          peer: { scenePath: pathA, markerId: "scene-link-b", mapId: "map-2" }
+        }
+      }]
+    });
+
+    expect(validation.ok && validation.statuses["scene-link-a"]).toEqual({ state: "valid" });
+  });
+
   it("frees a remote point that still points to the current marker even if its connection metadata is stale", async () => {
     const markerA = marker("scene-link-a", "Salida", 10, 20);
     const markerB = marker("scene-link-b", "Entrada", 300, 400);

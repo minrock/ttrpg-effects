@@ -10,6 +10,22 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.1.0] - 2026-09-04
+
+### Added
+
+- Escenas `.ttrpgscene` v2 con soporte para multiples mapas, navegador de mapas en el panel izquierdo y acciones para agregar mapas desde imagen o importar otro archivo de escena como mapa.
+- Panel izquierdo con tabs horizontales para separar contenido de escena y contenido del mapa activo.
+- Migracion automatica de escenas v1 de un solo mapa hacia escenas v2 al cargar o importar, incluyendo carga dinamica de archivos legacy conectados y conversion de sus conexiones en links internos entre mapas.
+
+### Changed
+
+- Notas, monstruos, NPCs, personajes y combat tracker quedan a nivel de escena; grilla, fog, oscuridad, luces, efectos, formas, tokens, labels y anotaciones quedan aislados por mapa.
+- Al abrir una escena multi-mapa, la app activa el primer mapa del orden guardado.
+- El navegador de mapas usa drag/drop para reorganizar mapas en lugar de controles de subir/bajar.
+- El zoom/bloqueo de grilla inicia desbloqueado por defecto en nuevos mapas.
+- El guardado bloquea escenas en borrador sin mapas y serializa siempre el formato v2 hacia adelante.
+
 ## [2.0.1] - 2026-09-03
 
 ### Fixed
