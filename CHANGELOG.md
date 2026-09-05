@@ -10,6 +10,12 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.2.2] - 2026-09-05
+
+### Changed
+
+- Los controles de orientacion de brujula reemplazan las letras `N`, `E`, `S`, `O` por flechas direccionales mas visuales.
+
 ## [2.2.1] - 2026-09-05
 
 ### Added

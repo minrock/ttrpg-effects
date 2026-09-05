@@ -17,6 +17,10 @@ import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import logoUrl from "../../../assets/logo/ttrpg-effects-icon.png";
 import * as Switch from "@radix-ui/react-switch";
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   CircleDot,
   Camera,
   Compass,
@@ -120,7 +124,7 @@ import {
   syncActiveMapFromRuntimeFields,
   syncRuntimeFieldsFromActiveMap
 } from "../../domain/sessions/scene-maps";
-import { compassOrientations, getCompassLabel, type CompassOrientation } from "../../domain/map/compass-orientation";
+import { compassOrientations, type CompassOrientation } from "../../domain/map/compass-orientation";
 import type {
   SceneDocument,
   SceneDynamicLightEffect,
@@ -4085,10 +4089,11 @@ export function App(): JSX.Element {
                     aria-pressed={scene.compassOrientation === orientation}
                     onClick={() => handleCompassOrientationChange(orientation)}
                     disabled={mapState === null}
-                    title={`Norte hacia ${getCompassLabel(orientation)}`}
+                    aria-label={`Norte hacia ${getCompassDirectionText(orientation)}`}
+                    title={`Norte hacia ${getCompassDirectionText(orientation)}`}
                   >
                     <Compass size={16} aria-hidden="true" style={{ transform: `rotate(${orientation}deg)` }} />
-                    {getCompassLabel(orientation)}
+                    {renderCompassDirectionIcon(orientation)}
                   </button>
                 ))}
               </div>
@@ -4741,6 +4746,34 @@ function getTokenSizeCellLabel(size: TokenSize): string {
       return "3x3";
     case "gargantuan":
       return "4x4";
+  }
+}
+
+function getCompassDirectionText(orientation: CompassOrientation): string {
+  switch (orientation) {
+    case 90:
+      return "la derecha";
+    case 180:
+      return "abajo";
+    case 270:
+      return "la izquierda";
+    case 0:
+    default:
+      return "arriba";
+  }
+}
+
+function renderCompassDirectionIcon(orientation: CompassOrientation): JSX.Element {
+  switch (orientation) {
+    case 90:
+      return <ArrowRight size={16} aria-hidden="true" />;
+    case 180:
+      return <ArrowDown size={16} aria-hidden="true" />;
+    case 270:
+      return <ArrowLeft size={16} aria-hidden="true" />;
+    case 0:
+    default:
+      return <ArrowUp size={16} aria-hidden="true" />;
   }
 }
 
