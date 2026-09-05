@@ -66,6 +66,10 @@ interface DmAsidePanelProps {
   readonly onEditAnnotation: (annotation: MapAnnotation) => void;
   readonly onToggleAnnotationLock: (annotation: MapAnnotation) => void;
   readonly onHighlightInformationArea: (areaId: string) => void;
+  readonly activeAnnotationTool: string;
+  readonly onStartRoomPin: () => void;
+  readonly onStartInformationArea: () => void;
+  readonly onStartSceneLink: () => void;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
   readonly hidden?: boolean;
 }
@@ -99,6 +103,10 @@ export function DmAsidePanel({
   onEditAnnotation,
   onToggleAnnotationLock,
   onHighlightInformationArea,
+  activeAnnotationTool,
+  onStartRoomPin,
+  onStartInformationArea,
+  onStartSceneLink,
   sceneLinkStatuses = {},
   hidden
 }: DmAsidePanelProps): JSX.Element {
@@ -298,6 +306,10 @@ export function DmAsidePanel({
                 onEdit={onEditAnnotation}
                 onToggleLock={onToggleAnnotationLock}
                 onHighlightArea={onHighlightInformationArea}
+                activeTool={activeAnnotationTool}
+                onStartPin={onStartRoomPin}
+                onStartArea={onStartInformationArea}
+                onStartSceneLink={onStartSceneLink}
                 sceneLinkStatuses={sceneLinkStatuses}
               />
             </AccordionSection>

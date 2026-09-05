@@ -3213,6 +3213,10 @@ export function App(): JSX.Element {
           onEditAnnotation={handleEditMapAnnotation}
           onToggleAnnotationLock={handleToggleMapAnnotationLock}
           onHighlightInformationArea={handleInformationAreaHighlight}
+          activeAnnotationTool={interaction.activeTool}
+          onStartRoomPin={handleStartRoomPin}
+          onStartInformationArea={handleStartInformationArea}
+          onStartSceneLink={handleStartSceneLink}
           sceneLinkStatuses={sceneLinkStatuses}
           hidden={!isAsidePanelVisible}
         />
@@ -4346,11 +4350,7 @@ export function App(): JSX.Element {
           >
             <MapAnnotationsSection
               visible={showMapAnnotations}
-              activeTool={interaction.activeTool}
               onVisibleChange={setShowMapAnnotations}
-              onStartPin={handleStartRoomPin}
-              onStartArea={handleStartInformationArea}
-              onStartSceneLink={handleStartSceneLink}
             />
           </SidebarAccordion>
 
