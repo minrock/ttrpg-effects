@@ -20,6 +20,7 @@ export function hasSceneContent(
     syncedScene.mapAnnotations.areas.length > 0 ||
     syncedScene.mapAnnotations.sceneLinks.length > 0 ||
     syncedScene.combatTracker.active ||
+    syncedScene.counters.length > 0 ||
     tacticalElementsCount > 0 ||
     syncedScene.fogOfWar.revealedAreas.length > 0 ||
     syncedScene.fogOfWar.obstacles.length > 0 ||

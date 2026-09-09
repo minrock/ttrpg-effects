@@ -64,7 +64,8 @@ export async function loadLinkedLegacySceneGraph(
     maps: mapsWithInternalLinks,
     activeMapId: mapsWithInternalLinks[0]?.id ?? null,
     sceneAside: mergeSceneAsides(loadedFiles.map((file) => file.scene.sceneAside)),
-    combatTracker: rootScene.combatTracker
+    combatTracker: rootScene.combatTracker,
+    counters: rootScene.counters
   });
 
   return hydrateSceneAssets(storage, scene);

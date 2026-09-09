@@ -91,4 +91,34 @@ describe("player window view rules", () => {
     expect(snapshot.labels).toEqual([]);
     expect(snapshot.mapAnnotations).toEqual({ pins: [], areas: [], sceneLinks: [] });
   });
+
+  it("only sends published scene counters to Player View", () => {
+    const scene = createDefaultScene();
+    const snapshot = createPlayerSceneSnapshot({
+      ...scene,
+      counters: [
+        {
+          id: "ritual",
+          label: "Ritual",
+          mode: "countdown",
+          kind: "fixed",
+          capacity: 6,
+          value: 4,
+          isVisibleToPlayers: true,
+          isLabelVisibleToPlayers: false
+        },
+        {
+          id: "secret",
+          label: "Amenaza oculta",
+          mode: "progress",
+          kind: "dynamic",
+          value: 3,
+          isVisibleToPlayers: false,
+          isLabelVisibleToPlayers: true
+        }
+      ]
+    });
+
+    expect(snapshot.counters).toEqual([expect.objectContaining({ id: "ritual", value: 4 })]);
+  });
 });
