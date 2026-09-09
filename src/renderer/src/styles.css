@@ -971,6 +971,37 @@ body {
   height: 100%;
 }
 
+.player-zoom-indicator {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgb(123 199 178 / 34%);
+  border-radius: 6px;
+  color: #d7e5df;
+  background: rgb(12 18 18 / 86%);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 28%);
+  backdrop-filter: blur(8px);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.player-zoom-indicator span {
+  color: #9eaca7;
+  font-weight: 650;
+}
+
+.player-zoom-indicator strong {
+  color: #a8ecd9;
+  font-size: 0.9rem;
+}
+
 .player-loading {
   position: absolute;
   inset: 0;
@@ -1097,6 +1128,10 @@ body {
   left: 18px;
   z-index: 5;
   opacity: 1;
+}
+
+.player-zoom-indicator ~ .scene-counters-overlay {
+  top: 56px;
 }
 
 .scene-counters-overlay__manage,

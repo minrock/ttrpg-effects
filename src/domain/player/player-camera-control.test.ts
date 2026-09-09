@@ -6,6 +6,7 @@ import {
   sanitizePlayerCameraCommand,
   sanitizePlayerCameraReport,
   sanitizePlayerViewportReport,
+  movePlayerCameraToMap,
   shouldShowAuxiliaryViewportPreview,
   shouldApplyPlayerCameraReport,
   shouldShowPrimaryViewportPreview,
@@ -158,6 +159,17 @@ describe("player camera control", () => {
     expect(zoomPlayerCamera(primary, "out").zoom).toBeCloseTo(1 / 1.15);
     expect(zoomPlayerCamera({ ...primary, zoom: 4 }, "in").zoom).toBe(4);
     expect(zoomPlayerCamera({ ...primary, zoom: 0.25 }, "out").zoom).toBe(0.25);
+  });
+
+  it("keeps the player grid cell size while moving to another map", () => {
+    expect(
+      movePlayerCameraToMap(
+        { center: { x: 100, y: 200 }, zoom: 1.75 },
+        { center: { x: -320, y: 640 }, zoom: 0.5 },
+        100,
+        50
+      )
+    ).toEqual({ center: { x: -320, y: 640 }, zoom: 3.5 });
   });
 
   it("calculates the player viewport footprint in world coordinates", () => {

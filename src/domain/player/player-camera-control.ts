@@ -237,6 +237,23 @@ export function zoomPlayerCamera(
   };
 }
 
+export function movePlayerCameraToMap(
+  currentCamera: ViewportCameraSnapshot,
+  destinationCamera: ViewportCameraSnapshot,
+  sourceGridCellSizeWorld: number,
+  destinationGridCellSizeWorld: number
+): ViewportCameraSnapshot {
+  const current = normalizeCameraSnapshot(currentCamera);
+  const destination = normalizeCameraSnapshot(destinationCamera);
+  const sourceCellSize = normalizeGridCellSize(sourceGridCellSizeWorld);
+  const destinationCellSize = normalizeGridCellSize(destinationGridCellSizeWorld);
+
+  return {
+    center: destination.center,
+    zoom: clampZoom(current.zoom * (sourceCellSize / destinationCellSize))
+  };
+}
+
 export function calculatePlayerViewportPreview(
   camera: ViewportCameraSnapshot,
   viewport: PlayerViewportReport,
@@ -331,6 +348,10 @@ function isNonNegativeInteger(value: unknown): value is number {
 
 function isNullableNonNegativeInteger(value: unknown): value is number | null {
   return value === null || isNonNegativeInteger(value);
+}
+
+function normalizeGridCellSize(value: number): number {
+  return Number.isFinite(value) && value > 0 ? value : 100;
 }
 
 function isCommandReason(value: unknown): value is PlayerCameraCommandReason {

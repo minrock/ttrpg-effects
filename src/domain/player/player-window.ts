@@ -28,6 +28,7 @@ export interface PlayerWindowSnapshot {
   readonly camera: ViewportCameraSnapshot;
   readonly cameraSyncKey?: number;
   readonly showDmFogOverlay: boolean;
+  readonly showZoomIndicator?: boolean;
   readonly informationAreaHighlightResetKey?: number;
 }
 

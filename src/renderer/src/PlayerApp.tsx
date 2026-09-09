@@ -25,6 +25,7 @@ export function PlayerApp(): JSX.Element {
   const [camera, setCamera] = useState<ViewportCameraSnapshot>(() =>
     normalizeCameraSnapshot({ center: { x: 0, y: 0 }, zoom: 1 })
   );
+  const [activeZoom, setActiveZoom] = useState(1);
   const hasInitializedCameraRef = useRef(false);
   const cameraSyncKeyRef = useRef<number | null>(null);
   const mapLoadKeyRef = useRef<string | null>(null);
@@ -32,6 +33,7 @@ export function PlayerApp(): JSX.Element {
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [isZoomLocked, setIsZoomLocked] = useState(true);
   const [showCompass, setShowCompass] = useState(false);
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
   const [arcanePointerEvent, setArcanePointerEvent] = useState<ArcanePointerBroadcast | null>(null);
   const [informationAreaHighlightEvent, setInformationAreaHighlightEvent] =
     useState<InformationAreaHighlightBroadcast | null>(null);
@@ -151,6 +153,7 @@ export function PlayerApp(): JSX.Element {
       const normalized = normalizeCameraSnapshot(command.camera);
       latestPlayerCameraRef.current = normalized;
       setCamera(normalized);
+      setActiveZoom(normalized.zoom);
       queuePlayerCameraReport(normalized, "remote-command", true);
     },
     [queuePlayerCameraReport]
@@ -164,6 +167,7 @@ export function PlayerApp(): JSX.Element {
     setScene(snapshot.scene);
     setMapImageUrl(snapshot.mapImageUrl);
     setTokenImageUrls(snapshot.tokenImageUrls);
+    setShowZoomIndicator(snapshot.showZoomIndicator ?? false);
     setIsHydrated(true);
     setInformationAreaHighlightResetKey(snapshot.informationAreaHighlightResetKey ?? 0);
     const nextMapLoadKey =
@@ -182,6 +186,7 @@ export function PlayerApp(): JSX.Element {
       const normalized = normalizeCameraSnapshot(snapshot.camera);
       latestPlayerCameraRef.current = normalized;
       setCamera(normalized);
+      setActiveZoom(normalized.zoom);
       hasInitializedCameraRef.current = true;
       cameraSyncKeyRef.current = nextCameraSyncKey;
     }
@@ -221,6 +226,7 @@ export function PlayerApp(): JSX.Element {
         const normalized = normalizeCameraSnapshot(state.camera);
         latestPlayerCameraRef.current = normalized;
         setCamera(normalized);
+        setActiveZoom(normalized.zoom);
         hasInitializedCameraRef.current = true;
       }
       if (state.cameraCommand !== null) {
@@ -286,13 +292,17 @@ export function PlayerApp(): JSX.Element {
   const noop = useCallback((): void => undefined, []);
   const handlePlayerCameraChange = useCallback(
     (nextCamera: ViewportCameraSnapshot): void => {
-      queuePlayerCameraReport(nextCamera, "local-navigation", false);
+      const normalized = normalizeCameraSnapshot(nextCamera);
+      setActiveZoom(normalized.zoom);
+      queuePlayerCameraReport(normalized, "local-navigation", false);
     },
     [queuePlayerCameraReport]
   );
   const handlePlayerCameraInteractionEnd = useCallback(
     (nextCamera: ViewportCameraSnapshot): void => {
-      queuePlayerCameraReport(nextCamera, "local-navigation", true);
+      const normalized = normalizeCameraSnapshot(nextCamera);
+      setActiveZoom(normalized.zoom);
+      queuePlayerCameraReport(normalized, "local-navigation", true);
     },
     [queuePlayerCameraReport]
   );
@@ -391,6 +401,17 @@ export function PlayerApp(): JSX.Element {
       {isHydrated && (
         <PlayerAsideOverlay aside={scene.sceneAside ?? createDefaultSceneAside()} />
       )}
+      {showZoomIndicator ? (
+        <output
+          className="player-zoom-indicator"
+          aria-label={`Zoom actual: ${Math.round(activeZoom * 100)} por ciento. Tamano de cuadro: ${Math.round(scene.grid.cellSizeWorld * activeZoom)} pixeles`}
+        >
+          <span>Zoom</span>
+          <strong>{Math.round(activeZoom * 100)}%</strong>
+          <span>Cuadro</span>
+          <strong>{Math.round(scene.grid.cellSizeWorld * activeZoom)} px</strong>
+        </output>
+      ) : null}
       {isHydrated ? (
         <CombatTurnBar tracker={scene.combatTracker} viewRole="player" />
       ) : null}
