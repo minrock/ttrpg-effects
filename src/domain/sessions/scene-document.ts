@@ -4,6 +4,7 @@ import type { MapAnnotations } from "../annotations/map-annotations";
 import type { GridCell } from "../grid/grid-cell";
 import type { CompassOrientation } from "../map/compass-orientation";
 import type { MapBackgroundColor } from "../map/map-background";
+import type { SceneCounter } from "../counters/scene-counters";
 
 export const LEGACY_SCENE_DOCUMENT_VERSION = 1;
 export const SCENE_DOCUMENT_VERSION = 2;
@@ -298,6 +299,7 @@ export interface SceneDocumentV1 {
   readonly mapAnnotations: MapAnnotations;
   readonly sceneAside?: SceneAside;
   readonly combatTracker: CombatTracker;
+  readonly counters?: readonly SceneCounter[];
 }
 
 export interface SceneDocumentV2 extends SceneMapDocument {
@@ -306,6 +308,7 @@ export interface SceneDocumentV2 extends SceneMapDocument {
   readonly activeMapId: string | null;
   readonly sceneAside: SceneAside;
   readonly combatTracker: CombatTracker;
+  readonly counters: readonly SceneCounter[];
 }
 
 export type SceneDocument = SceneDocumentV2;

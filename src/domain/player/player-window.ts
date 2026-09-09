@@ -3,6 +3,7 @@ import type { SceneDocument, SceneToken } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import type { ArcanePointerCreatureSize } from "../pointer/arcane-pointer";
 import { stripPrivateMapAnnotationsForPlayer } from "../annotations/map-annotations";
+import { getPlayerVisibleSceneCounters } from "../counters/scene-counters";
 
 export type ViewportViewRole = "dm" | "player";
 export type FogPresentation = "dm-hidden" | "dm-preview" | "player-blocking";
@@ -73,6 +74,7 @@ export function getTokensForRole(
 export function createPlayerSceneSnapshot(scene: SceneDocument): SceneDocument {
   return {
     ...stripPrivateMapAnnotationsForPlayer(scene),
+    counters: getPlayerVisibleSceneCounters(scene.counters),
     labels: []
   };
 }

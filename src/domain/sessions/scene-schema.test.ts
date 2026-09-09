@@ -85,6 +85,43 @@ describe("scene document schema", () => {
     expect(parseSceneDocument(createDefaultScene())).toEqual(createDefaultScene());
   });
 
+  it("defaults counters for older scenes and persists valid counters", () => {
+    const { counters, ...sceneWithoutCounters } = createDefaultScene();
+    void counters;
+    expect(parseSceneDocument(sceneWithoutCounters).counters).toEqual([]);
+
+    const scene = {
+      ...createDefaultScene(),
+      counters: [{
+        id: "ritual",
+        label: "Ritual",
+        mode: "countdown" as const,
+        kind: "fixed" as const,
+        capacity: 6,
+        value: 4,
+        isVisibleToPlayers: true,
+        isLabelVisibleToPlayers: true
+      }]
+    };
+    expect(parseSceneJson(serializeSceneDocument(scene)).counters).toEqual(scene.counters);
+  });
+
+  it("rejects counters with duplicate IDs or invalid fixed values", () => {
+    const scene = createDefaultScene();
+    const counter = {
+      id: "same",
+      label: "Ritual",
+      mode: "countdown" as const,
+      kind: "fixed" as const,
+      capacity: 2,
+      value: 2,
+      isVisibleToPlayers: false,
+      isLabelVisibleToPlayers: false
+    };
+    expect(() => parseSceneDocument({ ...scene, counters: [counter, counter] })).toThrow("IDs unicos");
+    expect(() => parseSceneDocument({ ...scene, counters: [{ ...counter, value: 3 }] })).toThrow("capacidad");
+  });
+
   it("serializes scene JSON with version 2", () => {
     const serialized = serializeSceneDocument(createDefaultScene());
 

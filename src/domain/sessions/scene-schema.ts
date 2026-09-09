@@ -36,6 +36,45 @@ const compassOrientationSchema = z.union([
   z.literal(compassOrientations[3])
 ]);
 
+const sceneCounterSchema = z.discriminatedUnion("kind", [
+  z.object({
+    id: z.string().trim().min(1),
+    label: z.string().trim().min(1).max(120),
+    mode: z.enum(["progress", "countdown"]),
+    kind: z.literal("fixed"),
+    value: z.number().int().min(0),
+    capacity: z.number().int().min(1),
+    isVisibleToPlayers: z.boolean().default(false),
+    isLabelVisibleToPlayers: z.boolean().default(false)
+  }).refine((counter) => counter.value <= counter.capacity, {
+    message: "El valor del contador no puede superar su capacidad.",
+    path: ["value"]
+  }),
+  z.object({
+    id: z.string().trim().min(1),
+    label: z.string().trim().min(1).max(120),
+    mode: z.enum(["progress", "countdown"]),
+    kind: z.literal("dynamic"),
+    value: z.number().int().min(0),
+    isVisibleToPlayers: z.boolean().default(false),
+    isLabelVisibleToPlayers: z.boolean().default(false)
+  }).strict()
+]);
+
+const sceneCountersSchema = z.array(sceneCounterSchema).superRefine((counters, context) => {
+  const ids = new Set<string>();
+  counters.forEach((counter, index) => {
+    if (ids.has(counter.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Los contadores deben tener IDs unicos.",
+        path: [index, "id"]
+      });
+    }
+    ids.add(counter.id);
+  });
+});
+
 const linearShapeSchema = z.object({
   id: z.string().min(1),
   type: z.literal("measurement"),
@@ -459,7 +498,8 @@ export const sceneDocumentV1Schema = z.object({
   combatTracker: combatTrackerSchema.default(() => ({
     ...createDefaultCombatTracker(),
     participants: []
-  }))
+  })),
+  counters: sceneCountersSchema.default(() => [])
 });
 
 const sceneMapDocumentSchema = z.object({
@@ -491,6 +531,7 @@ export const sceneDocumentV2Schema = z.object({
   backgroundColor: normalizedHexColor.default(DEFAULT_MAP_BACKGROUND_COLOR).optional(),
   sceneAside: sceneDocumentV1Schema.shape.sceneAside,
   combatTracker: sceneDocumentV1Schema.shape.combatTracker,
+  counters: sceneDocumentV1Schema.shape.counters,
   map: sceneDocumentV1Schema.shape.map.optional(),
   camera: sceneDocumentV1Schema.shape.camera.optional(),
   grid: sceneDocumentV1Schema.shape.grid.optional(),
@@ -532,6 +573,7 @@ export const sceneDocumentV2Schema = z.object({
     backgroundColor: active?.backgroundColor ?? scene.backgroundColor ?? DEFAULT_MAP_BACKGROUND_COLOR,
     sceneAside: scene.sceneAside,
     combatTracker: scene.combatTracker,
+    counters: scene.counters,
     ...(hasRuntimeFields ? {
       map: scene.map,
       camera: scene.camera,

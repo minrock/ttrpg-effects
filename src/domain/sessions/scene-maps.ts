@@ -1,6 +1,7 @@
 import type { MapAnnotations } from "../annotations/map-annotations";
 import { createDefaultMapAnnotations } from "../annotations/map-annotations";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
+import { createDefaultSceneCounters } from "../counters/scene-counters";
 import { DEFAULT_COMPASS_ORIENTATION, type CompassOrientation } from "../map/compass-orientation";
 import {
   DEFAULT_MAP_BACKGROUND_COLOR,
@@ -124,6 +125,7 @@ export function createEmptyScene(): SceneDocument {
     backgroundColor: DEFAULT_MAP_BACKGROUND_COLOR,
     sceneAside: createDefaultSceneAside(),
     combatTracker: createDefaultCombatTracker(),
+    counters: createDefaultSceneCounters(),
     ...payload
   };
 }
@@ -207,6 +209,7 @@ export function migrateSceneDocument(scene: AnySceneDocument): SceneDocument {
     activeMapId: map.id,
     sceneAside: scene.sceneAside ?? createDefaultSceneAside(),
     combatTracker: scene.combatTracker,
+    counters: scene.counters ?? createDefaultSceneCounters(),
     ...map
   });
 }

@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.4.0] - 2026-09-08
+
+### Added
+
+- Contadores flotantes a nivel de escena para progreso, countdown y valores dinamicos, independientes del turnero de combate.
+- Barras persistentes en `.ttrpgscene` con acciones rapidas para aumentar, disminuir y administrar cada contador.
+- Publicacion selectiva en Player View, con eleccion al mostrar entre barra sin etiqueta o barra con etiqueta.
+
+### Changed
+
+- Los contadores del DM se muestran bajo el indicador de oscuridad dentro del canvas y se atenúan fuera de hover para no interferir con el mapa.
+- Escenas antiguas cargan una coleccion vacia de contadores de forma retrocompatible.
+
 ## [2.3.0] - 2026-09-05
 
 ### Added

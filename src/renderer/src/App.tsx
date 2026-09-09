@@ -38,6 +38,7 @@ import {
   Shapes,
   Sparkles,
   Swords,
+  Timer,
   LocateFixed,
   ZoomIn,
   ZoomOut,
@@ -201,6 +202,16 @@ import {
 } from "../../domain/combat/combat-tracker";
 import { CombatSetupModal } from "./components/combat/CombatSetupModal";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
+import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay";
+import { SceneCounterManagerModal } from "./components/counters/SceneCounterManagerModal";
+import {
+  adjustSceneCounter,
+  createSceneCounter,
+  removeSceneCounter,
+  updateSceneCounter,
+  type CreateSceneCounterInput,
+  type UpdateSceneCounterInput
+} from "../../domain/counters/scene-counters";
 import {
   canDeleteMapAnnotation,
   removeInformationArea,
@@ -289,6 +300,7 @@ export function App(): JSX.Element {
   const [monsterTemplates, setMonsterTemplates] = useState<readonly MonsterTemplate[]>([]);
   const [isMonsterTemplateManagerOpen, setIsMonsterTemplateManagerOpen] = useState(false);
   const [isCombatSetupOpen, setIsCombatSetupOpen] = useState(false);
+  const [isSceneCounterManagerOpen, setIsSceneCounterManagerOpen] = useState(false);
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
@@ -362,6 +374,7 @@ export function App(): JSX.Element {
   const nextPinId = useRef(1);
   const nextInformationAreaId = useRef(1);
   const nextSceneLinkId = useRef(1);
+  const nextSceneCounterId = useRef(1);
   const sceneLinkValidationRequestId = useRef(0);
   const lastSavedSceneJsonRef = useRef<string | null>(null);
   const syncSceneEntityCounters = useCallback((targetScene: SceneDocument): void => {
@@ -389,6 +402,7 @@ export function App(): JSX.Element {
       targetScene.mapAnnotations.sceneLinks.map((marker) => marker.id),
       "scene-link-"
     );
+    nextSceneCounterId.current = getNextNumericId(targetScene.counters.map((counter) => counter.id), "counter-");
   }, []);
   const viewportHandleRef = useRef<MapViewportHandle | null>(null);
   const isSpaceDragActiveRef = useRef(isSpaceDragActive);
@@ -1448,6 +1462,7 @@ export function App(): JSX.Element {
     nextPinId.current = 1;
     nextInformationAreaId.current = 1;
     nextSceneLinkId.current = 1;
+    nextSceneCounterId.current = 1;
     lastSavedSceneJsonRef.current = null;
     refreshPlayerCameraControl();
     sendPlayerCameraCommand("scene-change");
@@ -2568,6 +2583,54 @@ export function App(): JSX.Element {
     setFeedback("Batalla finalizada. Turnero listo para una nueva batalla.");
   }, [setScene]);
 
+  const handleCreateSceneCounter = useCallback((input: Omit<CreateSceneCounterInput, "id">): void => {
+    const id = getNextAvailableSceneId(sceneRef.current, ["counter-"], nextSceneCounterId);
+    setScene((current) => ({
+      ...current,
+      counters: [
+        ...current.counters,
+        createSceneCounter({
+          ...input,
+          id,
+          ...(input.kind === "dynamic" && input.initialValue !== undefined
+            ? { initialValue: input.initialValue }
+            : {})
+        })
+      ]
+    }));
+  }, [setScene]);
+
+  const handleUpdateSceneCounter = useCallback((id: string, input: UpdateSceneCounterInput): void => {
+    setScene((current) => ({ ...current, counters: updateSceneCounter(current.counters, id, input) }));
+  }, [setScene]);
+
+  const handleAdjustSceneCounter = useCallback((id: string, delta: number): void => {
+    setScene((current) => ({ ...current, counters: adjustSceneCounter(current.counters, id, delta) }));
+  }, [setScene]);
+
+  const handleDeleteSceneCounter = useCallback((id: string): void => {
+    setScene((current) => ({ ...current, counters: removeSceneCounter(current.counters, id) }));
+  }, [setScene]);
+
+  const handleSetSceneCounterPlayerVisibility = useCallback((
+    id: string,
+    isVisibleToPlayers: boolean,
+    isLabelVisibleToPlayers: boolean
+  ): void => {
+    setScene((current) => {
+      const counter = current.counters.find((candidate) => candidate.id === id);
+      if (counter === undefined) return current;
+      return {
+        ...current,
+        counters: updateSceneCounter(current.counters, id, {
+          ...counter,
+          isVisibleToPlayers,
+          isLabelVisibleToPlayers
+        })
+      };
+    });
+  }, [setScene]);
+
   function handleCreateToken(): void {
     if (interaction.contextMenu === null) {
       return;
@@ -3146,6 +3209,10 @@ export function App(): JSX.Element {
               <Swords size={15} aria-hidden="true" />
               {scene.combatTracker.active ? "Batalla activa" : "Iniciar batalla"}
             </button>
+            <button type="button" className="is-quiet" onClick={() => setIsSceneCounterManagerOpen(true)} disabled={isBusy}>
+              <Timer size={15} aria-hidden="true" />
+              Contadores
+            </button>
           </div>
         </div>
       </header>
@@ -3320,7 +3387,18 @@ export function App(): JSX.Element {
           onMapAnnotationPreview={handleMapAnnotationPreviewById}
           compassOrientation={scene.compassOrientation}
           showCompass={mapState !== null}
-          overlay={<DmDarknessStatusBadge darkness={scene.darkness} />}
+          overlay={
+            <>
+              <DmDarknessStatusBadge darkness={scene.darkness} />
+              <SceneCountersOverlay
+                counters={scene.counters}
+                viewRole="dm"
+                onAdjust={handleAdjustSceneCounter}
+                onSetPlayerVisibility={handleSetSceneCounterPlayerVisibility}
+                onManage={() => setIsSceneCounterManagerOpen(true)}
+              />
+            </>
+          }
         />
         <CombatTurnBar
           tracker={scene.combatTracker}
@@ -4722,6 +4800,15 @@ export function App(): JSX.Element {
           onClose={() => setIsCombatSetupOpen(false)}
         />
       ) : null}
+      {isSceneCounterManagerOpen ? (
+        <SceneCounterManagerModal
+          counters={scene.counters}
+          onCreate={handleCreateSceneCounter}
+          onUpdate={handleUpdateSceneCounter}
+          onDelete={handleDeleteSceneCounter}
+          onClose={() => setIsSceneCounterManagerOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }
@@ -4856,6 +4943,7 @@ function getSceneObjectIds(scene: SceneDocument): readonly string[] {
     ...scene.mapAnnotations.pins.map((pin) => pin.id),
     ...scene.mapAnnotations.areas.map((area) => area.id),
     ...scene.mapAnnotations.sceneLinks.map((marker) => marker.id),
+    ...scene.counters.map((counter) => counter.id),
     ...scene.fogOfWar.revealedAreas.map((area) => area.id),
     ...scene.fogOfWar.obstacles.map((obstacle) => obstacle.id)
   ];

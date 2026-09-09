@@ -9,6 +9,7 @@ import { MapViewport } from "./components/MapViewport";
 import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
+import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
   sanitizePlayerCameraCommand,
@@ -393,6 +394,7 @@ export function PlayerApp(): JSX.Element {
       {isHydrated ? (
         <CombatTurnBar tracker={scene.combatTracker} viewRole="player" />
       ) : null}
+      {isHydrated ? <SceneCountersOverlay counters={scene.counters} viewRole="player" /> : null}
       {!isViewportReady && (
         <div className="player-loading" role="status" aria-live="polite">
           <div className="player-loading__mark" aria-hidden="true" />
