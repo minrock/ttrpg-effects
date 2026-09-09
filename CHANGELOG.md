@@ -10,6 +10,17 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.4.2] - 2026-09-08
+
+### Fixed
+
+- Player View conserva el tamano visual de los cuadros de grilla al navegar entre mapas con calibraciones distintas, compensando el zoom automaticamente.
+- El cambio funciona tanto desde el navegador de mapas como al atravesar conexiones internas.
+
+### Changed
+
+- El diagnostico de zoom y pixeles por cuadro en Player View inicia oculto y se activa de forma opcional desde la barra de camara del DM.
+
 ## [2.4.1] - 2026-09-08
 
 ### Fixed

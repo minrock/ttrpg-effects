@@ -67,6 +67,8 @@
 - Pan/zoom local del jugador: transformacion Pixi normal; reporte coalescido durante el gesto y uno final.
 - Zoom remoto desde DM: una orden IPC y una llamada `setCameraSnapshot()` en Player View por click.
 - Recentrar: una orden atomica para centro+zoom y una confirmacion correlacionada.
+- Navegacion entre mapas internos: conservar los pixeles por cuadro de Player View, compensando el zoom segun el tamano de celda, y reemplazar solo su centro por el punto de entrada.
+- Exponer un indicador visual de solo lectura en Player View, actualizado desde la camara efectiva, con porcentaje de zoom y pixeles por cuadro para diagnosticar zoom remoto y local. Inicia oculto y se controla desde la barra de camara del DM como preferencia efimera de presentacion.
 - Actualizar camara virtual: mutacion de posicion/escala/visibilidad del objeto persistente, sin redibujar el resto del viewport.
 
 ## 4. Decisiones tecnicas
@@ -283,8 +285,9 @@ Los nombres definitivos pueden ajustarse al estilo local, conservando el contrat
 12. Agregar controles DM de zoom/recentrado/estado con callbacks estables.
 13. Integrar apertura, cierre, cambio de escena y reapertura.
 14. Verificar que camaras no entren en scene snapshots, autosave ni `.ttrpgscene`.
-15. Ejecutar tests, typecheck, lint, build y smoke de dos ventanas.
-16. Medir contadores/perfil Pixi durante drag y pan para confirmar ausencia de reconstrucciones nuevas.
+15. Agregar una regla pura y test de regresion para conservar zoom de Player View al navegar entre mapas internos.
+16. Ejecutar tests, typecheck, lint, build y smoke de dos ventanas.
+17. Medir contadores/perfil Pixi durante drag y pan para confirmar ausencia de reconstrucciones nuevas.
 
 ## 9. Testing y verificacion
 

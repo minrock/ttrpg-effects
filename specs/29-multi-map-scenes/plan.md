@@ -22,6 +22,7 @@
 - Estado tactico por mapa activo: mapa, camara, grilla, darkness, fog, luces, efectos, formas, tokens, labels, objetos y anotaciones.
 - Notas, monstruos, NPCs, personajes y combat tracker a nivel escena.
 - Player View sincronizado con mapa activo.
+- Tamano visual de las celdas de Player View preservado entre mapas de una misma escena.
 - Zoom desbloqueado por defecto en nuevos mapas/escenas.
 - Base tecnica para links internos entre mapas y migracion de conexiones antiguas sin ciclos infinitos.
 
@@ -93,6 +94,7 @@
 - No se transforman coordenadas al mover contenido V1 dentro de `SceneMapDocument`.
 - Cada mapa conserva su propia grilla, escala, camera y zoom.
 - Player View recibe snapshot del mapa activo y no interpreta coordenadas de mapas inactivos.
+- Todo cambio de mapa conserva los pixeles por celda de la camara principal de Player View. El navegador toma el `center` de la camara del mapa destino y una navegacion interna toma el punto de entrada; el zoom se calcula como `zoomActual * celdaOrigen / celdaDestino`. El zoom propio de cada mapa sigue siendo exclusivo de su camara DM.
 
 ### Errores de dominio
 
@@ -247,6 +249,8 @@
   - crear escena nueva, agregar primer mapa, agregar segundo mapa;
   - alternar mapas y confirmar fog/grilla/anotaciones aisladas;
   - abrir Player View y cambiar mapa activo;
+  - aplicar zoom remoto de Player View, seleccionar otro mapa desde el navegador y confirmar que el centro del destino cambia conservando los pixeles por cuadro aun con celdas de distinto tamano;
+  - aplicar zoom remoto de Player View, navegar mediante una conexion interna y confirmar que el punto de entrada cambia sin alterar el zoom;
   - importar dos escenas antiguas conectadas;
   - validar que zoom inicia desbloqueado.
 
@@ -285,6 +289,7 @@
 - El tab `Mapa` muestra objetos/anotaciones del mapa activo.
 - Cambiar de mapa no mezcla contenido visual ni seleccion.
 - Player View sigue el mapa activo.
+- El tamano visual de las celdas de Player View se mantiene al cambiar o navegar entre mapas de la misma escena.
 - `Agregar a escena` importa `.ttrpgscene` antiguo sin reemplazar escena abierta.
 - Tests relevantes, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
 

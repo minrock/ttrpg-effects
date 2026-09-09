@@ -139,6 +139,13 @@ Esta funcionalidad agrega control de presentacion al DM sin convertir la Ventana
 - Al aplicar zoom remoto, Player View se recentra en la camara principal y vuelve al estado sincronizado tras confirmar la actualizacion.
 - El control remoto no modifica el zoom del viewport del DM.
 
+### Cambio de mapa dentro de una escena
+
+- Cuando el DM cambia al jugador entre mapas de una misma escena, se conserva el tamano visual de los cuadros de la grilla. El porcentaje de zoom se ajusta si las grillas tienen distinto tamano de celda.
+- Una conexion interna actualiza el centro de Player View al marcador de entrada del mapa destino y compensa el zoom para conservar los pixeles por cuadro.
+- La camara propia de cada mapa sigue controlando exclusivamente el viewport del DM al alternar entre mapas.
+- El DM puede activar o desactivar desde su barra de camara un indicador discreto en Player View con el porcentaje de zoom efectivo y los pixeles por cuadro; inicia oculto y no se persiste en la escena.
+
 ## Interfaz del DM
 
 ### Control sobre el mapa

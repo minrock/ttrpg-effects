@@ -40,6 +40,7 @@ import {
   Swords,
   Timer,
   LocateFixed,
+  Ruler,
   ZoomIn,
   ZoomOut,
   ChevronLeft,
@@ -161,6 +162,7 @@ import {
 } from "../../domain/player/player-window";
 import {
   derivePlayerCameraSyncStatus,
+  movePlayerCameraToMap,
   shouldApplyPlayerCameraReport,
   zoomPlayerCamera,
   type PlayerCameraCommandReason,
@@ -321,6 +323,7 @@ export function App(): JSX.Element {
   const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
+  const [showPlayerZoomIndicator, setShowPlayerZoomIndicator] = useState(false);
   const [showMapAnnotations, setShowMapAnnotations] = useState(true);
   const [isFogRevealRadiusEditing, setIsFogRevealRadiusEditing] = useState(false);
   const [mapAnnotationModal, setMapAnnotationModal] = useState<MapAnnotationModalDraft | null>(null);
@@ -1034,7 +1037,13 @@ export function App(): JSX.Element {
       }
 
       const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
-      playerCameraRef.current = internalTarget.camera;
+      const targetMap = sceneRef.current.maps.find((map) => map.id === internalTarget.mapId);
+      playerCameraRef.current = movePlayerCameraToMap(
+        playerCameraRef.current,
+        internalTarget.camera,
+        sceneRef.current.grid.cellSizeWorld,
+        targetMap?.grid.cellSizeWorld ?? sceneRef.current.grid.cellSizeWorld
+      );
       dmCameraRef.current = internalTarget.camera;
       effectivePlayerCameraRef.current = null;
       effectivePlayerViewportRef.current = null;
@@ -1295,9 +1304,10 @@ export function App(): JSX.Element {
       camera: playerCameraRef.current,
       cameraSyncKey: playerCameraSyncKey,
       showDmFogOverlay,
+      showZoomIndicator: showPlayerZoomIndicator,
       informationAreaHighlightResetKey
     }),
-    [playerSceneSnapshot, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay, informationAreaHighlightResetKey]
+    [playerSceneSnapshot, mapImageUrl, tokenImageUrls, playerCameraSyncKey, showDmFogOverlay, showPlayerZoomIndicator, informationAreaHighlightResetKey]
   );
 
   useEffect(() => {
@@ -1845,7 +1855,8 @@ export function App(): JSX.Element {
       tokenImageUrls: loadedTokenImageUrls,
       camera,
       cameraSyncKey,
-      showDmFogOverlay
+      showDmFogOverlay,
+      showZoomIndicator: showPlayerZoomIndicator
     });
   }
 
@@ -2004,6 +2015,27 @@ export function App(): JSX.Element {
 
   function handleSelectSceneMap(mapId: string): void {
     try {
+      const targetMap = sceneRef.current.maps.find((map) => map.id === mapId);
+      if (targetMap === undefined) {
+        throw new Error("El mapa seleccionado no existe.");
+      }
+
+      if (sceneRef.current.activeMapId !== mapId) {
+        const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
+        playerCameraRef.current = movePlayerCameraToMap(playerCameraRef.current, {
+          center: { x: targetMap.camera.x, y: targetMap.camera.y },
+          zoom: targetMap.camera.zoom
+        }, sceneRef.current.grid.cellSizeWorld, targetMap.grid.cellSizeWorld);
+        effectivePlayerCameraRef.current = null;
+        effectivePlayerViewportRef.current = null;
+        pendingPlayerCameraCommandRevisionRef.current = null;
+        acknowledgedPlayerCameraCommandRevisionRef.current = null;
+        playerCameraSyncKeyRef.current = nextCameraSyncKey;
+        setPlayerCameraSyncKey(nextCameraSyncKey);
+        refreshPlayerCameraControl();
+        sendPlayerCameraCommand("scene-change");
+      }
+
       setMapImageUrl(null);
       setTokenImageUrls({});
       setScene((current) => setActiveSceneMap(current, mapId));
@@ -3155,6 +3187,17 @@ export function App(): JSX.Element {
             >
               <Camera size={15} aria-hidden="true" />
               <span>{getPlayerCameraStatusLabel(playerCameraSyncStatus)}</span>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
+                title={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
+                aria-pressed={showPlayerZoomIndicator}
+                disabled={isBusy}
+                onClick={() => setShowPlayerZoomIndicator((current) => !current)}
+              >
+                <Ruler size={14} aria-hidden="true" />
+              </button>
               <button
                 type="button"
                 className="player-camera-toolbar__icon"

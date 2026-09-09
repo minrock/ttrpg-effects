@@ -45,6 +45,7 @@ Esta spec introduce una evolucion del formato `.ttrpgscene`: los archivos antigu
 - Reorganizar el panel izquierdo con tabs horizontales para alternar entre contenido de escena y contenido del mapa activo.
 - Sincronizar Player View con el mapa activo seleccionado por el DM.
 - Conservar camara y zoom por mapa.
+- Conservar el tamano visual de los cuadros de grilla en Player View al cambiar de mapa dentro de la misma escena.
 - Cambiar el zoom bloqueado para que por defecto inicie desbloqueado; el DM decide cuando bloquearlo.
 - Preparar el modelo para que las instancias de monstruos/tokens en mapa referencien informacion de nivel escena mediante ids estables.
 - Permitir que los links entre mapas evolucionen para apuntar a mapas internos de la escena.
@@ -211,6 +212,7 @@ El archivo viejo no se modifica en disco hasta que el usuario guarde.
 6. El mapa nuevo restaura su propia camara y zoom.
 7. La seleccion de objetos/anotaciones se limpia si pertenecia al mapa anterior.
 8. Player View cambia automaticamente al nuevo mapa activo.
+9. El tamano visual de los cuadros de Player View se conserva en cualquier cambio de mapa. El porcentaje de zoom se compensa segun la relacion entre el tamano de celda origen y destino; el navegador usa el centro de la camara del mapa destino y una navegacion por conexion usa su punto de entrada.
 
 ### Renombrar, ordenar y eliminar mapas
 
@@ -284,7 +286,7 @@ Al cambiar el mapa activo:
 - se ocultan datos privados como hasta ahora;
 - se conserva la separacion DM/jugador para pines, areas privadas y notas;
 - se aplican fog, oscuridad, efectos y visibilidad propias de ese mapa;
-- se restablece o aplica la camara de jugador correspondiente al nuevo mapa segun las reglas vigentes;
+- se conserva el tamano visual vigente de los cuadros de la camara principal de jugador, compensando el porcentaje de zoom cuando las grillas tienen distinto tamano de celda; cuando la transicion tiene punto de entrada, solo se actualiza su centro;
 - no se revela contenido de nivel escena que no haya sido explicitamente enviado o permitido.
 
 Si Player View esta abierta y el DM agrega o cambia mapas, la actualizacion debe ser recuperable aunque la ventana de jugador no este lista en ese instante.
@@ -392,6 +394,7 @@ Esta migracion debe ser forward-only: una vez guardada en formato nuevo, la esce
 - Cambiar de mapa activo reemplaza el contenido visible del canvas por el contenido propio de ese mapa.
 - Cada mapa conserva su camara y zoom al cambiar entre mapas.
 - Player View cambia automaticamente al mapa activo del DM.
+- El tamano visual de los cuadros de Player View permanece estable al navegar entre mapas de una misma escena, aunque el porcentaje de zoom cambie para compensar grillas con distinta calibracion.
 - Notas generales se muestran y persisten a nivel escena.
 - Monstruos, NPCs y personajes se muestran y persisten a nivel escena.
 - Objetos, pines, areas, links visuales, grilla, fog, oscuridad, luces, efectos, formas, mediciones y tokens se muestran y persisten a nivel mapa.
