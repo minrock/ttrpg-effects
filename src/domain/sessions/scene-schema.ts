@@ -170,7 +170,7 @@ const fireZoneSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("cells"),
-    radius: positiveNumber.default(50),
+    radius: positiveNumber.default(100),
     cells: z.array(gridCellSchema).min(1)
   })
 ]);
