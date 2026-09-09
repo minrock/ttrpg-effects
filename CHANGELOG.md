@@ -10,6 +10,13 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.4.1] - 2026-09-08
+
+### Fixed
+
+- El pincel de revelado de niebla muestra siempre bajo el puntero el circulo que delimita el area a descubrir.
+- Las escenas nuevas y los datos de niebla sin radio explicito inician el revelado con un cuadro de la grilla inicial.
+
 ## [2.4.0] - 2026-09-08
 
 ### Added

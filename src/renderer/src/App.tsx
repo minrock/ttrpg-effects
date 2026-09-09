@@ -322,6 +322,7 @@ export function App(): JSX.Element {
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
   const [showMapAnnotations, setShowMapAnnotations] = useState(true);
+  const [isFogRevealRadiusEditing, setIsFogRevealRadiusEditing] = useState(false);
   const [mapAnnotationModal, setMapAnnotationModal] = useState<MapAnnotationModalDraft | null>(null);
   const [sceneLinkModalId, setSceneLinkModalId] = useState<string | null>(null);
   const [sceneLinkStatuses, setSceneLinkStatuses] = useState<Readonly<Record<string, SceneLinkValidationStatus>>>({});
@@ -2130,10 +2131,12 @@ export function App(): JSX.Element {
     }));
   }
 
-  function handleFogRevealRadiusChange(radius: number): void {
+  function handleFogRevealRadiusChange(radiusInCells: number): void {
     setScene((current) => ({
       ...current,
-      fogOfWar: updateFogOfWar(current.fogOfWar, { revealRadius: radius })
+      fogOfWar: updateFogOfWar(current.fogOfWar, {
+        revealRadius: radiusInCells * current.grid.cellSizeWorld
+      })
     }));
   }
 
@@ -3336,6 +3339,9 @@ export function App(): JSX.Element {
           fogPresentation={deriveFogPresentation("dm", showDmFogOverlay)}
           hiddenTokenPolicy={deriveHiddenTokenPolicy("dm")}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
+          fogRevealGuideRadius={
+            isFogRevealRadiusEditing && scene.fogOfWar.enabled ? scene.fogOfWar.revealRadius : null
+          }
           isFirePaintMode={interaction.activeTool === "fire-paint"}
           isPathDrawingMode={interaction.activeTool === "path"}
           isWaterDrawingMode={interaction.activeTool === "water"}
@@ -4534,13 +4540,16 @@ export function App(): JSX.Element {
               />
             </label>
             <label>
-              Reveal
+              Revelar (cuadros)
               <input
                 type="number"
-                min="8"
-                max="3000"
-                value={scene.fogOfWar.revealRadius}
+                min="0.25"
+                max="30"
+                step="0.25"
+                value={scene.fogOfWar.revealRadius / scene.grid.cellSizeWorld}
                 onChange={(event) => handleFogRevealRadiusChange(event.currentTarget.valueAsNumber)}
+                onFocus={() => setIsFogRevealRadiusEditing(true)}
+                onBlur={() => setIsFogRevealRadiusEditing(false)}
               />
             </label>
             <button

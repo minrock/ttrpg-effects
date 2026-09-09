@@ -30,7 +30,7 @@ export function createDefaultFogOfWar(): SceneFogOfWar {
     enabled: false,
     opacity: 0.92,
     color: "#000000",
-    revealRadius: 50,
+    revealRadius: 100,
     revealedAreas: [],
     obstacles: []
   };

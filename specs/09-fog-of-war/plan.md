@@ -21,7 +21,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Agregar validacion/schema para esos datos con defaults vacios.
 - Reservar y usar capas de render para `fogOfWar` y `walls`.
 - Permitir activar/desactivar fog of war y configurar opacidad/color.
-- Permitir revelar areas manuales desde el mapa con radio default `50`.
+- Permitir revelar areas manuales desde el mapa con radio default de una celda inicial (`100` unidades de mundo), configurado en UI como cantidad de cuadros de la grilla activa.
+- Mostrar una guia temporal centrada durante la edicion del radio y una guia bajo el puntero durante `Modo niebla`.
 - Consolidar cada arrastre de revelado en una sola area compuesta tipo stroke, con puntos simplificados por distancia, para evitar crecimiento de memoria por miles de circulos.
 - Separar `Modo niebla` del pan temporal con `Space` para que navegar el mapa no revele fog accidentalmente.
 - Exponer `Modo niebla` dentro de la seccion Niebla del sidebar derecho.
@@ -57,7 +58,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 
 - **Entidades / tipos:** `SceneFogOfWar`, `SceneFogRevealArea`, `SceneFogObstacle` y helpers de `domain/vision`.
 - **Reglas puras:** Crear areas reveladas circulares y de trazo, simplificar puntos de stroke, validar segmentos de pared, activar/desactivar niebla, calcular areas visibles desde luces, unir vision persistente/manual y vision temporal.
-- **Coordenadas / unidades:** Todas las zonas y obstaculos se guardan en coordenadas de mundo. No guardar datos en pantalla.
+- **Coordenadas / unidades:** Todas las zonas, obstaculos y `revealRadius` se guardan en coordenadas de mundo. El renderer muestra y recibe el radio en cuadros mediante `revealRadius / grid.cellSizeWorld`; las guias son efimeras y no se guardan.
 - **Errores de dominio:** Coordenadas invalidas, ids vacios, poligonos insuficientes, segmentos de pared sin dos puntos, opacidades fuera de rango.
 
 ### 5. Cambios por capa
@@ -65,7 +66,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 #### `domain`
 
 - Crear `src/domain/vision/vision.ts` con tipos y helpers puros.
-- Definir `revealRadius: 50` como default de `SceneFogOfWar`.
+- Definir `revealRadius: 100` como default de `SceneFogOfWar`, equivalente a una celda de la grilla inicial.
 - Agregar tests para defaults, validacion de areas reveladas circulares/stroke, simplificacion de trazos y obstaculos.
 - Mantener separacion conceptual entre:
   - oscuridad ambiental,
@@ -95,7 +96,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 
 #### `renderer`
 
-- Agregar controles discretos para activar fog of war, ajustar opacidad, revelar area circular y resetear revelado.
+- Agregar controles discretos para activar fog of war, ajustar opacidad, configurar radio de revelado en cuadros, revelar area circular y resetear revelado.
+- Mantener un estado visual efimero mientras el input de radio tiene foco y pasarlo a Pixi para dibujar el circulo guia centrado.
 - Exponer `Modo niebla` como modo de herramienta desde la seccion Niebla del sidebar; el pan temporal se activa con `Space`.
 - Agregar una accion al menu contextual para activar o salir rapidamente de `Modo niebla`.
 - Agregar listener de teclado para `Cmd+F` / `Ctrl+F`; debe prevenir el buscador del navegador y habilitar fog of war si estaba apagado.
@@ -110,7 +112,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Documentar orden esperado respecto a `tokens`, `darkness`, `lights`, `effects`, `magicalDarkness` y `shapesAndMeasurements`.
 - Renderizar fog of war encima de mapa, tokens, oscuridad, luces, efectos y oscuridad magica, y debajo de herramientas tacticas/seleccion.
 - Renderizar solo areas reveladas manuales como huecos/zonas claras; fuentes de luz y fuego no revelan fog of war.
-- Aplicar cursor tipo pincel/crosshair al viewport cuando `Modo niebla` este activo.
+- Aplicar cursor tipo pincel/crosshair al viewport cuando `Modo niebla` este activo y dibujar un circulo de pincel bajo el puntero con el radio efectivo.
 - Evitar shaders complejos si Pixi Graphics alcanza.
 
 ### 6. Plan de trabajo
@@ -126,11 +128,12 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 9. Separar `Modo niebla` del pan temporal con `Space` para evitar revelado accidental durante navegacion.
 10. Agregar accion de activar/salir de `Modo niebla` al menu contextual de click derecho.
 11. Agregar shortcut `Cmd+F` / `Ctrl+F` para activar o salir de `Modo niebla`.
-12. Agregar cursor tipo pincel/crosshair en `Modo niebla`.
-13. Implementar render Pixi de fog y areas visibles, agrupando cada stroke en una geometria en vez de un objeto por circulo.
-14. Actualizar README/docs con la decision: la fog se revela manualmente; luces/fuego no la perforan y no hay LoS automatica por paredes.
-15. Referenciar el bug de mascaras de luces como riesgo tecnico conocido para futuras capas de vision.
-16. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
+12. Agregar cursor tipo pincel/crosshair y circulo de pincel bajo el cursor en `Modo niebla`.
+13. Convertir el input de radio de mundo a cuadros y dibujar una guia central mientras se edita.
+14. Implementar render Pixi de fog y areas visibles, agrupando cada stroke en una geometria en vez de un objeto por circulo.
+15. Actualizar README/docs con la decision: la fog se revela manualmente; luces/fuego no la perforan y no hay LoS automatica por paredes.
+16. Referenciar el bug de mascaras de luces como riesgo tecnico conocido para futuras capas de vision.
+17. Ejecutar `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 
 ### 7. Testing y verificacion
 
@@ -160,7 +163,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - Escenas con datos validos de vision futura serializan y parsean.
 - Las capas de render de fog/vision/paredes quedan implementadas o reservadas.
 - El usuario puede activar fog of war y revelar areas manualmente.
-- El radio default de revelado manual es `50`.
+- El radio default de revelado manual es una celda de la grilla inicial (`100` unidades de mundo).
 - Un trazo largo de niebla se persiste como una sola area `stroke` con puntos simplificados.
 - El render de niebla no crea un objeto persistente por cada movimiento del cursor.
 - `Space` + drag permite navegar sin revelar niebla.
@@ -168,6 +171,8 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - El menu contextual permite activar o salir de `Modo niebla`.
 - `Cmd+F` / `Ctrl+F` permite activar o salir de `Modo niebla` desde teclado.
 - `Modo niebla` muestra un puntero tipo pincel/crosshair.
+- El radio de revelado se edita en cuadros y se convierte usando el tamano de celda de la grilla activa.
+- Al editar el radio aparece una guia circular centrada; al revelar aparece una guia circular bajo el puntero.
 - Las luces visibles no revelan ni perforan fog of war; solo afectan oscuridad/darkvision segun sus specs.
 - No hay LoS automatica por paredes.
 - `pnpm test`, `pnpm typecheck`, `pnpm lint` y `pnpm build` pasan.
@@ -183,7 +188,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Implementacion completada dentro del alcance.
 - [x] Tipos de dominio de vision creados.
 - [x] Defaults de escena actualizados o schema tolerante implementado.
-- [x] Radio default de revelado definido en `50`.
+- [x] Radio default de revelado definido en una celda inicial (`100` unidades de mundo).
 - [x] Revelado por stroke documentado e implementado para reducir consumo de memoria.
 - [x] Schema de escena actualizado.
 - [x] Tests de dominio agregados.

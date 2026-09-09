@@ -235,6 +235,8 @@ export class PixiViewport {
   private isNavigationEnabled = false;
   private isSpaceNavigationActive = false;
   private isFogRevealMode = false;
+  private fogRevealGuideRadius: number | null = null;
+  private fogRevealPointerWorldPoint: WorldPoint | null = null;
   private isFirePaintMode = false;
   private isPathDrawingMode = false;
   private isWaterDrawingMode = false;
@@ -455,7 +457,14 @@ export class PixiViewport {
 
   setFogRevealMode(isFogRevealMode: boolean): void {
     this.isFogRevealMode = isFogRevealMode;
+    if (!isFogRevealMode) this.fogRevealPointerWorldPoint = null;
+    this.drawSelectionLayer();
     this.updateCursor();
+  }
+
+  setFogRevealGuideRadius(radius: number | null): void {
+    this.fogRevealGuideRadius = radius !== null && Number.isFinite(radius) && radius > 0 ? radius : null;
+    this.drawSelectionLayer();
   }
 
   setFirePaintMode(isFirePaintMode: boolean): void {
@@ -1176,6 +1185,11 @@ export class PixiViewport {
   private readonly handleDoubleClick = (event: MouseEvent): void => {
     if (this.viewRole !== "dm" || !this.showMapAnnotations || event.button !== 0) return;
     const screenPoint = this.eventToScreenPoint(event);
+
+    if (this.isFogRevealMode && this.fogOfWar?.enabled) {
+      this.fogRevealPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+      this.drawSelectionLayer();
+    }
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const area = [...this.mapAnnotations.areas]
       .reverse()
@@ -1415,6 +1429,11 @@ export class PixiViewport {
       this.scheduleViewportUpdate("water-pointer-preview", () => {
         this.options.onWaterPointerMove?.(point);
       });
+    }
+
+    if (this.isFogRevealMode && this.fogOfWar?.enabled) {
+      this.fogRevealPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+      this.drawSelectionLayer();
     }
 
     if (this.dragState === null) {
@@ -2523,6 +2542,18 @@ export class PixiViewport {
         this.grid ?? 100
       );
       selectionLayer.addChild(drawInformationAreaCells(cells, "#fff0a8", 0.28, 2));
+    }
+
+    if (this.fogRevealGuideRadius !== null) {
+      selectionLayer.addChild(
+        drawFogRevealGuide(this.camera.center, this.fogRevealGuideRadius, this.camera.zoom, 0x7bc7b2, 0.78)
+      );
+    }
+
+    if (this.isFogRevealMode && this.fogOfWar?.enabled && this.fogRevealPointerWorldPoint !== null) {
+      selectionLayer.addChild(
+        drawFogRevealGuide(this.fogRevealPointerWorldPoint, this.fogOfWar.revealRadius, this.camera.zoom, 0xffd28a, 0.94)
+      );
     }
 
     this.updateAreaToolLabelScale();
@@ -6934,5 +6965,20 @@ function drawFireZoneHint(effect: SceneFireEffect): Graphics {
       .stroke({ color: 0xff8a38, width: 2, alpha: 0.28 });
   }
 
+  return graphic;
+}
+
+function drawFogRevealGuide(
+  center: WorldPoint,
+  radius: number,
+  zoom: number,
+  color: number,
+  alpha: number
+): Graphics {
+  const graphic = new Graphics();
+  graphic
+    .circle(center.x, center.y, radius)
+    .fill({ color, alpha: 0.08 })
+    .stroke({ color, alpha, width: Math.max(1 / Math.max(zoom, 0.01), 0.65) });
   return graphic;
 }

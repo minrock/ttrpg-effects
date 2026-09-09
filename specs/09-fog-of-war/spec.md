@@ -12,15 +12,17 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 
 - Ocultar el mapa con una capa de fog of war configurable.
 - Activar/desactivar la niebla sin afectar la oscuridad ambiental existente.
-- Configurar opacidad, color y radio de revelado manual.
-- Usar `50` como radio default de revelado para empezar con un pincel controlado.
+- Configurar opacidad, color y radio de revelado manual expresado en cuadros de la grilla activa.
+- Mantener el radio persistido en coordenadas de mundo para compatibilidad; el control lo convierte hacia/desde cuadros usando `grid.cellSizeWorld`.
+- Usar una celda de la grilla inicial (`100` unidades de mundo) como radio default de revelado para escenas nuevas; las escenas existentes conservan su radio guardado.
+- Mientras se edita el radio, mostrar en el centro del canvas un circulo guia con el tamano resultante.
 - Revelar areas circulares con click o trazos compuestos al arrastrar sobre el mapa.
 - Consolidar cada trazo de revelado en una sola area compuesta por puntos simplificados con radio, evitando persistir un circulo por cada movimiento del cursor.
 - Separar `Modo niebla` del pan temporal con `Space` para evitar revelar zonas mientras se navega el mapa.
 - Exponer `Modo niebla` desde la seccion Niebla del sidebar derecho.
 - Permitir salir de `Modo niebla` desde el menu contextual de click derecho.
 - Permitir entrar/salir de `Modo niebla` con `Cmd+F` en macOS y `Ctrl+F` en Windows/Linux.
-- Mostrar un cursor tipo pincel/crosshair cuando `Modo niebla` este activo.
+- Mostrar un cursor tipo pincel/crosshair y el circulo de revelado bajo el puntero cuando `Modo niebla` este activo.
 - Resetear las zonas reveladas de la escena.
 - Guardar y cargar las zonas reveladas dentro del archivo `.ttrpgscene`.
 - Usar luces visibles y fuego con emision de luz como areas de vision actual.
@@ -47,12 +49,13 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 
 - El usuario puede activar fog of war desde la seccion Niebla del sidebar derecho.
 - La niebla cubre el mapa no revelado con opacidad configurable.
-- El radio default de revelado manual es `50`.
+- El radio default de revelado manual de una escena nueva equivale a un cuadro de la grilla inicial (`100` unidades de mundo) y se muestra en el control como cuadros segun la grilla activa.
+- El control de revelado se expresa en cuadros y al enfocarlo muestra un circulo guia centrado en el canvas.
 - `Modo niebla` permite descubrir areas circulares con click o trazos compuestos al arrastrar.
 - `Modo niebla` se activa o desactiva desde la seccion Niebla del sidebar derecho.
 - Cada trazo de arrastre se guarda como una sola zona revelada compuesta, no como cientos o miles de circulos independientes.
 - La simplificacion del trazo conserva la forma visual aproximada y reduce objetos renderizados/serializados.
-- `Modo niebla` cambia el puntero del canvas para indicar que se va a revelar niebla.
+- `Modo niebla` cambia el puntero del canvas y muestra un circulo bajo el cursor para indicar exactamente el area que se va a revelar.
 - `Space` + arrastrar permite mover la vista sin revelar fog accidentalmente.
 - El menu contextual permite activar o salir de `Modo niebla`; `Grab` no existe como modo persistente.
 - `Cmd+F` / `Ctrl+F` activa o desactiva `Modo niebla` y habilita fog of war si estaba apagado.

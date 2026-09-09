@@ -18,7 +18,7 @@ describe("vision and fog of war", () => {
       enabled: false,
       opacity: 0.92,
       color: "#000000",
-      revealRadius: 50,
+      revealRadius: 100,
       revealedAreas: [],
       obstacles: []
     });

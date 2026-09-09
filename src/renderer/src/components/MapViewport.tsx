@@ -81,6 +81,7 @@ interface MapViewportProps {
   readonly hiddenTokenPolicy?: HiddenTokenPolicy;
   readonly cameraSnapshot?: ViewportCameraSnapshot | null;
   readonly isFogRevealMode: boolean;
+  readonly fogRevealGuideRadius?: number | null;
   readonly isFirePaintMode: boolean;
   readonly isPathDrawingMode: boolean;
   readonly isWaterDrawingMode: boolean;
@@ -167,6 +168,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   hiddenTokenPolicy = "show-with-indicator",
   cameraSnapshot = null,
   isFogRevealMode,
+  fogRevealGuideRadius = null,
   isFirePaintMode,
   isPathDrawingMode,
   isWaterDrawingMode,
@@ -469,6 +471,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setFogRevealMode(isFogRevealMode);
   }, [isFogRevealMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setFogRevealGuideRadius(fogRevealGuideRadius);
+  }, [fogRevealGuideRadius]);
 
   useEffect(() => {
     viewportRef.current?.setFirePaintMode(isFirePaintMode);
