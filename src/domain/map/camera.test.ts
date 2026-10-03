@@ -49,7 +49,8 @@ describe("camera coordinate transforms", () => {
   it("clamps invalid and extreme zoom values", () => {
     expect(clampZoom(Number.NaN)).toBe(1);
     expect(clampZoom(0)).toBe(1);
-    expect(clampZoom(0.01)).toBe(0.25);
+    expect(clampZoom(0.01)).toBe(0.1);
+    expect(clampZoom(0.1)).toBe(0.1);
     expect(clampZoom(99)).toBe(4);
   });
 });

@@ -1,6 +1,6 @@
 import type { ScreenPoint, ViewportSize, WorldPoint } from "../shared/coordinates";
 
-export const MIN_ZOOM = 0.25;
+export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 4;
 
 export interface CameraState {

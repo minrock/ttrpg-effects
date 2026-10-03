@@ -15,6 +15,7 @@ import type { MapImageState } from "../../domain/map/map-image";
 import type { CompassOrientation } from "../../domain/map/compass-orientation";
 import { DEFAULT_COMPASS_ORIENTATION, getPlayerViewRotationDegrees } from "../../domain/map/compass-orientation";
 import { DEFAULT_MAP_BACKGROUND_COLOR, type MapBackgroundColor } from "../../domain/map/map-background";
+import type { DaytimeBrushTopology, DaytimeMaskStrokeMode, SceneDaytimeFilter, SceneDaytimeMask } from "../../domain/environment/daytime-filter";
 import type {
   SceneDarkness,
   SceneDynamicLightEffect,
@@ -131,6 +132,7 @@ interface PointerDragState {
     | "path-point-move"
     | "path-move"
     | "fog-reveal"
+    | "daytime-mask-paint"
     | "information-area-paint"
     | "fire-paint"
     | "fire-zone-resize"
@@ -174,6 +176,13 @@ export interface PixiViewportOptions {
   readonly onPathMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
   readonly onFogRevealStroke?: (points: readonly WorldPoint[]) => void;
+  readonly onDaytimeMaskStroke?: (stroke: {
+    readonly topology: DaytimeBrushTopology;
+    readonly mode: DaytimeMaskStrokeMode;
+    readonly cells: readonly GridCell[];
+    readonly points: readonly WorldPoint[];
+    readonly radius: number;
+  }) => void;
   readonly onFirePaint?: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange?: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange?: (elementId: string, radius: number) => void;
@@ -210,6 +219,8 @@ export class PixiViewport {
   private mapSprite: Sprite | null = null;
   private colorMapSprite: Sprite | null = null;
   private darkvisionMask: Graphics | null = null;
+  private daytimeFilter: SceneDaytimeFilter | null = null;
+  private daytimeMask: SceneDaytimeMask | null = null;
   private readonly grayscaleFilter = new ColorMatrixFilter();
   private mapLoadVersion = 0;
   private tokenLoadVersion = 0;
@@ -235,6 +246,13 @@ export class PixiViewport {
   private isNavigationEnabled = false;
   private isSpaceNavigationActive = false;
   private isFogRevealMode = false;
+  private isDaytimeMaskPaintMode = false;
+  private daytimeBrushTopology: DaytimeBrushTopology = "topology";
+  private daytimeMaskStrokeMode: DaytimeMaskStrokeMode = "paint";
+  private daytimeBrushRadius = 100;
+  private daytimeMaskPointerWorldPoint: WorldPoint | null = null;
+  private daytimeMaskStrokePoints: WorldPoint[] = [];
+  private readonly daytimeMaskStrokeCells = new Map<string, GridCell>();
   private fogRevealGuideRadius: number | null = null;
   private fogRevealPointerWorldPoint: WorldPoint | null = null;
   private isFirePaintMode = false;
@@ -268,6 +286,8 @@ export class PixiViewport {
     | null = null;
   private _darknessTexture: RenderTexture | null = null;
   private _fogOfWarTexture: RenderTexture | null = null;
+  private daytimeFeedbackTexture: RenderTexture | null = null;
+  private daytimeFeedbackSignature = "";
   private _darknessTextureSize: { readonly width: number; readonly height: number } | null = null;
   private _fogOfWarTextureSize: { readonly width: number; readonly height: number } | null = null;
   private fogRedrawFrame: number | null = null;
@@ -465,6 +485,20 @@ export class PixiViewport {
   setFogRevealGuideRadius(radius: number | null): void {
     this.fogRevealGuideRadius = radius !== null && Number.isFinite(radius) && radius > 0 ? radius : null;
     this.drawSelectionLayer();
+  }
+
+  setDaytimeMaskPaintMode(enabled: boolean, topology: DaytimeBrushTopology, mode: DaytimeMaskStrokeMode, radius: number): void {
+    this.isDaytimeMaskPaintMode = enabled;
+    this.daytimeBrushTopology = topology;
+    this.daytimeMaskStrokeMode = mode;
+    this.daytimeBrushRadius = Number.isFinite(radius) && radius > 0 ? radius : 100;
+    if (!enabled) {
+      this.resetDaytimeMaskStroke();
+      this.daytimeMaskPointerWorldPoint = null;
+    }
+    this.drawDaytimeFilterLayer();
+    this.drawSelectionLayer();
+    this.updateCursor();
   }
 
   setFirePaintMode(isFirePaintMode: boolean): void {
@@ -739,6 +773,7 @@ export class PixiViewport {
         this.colorMapSprite?.scale.set(map.scale);
       }
       this.drawDarkvisionLayer();
+      this.drawDaytimeFilterLayer();
       this.scheduleDarknessRedraw();
       this.scheduleFogOfWarRedraw();
     }
@@ -788,6 +823,13 @@ export class PixiViewport {
     this.drawVisionObstaclesLayer();
   }
 
+  setDaytimeFilter(filter: SceneDaytimeFilter, mask: SceneDaytimeMask): void {
+    this.daytimeFilter = filter;
+    this.daytimeMask = mask;
+    this.drawDaytimeFilterLayer();
+    this.drawSelectionLayer();
+  }
+
   destroy(): void {
     if (this.disposed) {
       return;
@@ -809,6 +851,9 @@ export class PixiViewport {
     this._fogOfWarTexture?.destroy();
     this._fogOfWarTexture = null;
     this._fogOfWarTextureSize = null;
+    this.daytimeFeedbackTexture?.destroy();
+    this.daytimeFeedbackTexture = null;
+    this.daytimeFeedbackSignature = "";
     for (const url of this.loadedTokenUrls) {
       void Assets.unload(url);
     }
@@ -978,6 +1023,108 @@ export class PixiViewport {
 
     grid.stroke({ color: 0xd9e5df, width: lineWidth, alpha: this.grid.opacity });
     layer.addChild(grid);
+  }
+
+  private drawDaytimeFilterLayer(): void {
+    const layer = this.getLayer("daytimeFilter");
+    clearContainerChildren(layer);
+
+    if (
+      this.map === null ||
+      this.mapSprite === null ||
+      this.daytimeFilter?.enabled !== true ||
+      this.isDaytimeMaskPaintMode
+    ) {
+      return;
+    }
+
+    const appearance = getDaytimeFilterAppearance(this.daytimeFilter.preset);
+    if (appearance === null) return;
+
+    const texture = this.mapSprite.texture;
+    const width = texture.width * this.map.scale;
+    const height = texture.height * this.map.scale;
+    const mapBounds = new Graphics()
+      .rect(this.map.position.x - width / 2, this.map.position.y - height / 2, width, height)
+      .fill({ color: appearance.color, alpha: appearance.alpha });
+    mapBounds.blendMode = "multiply";
+
+    const mask = new Graphics();
+    if (this.daytimeFilter.coverage === "scene") {
+      mask.rect(this.map.position.x - width / 2, this.map.position.y - height / 2, width, height).fill({ color: 0xffffff });
+    } else {
+      for (const stroke of this.daytimeMask?.strokes ?? []) {
+        if (stroke.topology === "topology") {
+          for (const cell of stroke.cells) {
+            drawGridCell(mask, cell);
+            if (stroke.mode === "paint") mask.fill({ color: 0xffffff });
+            else mask.cut();
+          }
+          continue;
+        }
+
+        drawDaytimeCircularStroke(mask, stroke.points, stroke.radius, stroke.mode, 0xffffff, 1);
+      }
+    }
+
+    layer.addChild(mask);
+    layer.addChild(mapBounds);
+    mapBounds.setMask({ mask });
+  }
+
+  private createDaytimeMaskFeedbackSprite(): Sprite | null {
+    if (this.map === null || this.mapSprite === null || this.daytimeMask === null) return null;
+
+    const sourceTexture = this.mapSprite.texture;
+    const width = Math.max(1, Math.ceil(sourceTexture.width));
+    const height = Math.max(1, Math.ceil(sourceTexture.height));
+    const signature = [
+      this.map.imageUrl,
+      this.map.position.x,
+      this.map.position.y,
+      this.map.scale,
+      width,
+      height,
+      JSON.stringify(this.daytimeMask)
+    ].join("|");
+
+    if (this.daytimeFeedbackTexture === null || this.daytimeFeedbackSignature !== signature) {
+      this.daytimeFeedbackTexture?.destroy();
+      this.daytimeFeedbackTexture = RenderTexture.create({ width, height });
+      this.daytimeFeedbackSignature = signature;
+
+      // Rasterize the whole mask once. White paint stays opaque, while erase
+      // operations remove pixels, so overlapping strokes cannot accumulate alpha.
+      const maskContainer = new Container();
+      maskContainer.position.set(
+        width / 2 - this.map.position.x / this.map.scale,
+        height / 2 - this.map.position.y / this.map.scale
+      );
+      maskContainer.scale.set(1 / this.map.scale);
+      const maskGraphic = new Graphics();
+      for (const stroke of this.daytimeMask.strokes) {
+        if (stroke.topology === "topology") {
+          for (const cell of stroke.cells) {
+            drawGridCell(maskGraphic, cell);
+            if (stroke.mode === "paint") maskGraphic.fill({ color: 0xffffff, alpha: 1 });
+            else maskGraphic.cut();
+          }
+        } else {
+          drawDaytimeCircularStroke(maskGraphic, stroke.points, stroke.radius, stroke.mode, 0xffffff, 1);
+        }
+      }
+      maskContainer.addChild(maskGraphic);
+      this.app.renderer.render({ container: maskContainer, target: this.daytimeFeedbackTexture, clear: true });
+      maskContainer.destroy({ children: true });
+    }
+
+    const feedback = new Sprite(this.daytimeFeedbackTexture);
+    feedback.anchor.set(0.5);
+    feedback.position.set(this.map.position.x, this.map.position.y);
+    feedback.scale.set(this.map.scale);
+    feedback.tint = 0xff2f2f;
+    feedback.alpha = 0.42;
+    return feedback;
   }
 
   private drawDarknessLayer(): void {
@@ -1190,6 +1337,7 @@ export class PixiViewport {
       this.fogRevealPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
       this.drawSelectionLayer();
     }
+
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
     const area = [...this.mapAnnotations.areas]
       .reverse()
@@ -1264,6 +1412,9 @@ export class PixiViewport {
       } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
         this.startFogRevealStroke(point);
+      } else if (this.isDaytimeMaskPaintMode) {
+        mode = "daytime-mask-paint";
+        this.startDaytimeMaskStroke(point);
       } else if (this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
@@ -1436,6 +1587,11 @@ export class PixiViewport {
       this.drawSelectionLayer();
     }
 
+    if (this.isDaytimeMaskPaintMode) {
+      this.daytimeMaskPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+      this.drawSelectionLayer();
+    }
+
     if (this.dragState === null) {
       const newZone = this.hitTestPathHandles(screenPoint)?.zone ?? null;
       const isPlayerCameraHovered = this.hitTestPlayerCameraControl(screenPoint);
@@ -1463,6 +1619,8 @@ export class PixiViewport {
       this.scheduleViewportUpdate("grid-cell-size", () => {
         this.options.onGridCellSizeChange?.(cellSize);
       });
+    } else if (this.dragState.mode === "daytime-mask-paint") {
+      this.appendDaytimeMaskStrokePoint(nextPoint);
     } else if (this.dragState.mode === "map-move" && this.mapSprite !== null) {
       const dx = (nextPoint.x - this.dragState.lastPoint.x) / this.camera.zoom;
       const dy = (nextPoint.y - this.dragState.lastPoint.y) / this.camera.zoom;
@@ -1603,6 +1761,10 @@ export class PixiViewport {
 
     if (this.dragState.mode === "fog-reveal") {
       this.finishFogRevealStroke(releasePoint);
+    }
+
+    if (this.dragState.mode === "daytime-mask-paint") {
+      this.finishDaytimeMaskStroke(releasePoint);
     }
 
     if (this.dragState.mode === "fire-paint") {
@@ -1892,7 +2054,7 @@ export class PixiViewport {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode) {
       this.app.canvas.style.cursor = "crosshair";
-    } else if (this.isFogRevealMode || this.isFirePaintMode || this.isInformationAreaMode) {
+    } else if (this.isFogRevealMode || this.isDaytimeMaskPaintMode || this.isFirePaintMode || this.isInformationAreaMode) {
       this.app.canvas.style.cursor = "cell";
     } else if (this.pathHoverZone === "circle") {
       this.app.canvas.style.cursor = "grab";
@@ -2556,6 +2718,26 @@ export class PixiViewport {
       );
     }
 
+    if (this.isDaytimeMaskPaintMode && this.daytimeMaskPointerWorldPoint !== null) {
+      const feedback = this.createDaytimeMaskFeedbackSprite();
+      if (feedback !== null) selectionLayer.addChild(feedback);
+      const color = this.daytimeMaskStrokeMode === "paint" ? "#ff3b30" : "#cf758b";
+      if (this.daytimeBrushTopology === "topology") {
+        selectionLayer.addChild(
+          drawInformationAreaCells(
+            getGridCellsInBrush(this.daytimeMaskPointerWorldPoint, this.daytimeBrushRadius, this.grid ?? 100),
+            color,
+            0.36,
+            3
+          )
+        );
+      } else {
+        selectionLayer.addChild(
+          drawFogRevealGuide(this.daytimeMaskPointerWorldPoint, this.daytimeBrushRadius, this.camera.zoom, parseHexColor(color), 0.88)
+        );
+      }
+    }
+
     this.updateAreaToolLabelScale();
   }
 
@@ -2953,6 +3135,48 @@ export class PixiViewport {
   private startFogRevealStroke(screenPoint: ScreenPoint): void {
     this.fogRevealStrokePoints = [screenToWorld(screenPoint, this.camera, this.getViewportSize())];
     this.scheduleFogOfWarRedraw();
+  }
+
+  private startDaytimeMaskStroke(screenPoint: ScreenPoint): void {
+    this.resetDaytimeMaskStroke();
+    this.appendDaytimeMaskStrokePoint(screenPoint);
+  }
+
+  private appendDaytimeMaskStrokePoint(screenPoint: ScreenPoint): void {
+    const point = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    if (this.daytimeBrushTopology === "topology") {
+      for (const cell of getGridCellsInBrush(point, this.daytimeBrushRadius, this.grid ?? 100)) {
+        this.daytimeMaskStrokeCells.set(getGridCellKey(cell), cell);
+      }
+      return;
+    }
+
+    const previous = this.daytimeMaskStrokePoints[this.daytimeMaskStrokePoints.length - 1];
+    if (previous === undefined || Math.hypot(point.x - previous.x, point.y - previous.y) >= this.daytimeBrushRadius * 0.35) {
+      this.daytimeMaskStrokePoints.push(point);
+    }
+  }
+
+  private finishDaytimeMaskStroke(screenPoint: ScreenPoint): void {
+    this.appendDaytimeMaskStrokePoint(screenPoint);
+    const cells = [...this.daytimeMaskStrokeCells.values()];
+    const points = [...this.daytimeMaskStrokePoints];
+    if ((this.daytimeBrushTopology === "topology" && cells.length > 0) ||
+      (this.daytimeBrushTopology === "circular" && points.length > 0)) {
+      this.options.onDaytimeMaskStroke?.({
+        topology: this.daytimeBrushTopology,
+        mode: this.daytimeMaskStrokeMode,
+        cells,
+        points,
+        radius: this.daytimeBrushRadius
+      });
+    }
+    this.resetDaytimeMaskStroke();
+  }
+
+  private resetDaytimeMaskStroke(): void {
+    this.daytimeMaskStrokePoints = [];
+    this.daytimeMaskStrokeCells.clear();
   }
 
   private appendFogRevealStrokePoint(screenPoint: ScreenPoint): void {
@@ -4139,6 +4363,9 @@ export class PixiViewport {
   private async drawMapImage(): Promise<void> {
     const layer = this.getLayer("map");
     const loadVersion = ++this.mapLoadVersion;
+    this.daytimeFeedbackTexture?.destroy();
+    this.daytimeFeedbackTexture = null;
+    this.daytimeFeedbackSignature = "";
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
     }
@@ -4195,6 +4422,7 @@ export class PixiViewport {
       layer.addChild(colorSprite);
       this.darkvisionSignature = "";
       this.drawDarkvisionLayer();
+      this.drawDaytimeFilterLayer();
       this.drawGrid();
       this.drawDarknessLayer();
       this.drawFogOfWarLayer();
@@ -6178,6 +6406,47 @@ function addFirePattern(
 function drawGridCell(graphic: Graphics, cell: GridCell): Graphics {
   if (cell.layout !== "hexagonal") return graphic.rect(cell.x, cell.y, cell.size, cell.size);
   return graphic.poly(getGridCellVertices(cell).flatMap((point) => [point.x, point.y]), true);
+}
+
+/** Draw a full circular brush stroke as one continuous, round-capped figure. */
+function drawDaytimeCircularStroke(
+  graphic: Graphics,
+  points: readonly WorldPoint[],
+  radius: number,
+  mode: DaytimeMaskStrokeMode,
+  color: number,
+  alpha: number
+): void {
+  const first = points[0];
+  if (first === undefined) return;
+
+  if (points.length === 1) {
+    graphic.circle(first.x, first.y, radius);
+    if (mode === "paint") graphic.fill({ color, alpha });
+    else graphic.cut();
+    return;
+  }
+
+  graphic.moveTo(first.x, first.y);
+  for (let index = 1; index < points.length; index += 1) {
+    const point = points[index];
+    if (point !== undefined) graphic.lineTo(point.x, point.y);
+  }
+  graphic.stroke({ color, width: radius * 2, alpha, cap: "round", join: "round" });
+  if (mode === "erase") graphic.cut();
+}
+
+function getDaytimeFilterAppearance(preset: SceneDaytimeFilter["preset"]): { readonly color: number; readonly alpha: number } | null {
+  switch (preset) {
+    case "day":
+      return { color: 0xfff4dc, alpha: 0.05 };
+    case "sunset":
+      return { color: 0xe6a45a, alpha: 0.28 };
+    case "night":
+      return { color: 0x294b78, alpha: 0.54 };
+    default:
+      return null;
+  }
 }
 
 function drawFireZoneMask(effect: SceneFireEffect): Graphics {

@@ -297,7 +297,7 @@ Los nombres definitivos pueden ajustarse al estilo local, conservando el contrat
 - Equivalencia dentro/fuera de tolerancia.
 - Estado sincronizado, pendiente, desincronizado y cerrado.
 - Descarte de reportes/comandos obsoletos.
-- Clamp y pasos de zoom.
+- Clamp y pasos de zoom, con rango compartido de `0.1` a `4`.
 - Reporte de confirmacion remota no produce desincronizacion falsa.
 
 ### Integration tests

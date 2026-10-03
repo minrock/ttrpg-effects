@@ -158,7 +158,8 @@ describe("player camera control", () => {
     expect(zoomPlayerCamera(primary, "in").zoom).toBeCloseTo(1.15);
     expect(zoomPlayerCamera(primary, "out").zoom).toBeCloseTo(1 / 1.15);
     expect(zoomPlayerCamera({ ...primary, zoom: 4 }, "in").zoom).toBe(4);
-    expect(zoomPlayerCamera({ ...primary, zoom: 0.25 }, "out").zoom).toBe(0.25);
+    expect(zoomPlayerCamera({ ...primary, zoom: 0.25 }, "out").zoom).toBeCloseTo(0.25 / 1.15);
+    expect(zoomPlayerCamera({ ...primary, zoom: 0.1 }, "out").zoom).toBe(0.1);
   });
 
   it("keeps the player grid cell size while moving to another map", () => {

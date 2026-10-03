@@ -6,6 +6,7 @@ describe("render layer order", () => {
     expect(renderLayerNames).toEqual([
       "background",
       "map",
+      "daytimeFilter",
       "grid",
       "tokens",
       "darkness",

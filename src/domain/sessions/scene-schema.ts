@@ -7,6 +7,7 @@ import {
   type SceneMapDocument
 } from "./scene-document";
 import { createDefaultFogOfWar } from "../vision/vision";
+import { daytimeCoverages, daytimeMaskStrokeModes, daytimePresets } from "../environment/daytime-filter";
 import { defaultSceneLabelStyle, systemLabelFonts } from "../labels/labels";
 import { createDefaultCombatTracker } from "../combat/combat-tracker";
 import { DEFAULT_COMPASS_ORIENTATION, compassOrientations } from "../map/compass-orientation";
@@ -160,6 +161,32 @@ const gridCellSchema = z.object({
   size: positiveNumber,
   layout: z.enum(["square", "hexagonal"]).optional()
 });
+
+const daytimeMaskStrokeSchema = z.discriminatedUnion("topology", [
+  z.object({
+    id: z.string().trim().min(1),
+    topology: z.literal("topology"),
+    mode: z.enum(daytimeMaskStrokeModes),
+    cells: z.array(gridCellSchema).min(1)
+  }),
+  z.object({
+    id: z.string().trim().min(1),
+    topology: z.literal("circular"),
+    mode: z.enum(daytimeMaskStrokeModes),
+    points: z.array(worldPointSchema).min(1),
+    radius: positiveNumber
+  })
+]);
+
+const daytimeMaskSchema = z.object({
+  strokes: z.array(daytimeMaskStrokeSchema).default([])
+}).default({ strokes: [] });
+
+const daytimeFilterSchema = z.object({
+  enabled: z.boolean().default(false),
+  preset: z.enum(daytimePresets).default("day"),
+  coverage: z.enum(daytimeCoverages).default("scene")
+}).default({ enabled: false, preset: "day", coverage: "scene" });
 
 const fireZoneSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -507,6 +534,7 @@ const sceneMapDocumentSchema = z.object({
   name: z.string().trim().min(1).max(120),
   compassOrientation: compassOrientationSchema.default(DEFAULT_COMPASS_ORIENTATION),
   backgroundColor: normalizedHexColor.default(DEFAULT_MAP_BACKGROUND_COLOR),
+  daytimeMask: daytimeMaskSchema,
   map: sceneDocumentV1Schema.shape.map,
   camera: sceneDocumentV1Schema.shape.camera,
   grid: sceneDocumentV1Schema.shape.grid,
@@ -532,6 +560,8 @@ export const sceneDocumentV2Schema = z.object({
   sceneAside: sceneDocumentV1Schema.shape.sceneAside,
   combatTracker: sceneDocumentV1Schema.shape.combatTracker,
   counters: sceneDocumentV1Schema.shape.counters,
+  daytimeFilter: daytimeFilterSchema,
+  daytimeMask: daytimeMaskSchema.optional(),
   map: sceneDocumentV1Schema.shape.map.optional(),
   camera: sceneDocumentV1Schema.shape.camera.optional(),
   grid: sceneDocumentV1Schema.shape.grid.optional(),
@@ -562,7 +592,8 @@ export const sceneDocumentV2Schema = z.object({
     scene.shapes !== undefined &&
     scene.tokens !== undefined &&
     scene.labels !== undefined &&
-    scene.mapAnnotations !== undefined;
+    scene.mapAnnotations !== undefined &&
+    scene.daytimeMask !== undefined;
   const parsedScene = {
     version: SCENE_DOCUMENT_VERSION,
     maps: scene.maps,
@@ -574,6 +605,7 @@ export const sceneDocumentV2Schema = z.object({
     sceneAside: scene.sceneAside,
     combatTracker: scene.combatTracker,
     counters: scene.counters,
+    daytimeFilter: scene.daytimeFilter,
     ...(hasRuntimeFields ? {
       map: scene.map,
       camera: scene.camera,
@@ -586,7 +618,8 @@ export const sceneDocumentV2Schema = z.object({
       shapes: scene.shapes,
       tokens: scene.tokens,
       labels: scene.labels,
-      mapAnnotations: scene.mapAnnotations
+      mapAnnotations: scene.mapAnnotations,
+      daytimeMask: scene.daytimeMask
     } : active)
   } as SceneDocument;
   return hasRuntimeFields
