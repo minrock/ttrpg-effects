@@ -2,7 +2,7 @@
 
 ## Estado
 
-Implementado en `feature/daytime-map-filters`; pendiente de validacion funcional y cierre de la feature.
+Implementado y estabilizado en la version `2.5.1`.
 
 ## Objetivo
 
@@ -24,6 +24,7 @@ La hora del dia es una decision narrativa de nivel escena. La cobertura visual, 
 - **Cobertura pintada:** el filtro cubre solamente la union de las celdas marcadas en cada mapa.
 - **Zona pintada:** region de cobertura creada con topologia de grilla o con pincel circular. Varias pinceladas forman una unica cobertura por mapa y no poseen presets independientes.
 - **Mascara de mapa:** mascara compuesta y cacheable que delimita donde el filtro de escena puede transformar la imagen del mapa.
+- **Bitmap de mascara:** imagen raster con alpha ya incorporado, generada desde los strokes del mapa activo y usada directamente por el overlay del filtro.
 - **Pincel topologico:** pinta las celdas cuadradas o hexagonales de la grilla activa.
 - **Pincel circular:** pinta discos y trazos circulares en coordenadas de mundo, sin depender de que el mapa tenga una grilla regular.
 
@@ -106,6 +107,7 @@ La hora del dia es una decision narrativa de nivel escena. La cobertura visual, 
 - El filtro transforma solo la imagen base del mapa, a traves de la mascara activa cuando corresponda.
 - La grilla, tokens, etiquetas, formas, mediciones, anotaciones privadas, controles y overlays de UI conservan sus colores normales.
 - La capa de filtro se renderiza por encima de la imagen base y por debajo de la grilla, tokens, oscuridad, luces, efectos, oscuridad magica y fog of war.
+- Para cobertura pintada, el renderer compone la transparencia de los strokes en un bitmap Canvas 2D y dibuja un unico sprite tintado. No usa un alpha-mask activo de Pixi ni render targets intermedios durante pan o zoom.
 - El filtro no modifica `darkness`, `fogOfWar`, `darkvision`, luces, lineas de vision ni visibilidad de tokens. Noche es una apariencia ambiental, no una mecanica de ocultamiento.
 - DM View y Player View ven el mismo filtro de ambiente del mapa activo. Las guias de pintado, controles y mascara editable solo aparecen en DM View.
 
@@ -164,6 +166,9 @@ El cambio debe ser aditivo para el formato actual de escena. Las escenas que no 
 
 - **Riesgo:** una mascara por pixel degrade rendimiento y haga dificil la persistencia.
   **Mitigacion:** persistir geometria topologica o trazos circulares y construir una sola imagen de mascara cacheable por mapa; evitar overlays por celda o por punto de mouse.
+
+- **Riesgo:** un alpha-mask de Pixi puede crear framebuffers incompletos al cambiar el zoom, especialmente con mapas o ventanas grandes.
+  **Mitigacion:** rasterizar los strokes en Canvas 2D con resolucion interna limitada y aplicar el filtro como sprite con alpha incorporado; no ejecutar `RenderTexture` ni `setMask` para la cobertura pintada.
 
 - **Riesgo:** se confunda noche ambiental con oscuridad de juego.
   **Mitigacion:** mantener datos, controles y capas separados; el preset no cambia ninguna regla de vision.

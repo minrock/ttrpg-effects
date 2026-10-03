@@ -1,4 +1,4 @@
-import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, Text, type Texture } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, Text, Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
   clampZoom,
@@ -106,6 +106,11 @@ interface DynamicLightRenderState {
   opacity: number;
   flicker: number;
   speed: number;
+}
+
+interface DaytimeMaskRaster {
+  readonly texture: Texture;
+  readonly sourceScale: number;
 }
 
 interface PointerDragState {
@@ -286,7 +291,8 @@ export class PixiViewport {
     | null = null;
   private _darknessTexture: RenderTexture | null = null;
   private _fogOfWarTexture: RenderTexture | null = null;
-  private daytimeFeedbackTexture: RenderTexture | null = null;
+  private daytimeFeedbackTexture: Texture | null = null;
+  private daytimeFeedbackTextureSourceScale = 1;
   private daytimeFeedbackSignature = "";
   private daytimeFeedbackRedrawFrame: number | null = null;
   private _darknessTextureSize: { readonly width: number; readonly height: number } | null = null;
@@ -862,6 +868,7 @@ export class PixiViewport {
     this._fogOfWarTextureSize = null;
     this.daytimeFeedbackTexture?.destroy();
     this.daytimeFeedbackTexture = null;
+    this.daytimeFeedbackTextureSourceScale = 1;
     this.daytimeFeedbackSignature = "";
     for (const url of this.loadedTokenUrls) {
       void Assets.unload(url);
@@ -1053,28 +1060,27 @@ export class PixiViewport {
     const texture = this.mapSprite.texture;
     const width = texture.width * this.map.scale;
     const height = texture.height * this.map.scale;
-    const mapBounds = new Graphics()
-      .rect(this.map.position.x - width / 2, this.map.position.y - height / 2, width, height)
-      .fill({ color: appearance.color, alpha: appearance.alpha });
-    mapBounds.blendMode = "multiply";
-
-    let mask: Graphics | Sprite;
     if (this.daytimeFilter.coverage === "scene") {
-      mask = new Graphics()
+      const mapBounds = new Graphics()
         .rect(this.map.position.x - width / 2, this.map.position.y - height / 2, width, height)
-        .fill({ color: 0xffffff });
-    } else {
-      const rasterMask = this.getDaytimeMaskRasterTexture(this.daytimeMask ?? { strokes: [] });
-      if (rasterMask === null) return;
-      mask = new Sprite(rasterMask);
-      mask.anchor.set(0.5);
-      mask.position.set(this.map.position.x, this.map.position.y);
-      mask.scale.set(this.map.scale);
+        .fill({ color: appearance.color, alpha: appearance.alpha });
+      mapBounds.blendMode = "multiply";
+      layer.addChild(mapBounds);
+      return;
     }
 
-    layer.addChild(mask);
-    layer.addChild(mapBounds);
-    mapBounds.setMask({ mask });
+    const rasterMask = this.getDaytimeMaskRasterTexture(this.daytimeMask ?? { strokes: [] });
+    if (rasterMask === null) return;
+    // The bitmap already contains the painted alpha. Drawing it directly avoids
+    // Pixi's alpha-mask framebuffer pass, which becomes unstable while zooming.
+    const overlay = new Sprite(rasterMask.texture);
+    overlay.anchor.set(0.5);
+    overlay.position.set(this.map.position.x, this.map.position.y);
+    overlay.scale.set(this.map.scale / rasterMask.sourceScale);
+    overlay.tint = appearance.color;
+    overlay.alpha = appearance.alpha;
+    overlay.blendMode = "multiply";
+    layer.addChild(overlay);
   }
 
   private createDaytimeMaskFeedbackSprite(): Sprite | null {
@@ -1084,21 +1090,29 @@ export class PixiViewport {
     const rasterMask = this.getDaytimeMaskRasterTexture(feedbackMask);
     if (rasterMask === null) return null;
 
-    const feedback = new Sprite(rasterMask);
+    const feedback = new Sprite(rasterMask.texture);
     feedback.anchor.set(0.5);
     feedback.position.set(this.map.position.x, this.map.position.y);
-    feedback.scale.set(this.map.scale);
+    feedback.scale.set(this.map.scale / rasterMask.sourceScale);
     feedback.tint = 0xff2f2f;
     feedback.alpha = 0.42;
     return feedback;
   }
 
-  private getDaytimeMaskRasterTexture(mask: SceneDaytimeMask): RenderTexture | null {
+  private getDaytimeMaskRasterTexture(mask: SceneDaytimeMask): DaytimeMaskRaster | null {
     if (this.map === null || this.mapSprite === null) return null;
 
     const sourceTexture = this.mapSprite.texture;
-    const width = Math.max(1, Math.ceil(sourceTexture.width));
-    const height = Math.max(1, Math.ceil(sourceTexture.height));
+    if (sourceTexture.width < 1 || sourceTexture.height < 1 || !this.hasDrawableViewport()) return null;
+    const maxRasterDimension = 2048;
+    const maxRasterPixels = 4 * 1024 * 1024;
+    const sourceScale = Math.min(
+      1,
+      maxRasterDimension / Math.max(sourceTexture.width, sourceTexture.height),
+      Math.sqrt(maxRasterPixels / (sourceTexture.width * sourceTexture.height))
+    );
+    const width = Math.max(1, Math.ceil(sourceTexture.width * sourceScale));
+    const height = Math.max(1, Math.ceil(sourceTexture.height * sourceScale));
     const signature = [
       this.map.imageUrl,
       this.map.position.x,
@@ -1111,33 +1125,41 @@ export class PixiViewport {
 
     if (this.daytimeFeedbackTexture === null || this.daytimeFeedbackSignature !== signature) {
       this.daytimeFeedbackTexture?.destroy();
-      this.daytimeFeedbackTexture = RenderTexture.create({ width, height });
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext("2d");
+      if (context === null) return null;
+      this.daytimeFeedbackTextureSourceScale = sourceScale;
       this.daytimeFeedbackSignature = signature;
 
       // Rasterize the whole mask once. White paint stays opaque, while erase
       // operations remove pixels, so overlapping strokes cannot accumulate alpha.
-      const maskContainer = new Container();
-      maskContainer.position.set(
-        width / 2 - this.map.position.x / this.map.scale,
-        height / 2 - this.map.position.y / this.map.scale
+      const worldToTextureScale = sourceScale / this.map.scale;
+      context.setTransform(
+        worldToTextureScale,
+        0,
+        0,
+        worldToTextureScale,
+        width / 2 - (this.map.position.x / this.map.scale) * sourceScale,
+        height / 2 - (this.map.position.y / this.map.scale) * sourceScale
       );
-      maskContainer.scale.set(1 / this.map.scale);
       for (const stroke of mask.strokes) {
-        const strokeGraphic = new Graphics();
+        context.globalCompositeOperation = stroke.mode === "erase" ? "destination-out" : "source-over";
+        context.fillStyle = "#ffffff";
+        context.strokeStyle = "#ffffff";
         if (stroke.topology === "topology") {
           for (const cell of stroke.cells) {
-            drawGridCell(strokeGraphic, cell).fill({ color: 0xffffff, alpha: 1 });
+            drawDaytimeMaskCellCanvas(context, cell);
           }
         } else {
-          drawDaytimeCircularStroke(strokeGraphic, stroke.points, stroke.radius, "paint", 0xffffff, 1);
+          drawDaytimeMaskCircularStrokeCanvas(context, stroke.points, stroke.radius);
         }
-        if (stroke.mode === "erase") strokeGraphic.blendMode = "erase";
-        maskContainer.addChild(strokeGraphic);
       }
-      this.app.renderer.render({ container: maskContainer, target: this.daytimeFeedbackTexture, clear: true });
-      maskContainer.destroy({ children: true });
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      this.daytimeFeedbackTexture = Texture.from(canvas);
     }
-    return this.daytimeFeedbackTexture;
+    return { texture: this.daytimeFeedbackTexture, sourceScale: this.daytimeFeedbackTextureSourceScale };
   }
 
   private getDaytimeFeedbackMask(): SceneDaytimeMask {
@@ -1194,6 +1216,7 @@ export class PixiViewport {
     ) {
       return;
     }
+    if (!this.hasDrawableViewport()) return;
 
     const viewport = this.getViewportSize();
     const renderViewport = getMaskRenderViewport(viewport, this.getPresentationRotationRadians());
@@ -2192,8 +2215,9 @@ export class PixiViewport {
 
   private resize(): void {
     const { width, height } = this.host.getBoundingClientRect();
-    const nextWidth = Math.max(1, Math.floor(width));
-    const nextHeight = Math.max(1, Math.floor(height));
+    if (width < 1 || height < 1) return;
+    const nextWidth = Math.floor(width);
+    const nextHeight = Math.floor(height);
 
     this.app.renderer.resize(nextWidth, nextHeight);
     this.applyCamera(false);
@@ -2218,8 +2242,7 @@ export class PixiViewport {
     if (emit) {
       this.options.onCameraChange?.(cameraStateToSnapshot(this.camera));
     }
-    this.cancelScheduledDarknessRedraw();
-    this.drawDarknessLayer();
+    this.scheduleDarknessRedraw();
     this.scheduleFogOfWarRedraw();
   }
 
@@ -2259,6 +2282,11 @@ export class PixiViewport {
       width: this.app.renderer.width,
       height: this.app.renderer.height
     };
+  }
+
+  private hasDrawableViewport(): boolean {
+    const { width, height } = this.host.getBoundingClientRect();
+    return width >= 1 && height >= 1 && this.app.renderer.width >= 1 && this.app.renderer.height >= 1;
   }
 
   private eventToScreenPoint(event: MouseEvent | PointerEvent | WheelEvent): ScreenPoint {
@@ -2969,6 +2997,7 @@ export class PixiViewport {
     ) {
       return;
     }
+    if (!this.hasDrawableViewport()) return;
 
     const viewport = this.getViewportSize();
     const renderViewport = getMaskRenderViewport(viewport, this.getPresentationRotationRadians());
@@ -4417,6 +4446,7 @@ export class PixiViewport {
     const loadVersion = ++this.mapLoadVersion;
     this.daytimeFeedbackTexture?.destroy();
     this.daytimeFeedbackTexture = null;
+    this.daytimeFeedbackTextureSourceScale = 1;
     this.daytimeFeedbackSignature = "";
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
@@ -6460,32 +6490,37 @@ function drawGridCell(graphic: Graphics, cell: GridCell): Graphics {
   return graphic.poly(getGridCellVertices(cell).flatMap((point) => [point.x, point.y]), true);
 }
 
-/** Draw a full circular brush stroke as one continuous, round-capped figure. */
-function drawDaytimeCircularStroke(
-  graphic: Graphics,
-  points: readonly WorldPoint[],
-  radius: number,
-  mode: DaytimeMaskStrokeMode,
-  color: number,
-  alpha: number
-): void {
-  const first = points[0];
-  if (first === undefined) return;
-
-  if (points.length === 1) {
-    graphic.circle(first.x, first.y, radius);
-    if (mode === "paint") graphic.fill({ color, alpha });
-    else graphic.cut();
+function drawDaytimeMaskCellCanvas(context: CanvasRenderingContext2D, cell: GridCell): void {
+  if (cell.layout !== "hexagonal") {
+    context.fillRect(cell.x, cell.y, cell.size, cell.size);
     return;
   }
 
-  graphic.moveTo(first.x, first.y);
-  for (let index = 1; index < points.length; index += 1) {
-    const point = points[index];
-    if (point !== undefined) graphic.lineTo(point.x, point.y);
-  }
-  graphic.stroke({ color, width: radius * 2, alpha, cap: "round", join: "round" });
-  if (mode === "erase") graphic.cut();
+  const [first, ...rest] = getGridCellVertices(cell);
+  if (first === undefined) return;
+  context.beginPath();
+  context.moveTo(first.x, first.y);
+  for (const point of rest) context.lineTo(point.x, point.y);
+  context.closePath();
+  context.fill();
+}
+
+function drawDaytimeMaskCircularStrokeCanvas(
+  context: CanvasRenderingContext2D,
+  points: readonly WorldPoint[],
+  radius: number
+): void {
+  const first = points[0];
+  if (first === undefined || radius <= 0) return;
+
+  context.beginPath();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.lineWidth = radius * 2;
+  context.moveTo(first.x, first.y);
+  for (const point of points.slice(1)) context.lineTo(point.x, point.y);
+  if (points.length === 1) context.lineTo(first.x, first.y);
+  context.stroke();
 }
 
 function getDaytimeFilterAppearance(preset: SceneDaytimeFilter["preset"]): { readonly color: number; readonly alpha: number } | null {
