@@ -10,6 +10,13 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.5.1] - 2026-10-03
+
+### Fixed
+
+- Las zonas pintadas de los filtros Dia, Atardecer y Noche ya no crean framebuffers WebGL incompletos ni pierden cobertura al alejar la camara.
+- La mascara de ambiente se compone como bitmap Canvas con alpha incorporado, evitando la composicion de alpha-mask de Pixi durante el zoom y mejorando su estabilidad en mapas grandes.
+
 ## [2.5.0] - 2026-10-03
 
 ### Added

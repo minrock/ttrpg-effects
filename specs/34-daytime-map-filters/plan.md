@@ -188,7 +188,7 @@ private daytimeFilteredSprite: Sprite | null;
 1. Usar `selection` o una capa de herramienta superior para la guia DM, nunca la capa `daytimeFilter` que se proyecta al jugador.
 2. Topologia: reutilizar `getGridCellAtPoint`, `getGridCellVertices` y la geometria de fire/information area para dibujar la celda hover.
 3. Circular: dibujar un circulo de radio constante en mundo y, durante drag, el trazo compuesto temporal.
-4. Pintura/borrado deben diferenciarse visualmente por color y alpha, sin representar el preset final sobre tokens o UI. Mientras la herramienta este activa, reconstruir desde los trazos persistidos una unica `RenderTexture` de mascara local: `paint` escribe opaco y `erase` compone geometria opaca con blend `erase` para eliminar pixeles. Proyectar sobre ella un solo sprite rojo translucido privado, con contraste suficiente sobre mapas claros. La opacidad del sprite no se acumula donde las pinceladas se superponen.
+4. Pintura/borrado deben diferenciarse visualmente por color y alpha, sin representar el preset final sobre tokens o UI. Mientras la herramienta este activa, reconstruir desde los trazos persistidos un unico bitmap Canvas 2D de mascara local: `paint` escribe opaco y `erase` usa composicion `destination-out` para eliminar pixeles. Proyectar sobre ella un solo sprite rojo translucido privado, con contraste suficiente sobre mapas claros. La opacidad del sprite no se acumula donde las pinceladas se superponen.
 5. `Space` + drag conserva pan y no agrega strokes; el cursor y el hit testing siguen las convenciones de fog/fire.
 
 ## 6. Integracion de carga, guardado y mapas
@@ -251,8 +251,8 @@ private daytimeFilteredSprite: Sprite | null;
 - **Riesgo:** strokes de borrado hacen crecer indefinidamente el documento.
   **Mitigacion:** simplificar puntos, deduplicar celdas, coalescer strokes consecutivos compatibles cuando sea seguro y establecer limites de validacion recuperables.
 
-- **Riesgo:** RenderTexture demasiado grande consume memoria con mapas pesados.
-  **Mitigacion:** una sola textura por viewport/mapa activo, destruccion inmediata al reemplazarla y limite de resolucion interna con validacion visual.
+- **Riesgo:** una textura de mascara demasiado grande consume memoria o deja un framebuffer GPU incompleto con mapas pesados.
+  **Mitigacion:** generar una sola textura Canvas por mapa activo, con limite de 2048 px por lado y 4 MP; destruirla al reemplazarla. El filtro usa el alpha del bitmap directamente y no crea un `RenderTexture` ni un `setMask` de Pixi durante zoom.
 
 - **Riesgo:** actualizar el preset reconstruye texturas para todos los mapas.
   **Mitigacion:** el preset es estado de escena liviano; solo el mapa activo actualiza su sprite filtrado y los demas al activarse.
