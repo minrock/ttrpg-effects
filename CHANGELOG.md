@@ -10,6 +10,20 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.5.0] - 2026-10-03
+
+### Added
+
+- Filtros de ambiente a nivel de escena: Dia, Atardecer y Noche, aplicables a todos los mapas o a zonas pintadas por mapa.
+- Mascaras de ambiente persistidas en `.ttrpgscene`, con pinceles topologico y circular, borrado, guia de tamano en cuadros y feedback rojo privado para el DM.
+- Rasterizacion de mascara por mapa para mantener una cobertura uniforme, soportar borrado y evitar acumulacion visual en trazos superpuestos.
+
+### Changed
+
+- Player View reorienta mapa, filtro y mascara juntos al cambiar el norte de la escena.
+- El zoom minimo compartido de DM y Player View ahora permite alejar hasta 10%.
+- Escenas existentes cargan los nuevos campos de ambiente con defaults compatibles; el formato sigue siendo retrocompatible.
+
 ## [2.4.2] - 2026-09-08
 
 ### Fixed

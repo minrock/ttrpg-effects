@@ -15,7 +15,7 @@ import type { MapImageState } from "../../domain/map/map-image";
 import type { CompassOrientation } from "../../domain/map/compass-orientation";
 import { DEFAULT_COMPASS_ORIENTATION, getPlayerViewRotationDegrees } from "../../domain/map/compass-orientation";
 import { DEFAULT_MAP_BACKGROUND_COLOR, type MapBackgroundColor } from "../../domain/map/map-background";
-import type { DaytimeBrushTopology, DaytimeMaskStrokeMode, SceneDaytimeFilter, SceneDaytimeMask } from "../../domain/environment/daytime-filter";
+import type { DaytimeBrushTopology, DaytimeMaskStroke, DaytimeMaskStrokeMode, SceneDaytimeFilter, SceneDaytimeMask } from "../../domain/environment/daytime-filter";
 import type {
   SceneDarkness,
   SceneDynamicLightEffect,
@@ -288,6 +288,7 @@ export class PixiViewport {
   private _fogOfWarTexture: RenderTexture | null = null;
   private daytimeFeedbackTexture: RenderTexture | null = null;
   private daytimeFeedbackSignature = "";
+  private daytimeFeedbackRedrawFrame: number | null = null;
   private _darknessTextureSize: { readonly width: number; readonly height: number } | null = null;
   private _fogOfWarTextureSize: { readonly width: number; readonly height: number } | null = null;
   private fogRedrawFrame: number | null = null;
@@ -548,6 +549,10 @@ export class PixiViewport {
     if (this.compassOrientation === compassOrientation) return;
     this.compassOrientation = compassOrientation;
     this.applyCamera(false);
+    // The map and its raster mask live below the same rotated world container.
+    // Redraw so Pixi refreshes the mask relationship in the new orientation.
+    this.drawDaytimeFilterLayer();
+    this.drawSelectionLayer();
   }
 
   setBackgroundColor(backgroundColor: MapBackgroundColor): void {
@@ -841,6 +846,10 @@ export class PixiViewport {
     this.cancelScheduledFogRedraw();
     this.cancelScheduledDarknessRedraw();
     this.cancelPendingViewportUpdates();
+    if (this.daytimeFeedbackRedrawFrame !== null) {
+      window.cancelAnimationFrame(this.daytimeFeedbackRedrawFrame);
+      this.daytimeFeedbackRedrawFrame = null;
+    }
     if (this.cameraInteractionEndTimer !== null) {
       window.clearTimeout(this.cameraInteractionEndTimer);
       this.cameraInteractionEndTimer = null;
@@ -1049,22 +1058,18 @@ export class PixiViewport {
       .fill({ color: appearance.color, alpha: appearance.alpha });
     mapBounds.blendMode = "multiply";
 
-    const mask = new Graphics();
+    let mask: Graphics | Sprite;
     if (this.daytimeFilter.coverage === "scene") {
-      mask.rect(this.map.position.x - width / 2, this.map.position.y - height / 2, width, height).fill({ color: 0xffffff });
+      mask = new Graphics()
+        .rect(this.map.position.x - width / 2, this.map.position.y - height / 2, width, height)
+        .fill({ color: 0xffffff });
     } else {
-      for (const stroke of this.daytimeMask?.strokes ?? []) {
-        if (stroke.topology === "topology") {
-          for (const cell of stroke.cells) {
-            drawGridCell(mask, cell);
-            if (stroke.mode === "paint") mask.fill({ color: 0xffffff });
-            else mask.cut();
-          }
-          continue;
-        }
-
-        drawDaytimeCircularStroke(mask, stroke.points, stroke.radius, stroke.mode, 0xffffff, 1);
-      }
+      const rasterMask = this.getDaytimeMaskRasterTexture(this.daytimeMask ?? { strokes: [] });
+      if (rasterMask === null) return;
+      mask = new Sprite(rasterMask);
+      mask.anchor.set(0.5);
+      mask.position.set(this.map.position.x, this.map.position.y);
+      mask.scale.set(this.map.scale);
     }
 
     layer.addChild(mask);
@@ -1074,6 +1079,22 @@ export class PixiViewport {
 
   private createDaytimeMaskFeedbackSprite(): Sprite | null {
     if (this.map === null || this.mapSprite === null || this.daytimeMask === null) return null;
+
+    const feedbackMask = this.getDaytimeFeedbackMask();
+    const rasterMask = this.getDaytimeMaskRasterTexture(feedbackMask);
+    if (rasterMask === null) return null;
+
+    const feedback = new Sprite(rasterMask);
+    feedback.anchor.set(0.5);
+    feedback.position.set(this.map.position.x, this.map.position.y);
+    feedback.scale.set(this.map.scale);
+    feedback.tint = 0xff2f2f;
+    feedback.alpha = 0.42;
+    return feedback;
+  }
+
+  private getDaytimeMaskRasterTexture(mask: SceneDaytimeMask): RenderTexture | null {
+    if (this.map === null || this.mapSprite === null) return null;
 
     const sourceTexture = this.mapSprite.texture;
     const width = Math.max(1, Math.ceil(sourceTexture.width));
@@ -1085,7 +1106,7 @@ export class PixiViewport {
       this.map.scale,
       width,
       height,
-      JSON.stringify(this.daytimeMask)
+      JSON.stringify(mask)
     ].join("|");
 
     if (this.daytimeFeedbackTexture === null || this.daytimeFeedbackSignature !== signature) {
@@ -1101,30 +1122,60 @@ export class PixiViewport {
         height / 2 - this.map.position.y / this.map.scale
       );
       maskContainer.scale.set(1 / this.map.scale);
-      const maskGraphic = new Graphics();
-      for (const stroke of this.daytimeMask.strokes) {
+      for (const stroke of mask.strokes) {
+        const strokeGraphic = new Graphics();
         if (stroke.topology === "topology") {
           for (const cell of stroke.cells) {
-            drawGridCell(maskGraphic, cell);
-            if (stroke.mode === "paint") maskGraphic.fill({ color: 0xffffff, alpha: 1 });
-            else maskGraphic.cut();
+            drawGridCell(strokeGraphic, cell).fill({ color: 0xffffff, alpha: 1 });
           }
         } else {
-          drawDaytimeCircularStroke(maskGraphic, stroke.points, stroke.radius, stroke.mode, 0xffffff, 1);
+          drawDaytimeCircularStroke(strokeGraphic, stroke.points, stroke.radius, "paint", 0xffffff, 1);
         }
+        if (stroke.mode === "erase") strokeGraphic.blendMode = "erase";
+        maskContainer.addChild(strokeGraphic);
       }
-      maskContainer.addChild(maskGraphic);
       this.app.renderer.render({ container: maskContainer, target: this.daytimeFeedbackTexture, clear: true });
       maskContainer.destroy({ children: true });
     }
+    return this.daytimeFeedbackTexture;
+  }
 
-    const feedback = new Sprite(this.daytimeFeedbackTexture);
-    feedback.anchor.set(0.5);
-    feedback.position.set(this.map.position.x, this.map.position.y);
-    feedback.scale.set(this.map.scale);
-    feedback.tint = 0xff2f2f;
-    feedback.alpha = 0.42;
-    return feedback;
+  private getDaytimeFeedbackMask(): SceneDaytimeMask {
+    if (this.daytimeMask === null || this.dragState?.mode !== "daytime-mask-paint") {
+      return this.daytimeMask ?? { strokes: [] };
+    }
+
+    const stroke = this.getPendingDaytimeMaskStroke();
+    return stroke === null
+      ? this.daytimeMask
+      : { strokes: [...this.daytimeMask.strokes, stroke] };
+  }
+
+  private getPendingDaytimeMaskStroke(): DaytimeMaskStroke | null {
+    if (this.daytimeBrushTopology === "topology") {
+      const cells = [...this.daytimeMaskStrokeCells.values()];
+      return cells.length === 0
+        ? null
+        : { id: "__daytime-mask-preview", topology: "topology", mode: this.daytimeMaskStrokeMode, cells };
+    }
+
+    return this.daytimeMaskStrokePoints.length === 0
+      ? null
+      : {
+          id: "__daytime-mask-preview",
+          topology: "circular",
+          mode: this.daytimeMaskStrokeMode,
+          points: this.daytimeMaskStrokePoints,
+          radius: this.daytimeBrushRadius
+        };
+  }
+
+  private scheduleDaytimeMaskFeedbackRedraw(): void {
+    if (this.daytimeFeedbackRedrawFrame !== null) return;
+    this.daytimeFeedbackRedrawFrame = window.requestAnimationFrame(() => {
+      this.daytimeFeedbackRedrawFrame = null;
+      this.drawSelectionLayer();
+    });
   }
 
   private drawDarknessLayer(): void {
@@ -1621,6 +1672,7 @@ export class PixiViewport {
       });
     } else if (this.dragState.mode === "daytime-mask-paint") {
       this.appendDaytimeMaskStrokePoint(nextPoint);
+      this.scheduleDaytimeMaskFeedbackRedraw();
     } else if (this.dragState.mode === "map-move" && this.mapSprite !== null) {
       const dx = (nextPoint.x - this.dragState.lastPoint.x) / this.camera.zoom;
       const dy = (nextPoint.y - this.dragState.lastPoint.y) / this.camera.zoom;

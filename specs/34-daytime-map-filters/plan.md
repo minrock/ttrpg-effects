@@ -180,6 +180,7 @@ private daytimeFilteredSprite: Sprite | null;
    - `erase`: usar blend mode de borrado sobre la misma textura.
 6. En una nueva pincelada confirmada, renderizar solo el nuevo stroke contra la textura existente cuando su firma, imagen y transformacion local siguen siendo validas. Rehacer la textura completa solo tras borrar todo, cambiar de mapa/imagen, alterar escala/posicion que invalide la conversion local, o recibir una mascara externa distinta.
 7. Adjuntar el sprite de mascara al sprite/composite filtrado mediante `setMask`. La textura se destruye al cambiar imagen, destruir viewport o detectar dimensiones distintas.
+8. Mantener sprite de mapa, sprite de mascara raster y overlay en el mismo contenedor de mundo. Un cambio de `compassOrientation` debe redibujar la relacion de mascara despues de actualizar la transformacion de presentacion, de modo que la rotacion aplicada a Player View afecte por igual mapa y mascara.
 8. Mantener un limite practico de resolucion de mascara derivado de la textura fuente. Si se necesita reducir memoria para mapas gigantes, elegir una escala interna documentada y probar que los bordes siguen aceptables; no usar una textura dependiente del tamano del viewport.
 
 ### Preview de herramienta
@@ -187,7 +188,7 @@ private daytimeFilteredSprite: Sprite | null;
 1. Usar `selection` o una capa de herramienta superior para la guia DM, nunca la capa `daytimeFilter` que se proyecta al jugador.
 2. Topologia: reutilizar `getGridCellAtPoint`, `getGridCellVertices` y la geometria de fire/information area para dibujar la celda hover.
 3. Circular: dibujar un circulo de radio constante en mundo y, durante drag, el trazo compuesto temporal.
-4. Pintura/borrado deben diferenciarse visualmente por color y alpha, sin representar el preset final sobre tokens o UI. Mientras la herramienta este activa, reconstruir desde los trazos persistidos una unica `RenderTexture` de mascara local: `paint` escribe opaco y `erase` elimina pixeles. Proyectar sobre ella un solo sprite rojo translucido privado, con contraste suficiente sobre mapas claros. La opacidad del sprite no se acumula donde las pinceladas se superponen.
+4. Pintura/borrado deben diferenciarse visualmente por color y alpha, sin representar el preset final sobre tokens o UI. Mientras la herramienta este activa, reconstruir desde los trazos persistidos una unica `RenderTexture` de mascara local: `paint` escribe opaco y `erase` compone geometria opaca con blend `erase` para eliminar pixeles. Proyectar sobre ella un solo sprite rojo translucido privado, con contraste suficiente sobre mapas claros. La opacidad del sprite no se acumula donde las pinceladas se superponen.
 5. `Space` + drag conserva pan y no agrega strokes; el cursor y el hit testing siguen las convenciones de fog/fire.
 
 ## 6. Integracion de carga, guardado y mapas

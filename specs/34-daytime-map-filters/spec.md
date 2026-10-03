@@ -87,7 +87,7 @@ La hora del dia es una decision narrativa de nivel escena. La cobertura visual, 
 - El pincel topologico usa la grilla logica aunque sus lineas esten ocultas visualmente. Si la calibracion de grilla cambia, las celdas conservan sus coordenadas de mundo ya registradas, siguiendo la politica existente para datos basados en grilla.
 - El pincel circular puede usarse con grilla visible, oculta o no calibrada; su radio se muestra en unidades de mundo y se puede presentar como cantidad de cuadros cuando exista una grilla util.
 - Al entrar al modo de pintado, el DM ve bajo el puntero una guia de celda o de circulo segun el pincel elegido. La guia se actualiza con cada movimiento del puntero y es privada del DM.
-- Mientras el modo de pintado esta activo, las regiones ya confirmadas se muestran al DM con una sobreimpresion roja translucida uniforme y de contraste alto. El renderer rasteriza una mascara acumulada por mapa a partir de los trazos persistidos y aplica un unico overlay rojo, por lo que las pasadas superpuestas no suman opacidad. Los trazos de borrado recortan tambien esta retroalimentacion visual; Player View nunca la recibe.
+- Mientras el modo de pintado esta activo, las regiones ya confirmadas se muestran al DM con una sobreimpresion roja translucida uniforme y de contraste alto. El renderer rasteriza una mascara acumulada por mapa a partir de los trazos persistidos y aplica un unico overlay rojo, por lo que las pasadas superpuestas no suman opacidad. Cada borrado se compone con blend `erase` sobre esa textura y recorta tambien esta retroalimentacion visual; Player View nunca la recibe.
 - El filtro ambiental se pausa por completo mientras el modo de pintado esta activo, incluso si ya estaba habilitado. Al salir del modo, vuelve a mostrarse segun el toggle `Activar filtro`; esto deja la edicion dedicada exclusivamente a la mascara roja.
 - El radio del pincel se controla y se muestra en cuadros de la grilla activa, con incrementos de `0.25` cuadros. Internamente se conserva en unidades de mundo.
 - `Escape` sale del modo de pintado sin modificar las zonas ya confirmadas.
@@ -113,6 +113,7 @@ La hora del dia es una decision narrativa de nivel escena. La cobertura visual, 
 
 - Las mascaras pertenecen al mapa donde se pintaron.
 - Al cambiar de mapa, el renderer lee el preset de hora del dia de la escena y la mascara del mapa nuevo.
+- La mascara raster local comparte la posicion, escala y transformacion de presentacion del mapa. Cuando cambia la orientacion norte de la escena, mapa, filtro y mascara se reorientan juntos; el renderer recompone su relacion de mascara para evitar desplazamientos o recortes erraticos en Player View.
 - Si se modifica el preset mientras otro mapa esta inactivo, no se necesita renderizar ni cargar ese mapa en segundo plano; aplicara el preset nuevo al abrirse.
 - En cobertura global, cambiar de mapa siempre mantiene el filtro activo sobre la imagen completa.
 
