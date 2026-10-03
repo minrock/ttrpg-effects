@@ -10,6 +10,7 @@ import {
   type MapBackgroundColor
 } from "../map/map-background";
 import { createDefaultFogOfWar } from "../vision/vision";
+import { createDefaultDaytimeFilter, createDefaultDaytimeMask } from "../environment/daytime-filter";
 import { createDefaultSceneAside } from "./scene-aside";
 import {
   LEGACY_SCENE_DOCUMENT_VERSION,
@@ -90,7 +91,7 @@ export function createDefaultMapPayload(): ActiveMapPayload {
 }
 
 export function createDefaultSceneMap(
-  input: Partial<Pick<SceneMapDocument, "id" | "name" | "compassOrientation" | "backgroundColor">> & Partial<ActiveMapPayload> = {}
+  input: Partial<Pick<SceneMapDocument, "id" | "name" | "compassOrientation" | "backgroundColor" | "daytimeMask">> & Partial<ActiveMapPayload> = {}
 ): SceneMapDocument {
   const payload = { ...createDefaultMapPayload(), ...input };
   return {
@@ -98,6 +99,7 @@ export function createDefaultSceneMap(
     name: input.name ?? "Mapa 1",
     compassOrientation: input.compassOrientation ?? DEFAULT_COMPASS_ORIENTATION,
     backgroundColor: input.backgroundColor ?? DEFAULT_MAP_BACKGROUND_COLOR,
+    daytimeMask: input.daytimeMask ?? createDefaultDaytimeMask(),
     map: payload.map,
     camera: payload.camera,
     grid: payload.grid,
@@ -123,9 +125,11 @@ export function createEmptyScene(): SceneDocument {
     name: "",
     compassOrientation: DEFAULT_COMPASS_ORIENTATION,
     backgroundColor: DEFAULT_MAP_BACKGROUND_COLOR,
+    daytimeMask: createDefaultDaytimeMask(),
     sceneAside: createDefaultSceneAside(),
     combatTracker: createDefaultCombatTracker(),
     counters: createDefaultSceneCounters(),
+    daytimeFilter: createDefaultDaytimeFilter(),
     ...payload
   };
 }
@@ -144,6 +148,7 @@ export function createSceneMapFromLegacyScene(scene: SceneDocumentV1, id = "map-
     name,
     compassOrientation: DEFAULT_COMPASS_ORIENTATION,
     backgroundColor: DEFAULT_MAP_BACKGROUND_COLOR,
+    daytimeMask: createDefaultDaytimeMask(),
     map: scene.map,
     camera: scene.camera,
     grid: scene.grid,
@@ -210,6 +215,7 @@ export function migrateSceneDocument(scene: AnySceneDocument): SceneDocument {
     sceneAside: scene.sceneAside ?? createDefaultSceneAside(),
     combatTracker: scene.combatTracker,
     counters: scene.counters ?? createDefaultSceneCounters(),
+    daytimeFilter: createDefaultDaytimeFilter(),
     ...map
   });
 }
@@ -228,6 +234,7 @@ export function syncActiveMapFromRuntimeFields(scene: SceneDocument): SceneDocum
     ...active,
     compassOrientation: scene.compassOrientation,
     backgroundColor: scene.backgroundColor,
+    daytimeMask: scene.daytimeMask,
     map: scene.map,
     camera: scene.camera,
     grid: scene.grid,

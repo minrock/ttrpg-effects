@@ -1,6 +1,7 @@
 export const renderLayerNames = [
   "background",
   "map",
+  "daytimeFilter",
   "grid",
   "tokens",
   "darkness",

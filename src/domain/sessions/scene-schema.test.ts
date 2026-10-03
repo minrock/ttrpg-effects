@@ -106,6 +106,22 @@ describe("scene document schema", () => {
     expect(parseSceneJson(serializeSceneDocument(scene)).counters).toEqual(scene.counters);
   });
 
+  it("defaults the daytime filter and per-map masks for existing V2 scenes", () => {
+    const scene = createDefaultScene();
+    const { daytimeFilter, daytimeMask, maps, ...sceneWithoutDaytime } = scene;
+    void daytimeFilter;
+    void daytimeMask;
+    const mapsWithoutDaytime = maps.map(({ daytimeMask: ignoredMask, ...map }) => {
+      void ignoredMask;
+      return map;
+    });
+
+    const restored = parseSceneDocument({ ...sceneWithoutDaytime, maps: mapsWithoutDaytime });
+    expect(restored.daytimeFilter).toEqual({ enabled: false, preset: "day", coverage: "scene" });
+    expect(restored.daytimeMask).toEqual({ strokes: [] });
+    expect(restored.maps[0]?.daytimeMask).toEqual({ strokes: [] });
+  });
+
   it("rejects counters with duplicate IDs or invalid fixed values", () => {
     const scene = createDefaultScene();
     const counter = {

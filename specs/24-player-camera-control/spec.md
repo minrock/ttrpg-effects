@@ -135,6 +135,7 @@ Esta funcionalidad agrega control de presentacion al DM sin convertir la Ventana
 - Los controles modifican el zoom esperado de la camara principal y ordenan a Player View aplicar ese zoom alrededor del centro principal.
 - El zoom remoto del DM debe funcionar aunque el boton local de Player View indique `Zoom bloqueado`; ese bloqueo solo protege la entrada local del jugador.
 - El zoom debe respetar los limites minimos y maximos ya definidos por el motor de camara.
+- El motor de camara permite alejar hasta `10%` (`0.1`) para que DM y Player View puedan encuadrar mapas extensos; el limite maximo permanece en `400%` (`4`).
 - Cada paso de zoom debe ser predecible y consistente con la politica de zoom existente.
 - Al aplicar zoom remoto, Player View se recentra en la camara principal y vuelve al estado sincronizado tras confirmar la actualizacion.
 - El control remoto no modifica el zoom del viewport del DM.

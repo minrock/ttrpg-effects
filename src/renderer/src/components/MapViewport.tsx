@@ -18,6 +18,7 @@ import type {
   SceneShape
 } from "../../../domain/sessions/scene-document";
 import type { FireCell } from "../../../domain/effects/fire";
+import type { GridCell } from "../../../domain/grid/grid-cell";
 import type { CompassOrientation } from "../../../domain/map/compass-orientation";
 import { DEFAULT_COMPASS_ORIENTATION } from "../../../domain/map/compass-orientation";
 import { DEFAULT_MAP_BACKGROUND_COLOR, type MapBackgroundColor } from "../../../domain/map/map-background";
@@ -37,6 +38,7 @@ import type {
 import type { SceneLinkValidationStatus } from "../../../domain/annotations/scene-navigation-links";
 import type { PlayerCameraControlViewState } from "../../../domain/player/player-camera-control";
 import { CompassOverlay } from "./CompassOverlay";
+import type { DaytimeBrushTopology, DaytimeMaskStrokeMode, SceneDaytimeFilter, SceneDaytimeMask } from "../../../domain/environment/daytime-filter";
 
 export interface MapViewportHandle {
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
@@ -66,6 +68,8 @@ interface MapViewportProps {
   readonly mapAnnotations: MapAnnotations;
   readonly compassOrientation?: CompassOrientation;
   readonly backgroundColor?: MapBackgroundColor;
+  readonly daytimeFilter: SceneDaytimeFilter;
+  readonly daytimeMask: SceneDaytimeMask;
   readonly showCompass?: boolean;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
   readonly showMapAnnotations: boolean;
@@ -81,6 +85,10 @@ interface MapViewportProps {
   readonly hiddenTokenPolicy?: HiddenTokenPolicy;
   readonly cameraSnapshot?: ViewportCameraSnapshot | null;
   readonly isFogRevealMode: boolean;
+  readonly isDaytimeMaskPaintMode?: boolean;
+  readonly daytimeBrushTopology?: DaytimeBrushTopology;
+  readonly daytimeMaskStrokeMode?: DaytimeMaskStrokeMode;
+  readonly daytimeBrushRadius?: number;
   readonly fogRevealGuideRadius?: number | null;
   readonly isFirePaintMode: boolean;
   readonly isPathDrawingMode: boolean;
@@ -119,6 +127,13 @@ interface MapViewportProps {
   readonly onShapeRadiusChange: (elementId: string, radius: number) => void;
   readonly onShapeRectResize: (elementId: string, width: number, height: number, anchorX: number, anchorY: number) => void;
   readonly onFogRevealStroke: (points: readonly { readonly x: number; readonly y: number }[]) => void;
+  readonly onDaytimeMaskStroke?: (stroke: {
+    readonly topology: DaytimeBrushTopology;
+    readonly mode: DaytimeMaskStrokeMode;
+    readonly cells: readonly GridCell[];
+    readonly points: readonly { readonly x: number; readonly y: number }[];
+    readonly radius: number;
+  }) => void;
   readonly onFirePaint: (cells: readonly FireCell[], center: { readonly x: number; readonly y: number }) => void;
   readonly onFireZoneRadiusChange: (elementId: string, radius: number) => void;
   readonly onFireLightRadiusChange: (elementId: string, radius: number) => void;
@@ -153,6 +168,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   mapAnnotations,
   compassOrientation = DEFAULT_COMPASS_ORIENTATION,
   backgroundColor = DEFAULT_MAP_BACKGROUND_COLOR,
+  daytimeFilter,
+  daytimeMask,
   showCompass = false,
   sceneLinkStatuses = {},
   showMapAnnotations,
@@ -168,6 +185,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   hiddenTokenPolicy = "show-with-indicator",
   cameraSnapshot = null,
   isFogRevealMode,
+  isDaytimeMaskPaintMode = false,
+  daytimeBrushTopology = "topology",
+  daytimeMaskStrokeMode = "paint",
+  daytimeBrushRadius = 100,
   fogRevealGuideRadius = null,
   isFirePaintMode,
   isPathDrawingMode,
@@ -206,6 +227,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onShapeRadiusChange,
   onShapeRectResize,
   onFogRevealStroke,
+  onDaytimeMaskStroke,
   onFirePaint,
   onFireZoneRadiusChange,
   onFireLightRadiusChange,
@@ -281,6 +303,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onShapeRadiusChange,
       onShapeRectResize,
       onFogRevealStroke,
+      onDaytimeMaskStroke,
       onFirePaint,
       onFireZoneRadiusChange,
       onFireLightRadiusChange,
@@ -309,6 +332,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setSettings(settings);
       createdViewport.setDarkness(darkness);
       createdViewport.setFogOfWar(fogOfWar);
+      createdViewport.setDaytimeFilter(daytimeFilter, daytimeMask);
       createdViewport.setElements(elements);
       createdViewport.setShapes(shapes);
       createdViewport.setLights(lights);
@@ -356,7 +380,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);
@@ -377,6 +401,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setFogOfWar(fogOfWar);
   }, [fogOfWar]);
+
+  useEffect(() => {
+    viewportRef.current?.setDaytimeFilter(daytimeFilter, daytimeMask);
+  }, [daytimeFilter, daytimeMask]);
 
   useEffect(() => {
     viewportRef.current?.setElements(elements);
@@ -471,6 +499,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setFogRevealMode(isFogRevealMode);
   }, [isFogRevealMode]);
+
+  useEffect(() => {
+    viewportRef.current?.setDaytimeMaskPaintMode(isDaytimeMaskPaintMode, daytimeBrushTopology, daytimeMaskStrokeMode, daytimeBrushRadius);
+  }, [isDaytimeMaskPaintMode, daytimeBrushTopology, daytimeMaskStrokeMode, daytimeBrushRadius]);
 
   useEffect(() => {
     viewportRef.current?.setFogRevealGuideRadius(fogRevealGuideRadius);

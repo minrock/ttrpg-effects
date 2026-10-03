@@ -34,6 +34,7 @@ import {
   Monitor,
   Minus,
   Moon,
+  Sun,
   Save,
   Shapes,
   Sparkles,
@@ -60,6 +61,15 @@ import {
 } from "../../domain/interaction/interaction-state";
 import { applyGridPreset, gridPresets, setGridCellSize, setGridOpacity } from "../../domain/grid/grid";
 import { getGridCellKey } from "../../domain/grid/grid-cell";
+import {
+  appendDaytimeMaskStroke,
+  clearDaytimeMask,
+  createCircularDaytimeMaskStroke,
+  createTopologyDaytimeMaskStroke,
+  updateDaytimeFilter,
+  type DaytimeBrushTopology,
+  type DaytimeMaskStrokeMode
+} from "../../domain/environment/daytime-filter";
 import {
   createAnimatedFireEffect,
   createCellFireZone,
@@ -248,7 +258,7 @@ const fallbackAppInfo = {
   version: "0.0.0"
 } as const;
 
-type SidebarSectionId = "grid" | "figures" | "effects" | "tokens" | "darkness" | "fog" | "annotations";
+type SidebarSectionId = "grid" | "figures" | "effects" | "tokens" | "darkness" | "fog" | "annotations" | "daytime";
 
 type SidebarOpenState = Record<SidebarSectionId, boolean>;
 
@@ -326,6 +336,10 @@ export function App(): JSX.Element {
   const [showPlayerZoomIndicator, setShowPlayerZoomIndicator] = useState(false);
   const [showMapAnnotations, setShowMapAnnotations] = useState(true);
   const [isFogRevealRadiusEditing, setIsFogRevealRadiusEditing] = useState(false);
+  const [isDaytimeMaskPaintMode, setIsDaytimeMaskPaintMode] = useState(false);
+  const [daytimeBrushTopology, setDaytimeBrushTopology] = useState<DaytimeBrushTopology>("topology");
+  const [daytimeMaskStrokeMode, setDaytimeMaskStrokeMode] = useState<DaytimeMaskStrokeMode>("paint");
+  const [daytimeBrushRadius, setDaytimeBrushRadius] = useState(100);
   const [mapAnnotationModal, setMapAnnotationModal] = useState<MapAnnotationModalDraft | null>(null);
   const [sceneLinkModalId, setSceneLinkModalId] = useState<string | null>(null);
   const [sceneLinkStatuses, setSceneLinkStatuses] = useState<Readonly<Record<string, SceneLinkValidationStatus>>>({});
@@ -367,7 +381,8 @@ export function App(): JSX.Element {
     tokens: false,
     darkness: false,
     fog: false,
-    annotations: false
+    annotations: false,
+    daytime: false
   });
   const nextShapeId = useRef(1);
   const nextLightId = useRef(1);
@@ -2104,6 +2119,32 @@ export function App(): JSX.Element {
     );
   }
 
+  function handleDaytimeFilterChange(patch: Parameters<typeof updateDaytimeFilter>[1]): void {
+    setScene((current) => ({ ...current, daytimeFilter: updateDaytimeFilter(current.daytimeFilter, patch) }));
+  }
+
+  const handleDaytimeMaskStroke = useCallback((stroke: {
+    readonly topology: DaytimeBrushTopology;
+    readonly mode: DaytimeMaskStrokeMode;
+    readonly cells: readonly import("../../domain/grid/grid-cell").GridCell[];
+    readonly points: readonly WorldPoint[];
+    readonly radius: number;
+  }): void => {
+    setScene((current) => {
+      const id = `daytime-mask-${Date.now()}-${current.daytimeMask.strokes.length + 1}`;
+      const nextStroke = stroke.topology === "topology"
+        ? createTopologyDaytimeMaskStroke(id, stroke.mode, stroke.cells)
+        : createCircularDaytimeMaskStroke(id, stroke.mode, stroke.points, stroke.radius);
+      return nextStroke === null
+        ? current
+        : { ...current, daytimeMask: appendDaytimeMaskStroke(current.daytimeMask, nextStroke) };
+    });
+  }, [setScene]);
+
+  function handleClearDaytimeMask(): void {
+    setScene((current) => ({ ...current, daytimeMask: clearDaytimeMask() }));
+  }
+
   function handleDarknessEnabledChange(): void {
     setScene((current) => ({
       ...current,
@@ -3371,6 +3412,8 @@ export function App(): JSX.Element {
           sceneLinkStatuses={sceneLinkStatuses}
           showMapAnnotations={showMapAnnotations}
           backgroundColor={scene.backgroundColor}
+          daytimeFilter={scene.daytimeFilter}
+          daytimeMask={scene.daytimeMask}
           selectedElementId={interaction.selectedElementId}
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
@@ -3382,6 +3425,10 @@ export function App(): JSX.Element {
           fogPresentation={deriveFogPresentation("dm", showDmFogOverlay)}
           hiddenTokenPolicy={deriveHiddenTokenPolicy("dm")}
           isFogRevealMode={interaction.activeTool === "fog-reveal"}
+          isDaytimeMaskPaintMode={isDaytimeMaskPaintMode}
+          daytimeBrushTopology={daytimeBrushTopology}
+          daytimeMaskStrokeMode={daytimeMaskStrokeMode}
+          daytimeBrushRadius={daytimeBrushRadius}
           fogRevealGuideRadius={
             isFogRevealRadiusEditing && scene.fogOfWar.enabled ? scene.fogOfWar.revealRadius : null
           }
@@ -3420,6 +3467,7 @@ export function App(): JSX.Element {
           onShapeRadiusChange={handleShapeRadiusChange}
           onShapeRectResize={handleShapeRectResize}
           onFogRevealStroke={handleFogRevealStroke}
+          onDaytimeMaskStroke={handleDaytimeMaskStroke}
           onFirePaint={handleFirePaint}
           onFireZoneRadiusChange={handleFireZoneRadiusChange}
           onFireLightRadiusChange={handleFireLightRadiusChange}
@@ -4491,6 +4539,85 @@ export function App(): JSX.Element {
               visible={showMapAnnotations}
               onVisibleChange={setShowMapAnnotations}
             />
+          </SidebarAccordion>
+
+          <SidebarAccordion
+            id="daytime-controls-panel"
+            icon={<Sun size={16} />}
+            title="Hora del dia"
+            isOpen={openSidebarSections.daytime}
+            onToggle={() => toggleSidebarSection("daytime")}
+          >
+            <label>
+              <input
+                type="checkbox"
+                checked={scene.daytimeFilter.enabled}
+                onChange={(event) => handleDaytimeFilterChange({ enabled: event.currentTarget.checked })}
+              />
+              Activar filtro
+            </label>
+            <label>
+              Hora
+              <select
+                value={scene.daytimeFilter.preset}
+                onChange={(event) => handleDaytimeFilterChange({ preset: event.currentTarget.value as "day" | "sunset" | "night" })}
+              >
+                <option value="day">Dia</option>
+                <option value="sunset">Atardecer</option>
+                <option value="night">Noche</option>
+              </select>
+            </label>
+            <label>
+              Cobertura
+              <select
+                value={scene.daytimeFilter.coverage}
+                onChange={(event) => handleDaytimeFilterChange({ coverage: event.currentTarget.value as "scene" | "painted" })}
+              >
+                <option value="scene">Toda la escena</option>
+                <option value="painted">Zonas pintadas</option>
+              </select>
+            </label>
+            {scene.daytimeFilter.coverage === "painted" ? (
+              <>
+                <div className="switch-control">
+                  <span>Pintar mascara</span>
+                  <Switch.Root
+                    className="switch-root"
+                    checked={isDaytimeMaskPaintMode}
+                    onCheckedChange={setIsDaytimeMaskPaintMode}
+                    aria-label="Activar pincel de hora del dia"
+                  >
+                    <Switch.Thumb className="switch-thumb" />
+                  </Switch.Root>
+                </div>
+                <label>
+                  Pincel
+                  <select value={daytimeBrushTopology} onChange={(event) => setDaytimeBrushTopology(event.currentTarget.value as DaytimeBrushTopology)}>
+                    <option value="topology">Topologia de grilla</option>
+                    <option value="circular">Circular</option>
+                  </select>
+                </label>
+                <label>
+                  Accion
+                  <select value={daytimeMaskStrokeMode} onChange={(event) => setDaytimeMaskStrokeMode(event.currentTarget.value as DaytimeMaskStrokeMode)}>
+                    <option value="paint">Pintar</option>
+                    <option value="erase">Borrar</option>
+                  </select>
+                </label>
+                <label>
+                  Tamano del pincel: {(daytimeBrushRadius / scene.grid.cellSizeWorld).toFixed(2)} cuadros
+                  <input
+                    type="range"
+                    min={scene.grid.cellSizeWorld * 0.25}
+                    max={scene.grid.cellSizeWorld * 8}
+                    step={scene.grid.cellSizeWorld * 0.25}
+                    value={daytimeBrushRadius}
+                    onChange={(event) => setDaytimeBrushRadius(event.currentTarget.valueAsNumber)}
+                  />
+                </label>
+                <button type="button" onClick={handleClearDaytimeMask}>Limpiar mascara</button>
+              </>
+            ) : null}
           </SidebarAccordion>
 
           <div className="control-sidebar-group-label">Visibilidad</div>

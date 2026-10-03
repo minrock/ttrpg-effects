@@ -335,6 +335,8 @@ export function PlayerApp(): JSX.Element {
           mapAnnotations={{ pins: [], areas: [], sceneLinks: [] }}
           compassOrientation={scene.compassOrientation}
           backgroundColor={scene.backgroundColor}
+          daytimeFilter={scene.daytimeFilter}
+          daytimeMask={scene.daytimeMask}
           showCompass={showCompass}
           showMapAnnotations={false}
           selectedElementId={null}
