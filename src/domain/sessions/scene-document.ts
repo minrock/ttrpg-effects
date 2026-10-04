@@ -110,9 +110,29 @@ export interface SceneLight {
 
 export type SceneEffect =
   | SceneFireEffect
+  | SceneLightningEffect
   | SceneDynamicLightEffect
   | SceneMagicalDarknessEffect
   | SceneWaterEffect;
+
+export interface SceneLightningEffect {
+  readonly id: string;
+  readonly kind: "lightning";
+  readonly position: { readonly x: number; readonly y: number };
+  readonly zone:
+    | { readonly kind: "line"; readonly end: { readonly x: number; readonly y: number } }
+    | { readonly kind: "cone"; readonly radius: number; readonly direction: number }
+    | { readonly kind: "circle"; readonly radius: number };
+  readonly intensity: number;
+  readonly speed: number;
+  readonly opacity: number;
+  readonly sparks: boolean;
+  readonly visible: boolean;
+  readonly showGuide: boolean;
+  readonly seed: number;
+  readonly clockOriginMs: number;
+  readonly clockOffsetSeconds: number;
+}
 
 export interface SceneFireEffect {
   readonly id: string;

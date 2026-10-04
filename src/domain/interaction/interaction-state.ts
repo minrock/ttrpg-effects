@@ -1,4 +1,5 @@
 import type { ScreenPoint, WorldPoint } from "../shared/coordinates";
+import type { LightningShape } from "../effects/lightning";
 import {
   createTacticalElement,
   type TacticalElement,
@@ -14,7 +15,21 @@ export type InteractionTool =
   | "arcane-pointer"
   | "room-pin"
   | "information-area"
-  | "scene-link";
+  | "scene-link"
+  | `lightning-${LightningShape}`;
+
+export interface LightningDraft {
+  readonly shape: LightningShape;
+  readonly anchor: WorldPoint | null;
+  readonly pointer: WorldPoint | null;
+}
+
+export function getLightningTool(tool: InteractionTool): LightningShape | null {
+  if (tool === "lightning-line") return "line";
+  if (tool === "lightning-cone") return "cone";
+  if (tool === "lightning-circle") return "circle";
+  return null;
+}
 
 export interface ContextMenuState {
   readonly screen: ScreenPoint;

@@ -31,6 +31,7 @@ function createHarness() {
     grid: { cellSizeWorld: 100 },
     layers: new Map([["effects", layer]]),
     effectRenderCache: new Map(),
+    lightningVisuals: new Map(),
     firePatternSource: animation,
     viewRole: "player",
     map: {},

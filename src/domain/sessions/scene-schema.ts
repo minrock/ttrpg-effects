@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MIN_LIGHTNING_LENGTH, normalizeLightningDirection } from "../effects/lightning";
 import {
   LEGACY_SCENE_DOCUMENT_VERSION,
   SCENE_DOCUMENT_VERSION,
@@ -286,6 +287,22 @@ const waterEffectSchema = z.discriminatedUnion("variant", [
   closedWaterEffectSchema
 ]);
 
+const lightningEffectSchema = z.object({
+  id: z.string().trim().min(1), kind: z.literal("lightning"), position: worldPointSchema,
+  zone: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("line"), end: worldPointSchema }).strict(),
+    z.object({ kind: z.literal("cone"), radius: finiteNumber.min(MIN_LIGHTNING_LENGTH), direction: finiteNumber.transform(normalizeLightningDirection) }).strict(),
+    z.object({ kind: z.literal("circle"), radius: finiteNumber.min(MIN_LIGHTNING_LENGTH) }).strict()
+  ]),
+  intensity: finiteNumber.min(0.4).max(2).default(1.2), speed: finiteNumber.min(0.2).max(1.5).default(0.7),
+  opacity: opacity.default(1), sparks: z.boolean().default(true), visible: z.boolean().default(true), showGuide: z.boolean().default(true),
+  seed: z.number().int().min(0).max(0xffffffff), clockOriginMs: finiteNumber.min(0), clockOffsetSeconds: finiteNumber.min(0)
+}).refine(effect => effect.zone.kind !== "line" || (
+  Number.isFinite(Math.hypot(effect.zone.end.x - effect.position.x, effect.zone.end.y - effect.position.y)) &&
+  Math.hypot(effect.zone.end.x - effect.position.x, effect.zone.end.y - effect.position.y) >= MIN_LIGHTNING_LENGTH),
+  { message: "El relampago necesita dos extremos diferentes.", path: ["zone"] })
+  .transform(effect => ({ ...effect, showGuide: effect.zone.kind !== "line" && effect.showGuide }));
+
 const tokenSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1),
@@ -438,7 +455,8 @@ export const sceneDocumentV1Schema = z.object({
       fireEffectSchema,
       dynamicLightEffectSchema,
       magicalDarknessEffectSchema,
-      waterEffectSchema
+      waterEffectSchema,
+      lightningEffectSchema
     ])
   ),
   shapes: z

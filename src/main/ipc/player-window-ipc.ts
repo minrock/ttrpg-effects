@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { sanitizeInformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
+import { sanitizePlayerWindowSnapshot } from "../../domain/player/player-window-snapshot";
 import {
   sanitizePlayerCameraCommand,
   sanitizePlayerCameraReport,
@@ -29,8 +30,10 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
     }
 
     if (snapshot !== null) {
-      latestSnapshot = snapshot;
-      latestCamera = getCameraFromSnapshot(snapshot) ?? latestCamera;
+      const validated = sanitizePlayerWindowSnapshot(snapshot);
+      if (validated === null) return { ok: false, error: "La escena de jugador no es valida." };
+      latestSnapshot = validated;
+      latestCamera = validated.camera;
     }
 
     openOrFocusPlayerWindow(options);
@@ -52,14 +55,16 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
       return { ok: false, error: "Solo la ventana del DM puede publicar escena." };
     }
 
-    latestSnapshot = snapshot;
-    latestCamera = getCameraFromSnapshot(snapshot) ?? latestCamera;
+    const validated = sanitizePlayerWindowSnapshot(snapshot);
+    if (validated === null) return { ok: false, error: "La escena de jugador no es valida." };
+    latestSnapshot = validated;
+    latestCamera = validated.camera;
 
     if (playerWindow === null || playerWindow.isDestroyed()) {
       return { ok: true };
     }
 
-    sendToPlayerWindow("player-window:scene", snapshot);
+    sendToPlayerWindow("player-window:scene", validated);
     return { ok: true };
   });
 
@@ -264,14 +269,6 @@ function isFromDmWindow(event: IpcMainInvokeEvent): boolean {
 function isFromPlayerWindow(event: IpcMainInvokeEvent): boolean {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
   return senderWindow !== null && senderWindow === playerWindow;
-}
-
-function getCameraFromSnapshot(snapshot: unknown): unknown {
-  if (typeof snapshot !== "object" || snapshot === null || !("camera" in snapshot)) {
-    return null;
-  }
-
-  return (snapshot as { readonly camera?: unknown }).camera ?? null;
 }
 
 export function getPlayerWindowRendererIndexPath(): string {

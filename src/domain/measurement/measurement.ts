@@ -185,6 +185,18 @@ export function formatDistance(value: number, unit: DistanceUnit): string {
   return `${display} ${unit}`;
 }
 
+export function worldLengthValue(length: number, grid: MeasurementSettings["grid"]): number {
+  return length / grid.cellSizeWorld * (grid.unit === "ft" ? grid.distancePerCell : grid.metricDistancePerCell);
+}
+
+export function worldLengthFromValue(value: number, grid: MeasurementSettings["grid"]): number {
+  return value / (grid.unit === "ft" ? grid.distancePerCell : grid.metricDistancePerCell) * grid.cellSizeWorld;
+}
+
+export function worldLengthLabel(length: number, grid: MeasurementSettings["grid"]): string {
+  return formatDistance(worldLengthValue(length, grid), grid.unit);
+}
+
 function assertFinitePoint(point: WorldPoint): void {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
     throw new Error("Measurement point must be a finite world coordinate.");

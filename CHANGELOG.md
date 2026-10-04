@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.5.4] - 2026-10-03
+
+### Added
+
+- Relampagos procedurales en linea, cono y circulo para DM y Player View, con ramificaciones, chispas y movimiento compartido.
+- Dibujo en dos puntos, medidas segun la grilla, edicion de extremos, alcance y direccion del cono; guias semitransparentes de area en ambas vistas.
+- Controles de intensidad, velocidad, opacidad, visibilidad y chispas desde propiedades; accesos desde Efectos y el menu contextual.
+
+### Changed
+
+- Persistencia y validacion de relampagos por mapa, sincronizacion de Player View y presupuesto agregado de geometria sin framebuffers intermedios.
+- Cierre del spec 35; version 2.5.4 solicitada explicitamente para esta entrega.
+
 ## [2.5.3] - 2026-10-03
 
 ### Changed

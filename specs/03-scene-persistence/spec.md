@@ -130,3 +130,9 @@ El contenido sera JSON.
 ## Cierre 1.9.0
 
 Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 incorpora `kind: lightning` a efectos de cada mapa, con geometria mundial, parametros, semilla y reloj; sin vertices ni borradores. Formato 2 aditivo, validacion Zod y round-trip; lectores antiguos pueden rechazar este tipo desconocido.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

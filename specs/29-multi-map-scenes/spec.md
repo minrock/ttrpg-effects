@@ -431,3 +431,9 @@ Esta migracion debe ser forward-only: una vez guardada en formato nuevo, la esce
 - Diseñar API de preload/IPC especifica para `Agregar a escena`.
 - Validar que los callbacks de `MapViewport` sigan estables al cambiar de mapa.
 - Agregar tests de serializacion, migracion, importacion, links circulares y seleccion de mapa activo.
+
+## Integracion con Relampagos (Spec 35)
+
+Relampagos de spec 35 pertenecen al mapa activo. Guardar/cambiar/importar preserva geometria, semilla y reloj por mapa. Al abandonar un mapa se cancela el borrador y se liberan sus recursos; al volver se retoma la fase vigente.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

@@ -1019,3 +1019,9 @@ export function measurePathDistance(
 - [x] Derivar centro en mundo y reutilizar seleccion/propiedades existentes.
 - [x] Probar centro de formas y borrado dirigido sin tocar otras colecciones.
 - [x] Flujo de seleccion/centrado/borrado aceptado para 1.9.0.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 reutiliza la medida tactica de linea y la conversion geometrica de radios ft/m. Relampago en cono: apertura fija de 60 grados, direccion editable y medida de largo, nunca de apertura. Circulo: radio; extremos de linea ajustados a centros hexagonales. No cambiar reglas de las figuras existentes.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

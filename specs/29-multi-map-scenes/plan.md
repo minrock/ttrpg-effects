@@ -316,3 +316,9 @@
 - [ ] `CHANGELOG.md` actualizado.
 - [ ] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [ ] Sin dependencias nuevas no justificadas.
+
+## Integracion con Relampagos (Spec 35)
+
+Relampagos de spec 35 pertenecen al mapa activo. Guardar/cambiar/importar preserva geometria, semilla y reloj por mapa. Al abandonar un mapa se cancela el borrador y se liberan sus recursos; al volver se retoma la fase vigente.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

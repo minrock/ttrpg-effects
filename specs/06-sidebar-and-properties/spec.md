@@ -374,3 +374,9 @@ Requisitos:
 ## Cierre 1.9.0
 
 Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 agrega Linea/Cono/Circulo de relampago en Efectos y menu contextual, con iconos y tooltip. Propiedades incluyen direccion del cono (no apertura), alcance/radio, intensidad, velocidad, opacidad, chispas, visibilidad y guia compartida. Cada efecto aparece en Objetos > Efectos.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
