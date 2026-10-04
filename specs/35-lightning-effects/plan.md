@@ -203,3 +203,7 @@ Extender todas las uniones exhaustivas y firmas/caches de efectos. Los snapshots
 - Smoke de navegador a 1280 x 720: dibujo de cono con preview, largo y sector; confirmacion y controles laterales. Pruebas automatizadas cubren ft/m, hexagonos, giros cardinales, guardado multi-mapa, invalidacion de caches y presupuestos de 1/3/24/100 efectos.
 - Verificada tambien edicion numerica de direccion a 90 grados con largo invariable y guardado/reapertura nativos de una escena temporal con las tres variantes; el JSON mantiene geometria y semilla/reloj sin recursos de render. La escena de prueba queda abierta en Electron, sin modificar archivos de campana existentes.
 - Pendiente: frame time medio/p95, memoria y sesion prolongada con 24 efectos simultaneos en DM/Player. El presupuesto de vertices probado no sustituye esa medicion ni permite prometer 60 FPS.
+
+## Cierre 2.5.4
+
+Merge a main autorizado el 2026-10-03. Suite de 457 tests y lint repetidos correctamente. `./scripts/build-dmg.sh` completo typecheck, compilacion y empaquetado macOS arm64. Bundle verificado como 2.5.4 e integridad confirmada con `hdiutil verify` para `dist/TTRPG Effects-2.5.4-arm64.dmg`. Build personal sin firma de distribucion ni notarizacion. El benchmark prolongado permanece diferido; el instalador no se incorpora a git.
