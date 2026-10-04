@@ -1,4 +1,4 @@
-import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RenderTexture, Sprite, Text, Texture } from "pixi.js";
+import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RendererType, RenderTexture, Sprite, Text, Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
   clampZoom,
@@ -79,6 +79,7 @@ import { getHexGridSegments } from "../../domain/grid/hex-grid";
 import { getGridCellBoundary, getGridCellHeight, getGridCellKey, getGridCellRings, getGridCellVertices, getGridCellsInBrush, isPointInGridCell, type GridCell } from "../../domain/grid/grid-cell";
 import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-pattern-animation";
 import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
+import { ProceduralFireRenderer } from "./procedural-fire";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
@@ -234,6 +235,7 @@ export class PixiViewport {
   private shouldDrawEffectsAfterMapLoad = false;
   private loadedTokenUrls = new Set<string>();
   private firePatternSource: FirePatternAnimation | null = null;
+  private proceduralFireSource: ProceduralFireRenderer | null = null;
   private elements: readonly TacticalElement[] = [];
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
@@ -578,6 +580,7 @@ export class PixiViewport {
     this.drawLightsLayer();
     this.drawLabelsLayer();
     this.drawMapAnnotationsLayer();
+    this.drawSelectionLayer();
     this.updatePlayerCameraControls();
   }
 
@@ -896,6 +899,8 @@ export class PixiViewport {
     }
     this.effectRenderCache.clear();
     firePatternSource?.destroy();
+    this.proceduralFireSource?.destroy();
+    this.proceduralFireSource = null;
     for (const cached of this.shapeRenderCache.values()) {
       destroyDisplayObject(cached.container);
     }
@@ -924,6 +929,9 @@ export class PixiViewport {
     });
 
     this.app.canvas.className = "pixi-canvas";
+    if (this.app.renderer.type === RendererType.WEBGL) {
+      this.proceduralFireSource = new ProceduralFireRenderer();
+    }
     this.app.canvas.tabIndex = 0;
     this.host.append(this.app.canvas);
     this.app.stage.addChild(this.world);
@@ -941,7 +949,7 @@ export class PixiViewport {
 
   private async loadPatternSources(): Promise<void> {
     const [firePatternSource, waterPatternSource, arcanePointerSource] = await Promise.all([
-      loadFirePatternAnimation(),
+      this.proceduralFireSource === null ? loadFirePatternAnimation() : Promise.resolve(null),
       loadWaterPatternSource(),
       loadArcanePointerSource()
     ]);
@@ -2534,7 +2542,9 @@ export class PixiViewport {
       if (effect.visible && effect.kind === "fire") {
         const rendered = this.getCachedEffectContainer(
           effect,
-          `${getSceneEffectRenderSignature(effect, this.firePatternSource !== null)}:${this.grid?.cellSizeWorld ?? 100}:${fireSpriteBudget}`,
+          this.proceduralFireSource
+            ? getProceduralFireRenderSignature(effect, this.grid?.cellSizeWorld ?? 100)
+            : `${getSceneEffectRenderSignature(effect, this.firePatternSource !== null)}:${this.grid?.cellSizeWorld ?? 100}:${fireSpriteBudget}`,
           fireSpriteBudget
         );
         nextCache.set(effect.id, rendered);
@@ -2589,12 +2599,14 @@ export class PixiViewport {
     const cached = this.effectRenderCache.get(effect.id);
 
     if (cached !== undefined && !cached.container.destroyed && cached.signature === signature) {
+      if (effect.kind === "fire" && this.proceduralFireSource) cached.container.alpha = effect.opacity;
       return cached;
     }
 
     const container =
       effect.kind === "fire"
-        ? drawSceneEffect(effect, this.firePatternSource, this.grid?.cellSizeWorld ?? 100, spriteBudget)
+        ? this.proceduralFireSource?.createEffect(effect, this.grid?.cellSizeWorld ?? 100)
+          ?? drawSceneEffect(effect, this.firePatternSource, this.grid?.cellSizeWorld ?? 100, spriteBudget)
         : drawWaterEffect(effect, this.waterPatternSource, spriteBudget);
 
     return { signature, container };
@@ -2635,7 +2647,7 @@ export class PixiViewport {
     clearContainerChildren(selectionLayer);
 
     for (const effect of this.getRenderableEffects()) {
-      if (effect.visible && effect.kind === "fire" && effect.id !== this.selectedElementId) {
+      if (this.viewRole === "dm" && effect.visible && effect.kind === "fire" && effect.id !== this.selectedElementId) {
         selectionLayer.addChild(drawFireZoneHint(effect));
       }
     }
@@ -4439,6 +4451,7 @@ export class PixiViewport {
 
   private readonly updateFirePattern = (): void => {
     this.firePatternSource?.update(performance.now());
+    this.proceduralFireSource?.update();
   };
 
   private async drawMapImage(): Promise<void> {
@@ -4662,15 +4675,22 @@ function destroyDisplayObject(child: Container): void {
   child.destroy();
 }
 
+function getFireZoneRenderSignature(effect: SceneFireEffect): string {
+  return effect.zone.kind === "circle"
+    ? `circle:${effect.zone.mode}:${effect.zone.radius}:${effect.zone.innerRadiusRatio}`
+    : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
+}
+
+function getProceduralFireRenderSignature(effect: SceneFireEffect, cellSize: number): string {
+  // Opacity and light properties do not change geometry or the static fuel texture.
+  return ["procedural-fire", effect.id, effect.position.x, effect.position.y,
+    effect.scale, cellSize, effect.opacity > 0, getFireZoneRenderSignature(effect)].join(":");
+}
+
 function getSceneEffectRenderSignature(effect: SceneFireEffect | SceneWaterEffect, hasPatternSource: boolean): string {
   const mode = hasPatternSource ? "pattern" : "fallback";
 
   if (effect.kind === "fire") {
-    const zoneSignature =
-      effect.zone.kind === "circle"
-        ? `circle:${effect.zone.mode}:${effect.zone.radius}:${effect.zone.innerRadiusRatio}`
-        : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
-
     return [
       mode,
       effect.kind,
@@ -4683,7 +4703,7 @@ function getSceneEffectRenderSignature(effect: SceneFireEffect | SceneWaterEffec
       effect.visible,
       effect.emitsLight,
       effect.lightRadius,
-      zoneSignature
+      getFireZoneRenderSignature(effect)
     ].join(":");
   }
 

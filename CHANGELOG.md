@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.5.3] - 2026-10-03
+
+### Changed
+
+- Fuego procedural en GPU para DM y Player View: turbulencia continua y siluetas variables por efecto, sin repetir una animacion GIF en WebGL.
+- El fuego se adapta a circulos, anillos y zonas pintadas cuadradas o hexagonales; conserva controles, iluminacion y compatibilidad con escenas existentes.
+- Reloj de pared compartido y semilla estable por ID para mantener el movimiento al navegar, seleccionar, cambiar zoom o reorientar el mapa.
+- Render directo con geometria y mascaras de combustible cacheadas, sin filtros ni framebuffers intermedios de fuego; cambiar opacidad o iluminacion no reconstruye la mascara.
+
+### Fixed
+
+- Las guias de edicion del fuego no se muestran en Player View.
+
 ## [2.5.1] - 2026-10-03
 
 ### Fixed
