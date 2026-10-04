@@ -42,7 +42,9 @@ import {
 import { getShapeAnchor, getShapeEndPoint, moveShape, rotateLinearShape } from "../../domain/shapes/shapes";
 import { snapTokenToGrid } from "../../domain/tokens/tokens";
 import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
-import type { FireCell } from "../../domain/effects/fire";
+import { createDrawnFireEffect, getFireZoneBounds, type FireCell } from "../../domain/effects/fire";
+import { editFireHandle, fireLength, fireOutline, firePoint, fireZone, hitTestFire, type FireShape } from "../../domain/effects/fire-shapes";
+import { drawFireEditor, hitTestFireHandle, traceFireFootprint } from "./fire-guides";
 import {
   getArcanePointerAlpha,
   getArcanePointerDiameterWorld,
@@ -82,7 +84,7 @@ import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-patt
 import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
 import { ProceduralFireRenderer } from "./procedural-fire";
 import { createLightningEffect, editLightningHandle, hitTestLightning, lightningPoint, lightningZone, type LightningHandle, type LightningShape } from "../../domain/effects/lightning";
-import type { LightningDraft } from "../../domain/interaction/interaction-state";
+import type { EffectDraft } from "../../domain/interaction/interaction-state";
 import { drawLightningEditor, drawLightningGuide, hitTestLightningHandle } from "./lightning-guides";
 import { LightningVisual, lightningVertexBudget } from "./lightning-visual";
 
@@ -131,7 +133,7 @@ interface PointerDragState {
     | "calibrate"
     | "map-move"
     | "element-move"
-    | "lightning-edit"
+    | "effect-edit"
     | "light-rotate"
     | "light-resize"
     | "dynamic-light-rotate"
@@ -154,7 +156,7 @@ interface PointerDragState {
     | "water-pattern-rotate";
   readonly elementId?: string;
   readonly handleIndex?: number;
-  readonly lightningHandle?: LightningHandle;
+  readonly effectHandle?: LightningHandle;
   readonly grabOffset?: WorldPoint;
   readonly moveStartPosition?: WorldPoint;
   readonly pendingMovePosition?: WorldPoint;
@@ -187,6 +189,8 @@ export interface PixiViewportOptions {
   readonly onWaterPointerMove?: (point: WorldPoint | null) => void;
   readonly onLightningCreate?: (shape: LightningShape, start: WorldPoint, end: WorldPoint) => void;
   readonly onLightningChange?: (effect: SceneLightningEffect) => void;
+  readonly onFireCreate?: (shape: FireShape, start: WorldPoint, end: WorldPoint) => void;
+  readonly onFireChange?: (effect: SceneFireEffect) => void;
   readonly onPathPointMove?: (elementId: string, pointIndex: number, x: number, y: number) => void;
   readonly onPathMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
@@ -246,8 +250,8 @@ export class PixiViewport {
   private firePatternSource: FirePatternAnimation | null = null;
   private proceduralFireSource: ProceduralFireRenderer | null = null;
   private readonly lightningVisuals = new Map<string, LightningVisual>();
-  private lightningDraft: LightningDraft | null = null;
-  private lightningResetKey: string | number = 0;
+  private effectDraft: EffectDraft | null = null;
+  private effectResetKey: string | number = 0;
   private elements: readonly TacticalElement[] = [];
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
@@ -275,6 +279,7 @@ export class PixiViewport {
   private fogRevealGuideRadius: number | null = null;
   private fogRevealPointerWorldPoint: WorldPoint | null = null;
   private isFirePaintMode = false;
+  private firePaintPointer: WorldPoint | null = null;
   private isPathDrawingMode = false;
   private isWaterDrawingMode = false;
   private isArcanePointerMode = false;
@@ -524,6 +529,8 @@ export class PixiViewport {
 
   setFirePaintMode(isFirePaintMode: boolean): void {
     this.isFirePaintMode = isFirePaintMode;
+    if (!isFirePaintMode) this.firePaintPointer = null;
+    this.drawSelectionLayer();
     this.updateCursor();
   }
 
@@ -538,12 +545,16 @@ export class PixiViewport {
   }
 
   setLightningTool(shape: LightningShape | null, resetKey: string | number = 0): void {
-    if (this.lightningDraft?.shape === shape && this.lightningResetKey === resetKey) return;
-    this.lightningResetKey = resetKey;
-    this.lightningDraft = shape === null ? null : { shape, anchor: null, pointer: null };
-    this.pendingViewportUpdates.delete("lightning-pointer");
-    if (this.dragState?.mode === "lightning-edit") {
-      this.pendingViewportUpdates.delete("lightning-edit");
+    this.setEffectTool("lightning", shape, resetKey);
+  }
+
+  setEffectTool(kind: "fire" | "lightning", shape: LightningShape | null, resetKey: string | number = 0): void {
+    if ((this.effectDraft === null ? shape === null : this.effectDraft.shape === shape && this.effectDraft.kind === kind) && this.effectResetKey === resetKey) return;
+    this.effectResetKey = resetKey;
+    this.effectDraft = shape === null ? null : { kind, shape, anchor: null, pointer: null };
+    this.pendingViewportUpdates.delete("effect-pointer");
+    if (this.dragState?.mode === "effect-edit") {
+      this.pendingViewportUpdates.delete("effect-edit");
       this.dragState = null;
       this.clearDragPreviews();
     }
@@ -1279,7 +1290,8 @@ export class PixiViewport {
         isVisibleLightEmittingFireEffect(effect) &&
         (effect.zone.kind === "cells"
           ? effect.zone.cells.some((cell) => isRectNearViewport(cell.x, cell.y, cell.size, getGridCellHeight(cell), viewportBounds))
-          : isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds))
+          : effect.zone.kind === "circle" ? isCircleNearViewport(effect.position, effect.lightRadius, viewportBounds)
+          : isFireNearViewport(effect, viewportBounds))
     );
     const activeDynamicLights = this.getRenderableEffects().filter(
       (effect): effect is SceneDynamicLightEffect =>
@@ -1410,8 +1422,8 @@ export class PixiViewport {
     canvas.addEventListener("pointermove", this.handlePointerMove);
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
-    canvas.addEventListener("lostpointercapture", this.handleLightningCaptureLost);
-    canvas.addEventListener("pointerleave", this.handleLightningPointerLeave);
+    canvas.addEventListener("lostpointercapture", this.handleEffectCaptureLost);
+    canvas.addEventListener("pointerleave", this.handleEffectPointerLeave);
     canvas.addEventListener("dblclick", this.handleDoubleClick);
     canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     window.addEventListener("keydown", this.handleKeyDown, true);
@@ -1428,8 +1440,8 @@ export class PixiViewport {
     canvas.removeEventListener("pointermove", this.handlePointerMove);
     canvas.removeEventListener("pointerup", this.handlePointerUp);
     canvas.removeEventListener("pointercancel", this.handlePointerUp);
-    canvas.removeEventListener("lostpointercapture", this.handleLightningCaptureLost);
-    canvas.removeEventListener("pointerleave", this.handleLightningPointerLeave);
+    canvas.removeEventListener("lostpointercapture", this.handleEffectCaptureLost);
+    canvas.removeEventListener("pointerleave", this.handleEffectPointerLeave);
     canvas.removeEventListener("dblclick", this.handleDoubleClick);
     canvas.removeEventListener("wheel", this.handleWheel);
     window.removeEventListener("keydown", this.handleKeyDown, true);
@@ -1444,7 +1456,7 @@ export class PixiViewport {
   };
 
   private readonly handleDoubleClick = (event: MouseEvent): void => {
-    if (this.lightningDraft !== null) return;
+    if (this.effectDraft !== null) return;
     if (this.viewRole !== "dm" || !this.showMapAnnotations || event.button !== 0) return;
     const screenPoint = this.eventToScreenPoint(event);
 
@@ -1503,14 +1515,14 @@ export class PixiViewport {
     let mode: PointerDragState["mode"] = "idle";
     let elementId: string | undefined;
     let handleIndex: number | undefined;
-    let lightningHandle: LightningHandle | undefined;
+    let effectHandle: LightningHandle | undefined;
     let grabOffset: WorldPoint | undefined;
     let moveStartPosition: WorldPoint | undefined;
     if (event.button === 0) {
       if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
         this.app.canvas.style.cursor = "grabbing";
-      } else if (this.lightningDraft !== null) {
+      } else if (this.effectDraft !== null) {
         mode = "idle";
       } else if (this.hitTestPlayerCameraControl(point)) {
         mode = "player-camera-move";
@@ -1566,10 +1578,17 @@ export class PixiViewport {
         const hitLightning = selectedLightning === undefined ? null : hitTestLightningHandle(
           selectedLightning, screenToWorld(point, this.camera, this.getViewportSize()), this.camera.zoom
         );
-        if (hitLightning !== null && selectedLightning !== undefined) {
-          mode = "lightning-edit";
+        const selectedFire = this.getSelectedFireEffect();
+        const hitFire = selectedFire && (selectedFire.zone.kind === "line" || selectedFire.zone.kind === "cone")
+          ? hitTestFireHandle(selectedFire, screenToWorld(point, this.camera, this.getViewportSize()), this.camera.zoom) : null;
+        if (hitFire !== null && selectedFire) {
+          mode = "effect-edit";
+          elementId = selectedFire.id;
+          effectHandle = hitFire;
+        } else if (hitLightning !== null && selectedLightning !== undefined) {
+          mode = "effect-edit";
           elementId = selectedLightning.id;
-          lightningHandle = hitLightning;
+          effectHandle = hitLightning;
         } else if (hitFireZoneResizeElementId !== null) {
           mode = "fire-zone-resize";
           elementId = hitFireZoneResizeElementId;
@@ -1684,7 +1703,7 @@ export class PixiViewport {
       mode,
       elementId,
       handleIndex,
-      lightningHandle,
+      effectHandle,
       grabOffset,
       moveStartPosition
     };
@@ -1697,11 +1716,11 @@ export class PixiViewport {
 
     const screenPoint = this.eventToScreenPoint(event);
 
-    if (this.lightningDraft !== null && !this.isGrabMode) {
-      this.scheduleViewportUpdate("lightning-pointer", () => {
-        if (this.lightningDraft === null || this.grid === null || this.settings === null) return;
-        this.lightningDraft = { ...this.lightningDraft, pointer: lightningPoint(
-          screenToWorld(screenPoint, this.camera, this.getViewportSize()), this.lightningDraft.shape, this.grid, this.settings
+    if (this.effectDraft !== null && !this.isGrabMode) {
+      this.scheduleViewportUpdate("effect-pointer", () => {
+        if (this.effectDraft === null || this.grid === null || this.settings === null) return;
+        this.effectDraft = { ...this.effectDraft, pointer: (this.effectDraft.kind === "fire" ? firePoint : lightningPoint)(
+          screenToWorld(screenPoint, this.camera, this.getViewportSize()), this.effectDraft.shape, this.grid, this.settings
         ) };
         this.drawSelectionLayer();
       });
@@ -1729,6 +1748,11 @@ export class PixiViewport {
     if (this.isDaytimeMaskPaintMode) {
       this.daytimeMaskPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
       this.drawSelectionLayer();
+    }
+
+    if (this.isFirePaintMode) {
+      this.firePaintPointer = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+      this.scheduleViewportUpdate("fire-brush-preview", () => this.drawSelectionLayer());
     }
 
     if (this.dragState === null) {
@@ -1771,10 +1795,10 @@ export class PixiViewport {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
       this.applyElementMovePreview(this.dragState.elementId, targetPoint, this.dragState.moveStartPosition);
-    } else if (this.dragState.mode === "lightning-edit" && this.dragState.elementId !== undefined && this.dragState.lightningHandle !== undefined) {
+    } else if (this.dragState.mode === "effect-edit" && this.dragState.elementId !== undefined && this.dragState.effectHandle !== undefined) {
       const id = this.dragState.elementId;
-      const handle = this.dragState.lightningHandle;
-      this.scheduleViewportUpdate("lightning-edit", () => this.updateLightningHandle(id, handle, nextPoint));
+      const handle = this.dragState.effectHandle;
+      this.scheduleViewportUpdate("effect-edit", () => this.updateEffectHandle(id, handle, nextPoint));
     } else if (this.dragState.mode === "player-camera-move" && this.primaryPlayerCameraControl !== null) {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
@@ -1866,7 +1890,7 @@ export class PixiViewport {
       mode: this.dragState.mode,
       elementId: this.dragState.elementId,
       handleIndex: this.dragState.handleIndex,
-      lightningHandle: this.dragState.lightningHandle,
+      effectHandle: this.dragState.effectHandle,
       grabOffset: this.dragState.grabOffset,
       moveStartPosition: this.dragState.moveStartPosition,
       pendingMovePosition:
@@ -1888,10 +1912,10 @@ export class PixiViewport {
 
     const completedMode = this.dragState.mode;
     const releasePoint = this.eventToScreenPoint(event);
-    if ((this.lightningDraft !== null || completedMode === "lightning-edit") &&
+    if ((this.effectDraft !== null || completedMode === "effect-edit") &&
       (event.type === "pointercancel" || releasePoint.x < 0 || releasePoint.y < 0 ||
         releasePoint.x > this.getViewportSize().width || releasePoint.y > this.getViewportSize().height)) {
-      this.pendingViewportUpdates.delete("lightning-edit");
+      this.pendingViewportUpdates.delete("effect-edit");
       this.dragState = null;
       this.clearDragPreviews();
       return;
@@ -1902,8 +1926,8 @@ export class PixiViewport {
     );
     const isClick = movedDistance < 4;
     this.flushPendingViewportUpdates();
-    if (completedMode === "lightning-edit" && this.dragState.elementId !== undefined && this.dragState.lightningHandle !== undefined) {
-      this.updateLightningHandle(this.dragState.elementId, this.dragState.lightningHandle, releasePoint);
+    if (completedMode === "effect-edit" && this.dragState.elementId !== undefined && this.dragState.effectHandle !== undefined) {
+      this.updateEffectHandle(this.dragState.elementId, this.dragState.effectHandle, releasePoint);
     }
 
     if (isClick && this.dragState.button === 2) {
@@ -1980,14 +2004,16 @@ export class PixiViewport {
     }
 
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
-      if (this.lightningDraft !== null && this.grid !== null && this.settings !== null) {
-        const { shape, anchor } = this.lightningDraft;
-        const point = lightningPoint(screenToWorld(releasePoint, this.camera, this.getViewportSize()), shape, this.grid, this.settings);
+      if (this.effectDraft !== null && this.grid !== null && this.settings !== null) {
+        const { kind, shape, anchor } = this.effectDraft;
+        const point = (kind === "fire" ? firePoint : lightningPoint)(screenToWorld(releasePoint, this.camera, this.getViewportSize()), shape, this.grid, this.settings);
         if (anchor === null) {
-          this.lightningDraft = { shape, anchor: point, pointer: point };
-        } else if (lightningZone(shape, anchor, point) !== null) {
-          this.lightningDraft = null;
-          this.options.onLightningCreate?.(shape, anchor, point);
+          this.effectDraft = { kind, shape, anchor: point, pointer: point };
+        } else if ((kind === "fire" ? fireZone(shape, anchor, point, this.grid.cellSizeWorld) : lightningZone(shape, anchor, point)) !== null) {
+          this.effectDraft = null;
+          this.updateCursor();
+          if (kind === "fire") this.options.onFireCreate?.(shape, anchor, point);
+          else this.options.onLightningCreate?.(shape, anchor, point);
         }
         this.drawSelectionLayer();
       } else if (this.isPathDrawingMode) {
@@ -2175,9 +2201,11 @@ export class PixiViewport {
 
     const previewEffect = this.previewEffects.get(dragState.elementId);
     if (previewEffect !== undefined) {
-      if (dragState.mode === "lightning-edit" && previewEffect.kind === "lightning") {
+      if (dragState.mode === "effect-edit" && previewEffect.kind === "lightning") {
         this.options.onLightningChange?.(previewEffect);
-      } else if (dragState.mode === "fire-zone-resize" && previewEffect.kind === "fire") {
+      } else if (dragState.mode === "effect-edit" && previewEffect.kind === "fire") {
+        this.options.onFireChange?.(previewEffect);
+      } else if (dragState.mode === "fire-zone-resize" && previewEffect.kind === "fire" && previewEffect.zone.kind !== "line") {
         this.options.onFireZoneRadiusChange?.(previewEffect.id, previewEffect.zone.radius);
       } else if (dragState.mode === "fire-light-resize" && previewEffect.kind === "fire") {
         this.options.onFireLightRadiusChange?.(previewEffect.id, previewEffect.lightRadius);
@@ -2218,7 +2246,7 @@ export class PixiViewport {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
-    } else if (this.lightningDraft !== null) {
+    } else if (this.effectDraft !== null) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isPlayerCameraControlHovered) {
       this.app.canvas.style.cursor = "grab";
@@ -2272,7 +2300,7 @@ export class PixiViewport {
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === "Escape" && !isEditableKeyboardTarget(event.target)) this.cancelLightningEdit();
+    if (event.key === "Escape" && !isEditableKeyboardTarget(event.target)) this.cancelEffectEdit();
     if (!this.isNavigationEnabled || !isSpaceKeyEvent(event) || isEditableKeyboardTarget(event.target)) {
       return;
     }
@@ -2297,7 +2325,7 @@ export class PixiViewport {
   };
 
   private readonly handleWindowBlur = (): void => {
-    this.cancelLightningEdit();
+    this.cancelEffectEdit();
     if (!this.isSpaceNavigationActive && this.dragState?.mode !== "pan") {
       return;
     }
@@ -2310,23 +2338,25 @@ export class PixiViewport {
     this.updateCursor();
   };
 
-  private cancelLightningEdit(): void {
-    if (this.dragState?.mode !== "lightning-edit") return;
-    this.pendingViewportUpdates.delete("lightning-edit");
+  private cancelEffectEdit(): void {
+    if (this.dragState?.mode !== "effect-edit") return;
+    this.pendingViewportUpdates.delete("effect-edit");
     this.dragState = null;
     this.clearDragPreviews();
   }
 
-  private readonly handleLightningCaptureLost = (): void => {
-    this.cancelLightningEdit();
+  private readonly handleEffectCaptureLost = (): void => {
+    this.cancelEffectEdit();
   };
 
-  private readonly handleLightningPointerLeave = (): void => {
-    this.pendingViewportUpdates.delete("lightning-pointer");
-    if (this.lightningDraft !== null) {
-      this.lightningDraft = { ...this.lightningDraft, pointer: null };
+  private readonly handleEffectPointerLeave = (): void => {
+    this.firePaintPointer = null;
+    this.pendingViewportUpdates.delete("effect-pointer");
+    if (this.effectDraft !== null) {
+      this.effectDraft = { ...this.effectDraft, pointer: null };
       this.drawSelectionLayer();
     }
+    if (this.isFirePaintMode) this.drawSelectionLayer();
   };
 
   private resize(): void {
@@ -2786,9 +2816,14 @@ export class PixiViewport {
       }
     }
 
-    if (this.viewRole === "dm" && this.lightningDraft?.anchor && this.lightningDraft.pointer && this.grid && this.settings) {
-      if (lightningZone(this.lightningDraft.shape, this.lightningDraft.anchor, this.lightningDraft.pointer) !== null) {
-        const preview = createLightningEffect("lightning-preview", this.lightningDraft.shape, this.lightningDraft.anchor, this.lightningDraft.pointer, 0);
+    if (this.viewRole === "dm" && this.effectDraft?.anchor && this.effectDraft.pointer && this.grid && this.settings) {
+      if (this.effectDraft.kind === "fire") {
+        if (fireZone(this.effectDraft.shape, this.effectDraft.anchor, this.effectDraft.pointer, this.grid.cellSizeWorld)) {
+          const preview = createDrawnFireEffect("fire-preview", this.effectDraft.shape, this.effectDraft.anchor, this.effectDraft.pointer, this.grid.cellSizeWorld);
+          selectionLayer.addChild(drawFireEditor(preview, this.grid, this.settings, this.camera.zoom, true));
+        }
+      } else if (lightningZone(this.effectDraft.shape, this.effectDraft.anchor, this.effectDraft.pointer) !== null) {
+        const preview = createLightningEffect("lightning-preview", this.effectDraft.shape, this.effectDraft.anchor, this.effectDraft.pointer, 0);
         selectionLayer.addChild(drawLightningGuide(preview, true));
         selectionLayer.addChild(drawLightningEditor(preview, this.grid, this.settings, this.camera.zoom, true));
       }
@@ -2801,7 +2836,8 @@ export class PixiViewport {
     if (this.selectedElementId !== null) {
       const selectedElement = this.findSelectableElement(this.selectedElementId);
 
-      if (selectedElement !== undefined && selectedElement.kind !== "lightning") {
+      if (selectedElement !== undefined && selectedElement.kind !== "lightning" &&
+        (selectedElement.kind !== "fire" || this.getSelectedFireEffect()?.zone.kind === "cells")) {
         const selectedAnnotation = this.findMapAnnotation(selectedElement.id);
         const child =
           selectedAnnotation?.kind === "information-area"
@@ -2841,7 +2877,10 @@ export class PixiViewport {
       );
 
       if (selectedFireEffect !== undefined) {
-        selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect, this.camera.zoom));
+        if (selectedFireEffect.zone.kind !== "cells" && this.grid && this.settings) {
+          selectionLayer.addChild(drawFireEditor(selectedFireEffect, this.grid, this.settings, this.camera.zoom));
+        }
+        if (selectedFireEffect.zone.kind === "circle") selectionLayer.addChild(drawFireResizeHandles(selectedFireEffect, this.camera.zoom));
       }
 
       const selectedDynamicLight = this.getRenderableEffects().find(
@@ -2946,6 +2985,9 @@ export class PixiViewport {
       );
     }
 
+    if (this.viewRole === "dm" && this.isFirePaintMode && this.firePaintPointer) {
+      selectionLayer.addChild(drawFogRevealGuide(this.firePaintPointer, this.getFirePaintRadius(), this.camera.zoom, 0xff9b4f, 0.95));
+    }
     if (this.isFogRevealMode && this.fogOfWar?.enabled && this.fogRevealPointerWorldPoint !== null) {
       selectionLayer.addChild(
         drawFogRevealGuide(this.fogRevealPointerWorldPoint, this.fogOfWar.revealRadius, this.camera.zoom, 0xffd28a, 0.94)
@@ -3516,10 +3558,8 @@ export class PixiViewport {
 
       if (element.kind === "fire") {
         const fire = this.effects.find((effect) => effect.id === element.id && effect.kind === "fire");
-        if (fire?.kind === "fire" && fire.zone.kind === "cells") {
-          if (fire.zone.cells.some((cell) => isPointInGridCell(worldPoint, cell))) return element.id;
-          continue;
-        }
+        if (fire?.kind === "fire" && hitTestFire(fire, worldPoint)) return element.id;
+        continue;
       }
 
       const radius = element.hitRadius ?? getHitRadius(element.kind);
@@ -3647,7 +3687,7 @@ export class PixiViewport {
   private hitTestFireZoneResizeHandle(screenPoint: ScreenPoint): string | null {
     const selectedFire = this.getSelectedFireEffect();
 
-    if (selectedFire === null || selectedFire.zone.kind === "cells") {
+    if (selectedFire === null || selectedFire.zone.kind !== "circle") {
       return null;
     }
 
@@ -3658,7 +3698,7 @@ export class PixiViewport {
   private hitTestFireLightResizeHandle(screenPoint: ScreenPoint): string | null {
     const selectedFire = this.getSelectedFireEffect();
 
-    if (selectedFire === null || !selectedFire.emitsLight || selectedFire.zone.kind === "cells") {
+    if (selectedFire === null || !selectedFire.emitsLight || selectedFire.zone.kind !== "circle") {
       return null;
     }
 
@@ -3891,7 +3931,7 @@ export class PixiViewport {
         candidate.id === elementId && candidate.kind === "fire"
     );
 
-    if (effect === undefined) {
+    if (effect === undefined || effect.zone.kind !== "circle") {
       return;
     }
 
@@ -4184,12 +4224,18 @@ export class PixiViewport {
     this.drawShapePreviewLayers();
   }
 
-  private updateLightningHandle(id: string, handle: LightningHandle, screen: ScreenPoint): void {
-    const effect = this.effects.find((candidate): candidate is SceneLightningEffect => candidate.id === id && candidate.kind === "lightning");
+  private updateEffectHandle(id: string, handle: LightningHandle, screen: ScreenPoint): void {
+    const effect = this.effects.find(candidate => candidate.id === id && (candidate.kind === "lightning" || candidate.kind === "fire"));
     if (!effect || !this.grid || !this.settings) return;
-    this.previewEffects.set(id, editLightningHandle(effect, handle, screenToWorld(screen, this.camera, this.getViewportSize()), this.grid, this.settings));
-    this.drawEffectsLayer();
-    this.drawSelectionLayer();
+    const point = screenToWorld(screen, this.camera, this.getViewportSize());
+    if (effect.kind === "fire") {
+      this.previewEffects.set(id, editFireHandle(effect, handle, point, this.grid, this.settings));
+      this.drawEffectPreviewLayers();
+    } else if (effect.kind === "lightning") {
+      this.previewEffects.set(id, editLightningHandle(effect, handle, point, this.grid, this.settings));
+      this.drawEffectsLayer();
+      this.drawSelectionLayer();
+    }
   }
 
   private getSelectableElements(): readonly SelectableRenderElement[] {
@@ -4833,6 +4879,8 @@ function destroyDisplayObject(child: Container): void {
 }
 
 function getFireZoneRenderSignature(effect: SceneFireEffect): string {
+  if (effect.zone.kind === "line") return `line:${effect.zone.end.x}:${effect.zone.end.y}:${effect.zone.width}`;
+  if (effect.zone.kind === "cone") return `cone:${effect.zone.radius}:${effect.zone.direction}`;
   return effect.zone.kind === "circle"
     ? `circle:${effect.zone.mode}:${effect.zone.radius}:${effect.zone.innerRadiusRatio}`
     : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
@@ -4921,10 +4969,7 @@ function getLightRenderSignature(light: SceneLight): string {
 }
 
 function getFireLightRenderSignature(effect: SceneFireEffect): string {
-  const zoneSignature =
-    effect.zone.kind === "circle"
-      ? `circle:${effect.position.x}:${effect.position.y}:${effect.zone.radius}:${effect.scale}`
-      : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
+  const zoneSignature = `${effect.position.x}:${effect.position.y}:${effect.scale}:${getFireZoneRenderSignature(effect)}`;
 
   return [
     effect.id,
@@ -5033,10 +5078,7 @@ function getEffectsLightingMaskSignature(
         return `dynamic:${getDynamicLightMaskSignature(effect, cellSizeWorld)}`;
       }
 
-      const zoneSignature =
-        effect.zone.kind === "circle"
-          ? `circle:${effect.position.x}:${effect.position.y}:${effect.zone.radius}:${effect.scale}`
-          : `cells:${effect.zone.radius}:${effect.zone.cells.length}:${hashCells(effect.zone.cells)}`;
+      const zoneSignature = `${effect.position.x}:${effect.position.y}:${effect.scale}:${getFireZoneRenderSignature(effect)}`;
       return `fire:${effect.id}:${effect.lightRadius}:${zoneSignature}`;
     })
     .join("|");
@@ -5148,7 +5190,7 @@ function getWaterPatternSpriteBudget(visibleWaterEffectCount: number, viewRole: 
 
 function isPreviewCommitDragMode(mode: PointerDragState["mode"]): boolean {
   return (
-    mode === "lightning-edit" ||
+    mode === "effect-edit" ||
     mode === "light-rotate" ||
     mode === "light-resize" ||
     mode === "dynamic-light-rotate" ||
@@ -5216,6 +5258,12 @@ function isVisionAreaNearViewport(
   }
 
   return area.points.some((point) => isCircleNearViewport(point, area.radius, bounds));
+}
+
+function isFireNearViewport(effect: SceneFireEffect, viewport: ReturnType<typeof getFireZoneBounds>): boolean {
+  const bounds = getFireZoneBounds(effect), padding = effect.lightRadius;
+  return isRectNearViewport(bounds.left - padding, bounds.top - padding,
+    bounds.right - bounds.left + padding * 2, bounds.bottom - bounds.top + padding * 2, viewport);
 }
 
 function isCircleNearViewport(
@@ -5925,6 +5973,14 @@ function buildFireLightEraseGraphicScreen(
 ): Graphics {
   const zoom = camera.zoom;
 
+  if (effect.zone.kind === "line" || effect.zone.kind === "cone") {
+    const points = fireOutline(effect, effect.lightRadius).map(point => worldToScreen(point.x, point.y, camera, viewport));
+    const graphic = new Graphics().poly(points.flatMap(p => [p.x, p.y]), true)
+      .fill({ color: 0xffffff });
+    graphic.blendMode = "erase";
+    return graphic;
+  }
+
   if (effect.zone.kind === "cells") {
     const graphic = new Graphics();
     const { bright, dim } = computeCellRings(effect.zone.cells);
@@ -6043,6 +6099,8 @@ function buildDarkvisionColorMask(
         drawGridCell(graphic, cell)
           .fill({ color: 0xffffff, alpha: 1 });
       }
+    } else if (effect.zone.kind === "line" || effect.zone.kind === "cone") {
+      traceFireFootprint(graphic, effect, effect.lightRadius).fill({ color: 0xffffff });
     } else {
       graphic
         .circle(effect.position.x, effect.position.y, effect.lightRadius)
@@ -6458,6 +6516,11 @@ function drawPolygon(graphic: Graphics, points: readonly WorldPoint[]): void {
 }
 
 function drawFireLight(effect: SceneFireEffect): Graphics {
+  if (effect.zone.kind === "line" || effect.zone.kind === "cone") {
+    const graphic = traceFireFootprint(new Graphics(), effect, effect.lightRadius)
+      .fill({ color: 0xffa54f, alpha: 0.12 * effect.opacity });
+    return traceFireFootprint(graphic, effect, effect.lightRadius / 2).fill({ color: 0xffd28a, alpha: 0.18 * effect.opacity });
+  }
   if (effect.zone.kind === "cells") {
     const graphic = new Graphics();
     const { bright, dim } = computeCellRings(effect.zone.cells);
@@ -6708,6 +6771,8 @@ function getDaytimeFilterAppearance(preset: SceneDaytimeFilter["preset"]): { rea
 
 function drawFireZoneMask(effect: SceneFireEffect): Graphics {
   const mask = new Graphics();
+
+  if (effect.zone.kind === "line" || effect.zone.kind === "cone") return traceFireFootprint(mask, effect).fill({ color: 0xffffff });
 
   if (effect.zone.kind === "circle") {
     const radius = effect.zone.radius * effect.scale;
@@ -7147,7 +7212,7 @@ function drawFireResizeHandles(effect: SceneFireEffect, cameraZoom: number): Gra
   const uiScale = getAreaToolUiScale(cameraZoom);
   const graphic = new Graphics();
 
-  if (effect.zone.kind === "cells") {
+  if (effect.zone.kind !== "circle") {
     return graphic;
   }
 
@@ -7186,7 +7251,7 @@ function drawMagicalDarknessResizeHandle(effect: SceneMagicalDarknessEffect, cam
 }
 
 function getFireVisualRadius(effect: SceneFireEffect): number {
-  return effect.zone.radius * effect.scale;
+  return fireLength(effect);
 }
 
 function drawConeShape(
@@ -7480,6 +7545,8 @@ function distanceToSegment(point: WorldPoint, from: WorldPoint, to: WorldPoint):
 
 function drawFireZoneHint(effect: SceneFireEffect): Graphics {
   const graphic = new Graphics();
+
+  if (effect.zone.kind === "line" || effect.zone.kind === "cone") return traceFireFootprint(graphic, effect).stroke({ color: 0xff8a38, width: 2, alpha: 0.28 });
 
   graphic
     .circle(effect.position.x, effect.position.y, 50)

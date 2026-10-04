@@ -1,5 +1,9 @@
 # Spec - Luces y Oscuridad
 
+## Fuego lineal y conico
+
+La ampliacion de spec 10, aceptada para 2.6.0, ilumina toda la huella de lineas/conos, expandiendo su contorno con `lightRadius`. El mismo contorno se transforma para borrar oscuridad normal y recuperar color de darkvision, sin revelar niebla ni atravesar oscuridad magica. Circulos y celdas mantienen sus reglas previas.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.

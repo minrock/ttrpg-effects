@@ -1,6 +1,7 @@
 import type { FireCell } from "../../domain/effects/fire";
 import type { SceneFireEffect } from "../../domain/sessions/scene-document";
 import { getGridCellCenter } from "../../domain/grid/grid-cell";
+import { FIRE_CONE_APERTURE, fireDirection, fireLength } from "../../domain/effects/fire-shapes";
 
 export const MAX_FIRE_FLAMES_PER_EFFECT = 256;
 export const MAX_FIRE_FLAMES_PER_VIEWPORT = 2048;
@@ -53,6 +54,18 @@ export function createFireFlameLayout(
       const r = Math.sqrt(inner * inner + (radius * radius - inner * inner) * (index + 0.2 + random() * 0.6) / count);
       const angle = angleOffset + index * 2.399963229728653 + (random() - 0.5) * 0.5;
       add(effect.position.x + Math.cos(angle) * r, effect.position.y + Math.sin(angle) * r, width);
+    }
+  } else if (effect.zone.kind === "line" || effect.zone.kind === "cone") {
+    const length = fireLength(effect), direction = fireDirection(effect);
+    const width = effect.zone.kind === "line" ? effect.zone.width * effect.scale : length;
+    const area = effect.zone.kind === "line" ? length * width : Math.PI * length * length * FIRE_CONE_APERTURE / 360;
+    const count = Math.max(1, Math.min(limit, Math.ceil(area / (spacing * spacing))));
+    for (let i = 0; i < count; i++) {
+      const along = effect.zone.kind === "line" ? length * (i + random()) / count : length * Math.sqrt((i + random()) / count);
+      const across = effect.zone.kind === "line" ? (random() - 0.5) * width : 0;
+      const angle = direction + (effect.zone.kind === "cone" ? (random() - 0.5) * FIRE_CONE_APERTURE * Math.PI / 180 : 0);
+      add(effect.position.x + Math.cos(angle) * along - Math.sin(angle) * across,
+        effect.position.y + Math.sin(angle) * along + Math.cos(angle) * across, Math.sqrt(area / count) * 1.7);
     }
   } else if (effect.zone.cells.length > 0) {
     // Group occupied cells spatially when needed; never scan the empty bounding box.

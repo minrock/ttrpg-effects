@@ -371,3 +371,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - [x] Incorporar ambos tipos al arbol lateral sin duplicar datos.
 - [x] Probar clicks dentro/fuera del handle a distintos zooms.
 - [x] Extension de controles aceptada por el usuario para 1.9.0; cobertura de hit testing automatizada.
+
+## Ampliacion de fuego (2.6.0)
+
+Seguir spec/plan 10: `fireOutline(effect, padding)` calcula un poligono convexo expandido y redondeado para lineas/conos. Reutilizarlo en halos, mascara de darkvision y borrado screen-space; incluir huella completa y halo en culling y geometria/escala en firmas de cache. Evitar strokes enormes auto-intersectados. Conservar el orden de capas y el pipeline de oscuridad existente.

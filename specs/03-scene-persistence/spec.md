@@ -1,5 +1,9 @@
 # Spec - Persistencia y Formato de Escena
 
+## Nuevas zonas de fuego
+
+La ampliacion de [spec 10](../10-fire-effects/spec.md), aceptada para 2.6.0, agrega zonas fire.line (end/width) y fire.cone (radius/direction) al formato 2. Mantener lectura de circle/cells, coordenadas mundiales por mapa y validacion de dimensiones finitas. No persistir borradores, mascaras derivadas ni recursos GPU. Lectores antiguos pueden rechazar variantes nuevas.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.

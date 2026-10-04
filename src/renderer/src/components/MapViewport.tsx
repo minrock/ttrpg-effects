@@ -19,6 +19,7 @@ import type {
 } from "../../../domain/sessions/scene-document";
 import type { FireCell } from "../../../domain/effects/fire";
 import type { LightningShape } from "../../../domain/effects/lightning";
+import type { FireShape } from "../../../domain/effects/fire-shapes";
 import type { GridCell } from "../../../domain/grid/grid-cell";
 import type { CompassOrientation } from "../../../domain/map/compass-orientation";
 import { DEFAULT_COMPASS_ORIENTATION } from "../../../domain/map/compass-orientation";
@@ -95,6 +96,9 @@ interface MapViewportProps {
   readonly isPathDrawingMode: boolean;
   readonly isWaterDrawingMode: boolean;
   readonly lightningTool?: LightningShape | null;
+  readonly fireTool?: FireShape | null;
+  readonly onFireCreate?: import("../../../render/pixi/PixiViewport").PixiViewportOptions["onFireCreate"];
+  readonly onFireChange?: import("../../../render/pixi/PixiViewport").PixiViewportOptions["onFireChange"];
   readonly lightningResetKey?: string | number;
   readonly onLightningCreate?: import("../../../render/pixi/PixiViewport").PixiViewportOptions["onLightningCreate"];
   readonly onLightningChange?: import("../../../render/pixi/PixiViewport").PixiViewportOptions["onLightningChange"];
@@ -199,6 +203,9 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isPathDrawingMode,
   isWaterDrawingMode,
   lightningTool = null,
+  fireTool = null,
+  onFireCreate,
+  onFireChange,
   lightningResetKey = 0,
   onLightningCreate,
   onLightningChange,
@@ -259,8 +266,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const mapRef = useRef(map);
   const compassOrientationRef = useRef(compassOrientation);
   const backgroundColorRef = useRef(backgroundColor);
-  const lightningToolRef = useRef({ lightningTool, lightningResetKey });
-  lightningToolRef.current = { lightningTool, lightningResetKey };
+  const lightningToolRef = useRef({ lightningTool, fireTool, lightningResetKey });
+  lightningToolRef.current = { lightningTool, fireTool, lightningResetKey };
   const playerCameraControlStateRef = useRef<PlayerCameraControlViewState | null>(null);
   mapRef.current = map;
   compassOrientationRef.current = compassOrientation;
@@ -310,6 +317,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onWaterPointerMove,
       onLightningCreate,
       onLightningChange,
+      onFireCreate,
+      onFireChange,
       onPathPointMove,
       onPathMove,
       onShapeDirectionChange,
@@ -377,7 +386,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setPathDrawingMode(isPathDrawingMode);
       createdViewport.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
       createdViewport.setWaterDrawingMode(isWaterDrawingMode);
-      createdViewport.setLightningTool(lightningToolRef.current.lightningTool, lightningToolRef.current.lightningResetKey);
+      const drawing = lightningToolRef.current;
+      createdViewport.setEffectTool(drawing.fireTool ? "fire" : "lightning", drawing.fireTool ?? drawing.lightningTool, drawing.lightningResetKey);
       createdViewport.setWaterPreview(waterPreviewPoints, waterPreviewHoverPoint);
       createdViewport.setArcanePointerMode(isArcanePointerMode);
       createdViewport.setRoomPinMode(isRoomPinMode);
@@ -394,11 +404,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
-    viewportRef.current?.setLightningTool(lightningTool, lightningResetKey);
-  }, [lightningTool, lightningResetKey]);
+    viewportRef.current?.setEffectTool(fireTool ? "fire" : "lightning", fireTool ?? lightningTool, lightningResetKey);
+  }, [fireTool, lightningTool, lightningResetKey]);
 
   useEffect(() => {
     viewportRef.current?.setMap(map);

@@ -1,5 +1,6 @@
 import { BufferImageSource, Container, GlProgram, Mesh, MeshGeometry, Shader, Texture, UniformGroup } from "pixi.js";
 import { getFireZoneBounds } from "../../domain/effects/fire";
+import { fireOutline } from "../../domain/effects/fire-shapes";
 import { getGridCellVertices } from "../../domain/grid/grid-cell";
 import type { SceneFireEffect } from "../../domain/sessions/scene-document";
 import { fireFragment, fireVertex } from "./procedural-fire-shader";
@@ -10,9 +11,8 @@ const CLOCK_RATES = [0.31, 0.47, 0.73, 1.13] as const;
 export function getFireFootprint(effect: SceneFireEffect, cellSize: number) {
   if (effect.opacity <= 0 || (effect.zone.kind === "cells" && effect.zone.cells.length === 0)) return null;
   const bounds = getFireZoneBounds(effect);
-  const detail = Math.max(1, effect.zone.kind === "circle"
-    ? Math.min(cellSize, effect.zone.radius * effect.scale)
-    : cellSize);
+  const detail = Math.max(1, effect.zone.kind === "cells" ? cellSize
+    : Math.min(cellSize, (effect.zone.kind === "line" ? effect.zone.width : effect.zone.radius) * effect.scale));
   const padding = detail * 0.35;
   const width = bounds.right - bounds.left + padding * 2;
   const height = bounds.bottom - bounds.top + padding * 2;
@@ -78,7 +78,7 @@ export class ProceduralFireRenderer {
     const footprint = getFireFootprint(effect, cellSize);
     if (!footprint) return container;
     const { x, y, width, height, detail } = footprint;
-    const mask = effect.zone.kind === "cells" ? createFuelTexture(effect, footprint) : null;
+    const mask = effect.zone.kind !== "circle" ? createFuelTexture(effect, footprint) : null;
     const radius = effect.zone.kind === "circle" ? effect.zone.radius * effect.scale / detail : 0;
     const geometry = new MeshGeometry({
       positions: new Float32Array([0, 0, width, 0, width, height, 0, height]),
@@ -140,6 +140,13 @@ function createFuelTexture(effect: SceneFireEffect, footprint: NonNullable<Retur
       if (!first) continue;
       context.moveTo(first.x, first.y);
       for (const vertex of rest) context.lineTo(vertex.x, vertex.y);
+      context.closePath();
+    }
+  } else {
+    const [first, ...rest] = fireOutline(effect);
+    if (first) {
+      context.moveTo(first.x, first.y);
+      for (const point of rest) context.lineTo(point.x, point.y);
       context.closePath();
     }
   }

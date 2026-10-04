@@ -1,5 +1,6 @@
 import type { ScreenPoint, WorldPoint } from "../shared/coordinates";
 import type { LightningShape } from "../effects/lightning";
+import type { FireShape } from "../effects/fire-shapes";
 import {
   createTacticalElement,
   type TacticalElement,
@@ -16,12 +17,22 @@ export type InteractionTool =
   | "room-pin"
   | "information-area"
   | "scene-link"
+  | `fire-${FireShape}`
   | `lightning-${LightningShape}`;
 
 export interface LightningDraft {
   readonly shape: LightningShape;
   readonly anchor: WorldPoint | null;
   readonly pointer: WorldPoint | null;
+}
+
+export interface EffectDraft extends LightningDraft { readonly kind: "fire" | "lightning" }
+
+export function getFireTool(tool: InteractionTool): FireShape | null {
+  if (tool === "fire-line") return "line";
+  if (tool === "fire-cone") return "cone";
+  if (tool === "fire-circle") return "circle";
+  return null;
 }
 
 export function getLightningTool(tool: InteractionTool): LightningShape | null {

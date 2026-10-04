@@ -1,5 +1,5 @@
 import { PixiViewport } from "../../render/pixi/PixiViewport";
-import { createAnimatedFireEffect } from "../../domain/effects/fire";
+import { createAnimatedFireEffect, createDrawnFireEffect } from "../../domain/effects/fire";
 import { createDefaultSceneMapDocument } from "../../domain/sessions/default-scene";
 import type { SceneFireEffect } from "../../domain/sessions/scene-document";
 
@@ -24,7 +24,15 @@ function circle(id: string, x: number, y: number, radius: number, open = false):
 
 function update(): void {
   let effects: SceneFireEffect[];
-  if (selector.value === "large") {
+  if (selector.value === "shapes") {
+    effects = [
+      { ...createDrawnFireEffect("fire-line", "line", { x: -470, y: -220 }, { x: 440, y: -180 }, 48), opacity: 1, emitsLight: false },
+      { ...createDrawnFireEffect("fire-cone", "cone", { x: -410, y: 10 }, { x: -120, y: 70 }, 60), opacity: 1, emitsLight: false },
+      circle("fire-circle", 155, 40, 100), circle("fire-ring", 385, 35, 90, true),
+      { ...circle("fire-painted", 0, 230, 50), zone: { kind: "cells", radius: 30,
+        cells: Array.from({ length: 11 }, (_, i) => ({ x: -270 + i * 50, y: 205 + Math.sin(i * 0.65) * 50, size: 55 })) } }
+    ];
+  } else if (selector.value === "large") {
     effects = [circle("large", 0, 0, 340)];
   } else if (selector.value === "many") {
     effects = Array.from({ length: 24 }, (_, index) => circle(`torch-${index}`, (index % 6 - 2.5) * 160, (Math.floor(index / 6) - 1.5) * 160, 50));

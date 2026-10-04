@@ -223,6 +223,8 @@ export type SceneWaterEffect =
     };
 
 export type SceneFireZone =
+  | { readonly kind: "line"; readonly end: { readonly x: number; readonly y: number }; readonly width: number }
+  | { readonly kind: "cone"; readonly radius: number; readonly direction: number }
   | {
       readonly kind: "circle";
       readonly mode: "closed" | "open";

@@ -27,6 +27,7 @@ import {
   CloudFog,
   Crosshair,
   FilePlus,
+  Flame,
   FolderOpen,
   Grid3X3,
   Hexagon,
@@ -55,6 +56,7 @@ import {
   createInitialInteractionState,
   deleteSelectedElement,
   getLightningTool,
+  getFireTool,
   openContextMenu,
   selectElement,
   setActiveTool,
@@ -74,9 +76,9 @@ import {
 } from "../../domain/environment/daytime-filter";
 import {
   createAnimatedFireEffect,
+  createDrawnFireEffect,
   createCellFireZone,
   createCircleFireZone,
-  toggleCircleFireMode,
   updateAnimatedFireEffect,
   type FireCell
 } from "../../domain/effects/fire";
@@ -101,6 +103,8 @@ import {
 } from "../../domain/effects/water";
 import { createLightningEffect, lightningPoint, lightningShapeNames, moveLightningEffect, updateLightningEffect, type LightningShape } from "../../domain/effects/lightning";
 import { LightningProperties, LightningTools } from "./components/LightningProperties";
+import { FireProperties, FireTools, type FireTool } from "./components/FireProperties";
+import { fireShapeNames, type FireShape } from "../../domain/effects/fire-shapes";
 import {
   createSceneLabel,
   systemLabelFonts,
@@ -739,6 +743,28 @@ export function App(): JSX.Element {
     setOpenSidebarSections((current) => ({ ...current, effects: true }));
     setInteraction((current) => selectElement(setMapAdjustMode(setActiveTool(closeContextMenu(current), `lightning-${shape}`), false), null));
   };
+
+  const handleStartFireDrawing = (tool: FireTool): void => {
+    setGridAdjustMode(false);
+    setOpenSidebarSections(current => ({ ...current, effects: true }));
+    setInteraction(current => {
+      const next = setActiveTool(closeContextMenu(current), tool === "paint" ? "fire-paint" : `fire-${tool}`);
+      return tool === "paint" ? next : selectElement(next, null);
+    });
+  };
+
+  const handleFireCreate = useCallback((shape: FireShape, start: { x: number; y: number }, end: { x: number; y: number }): void => {
+    const id = getNextAvailableSceneId(sceneRef.current, ["fire-"], nextEffectId);
+    const effect = createDrawnFireEffect(id, shape, start, end, sceneRef.current.grid.cellSizeWorld);
+    setScene(current => ({ ...current, effects: [...current.effects, effect] }));
+    setInteraction(current => selectElement(setActiveTool(current, "select"), id));
+  }, [setScene]);
+
+  const handleFireChange = useCallback((preview: SceneFireEffect): void => {
+    setScene(current => ({ ...current, effects: current.effects.map(effect =>
+      effect.id === preview.id && effect.kind === "fire" ? { ...effect, position: preview.position, zone: preview.zone } : effect
+    ) }));
+  }, [setScene]);
 
   const handleLightningCreate = useCallback((shape: LightningShape, start: { x: number; y: number }, end: { x: number; y: number }): void => {
     const id = getNextAvailableSceneId(sceneRef.current, ["lightning-"], nextEffectId);
@@ -1727,7 +1753,7 @@ export function App(): JSX.Element {
       if (event.code === "Space" && !shouldIgnoreSpaceDrag(event.target)) {
         event.preventDefault();
         setIsSpaceDragActive(true);
-        if (getLightningTool(interaction.activeTool) === null) resetToSelection();
+        if (getLightningTool(interaction.activeTool) === null && getFireTool(interaction.activeTool) === null) resetToSelection();
         return;
       }
 
@@ -1773,7 +1799,7 @@ export function App(): JSX.Element {
 
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
-        if (getLightningTool(interaction.activeTool) !== null) return;
+        if (getLightningTool(interaction.activeTool) !== null || getFireTool(interaction.activeTool) !== null) return;
         handleDeleteSelectedElement();
       }
 
@@ -1795,7 +1821,7 @@ export function App(): JSX.Element {
 
       event.preventDefault();
       setIsSpaceDragActive(false);
-      if (getLightningTool(interaction.activeTool) === null) resetToSelection();
+      if (getLightningTool(interaction.activeTool) === null && getFireTool(interaction.activeTool) === null) resetToSelection();
     };
 
     const handleWindowBlur = (): void => {
@@ -2508,13 +2534,14 @@ export function App(): JSX.Element {
 
       if (selectedEffect !== undefined && selectedEffect.zone.kind === "cells") {
         const mergedCells = mergeFireCells(selectedEffect.zone.cells, cells);
+        const radius = selectedEffect.zone.radius;
 
         return {
           ...current,
           effects: current.effects.map((effect) =>
             effect.id === selectedEffect.id && effect.kind === "fire"
               ? updateAnimatedFireEffect(effect, {
-                  zone: createCellFireZone(mergedCells, selectedEffect.zone.radius)
+                  zone: createCellFireZone(mergedCells, radius)
                 })
               : effect
           )
@@ -2615,15 +2642,6 @@ export function App(): JSX.Element {
     setInteraction((current) =>
       setActiveTool(current, current.activeTool === "fog-reveal" ? "select" : "fog-reveal")
     );
-  }
-
-  function handleToggleFirePaintMode(): void {
-    setInteraction((current) => {
-      if (current.activeTool === "fire-paint") {
-        return selectElement(setActiveTool(current, "select"), null);
-      }
-      return setActiveTool(current, "fire-paint");
-    });
   }
 
   function handleToggleArcanePointerMode(): void {
@@ -3156,7 +3174,7 @@ export function App(): JSX.Element {
       : selectedLightningEffect !== undefined
         ? `Relampago: ${lightningShapeNames[selectedLightningEffect.zone.kind]}`
       : selectedFireEffect !== undefined
-        ? "Fuego"
+        ? `Fuego: ${fireShapeNames[selectedFireEffect.zone.kind]}`
         : selectedDynamicLight !== undefined
           ? "Luz dinamica"
         : selectedMagicalDarkness !== undefined
@@ -3468,6 +3486,9 @@ export function App(): JSX.Element {
           isPathDrawingMode={interaction.activeTool === "path"}
           isWaterDrawingMode={interaction.activeTool === "water"}
           lightningTool={getLightningTool(interaction.activeTool)}
+          fireTool={getFireTool(interaction.activeTool)}
+          onFireCreate={handleFireCreate}
+          onFireChange={handleFireChange}
           lightningResetKey={`${scene.activeMapId}:${arcanePointerResetKey}`}
           onLightningCreate={handleLightningCreate}
           onLightningChange={handleLightningChange}
@@ -3679,112 +3700,7 @@ export function App(): JSX.Element {
                   effect.id === selectedLightningEffect.id && effect.kind === "lightning" ? updateLightningEffect(effect, patch, Date.now()) : effect
                 ) }))} />}
               {selectedFireEffect !== undefined ? (
-                <div className="selected-properties-content" aria-label="Propiedades de fuego">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={selectedFireEffect.visible}
-                      onChange={(event) => updateSelectedFireEffect({ visible: event.currentTarget.checked })}
-                    />
-                    Visible
-                  </label>
-                  <label>
-                    Color
-                    <input
-                      type="color"
-                      value={selectedFireEffect.color}
-                      onChange={(event) => updateSelectedFireEffect({ color: event.currentTarget.value })}
-                    />
-                  </label>
-                  <label>
-                    Escala
-                    <input
-                      type="number"
-                      min="0.1"
-                      max="8"
-                      step="0.1"
-                      value={selectedFireEffect.scale}
-                      onChange={(event) => updateSelectedFireEffect({ scale: event.currentTarget.valueAsNumber })}
-                    />
-                  </label>
-                  {selectedFireEffect.zone.kind === "circle" ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => updateSelectedFireEffect({ zone: toggleCircleFireMode(selectedFireEffect).zone })}
-                      >
-                        {selectedFireEffect.zone.mode === "closed" ? "Abrir circulo" : "Cerrar circulo"}
-                      </button>
-                      <label>
-                        Radio
-                        <input
-                          type="number"
-                          min="10"
-                          max="3000"
-                          value={selectedFireEffect.zone.radius}
-                          onChange={(event) =>
-                            updateSelectedFireEffect({
-                              zone: createCircleFireZone(
-                                event.currentTarget.valueAsNumber,
-                                selectedFireEffect.zone.kind === "circle" ? selectedFireEffect.zone.mode : "closed"
-                              )
-                            })
-                          }
-                        />
-                      </label>
-                    </>
-                  ) : (
-                    <>
-                      <span>{selectedFireEffect.zone.cells.length} celdas en fuego</span>
-                      <label>
-                        Pincel
-                        <input
-                          type="number"
-                          min="1"
-                          max="3000"
-                          value={selectedFireEffect.zone.radius}
-                          onChange={(event) =>
-                            updateSelectedFireEffect({
-                              zone: createCellFireZone(
-                                selectedFireEffect.zone.kind === "cells" ? selectedFireEffect.zone.cells : [],
-                                event.currentTarget.valueAsNumber
-                              )
-                            })
-                          }
-                        />
-                      </label>
-                    </>
-                  )}
-                  <label>
-                    Opacidad
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={selectedFireEffect.opacity}
-                      onChange={(event) => updateSelectedFireEffect({ opacity: event.currentTarget.valueAsNumber })}
-                    />
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={selectedFireEffect.emitsLight}
-                      onChange={(event) => updateSelectedFireEffect({ emitsLight: event.currentTarget.checked })}
-                    />
-                    Emite luz
-                  </label>
-                  <label>
-                    Radio luz
-                    <input
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={selectedFireEffect.lightRadius}
-                      onChange={(event) => updateSelectedFireEffect({ lightRadius: event.currentTarget.valueAsNumber })}
-                    />
-                  </label>
-                </div>
+                <FireProperties effect={selectedFireEffect} grid={scene.grid} settings={scene.settings} onChange={updateSelectedFireEffect} />
               ) : null}
               {selectedDynamicLight !== undefined ? (
                 <div className="selected-properties-content" aria-label="Propiedades de luz dinamica">
@@ -4501,9 +4417,8 @@ export function App(): JSX.Element {
                 </select>
               </label>
             ) : null}
-            <button type="button" onClick={handleToggleFirePaintMode}>
-              {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
-            </button>
+            <span className="lightning-tools-label"><Flame size={14} aria-hidden="true" /> Fuego</span>
+            <FireTools active={interaction.activeTool === "fire-paint" ? "paint" : getFireTool(interaction.activeTool)} onSelect={handleStartFireDrawing} />
             <button type="button" onClick={handleStartWaterDrawing}>
               {interaction.activeTool === "water" ? "Dibujando agua" : "Dibujar agua"}
             </button>
@@ -4990,10 +4905,7 @@ export function App(): JSX.Element {
             <li className="has-submenu">
               <button type="button">Efectos ▶</button>
               <menu className="context-submenu">
-                <button type="button" onClick={() => handleCreateElement("fire")}>Fuego</button>
-                <button type="button" onClick={handleToggleFirePaintMode}>
-                  {interaction.activeTool === "fire-paint" ? "Cancelar pintado de fuego" : "Pintar fuego"}
-                </button>
+                <li className="lightning-context-tools"><span>Fuego</span><FireTools active={interaction.activeTool === "fire-paint" ? "paint" : getFireTool(interaction.activeTool)} onSelect={handleStartFireDrawing} /></li>
                 <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
                 <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
                 <button type="button" onClick={handleCreateDynamicLight}>Luz dinamica</button>

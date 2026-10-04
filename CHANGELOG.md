@@ -10,6 +10,25 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.6.0] - 2026-10-03
+
+### Added
+
+- Lineas y conos de fuego procedural, con dibujo en dos puntos, medidas de grilla y manivelas para editar extremos, alcance y direccion.
+- Menu de fuego unificado en el panel lateral y contextual: linea, cono, circulo y lapiz para pintar; pincel con tamano en cuadros y preview bajo el puntero.
+
+### Changed
+
+- Propiedades de fuego adaptadas a cada forma, con ancho de linea y direccion del cono; se conservan circulos, anillos, zonas pintadas y controles de luz.
+- La iluminacion de lineas y conos sigue toda su huella. Las nuevas formas reutilizan el renderer procedural y mascaras de combustible cacheadas, sin framebuffers intermedios.
+- Persistencia y sincronizacion de las nuevas zonas por mapa, manteniendo lectura de escenas existentes y formato 2. Lectores antiguos pueden rechazar las variantes nuevas.
+- Cierre de la ampliacion del spec 10, con documentacion de persistencia, propiedades e iluminacion actualizada.
+
+### Fixed
+
+- Crear un circulo, linea o cono de fuego o relampago restaura inmediatamente el cursor normal; cancelar un borrador tambien elimina su preview pendiente.
+- Los halos amplios de lineas y conos usan contornos expandidos sin triangulos cruzados ni solapamientos del propio halo.
+
 ## [2.5.4] - 2026-10-03
 
 ### Added
