@@ -195,3 +195,9 @@ Al cargar escenas antiguas o mapas sin este campo, la app debe asumir `0` sin re
 - La brujula puede mostrarse en Player View mediante un toggle discreto y local.
 - Player View no permite editar la orientacion del mapa.
 - Escenas antiguas cargan sin errores y asumen orientacion `0`.
+
+## Integracion con Relampagos (Spec 35)
+
+Descargas y guias compartidas de spec 35 pertenecen al mismo mundo que el mapa, por lo que la orientacion cardinal de Player se aplica a ambas. Rotar norte no modifica geometria persistida, direccion relativa del cono, medidas ni reloj.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

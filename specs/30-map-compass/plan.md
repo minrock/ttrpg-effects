@@ -173,3 +173,9 @@
 - [x] Documentacion actualizada si cambio una decision.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## Integracion con Relampagos (Spec 35)
+
+Descargas y guias compartidas de spec 35 pertenecen al mismo mundo que el mapa, por lo que la orientacion cardinal de Player se aplica a ambas. Rotar norte no modifica geometria persistida, direccion relativa del cono, medidas ni reloj.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

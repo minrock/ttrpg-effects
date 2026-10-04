@@ -188,3 +188,9 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Agregar regresiones de controles a zoom 0.1/0.25/0.5/1/2 y de cache/limites de grilla.
 - [x] Aplicar `grid.lineWidth` al stroke/cache y probar cambio 1 -> 3 -> 1, liberacion de Graphics previos y ausencia de reconstruccion de mascaras.
 - [x] Aceptacion y cierre autorizados por el usuario para 1.9.0. Detalle funcional y pruebas: specs 04 y 06.
+
+## Integracion con Relampagos (Spec 35)
+
+Relampagos procedurales de spec 35: dos meshes por efecto, ticker existente, presupuesto agregado de vertices y sin filtros/FBO propios. Guia en efectos debajo de niebla; medidas y handles solo en seleccion DM.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

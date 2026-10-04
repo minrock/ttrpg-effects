@@ -44,6 +44,7 @@ import {
   Ruler,
   ZoomIn,
   ZoomOut,
+  Zap,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -53,6 +54,7 @@ import {
   closeContextMenu,
   createInitialInteractionState,
   deleteSelectedElement,
+  getLightningTool,
   openContextMenu,
   selectElement,
   setActiveTool,
@@ -97,6 +99,8 @@ import {
   type RiverWaterEffect,
   type WaterPatch
 } from "../../domain/effects/water";
+import { createLightningEffect, lightningPoint, lightningShapeNames, moveLightningEffect, updateLightningEffect, type LightningShape } from "../../domain/effects/lightning";
+import { LightningProperties, LightningTools } from "./components/LightningProperties";
 import {
   createSceneLabel,
   systemLabelFonts,
@@ -141,6 +145,7 @@ import type {
   SceneDocument,
   SceneDynamicLightEffect,
   SceneFireEffect,
+  SceneLightningEffect,
   SceneOperationResult,
   SceneToken
 } from "../../domain/sessions/scene-document";
@@ -407,7 +412,7 @@ export function App(): JSX.Element {
     );
     nextEffectId.current = getNextNumericIdForPrefixes(
       targetScene.effects.map((effect) => effect.id),
-      ["fire-", "magical-darkness-", "water-"]
+      ["fire-", "magical-darkness-", "water-", "lightning-"]
     );
     nextTokenId.current = getNextNumericId(targetScene.tokens.map((token) => token.id), "token-");
     nextLabelId.current = getNextNumericId(targetScene.labels.map((label) => label.id), "label-");
@@ -728,6 +733,25 @@ export function App(): JSX.Element {
     setOpenSidebarSections((current) => ({ ...current, effects: true }));
     setInteraction((current) => selectElement(setActiveTool(closeContextMenu(current), "water"), null));
   };
+
+  const handleStartLightningDrawing = (shape: LightningShape): void => {
+    setGridAdjustMode(false);
+    setOpenSidebarSections((current) => ({ ...current, effects: true }));
+    setInteraction((current) => selectElement(setMapAdjustMode(setActiveTool(closeContextMenu(current), `lightning-${shape}`), false), null));
+  };
+
+  const handleLightningCreate = useCallback((shape: LightningShape, start: { x: number; y: number }, end: { x: number; y: number }): void => {
+    const id = getNextAvailableSceneId(sceneRef.current, ["lightning-"], nextEffectId);
+    const effect = createLightningEffect(id, shape, start, end, Date.now());
+    setScene((current) => ({ ...current, effects: [...current.effects, effect] }));
+    setInteraction((current) => selectElement(setActiveTool(current, "select"), id));
+  }, [setScene]);
+
+  const handleLightningChange = useCallback((preview: SceneLightningEffect): void => {
+    setScene((current) => ({ ...current, effects: current.effects.map((effect) =>
+      effect.id === preview.id && effect.kind === "lightning" ? { ...effect, position: preview.position, zone: preview.zone } : effect
+    ) }));
+  }, [setScene]);
 
   const handleStartRoomPin = useCallback((): void => {
     setMapAnnotationModal(null);
@@ -1703,7 +1727,7 @@ export function App(): JSX.Element {
       if (event.code === "Space" && !shouldIgnoreSpaceDrag(event.target)) {
         event.preventDefault();
         setIsSpaceDragActive(true);
-        resetToSelection();
+        if (getLightningTool(interaction.activeTool) === null) resetToSelection();
         return;
       }
 
@@ -1749,6 +1773,7 @@ export function App(): JSX.Element {
 
       if (event.key === "Delete" || event.key === "Backspace") {
         event.preventDefault();
+        if (getLightningTool(interaction.activeTool) !== null) return;
         handleDeleteSelectedElement();
       }
 
@@ -1770,7 +1795,7 @@ export function App(): JSX.Element {
 
       event.preventDefault();
       setIsSpaceDragActive(false);
-      resetToSelection();
+      if (getLightningTool(interaction.activeTool) === null) resetToSelection();
     };
 
     const handleWindowBlur = (): void => {
@@ -2276,6 +2301,8 @@ export function App(): JSX.Element {
               ? updateDynamicLightEffect(effect, { position: { x, y } })
             : effect.kind === "magical-darkness"
               ? updateMagicalDarknessEffect(effect, { position: { x, y } })
+              : effect.kind === "lightning"
+                ? moveLightningEffect(effect, lightningPoint({ x, y }, effect.zone.kind, current.grid, current.settings))
               : updateWaterEffect(effect, { position: { x, y } })
           : effect
       ),
@@ -2864,6 +2891,7 @@ export function App(): JSX.Element {
     selectedEffect?.kind === "magical-darkness" ? selectedEffect : undefined;
   const selectedWaterEffect =
     selectedEffect?.kind === "water" ? selectedEffect : undefined;
+  const selectedLightningEffect = selectedEffect?.kind === "lightning" ? selectedEffect : undefined;
   const selectedShape =
     interaction.selectedElementId === null
       ? undefined
@@ -3125,6 +3153,8 @@ export function App(): JSX.Element {
       ? selectedLight.kind === "point"
         ? "Luz puntual"
         : "Luz conica"
+      : selectedLightningEffect !== undefined
+        ? `Relampago: ${lightningShapeNames[selectedLightningEffect.zone.kind]}`
       : selectedFireEffect !== undefined
         ? "Fuego"
         : selectedDynamicLight !== undefined
@@ -3155,6 +3185,8 @@ export function App(): JSX.Element {
       ? selectedLight.kind === "point"
         ? "●"
         : "◖"
+      : selectedLightningEffect !== undefined
+        ? <Zap size={16} />
       : selectedFireEffect !== undefined
         ? "火"
         : selectedDynamicLight !== undefined
@@ -3435,6 +3467,10 @@ export function App(): JSX.Element {
           isFirePaintMode={interaction.activeTool === "fire-paint"}
           isPathDrawingMode={interaction.activeTool === "path"}
           isWaterDrawingMode={interaction.activeTool === "water"}
+          lightningTool={getLightningTool(interaction.activeTool)}
+          lightningResetKey={`${scene.activeMapId}:${arcanePointerResetKey}`}
+          onLightningCreate={handleLightningCreate}
+          onLightningChange={handleLightningChange}
           isArcanePointerMode={interaction.activeTool === "arcane-pointer"}
           isRoomPinMode={interaction.activeTool === "room-pin"}
           isSceneLinkMode={interaction.activeTool === "scene-link"}
@@ -3638,6 +3674,10 @@ export function App(): JSX.Element {
                   ) : null}
                 </div>
               ) : null}
+              {selectedLightningEffect !== undefined && <LightningProperties effect={selectedLightningEffect} grid={scene.grid} settings={scene.settings}
+                onChange={(patch) => setScene((current) => ({ ...current, effects: current.effects.map((effect) =>
+                  effect.id === selectedLightningEffect.id && effect.kind === "lightning" ? updateLightningEffect(effect, patch, Date.now()) : effect
+                ) }))} />}
               {selectedFireEffect !== undefined ? (
                 <div className="selected-properties-content" aria-label="Propiedades de fuego">
                   <label>
@@ -4467,6 +4507,8 @@ export function App(): JSX.Element {
             <button type="button" onClick={handleStartWaterDrawing}>
               {interaction.activeTool === "water" ? "Dibujando agua" : "Dibujar agua"}
             </button>
+            <span className="lightning-tools-label"><Zap size={14} aria-hidden="true" /> Relampago</span>
+            <LightningTools active={getLightningTool(interaction.activeTool)} onSelect={handleStartLightningDrawing} />
           </SidebarAccordion>
 
           <SidebarAccordion
@@ -4957,6 +4999,7 @@ export function App(): JSX.Element {
                 <button type="button" onClick={handleCreateDynamicLight}>Luz dinamica</button>
                 <button type="button" onClick={handleCreateMagicalDarkness}>Oscuridad magica</button>
                 <button type="button" onClick={handleStartWaterDrawing}>Agua</button>
+                <li className="lightning-context-tools"><span>Relampago</span><LightningTools active={getLightningTool(interaction.activeTool)} onSelect={handleStartLightningDrawing} /></li>
               </menu>
             </li>
           </menu>

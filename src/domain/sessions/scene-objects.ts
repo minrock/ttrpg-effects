@@ -1,5 +1,6 @@
 import type { SceneDocument, SceneEffect, SceneLight, SceneShape } from "./scene-document";
 import type { WorldPoint } from "../shared/coordinates";
+import { lightningCenter, lightningShapeNames } from "../effects/lightning";
 
 export interface SceneObjectEntry {
   readonly id: string;
@@ -14,13 +15,13 @@ const shapeNames: Record<SceneShape["type"], string> = {
   measurement: "Medicion", circle: "Circulo", cone: "Cono", rectangle: "Rectangulo", path: "Camino"
 };
 const effectNames: Record<SceneEffect["kind"], string> = {
-  fire: "Fuego", "dynamic-light": "Luz dinamica", "magical-darkness": "Oscuridad magica", water: "Agua"
+  fire: "Fuego", "dynamic-light": "Luz dinamica", "magical-darkness": "Oscuridad magica", water: "Agua", lightning: "Relampago"
 };
 
 export function listSceneObjects(lights: readonly SceneLight[], effects: readonly SceneEffect[], shapes: readonly SceneShape[]): SceneObjectEntry[] {
   return [
     ...lights.map((light): SceneObjectEntry => ({ id: light.id, collection: "lights", group: "Efectos", label: `${light.kind === "point" ? "Luz puntual" : "Luz conica"} · ${light.id}`, visible: light.visible, center: light.position })),
-    ...effects.map((effect): SceneObjectEntry => ({ id: effect.id, collection: "effects", group: "Efectos", label: `${effectNames[effect.kind]} · ${effect.id}`, visible: effect.visible, center: effect.position })),
+    ...effects.map((effect): SceneObjectEntry => ({ id: effect.id, collection: "effects", group: "Efectos", label: `${effectNames[effect.kind]}${effect.kind === "lightning" ? ` ${lightningShapeNames[effect.zone.kind]}` : ""} · ${effect.id}`, visible: effect.visible, center: effect.kind === "lightning" ? lightningCenter(effect) : effect.position })),
     ...shapes.map((shape): SceneObjectEntry => ({ id: shape.id, collection: "shapes", group: "Areas", label: `${shapeNames[shape.type]} · ${shape.id}`, visible: true, center: shapeCenter(shape) }))
   ];
 }

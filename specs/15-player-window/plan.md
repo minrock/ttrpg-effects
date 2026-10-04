@@ -278,3 +278,9 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Cubrir propagacion de calibracion sin opcion de extension en `player-window.test.ts`.
 - [x] Incluir grosor 3 en la regresion del snapshot; usar schema y setGrid existentes para carga inicial y actualizaciones sin IPC nuevo.
 - [x] Cierre autorizado para 1.9.0 con snapshot y renderer compartido cubiertos; no se repitio un smoke nativo adicional de dos ventanas.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 comparte descargas y guias estables de cono/circulo, pero nunca previews, etiquetas de medidas ni handles. Semilla/origen/offset de reloj sincronizan ventanas sin IPC por frame. El snapshot se valida con Zod al abrir/publicar en main; niebla oculta guia y efecto.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

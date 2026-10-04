@@ -204,3 +204,9 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Usar serializacion y canales de guardado existentes, sin nuevo IPC ni version incompatible.
 - [x] Probar defaults antiguos, round trip en gruesas, valores invalidos y deteccion de contenido.
 - [x] Cierre de grosor autorizado para 1.9.0 con round trip automatizado; sin afirmar un smoke nativo adicional.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 incorpora `kind: lightning` a efectos de cada mapa, con geometria mundial, parametros, semilla y reloj; sin vertices ni borradores. Formato 2 aditivo, validacion Zod y round-trip; lectores antiguos pueden rechazar este tipo desconocido.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

@@ -287,3 +287,9 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 ## Cierre 1.9.0
 
 Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 comparte descargas y guias estables de cono/circulo, pero nunca previews, etiquetas de medidas ni handles. Semilla/origen/offset de reloj sincronizan ventanas sin IPC por frame. El snapshot se valida con Zod al abrir/publicar en main; niebla oculta guia y efecto.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.

@@ -5696,3 +5696,36 @@ body {
   font-size: 0.85rem;
   font-weight: 700;
 }
+.lightning-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  width: 100%;
+}
+
+.lightning-tools button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  min-width: 0;
+  padding: 0;
+}
+
+.lightning-tools-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.lightning-context-tools {
+  display: grid;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.lightning-properties input[type="number"] {
+  min-width: 0;
+  width: 100%;
+}

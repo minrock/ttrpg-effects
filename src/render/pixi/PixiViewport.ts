@@ -26,6 +26,7 @@ import type {
   SceneGrid,
   SceneLabel,
   SceneLight,
+  SceneLightningEffect,
   SceneMagicalDarknessEffect,
   SceneSettings,
   SceneShape,
@@ -33,9 +34,9 @@ import type {
   SceneWaterEffect
 } from "../../domain/sessions/scene-document";
 import {
-  formatDistance,
   measureDistance,
   measurePathDistance,
+  worldLengthLabel,
   snapWorldPointToCellCenter
 } from "../../domain/measurement/measurement";
 import { getShapeAnchor, getShapeEndPoint, moveShape, rotateLinearShape } from "../../domain/shapes/shapes";
@@ -80,6 +81,10 @@ import { getGridCellBoundary, getGridCellHeight, getGridCellKey, getGridCellRing
 import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-pattern-animation";
 import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
 import { ProceduralFireRenderer } from "./procedural-fire";
+import { createLightningEffect, editLightningHandle, hitTestLightning, lightningPoint, lightningZone, type LightningHandle, type LightningShape } from "../../domain/effects/lightning";
+import type { LightningDraft } from "../../domain/interaction/interaction-state";
+import { drawLightningEditor, drawLightningGuide, hitTestLightningHandle } from "./lightning-guides";
+import { LightningVisual, lightningVertexBudget } from "./lightning-visual";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
@@ -126,6 +131,7 @@ interface PointerDragState {
     | "calibrate"
     | "map-move"
     | "element-move"
+    | "lightning-edit"
     | "light-rotate"
     | "light-resize"
     | "dynamic-light-rotate"
@@ -148,6 +154,7 @@ interface PointerDragState {
     | "water-pattern-rotate";
   readonly elementId?: string;
   readonly handleIndex?: number;
+  readonly lightningHandle?: LightningHandle;
   readonly grabOffset?: WorldPoint;
   readonly moveStartPosition?: WorldPoint;
   readonly pendingMovePosition?: WorldPoint;
@@ -178,6 +185,8 @@ export interface PixiViewportOptions {
   readonly onPathPointerMove?: (point: WorldPoint | null) => void;
   readonly onWaterPointAdd?: (point: WorldPoint) => void;
   readonly onWaterPointerMove?: (point: WorldPoint | null) => void;
+  readonly onLightningCreate?: (shape: LightningShape, start: WorldPoint, end: WorldPoint) => void;
+  readonly onLightningChange?: (effect: SceneLightningEffect) => void;
   readonly onPathPointMove?: (elementId: string, pointIndex: number, x: number, y: number) => void;
   readonly onPathMove?: (elementId: string, x: number, y: number) => void;
   readonly onShapeDirectionChange?: (elementId: string, direction: number) => void;
@@ -236,6 +245,9 @@ export class PixiViewport {
   private loadedTokenUrls = new Set<string>();
   private firePatternSource: FirePatternAnimation | null = null;
   private proceduralFireSource: ProceduralFireRenderer | null = null;
+  private readonly lightningVisuals = new Map<string, LightningVisual>();
+  private lightningDraft: LightningDraft | null = null;
+  private lightningResetKey: string | number = 0;
   private elements: readonly TacticalElement[] = [];
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
@@ -522,6 +534,20 @@ export class PixiViewport {
 
   setWaterDrawingMode(isWaterDrawingMode: boolean): void {
     this.isWaterDrawingMode = isWaterDrawingMode;
+    this.updateCursor();
+  }
+
+  setLightningTool(shape: LightningShape | null, resetKey: string | number = 0): void {
+    if (this.lightningDraft?.shape === shape && this.lightningResetKey === resetKey) return;
+    this.lightningResetKey = resetKey;
+    this.lightningDraft = shape === null ? null : { shape, anchor: null, pointer: null };
+    this.pendingViewportUpdates.delete("lightning-pointer");
+    if (this.dragState?.mode === "lightning-edit") {
+      this.pendingViewportUpdates.delete("lightning-edit");
+      this.dragState = null;
+      this.clearDragPreviews();
+    }
+    this.drawSelectionLayer();
     this.updateCursor();
   }
 
@@ -878,6 +904,8 @@ export class PixiViewport {
     }
     this.loadedTokenUrls.clear();
     this.tokenTextureCache.clear();
+    for (const visual of this.lightningVisuals.values()) visual.destroy();
+    this.lightningVisuals.clear();
     if (this.colorMapSprite !== null) {
       this.colorMapSprite.mask = null;
     }
@@ -1382,6 +1410,8 @@ export class PixiViewport {
     canvas.addEventListener("pointermove", this.handlePointerMove);
     canvas.addEventListener("pointerup", this.handlePointerUp);
     canvas.addEventListener("pointercancel", this.handlePointerUp);
+    canvas.addEventListener("lostpointercapture", this.handleLightningCaptureLost);
+    canvas.addEventListener("pointerleave", this.handleLightningPointerLeave);
     canvas.addEventListener("dblclick", this.handleDoubleClick);
     canvas.addEventListener("wheel", this.handleWheel, { passive: false });
     window.addEventListener("keydown", this.handleKeyDown, true);
@@ -1398,6 +1428,8 @@ export class PixiViewport {
     canvas.removeEventListener("pointermove", this.handlePointerMove);
     canvas.removeEventListener("pointerup", this.handlePointerUp);
     canvas.removeEventListener("pointercancel", this.handlePointerUp);
+    canvas.removeEventListener("lostpointercapture", this.handleLightningCaptureLost);
+    canvas.removeEventListener("pointerleave", this.handleLightningPointerLeave);
     canvas.removeEventListener("dblclick", this.handleDoubleClick);
     canvas.removeEventListener("wheel", this.handleWheel);
     window.removeEventListener("keydown", this.handleKeyDown, true);
@@ -1412,6 +1444,7 @@ export class PixiViewport {
   };
 
   private readonly handleDoubleClick = (event: MouseEvent): void => {
+    if (this.lightningDraft !== null) return;
     if (this.viewRole !== "dm" || !this.showMapAnnotations || event.button !== 0) return;
     const screenPoint = this.eventToScreenPoint(event);
 
@@ -1470,12 +1503,15 @@ export class PixiViewport {
     let mode: PointerDragState["mode"] = "idle";
     let elementId: string | undefined;
     let handleIndex: number | undefined;
+    let lightningHandle: LightningHandle | undefined;
     let grabOffset: WorldPoint | undefined;
     let moveStartPosition: WorldPoint | undefined;
     if (event.button === 0) {
       if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
         this.app.canvas.style.cursor = "grabbing";
+      } else if (this.lightningDraft !== null) {
+        mode = "idle";
       } else if (this.hitTestPlayerCameraControl(point)) {
         mode = "player-camera-move";
         const worldPoint = screenToWorld(point, this.camera, this.getViewportSize());
@@ -1524,7 +1560,17 @@ export class PixiViewport {
         const hitPathHandles = this.hitTestPathHandles(point);
         const hitElementId = this.hitTestElement(point);
 
-        if (hitFireZoneResizeElementId !== null) {
+        const selectedLightning = this.getRenderableEffects().find(
+          (effect): effect is SceneLightningEffect => effect.kind === "lightning" && effect.id === this.selectedElementId
+        );
+        const hitLightning = selectedLightning === undefined ? null : hitTestLightningHandle(
+          selectedLightning, screenToWorld(point, this.camera, this.getViewportSize()), this.camera.zoom
+        );
+        if (hitLightning !== null && selectedLightning !== undefined) {
+          mode = "lightning-edit";
+          elementId = selectedLightning.id;
+          lightningHandle = hitLightning;
+        } else if (hitFireZoneResizeElementId !== null) {
           mode = "fire-zone-resize";
           elementId = hitFireZoneResizeElementId;
           this.options.onElementSelect?.(hitFireZoneResizeElementId);
@@ -1638,6 +1684,7 @@ export class PixiViewport {
       mode,
       elementId,
       handleIndex,
+      lightningHandle,
       grabOffset,
       moveStartPosition
     };
@@ -1649,6 +1696,16 @@ export class PixiViewport {
     }
 
     const screenPoint = this.eventToScreenPoint(event);
+
+    if (this.lightningDraft !== null && !this.isGrabMode) {
+      this.scheduleViewportUpdate("lightning-pointer", () => {
+        if (this.lightningDraft === null || this.grid === null || this.settings === null) return;
+        this.lightningDraft = { ...this.lightningDraft, pointer: lightningPoint(
+          screenToWorld(screenPoint, this.camera, this.getViewportSize()), this.lightningDraft.shape, this.grid, this.settings
+        ) };
+        this.drawSelectionLayer();
+      });
+    }
 
     if (this.isPathDrawingMode) {
       const point = this.snapScreenPointToCellCenter(screenPoint);
@@ -1714,6 +1771,10 @@ export class PixiViewport {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
       this.applyElementMovePreview(this.dragState.elementId, targetPoint, this.dragState.moveStartPosition);
+    } else if (this.dragState.mode === "lightning-edit" && this.dragState.elementId !== undefined && this.dragState.lightningHandle !== undefined) {
+      const id = this.dragState.elementId;
+      const handle = this.dragState.lightningHandle;
+      this.scheduleViewportUpdate("lightning-edit", () => this.updateLightningHandle(id, handle, nextPoint));
     } else if (this.dragState.mode === "player-camera-move" && this.primaryPlayerCameraControl !== null) {
       const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
@@ -1805,6 +1866,7 @@ export class PixiViewport {
       mode: this.dragState.mode,
       elementId: this.dragState.elementId,
       handleIndex: this.dragState.handleIndex,
+      lightningHandle: this.dragState.lightningHandle,
       grabOffset: this.dragState.grabOffset,
       moveStartPosition: this.dragState.moveStartPosition,
       pendingMovePosition:
@@ -1826,12 +1888,23 @@ export class PixiViewport {
 
     const completedMode = this.dragState.mode;
     const releasePoint = this.eventToScreenPoint(event);
+    if ((this.lightningDraft !== null || completedMode === "lightning-edit") &&
+      (event.type === "pointercancel" || releasePoint.x < 0 || releasePoint.y < 0 ||
+        releasePoint.x > this.getViewportSize().width || releasePoint.y > this.getViewportSize().height)) {
+      this.pendingViewportUpdates.delete("lightning-edit");
+      this.dragState = null;
+      this.clearDragPreviews();
+      return;
+    }
     const movedDistance = Math.hypot(
       releasePoint.x - this.dragState.startPoint.x,
       releasePoint.y - this.dragState.startPoint.y
     );
     const isClick = movedDistance < 4;
     this.flushPendingViewportUpdates();
+    if (completedMode === "lightning-edit" && this.dragState.elementId !== undefined && this.dragState.lightningHandle !== undefined) {
+      this.updateLightningHandle(this.dragState.elementId, this.dragState.lightningHandle, releasePoint);
+    }
 
     if (isClick && this.dragState.button === 2) {
       const screen = this.eventToClientPoint(event);
@@ -1907,7 +1980,17 @@ export class PixiViewport {
     }
 
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
-      if (this.isPathDrawingMode) {
+      if (this.lightningDraft !== null && this.grid !== null && this.settings !== null) {
+        const { shape, anchor } = this.lightningDraft;
+        const point = lightningPoint(screenToWorld(releasePoint, this.camera, this.getViewportSize()), shape, this.grid, this.settings);
+        if (anchor === null) {
+          this.lightningDraft = { shape, anchor: point, pointer: point };
+        } else if (lightningZone(shape, anchor, point) !== null) {
+          this.lightningDraft = null;
+          this.options.onLightningCreate?.(shape, anchor, point);
+        }
+        this.drawSelectionLayer();
+      } else if (this.isPathDrawingMode) {
         this.options.onPathPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
       } else if (this.isWaterDrawingMode) {
         this.options.onWaterPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
@@ -2092,7 +2175,9 @@ export class PixiViewport {
 
     const previewEffect = this.previewEffects.get(dragState.elementId);
     if (previewEffect !== undefined) {
-      if (dragState.mode === "fire-zone-resize" && previewEffect.kind === "fire") {
+      if (dragState.mode === "lightning-edit" && previewEffect.kind === "lightning") {
+        this.options.onLightningChange?.(previewEffect);
+      } else if (dragState.mode === "fire-zone-resize" && previewEffect.kind === "fire") {
         this.options.onFireZoneRadiusChange?.(previewEffect.id, previewEffect.zone.radius);
       } else if (dragState.mode === "fire-light-resize" && previewEffect.kind === "fire") {
         this.options.onFireLightRadiusChange?.(previewEffect.id, previewEffect.lightRadius);
@@ -2133,6 +2218,8 @@ export class PixiViewport {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
       this.app.canvas.style.cursor = "default";
+    } else if (this.lightningDraft !== null) {
+      this.app.canvas.style.cursor = "crosshair";
     } else if (this.isPlayerCameraControlHovered) {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode) {
@@ -2185,6 +2272,7 @@ export class PixiViewport {
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && !isEditableKeyboardTarget(event.target)) this.cancelLightningEdit();
     if (!this.isNavigationEnabled || !isSpaceKeyEvent(event) || isEditableKeyboardTarget(event.target)) {
       return;
     }
@@ -2209,6 +2297,7 @@ export class PixiViewport {
   };
 
   private readonly handleWindowBlur = (): void => {
+    this.cancelLightningEdit();
     if (!this.isSpaceNavigationActive && this.dragState?.mode !== "pan") {
       return;
     }
@@ -2219,6 +2308,25 @@ export class PixiViewport {
       this.dragState = null;
     }
     this.updateCursor();
+  };
+
+  private cancelLightningEdit(): void {
+    if (this.dragState?.mode !== "lightning-edit") return;
+    this.pendingViewportUpdates.delete("lightning-edit");
+    this.dragState = null;
+    this.clearDragPreviews();
+  }
+
+  private readonly handleLightningCaptureLost = (): void => {
+    this.cancelLightningEdit();
+  };
+
+  private readonly handleLightningPointerLeave = (): void => {
+    this.pendingViewportUpdates.delete("lightning-pointer");
+    if (this.lightningDraft !== null) {
+      this.lightningDraft = { ...this.lightningDraft, pointer: null };
+      this.drawSelectionLayer();
+    }
   };
 
   private resize(): void {
@@ -2537,9 +2645,24 @@ export class PixiViewport {
     const fireSpriteBudget = getFireFlameBudget(this.getRenderableEffects().filter(
       (effect) => effect.visible && effect.kind === "fire"
     ).length);
+    const lightningBudget = lightningVertexBudget(this.getRenderableEffects().filter(
+      (effect) => effect.kind === "lightning" && effect.visible && effect.opacity > 0
+    ).length);
+    const activeLightningIds = new Set<string>();
 
     for (const effect of this.getRenderableEffects()) {
-      if (effect.visible && effect.kind === "fire") {
+      if (effect.visible && effect.kind === "lightning" && effect.opacity > 0) {
+        let visual = this.lightningVisuals.get(effect.id);
+        if (visual === undefined || visual.container.destroyed) {
+          visual = new LightningVisual(effect, this.app.renderer.type === RendererType.WEBGL, lightningBudget);
+          this.lightningVisuals.set(effect.id, visual);
+        } else {
+          visual.configure(effect, lightningBudget);
+        }
+        activeLightningIds.add(effect.id);
+        reusedContainers.add(visual.container);
+        effectsLayer.addChild(visual.container);
+      } else if (effect.visible && effect.kind === "fire") {
         const rendered = this.getCachedEffectContainer(
           effect,
           this.proceduralFireSource
@@ -2566,6 +2689,13 @@ export class PixiViewport {
         nextCache.set(effect.id, rendered);
         reusedContainers.add(rendered.container);
         effectsLayer.addChild(rendered.container);
+      }
+    }
+
+    for (const [id, visual] of this.lightningVisuals) {
+      if (!activeLightningIds.has(id)) {
+        visual.destroy();
+        this.lightningVisuals.delete(id);
       }
     }
 
@@ -2647,8 +2777,20 @@ export class PixiViewport {
     clearContainerChildren(selectionLayer);
 
     for (const effect of this.getRenderableEffects()) {
+      if (this.viewRole === "dm" && effect.kind === "lightning" && this.grid !== null && this.settings !== null &&
+        ((effect.visible && effect.opacity > 0) || effect.id === this.selectedElementId)) {
+        selectionLayer.addChild(drawLightningEditor(effect, this.grid, this.settings, this.camera.zoom, effect.id === this.selectedElementId));
+      }
       if (this.viewRole === "dm" && effect.visible && effect.kind === "fire" && effect.id !== this.selectedElementId) {
         selectionLayer.addChild(drawFireZoneHint(effect));
+      }
+    }
+
+    if (this.viewRole === "dm" && this.lightningDraft?.anchor && this.lightningDraft.pointer && this.grid && this.settings) {
+      if (lightningZone(this.lightningDraft.shape, this.lightningDraft.anchor, this.lightningDraft.pointer) !== null) {
+        const preview = createLightningEffect("lightning-preview", this.lightningDraft.shape, this.lightningDraft.anchor, this.lightningDraft.pointer, 0);
+        selectionLayer.addChild(drawLightningGuide(preview, true));
+        selectionLayer.addChild(drawLightningEditor(preview, this.grid, this.settings, this.camera.zoom, true));
       }
     }
 
@@ -2659,7 +2801,7 @@ export class PixiViewport {
     if (this.selectedElementId !== null) {
       const selectedElement = this.findSelectableElement(this.selectedElementId);
 
-      if (selectedElement !== undefined) {
+      if (selectedElement !== undefined && selectedElement.kind !== "lightning") {
         const selectedAnnotation = this.findMapAnnotation(selectedElement.id);
         const child =
           selectedAnnotation?.kind === "information-area"
@@ -3341,6 +3483,11 @@ export class PixiViewport {
     const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
 
     for (const element of [...this.getSelectableElements()].reverse()) {
+      if (element.kind === "lightning") {
+        const lightning = this.effects.find((effect): effect is SceneLightningEffect => effect.id === element.id && effect.kind === "lightning");
+        if (lightning?.visible && lightning.opacity > 0 && hitTestLightning(lightning, worldPoint, 14 / this.camera.zoom)) return element.id;
+        continue;
+      }
       if (element.kind === "path") {
         const path = this.shapes.find((shape) => shape.id === element.id && shape.type === "path");
         if (path !== undefined && hitTestPath(path, worldPoint, 14 / this.camera.zoom)) {
@@ -4037,6 +4184,14 @@ export class PixiViewport {
     this.drawShapePreviewLayers();
   }
 
+  private updateLightningHandle(id: string, handle: LightningHandle, screen: ScreenPoint): void {
+    const effect = this.effects.find((candidate): candidate is SceneLightningEffect => candidate.id === id && candidate.kind === "lightning");
+    if (!effect || !this.grid || !this.settings) return;
+    this.previewEffects.set(id, editLightningHandle(effect, handle, screenToWorld(screen, this.camera, this.getViewportSize()), this.grid, this.settings));
+    this.drawEffectsLayer();
+    this.drawSelectionLayer();
+  }
+
   private getSelectableElements(): readonly SelectableRenderElement[] {
     return [
       ...this.elements,
@@ -4084,7 +4239,7 @@ export class PixiViewport {
               ? "dynamic-light" as const
               : effect.kind === "magical-darkness"
                 ? "magical-darkness" as const
-                : "water" as const,
+                : effect.kind === "lightning" ? "lightning" as const : "water" as const,
         position: effect.position,
         hitRadius:
           effect.kind === "magical-darkness"
@@ -4452,6 +4607,8 @@ export class PixiViewport {
   private readonly updateFirePattern = (): void => {
     this.firePatternSource?.update(performance.now());
     this.proceduralFireSource?.update();
+    const now = Date.now();
+    for (const visual of this.lightningVisuals.values()) visual.update(now);
   };
 
   private async drawMapImage(): Promise<void> {
@@ -4613,7 +4770,7 @@ export class PixiViewport {
 
 interface SelectableRenderElement {
   readonly id: string;
-  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "dynamic-light" | "magical-darkness" | "token" | "water" | "label" | "room-pin" | "information-area" | "scene-link";
+  readonly kind: TacticalElement["kind"] | SceneShape["type"] | "dynamic-light" | "magical-darkness" | "token" | "water" | "lightning" | "label" | "room-pin" | "information-area" | "scene-link";
   readonly position: { readonly x: number; readonly y: number };
   readonly hitRadius?: number;
   readonly selectionColor?: string;
@@ -4898,8 +5055,8 @@ function haveEffectLayerReferencesChanged(
   );
 }
 
-function isEffectLayerEffect(effect: SceneEffect): effect is SceneFireEffect | SceneWaterEffect {
-  return effect.kind === "fire" || effect.kind === "water";
+function isEffectLayerEffect(effect: SceneEffect): effect is SceneFireEffect | SceneWaterEffect | SceneLightningEffect {
+  return effect.kind === "fire" || effect.kind === "water" || effect.kind === "lightning";
 }
 
 function haveEffectSelectionChanged(
@@ -4991,6 +5148,7 @@ function getWaterPatternSpriteBudget(visibleWaterEffectCount: number, viewRole: 
 
 function isPreviewCommitDragMode(mode: PointerDragState["mode"]): boolean {
   return (
+    mode === "lightning-edit" ||
     mode === "light-rotate" ||
     mode === "light-resize" ||
     mode === "dynamic-light-rotate" ||
@@ -5232,14 +5390,6 @@ function drawElement(element: TacticalElement): Graphics {
         .circle(x + 8, y - 8, 13)
         .fill({ color: 0xffe39a, alpha: 0.96 });
   }
-}
-
-function worldLengthLabel(worldUnits: number, grid: SceneGrid): string {
-  const cells = worldUnits / grid.cellSizeWorld;
-  const value = grid.unit === "ft"
-    ? cells * grid.distancePerCell
-    : cells * grid.metricDistancePerCell;
-  return formatDistance(value, grid.unit);
 }
 
 function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSettings): Container {
@@ -7215,6 +7365,7 @@ function getHitRadius(kind: SelectableRenderElement["kind"]): number {
     case "token":
       return 50;
     case "water":
+    case "lightning":
       return 50;
     case "label":
       return 72;

@@ -41,7 +41,7 @@ function createViewportHarness() {
   dispose.push(() => { layer.destroy({ children: true }); selection.destroy({ children: true }); });
   const viewport = Object.assign(Object.create(PixiViewport.prototype) as FireViewportHarness, {
     effects: [fire], elements: [], previewEffects: new Map(), grid: { cellSizeWorld: 100 },
-    layers: new Map([["effects", layer], ["selection", selection]]), effectRenderCache: new Map(),
+    layers: new Map([["effects", layer], ["selection", selection]]), effectRenderCache: new Map(), lightningVisuals: new Map(),
     proceduralFireSource: renderer, firePatternSource: null, viewRole: "dm", map: {}, mapSprite: {},
     isMapImageLoading: false, selectedElementId: null, fogRevealGuideRadius: null,
     applyCamera: vi.fn(), scheduleDarknessRedraw: vi.fn(), drawDarkvisionLayer: vi.fn(),

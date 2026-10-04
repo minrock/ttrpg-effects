@@ -399,3 +399,9 @@ Validacion de rama (2026-09-02): typecheck, lint, 322 tests y build correctos. S
 - [x] Dar a ambos botones columnas iguales y dimensiones estables; no introducir dependencias.
 - [x] Conectar a estado de escena evitando cambios redundantes al pulsar la opcion ya activa.
 - [x] Aceptacion del usuario para 1.9.0; ambos grosores revisados por captura en navegador.
+
+## Integracion con Relampagos (Spec 35)
+
+Spec 35 agrega Linea/Cono/Circulo de relampago en Efectos y menu contextual, con iconos y tooltip. Propiedades incluyen direccion del cono (no apertura), alcance/radio, intensidad, velocidad, opacidad, chispas, visibilidad y guia compartida. Cada efecto aparece en Objetos > Efectos.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
