@@ -1,6 +1,6 @@
 # Spec - Efectos de Fuego
 
-Estado: fuego procedural aprobado e implementado el 2026-10-03. Cierre autorizado en main desde `codex/realistic-fire`, con empaquetado y publicacion de la version 2.5.3 por indicacion explicita del usuario. Este contrato sustituye el render primario por atlas de 1.9.0 y conserva sus interacciones y compatibilidad.
+Estado: fuego procedural aprobado, implementado e integrado en main desde `codex/realistic-fire` el 2026-10-03. Version 2.5.3 por indicacion explicita del usuario, con instalador macOS arm64 construido y verificado. Este contrato sustituye el render primario por atlas de 1.9.0 y conserva sus interacciones y compatibilidad.
 
 ## Objetivo
 

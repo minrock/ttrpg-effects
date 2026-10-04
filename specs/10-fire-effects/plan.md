@@ -1,6 +1,6 @@
 # Plan - Efectos de Fuego
 
-Estado: fuego procedural aprobado e implementado el 2026-10-03. Version 2.5.3 por indicacion explicita del usuario, con orden de integrar `codex/realistic-fire` en main, construir instalador y subir los cambios.
+Estado: fuego procedural aprobado, implementado e integrado en main desde `codex/realistic-fire` el 2026-10-03. Version 2.5.3 por indicacion explicita del usuario; instalador construido y verificado, cambios preparados para publicacion autorizada en remoto.
 
 ## Arquitectura
 
@@ -42,7 +42,9 @@ Ejecutar `pnpm typecheck`, `pnpm lint`, `pnpm test` y el empaquetado con `./scri
 
 El prototipo previo paso 403 tests, typecheck y lint. En navegador local se observaron aproximadamente 60 FPS con 24 fuentes, incendio extenso a zoom 2, alternancia visible/oculto y ventana estrecha, sin errores WebGL. El indicador mide intervalos de requestAnimationFrame, no tiempo GPU aislado.
 
-Validacion de la implementacion: typecheck y lint correctos, 409 tests en 59 archivos y build de main/preload/renderer exitoso. El bundler avisa que ignora directivas `use client` de Radix/Lucide; no impiden el build. Se reviso nuevamente el laboratorio con el renderer integrado, animacion visible y sin errores WebGL. El empaquetado y push de 2.5.3 se verifican al completar esta orden.
+Validacion de la implementacion: typecheck y lint correctos, 409 tests en 59 archivos y build de main/preload/renderer exitoso. El bundler avisa que ignora directivas `use client` de Radix/Lucide; no impiden el build. Se reviso nuevamente el laboratorio con el renderer integrado, animacion visible y sin errores WebGL.
+
+Cierre 2.5.3: `./scripts/build-dmg.sh` ejecutado exitosamente despues del merge. Generado `dist/TTRPG Effects-2.5.3-arm64.dmg`; `CFBundleShortVersionString` de la app confirma 2.5.3 y `hdiutil verify` confirma integridad del DMG. Build personal/interno sin firma de distribucion ni notarizacion. Los instaladores permanecen fuera de git; publicar main y la rama de implementacion sin incluir `dist/`.
 
 Pendientes del entorno, no declarados como ejecutados:
 
