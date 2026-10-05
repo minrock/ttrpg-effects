@@ -1,5 +1,13 @@
 # Spec - Luces y Oscuridad
 
+## Estabilidad de vision en la oscuridad
+
+- Crear, mover o actualizar figuras y efectos desde el DM no debe ocultar el mapa ni bloquear Player View cuando la vision en la oscuridad este activa.
+- Conservar el mapa base en gris y la recuperacion de color en las zonas iluminadas, incluso cuando un snapshot reenvie la misma configuracion con nuevas referencias de objetos.
+- La mascara de color y la visibilidad de su sprite forman un unico estado cacheado. No desconectarlos si la geometria de iluminacion no cambio, ni dibujar la mascara como una figura sobre el mapa.
+- Reconstruir la mascara solo cuando cambien sus fuentes de luz, geometria, rol o mapa. Desactivar la vision o quitar la ultima luz debe limpiar la mascara sin dejar residuos. El DM mantiene su mapa a color.
+- Mantener estas garantias con mapas rotados, filtros de hora del dia, zoom y navegacion entre mapas, sin cambiar el formato de escena.
+
 ## Fuego lineal y conico
 
 La ampliacion de spec 10, aceptada para 2.6.0, ilumina toda la huella de lineas/conos, expandiendo su contorno con `lightRadius`. El mismo contorno se transforma para borrar oscuridad normal y recuperar color de darkvision, sin revelar niebla ni atravesar oscuridad magica. Circulos y celdas mantienen sus reglas previas.

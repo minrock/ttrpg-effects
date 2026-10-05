@@ -1,6 +1,6 @@
 # Plan - Efectos de Fuego
 
-Estado: base procedural cerrada en 2.5.3. Ampliacion de formas aceptada por el usuario el 2026-10-03 para 2.6.0, rama `codex/fire-shape-tools`, sobre main 2.5.4. Commit, push y DMG autorizados; merge a main pendiente de orden explicita.
+Estado: base procedural cerrada en 2.5.3. Ampliacion de formas aceptada por el usuario el 2026-10-03 para 2.6.0, rama `codex/fire-shape-tools`, sobre main 2.5.4. Integracion a main autorizada el 2026-10-05 junto con el fix de darkvision 2.6.1 (spec 08).
 
 ## Ampliacion de herramientas (2026-10-03)
 
@@ -21,7 +21,7 @@ Estado: base procedural cerrada en 2.5.3. Ampliacion de formas aceptada por el u
 - [x] Halo de luz calculado como expansion convexa del contorno, con esquinas redondeadas; no usar strokes mas gruesos que la figura, que producen triangulos cruzados. Mismo contorno para luz, borrado de oscuridad y recuperacion de color en darkvision.
 - [x] `FireTools` de cuatro iconos en ambos menus, propiedades extraidas, medidas en unidades de grilla, ancho, direccion y pincel en cuadros. El largo de linea se lee segun reglas tacticas y se edita con extremos, evitando un segundo valor euclidiano contradictorio.
 - [x] Preview del pincel y extension de una zona pintada existente. Laboratorio actualizado con linea, cono, circulo, anillo y pintado.
-- [x] Revision del usuario y autorizacion de nueva version, commit, push y DMG. Version minor 2.6.0 por las nuevas herramientas; sin merge a main autorizado.
+- [x] Revision del usuario y autorizacion de nueva version, commit, push y DMG. Version minor 2.6.0 por las nuevas herramientas; integracion a main autorizada posteriormente para el cierre 2.6.1.
 
 Las secciones siguientes documentan la base de 2.5.3; las decisiones de esta ampliacion sustituyen unicamente las restricciones a circle/cells y a sus herramientas antiguas.
 

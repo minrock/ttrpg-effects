@@ -10,6 +10,13 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.6.1] - 2026-10-05
+
+### Fixed
+
+- Player View conserva la mascara de vision en la oscuridad al recibir actualizaciones de figuras o efectos que no cambian la iluminacion. La mascara y la visibilidad del mapa a color se actualizan juntas, evitando que queden desconectadas de su cache o se dibujen sobre el mapa.
+- Regresiones para figuras tacticas, relampagos, fuego, luces dinamicas, cambios de rol y activacion/desactivacion de vision en la oscuridad.
+
 ## [2.6.0] - 2026-10-03
 
 ### Added

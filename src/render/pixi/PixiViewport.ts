@@ -1358,11 +1358,6 @@ export class PixiViewport {
           ? [this.grayscaleFilter]
           : null;
     }
-
-    if (this.colorMapSprite !== null) {
-      this.colorMapSprite.visible = false;
-      this.colorMapSprite.mask = null;
-    }
   }
 
   private drawDarkvisionLayer(): void {
@@ -1385,7 +1380,10 @@ export class PixiViewport {
       return;
     }
 
+    // Keep the overlay and its mask together until the lighting signature changes.
+    // Player snapshots also resend darkness when only a tactical shape changed.
     if (this.colorMapSprite !== null) {
+      this.colorMapSprite.visible = false;
       this.colorMapSprite.mask = null;
     }
     this.darkvisionMask?.destroy();

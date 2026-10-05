@@ -1,6 +1,6 @@
 # Spec - Efectos de Fuego
 
-Estado: base procedural cerrada en 2.5.3. Ampliacion de herramientas aceptada por el usuario el 2026-10-03 para 2.6.0 en `codex/fire-shape-tools`, sobre main 2.5.4. Cierre y empaquetado autorizados; integracion a main pendiente de orden explicita. Las limitaciones de verificacion nativa estan registradas en el plan.
+Estado: base procedural cerrada en 2.5.3. Ampliacion de herramientas aceptada por el usuario el 2026-10-03 para 2.6.0 en `codex/fire-shape-tools`, sobre main 2.5.4. Integracion a main autorizada el 2026-10-05 junto con el fix de darkvision 2.6.1 (spec 08). Las limitaciones de verificacion nativa estan registradas en el plan.
 
 ## Objetivo
 
