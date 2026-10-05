@@ -1,5 +1,9 @@
 # Plan - Sidebar y Propiedades
 
+## Herramientas de fuego (2.6.0)
+
+La ampliacion de spec/plan 10 reutiliza `FireTools` en Efectos lateral/contextual y extrae `FireProperties` para controles por variante. Conectar herramientas con borradores locales del viewport y casos puros de geometria; confirmar a estado de escena una sola vez. Arbol con nombre y centro derivados de cada variante; no crear copias de los efectos para la UI. Cuatro iconos Lucide, tooltips/aria y pista de seleccion, sin botones de texto duplicados.
+
 ## Borrado en arbol de anotaciones
 
 - [x] Propagar `onDeleteInformationArea` desde App por DmAsidePanel y conectar `onDeleteArea` en MapAnnotationsTree.

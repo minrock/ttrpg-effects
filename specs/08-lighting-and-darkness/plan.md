@@ -1,5 +1,21 @@
 # Plan - Luces y Oscuridad
 
+## Fix de snapshots con darkvision (2.6.1)
+
+Implementado y aceptado para cierre 2.6.1 el 2026-10-05. El usuario autoriza commit, push, integracion a main y un nuevo DMG. Rama de cierre: `codex/fix-player-darkvision`, basada en las herramientas de fuego 2.6.0.
+
+1. Reproducir en Electron con `tomb-of-wayward-souls.ttrpgscene`, mapa `library-and-traps`, vision en oscuridad activa, abriendo Player y creando figuras en el DM. Revisar tambien `tomb-entrance` con norte a 270 grados y filtro nocturno.
+2. Mantener `updateBaseMapVisibility` limitado al mapa base y su filtro. La limpieza de `colorMapSprite.visible/mask` pertenece a `drawDarkvisionLayer`, despues de comparar la firma de iluminacion y junto con la destruccion de la mascara anterior.
+3. Conservar la mascara y su sprite cuando un snapshot reenviase oscuridad sin cambiar iluminacion. No invalidar la cache por cada figura, forzar recargas de mapa ni agregar render targets.
+4. Probar snapshots serializados para cono, linea, circulo, rectangulo y camino; agregar relampagos de las tres formas, luces dinamicas, fuego, ausencia de luces, cambios de radio, rol y activacion/desactivacion.
+
+### Evidencia y verificacion
+
+- Causa: `setDarkness` llamaba a `updateBaseMapVisibility`, que ocultaba el sprite de color y desconectaba su mascara. `drawDarkvisionLayer` retornaba por firma identica y dejaba la mascara como geometria visible independiente. En Electron se reprodujeron mascaras blancas al crear cono/linea; no se reprodujo el apagado negro completo reportado.
+- Seis regresiones fallaron antes del fix por sprite oculto/mascara desconectada y pasaron con la correccion. La cobertura final de `darkvision-render.test.ts` tiene 13 casos; la suite completa pasa 505 tests en 69 archivos. Lint, typecheck, build y diff check correctos; permanecen los avisos de `use client` de Radix/Lucide al compilar.
+- Smoke nativo posterior: Player conserva gris y recuperacion de color con cono, linea y circulo en `library-and-traps`, y con relampago en `tomb-entrance` rotado. Cambio de mapa y zoom local del jugador responden sin corrupcion visual. No se guardaron cambios en el archivo de escena original.
+- No se observaron excepciones JavaScript ni errores WebGL en los renderers durante el smoke. Persisten avisos de CSP de desarrollo y del menu nativo de Electron; no se declaran corregidos por este cambio.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
@@ -371,3 +387,7 @@ La capa de oscuridad ambiental pasó a ser **exclusiva de la ventana del jugador
 - [x] Incorporar ambos tipos al arbol lateral sin duplicar datos.
 - [x] Probar clicks dentro/fuera del handle a distintos zooms.
 - [x] Extension de controles aceptada por el usuario para 1.9.0; cobertura de hit testing automatizada.
+
+## Ampliacion de fuego (2.6.0)
+
+Seguir spec/plan 10: `fireOutline(effect, padding)` calcula un poligono convexo expandido y redondeado para lineas/conos. Reutilizarlo en halos, mascara de darkvision y borrado screen-space; incluir huella completa y halo en culling y geometria/escala en firmas de cache. Evitar strokes enormes auto-intersectados. Conservar el orden de capas y el pipeline de oscuridad existente.

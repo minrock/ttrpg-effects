@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hasValidFireGeometry } from "../effects/fire-shapes";
 import { MIN_LIGHTNING_LENGTH, normalizeLightningDirection } from "../effects/lightning";
 import {
   LEGACY_SCENE_DOCUMENT_VERSION,
@@ -190,6 +191,8 @@ const daytimeFilterSchema = z.object({
 }).default({ enabled: false, preset: "day", coverage: "scene" });
 
 const fireZoneSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("line"), end: worldPointSchema, width: positiveNumber }).strict(),
+  z.object({ kind: z.literal("cone"), radius: positiveNumber, direction: finiteNumber.transform(value => ((value % 360) + 360) % 360) }).strict(),
   z.object({
     kind: z.literal("circle"),
     mode: z.enum(["closed", "open"]),
@@ -219,7 +222,7 @@ const fireEffectSchema = z.object({
   visible: z.boolean(),
   emitsLight: z.boolean(),
   lightRadius: positiveNumber
-});
+}).refine(hasValidFireGeometry, { message: "El fuego necesita dimensiones positivas y finitas." });
 
 const dynamicLightEffectSchema = z.object({
   id: z.string().min(1),

@@ -1,23 +1,13 @@
 import { clampPositive, clampUnit, normalizeHexColor } from "../lighting/lights";
-import type { SceneFireEffect } from "../sessions/scene-document";
+import type { SceneFireEffect, SceneFireZone } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import { getGridCellHeight, getGridCellKey, type GridCell } from "../grid/grid-cell";
+import { fireOutline, fireZone, hasValidFireGeometry, type FireShape } from "./fire-shapes";
 
 export type EffectKind = "fire";
 export type FireCircleMode = "closed" | "open";
 
-export type FireZone =
-  | {
-      readonly kind: "circle";
-      readonly mode: FireCircleMode;
-      readonly radius: number;
-      readonly innerRadiusRatio: number;
-    }
-  | {
-      readonly kind: "cells";
-      readonly radius: number;
-      readonly cells: readonly FireCell[];
-    };
+export type FireZone = SceneFireZone;
 
 export type FireCell = GridCell;
 
@@ -74,8 +64,15 @@ export function updateAnimatedFireEffect(
   };
 
   assertFinitePoint(next.position);
+  if (!hasValidFireGeometry(next)) throw new Error("Fire geometry must have finite, positive dimensions.");
 
   return next;
+}
+
+export function createDrawnFireEffect(id: string, shape: FireShape, start: WorldPoint, end: WorldPoint, width: number): SceneFireEffect {
+  const zone = fireZone(shape, start, end, width);
+  if (!zone) throw new Error("La zona de fuego necesita dos puntos validos.");
+  return updateAnimatedFireEffect(createAnimatedFireEffect(id, start), { zone });
 }
 
 export function moveAnimatedFireEffect(
@@ -142,6 +139,11 @@ export function toggleCircleFireMode(effect: AnimatedFireEffect): AnimatedFireEf
 export function getFireZoneBounds(
   effect: Pick<AnimatedFireEffect, "position" | "zone" | "scale">
 ): { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number } {
+  if (effect.zone.kind === "line" || effect.zone.kind === "cone") {
+    const points = fireOutline(effect);
+    return { left: Math.min(...points.map(p => p.x)), right: Math.max(...points.map(p => p.x)),
+      top: Math.min(...points.map(p => p.y)), bottom: Math.max(...points.map(p => p.y)) };
+  }
   if (effect.zone.kind === "circle") {
     const radius = effect.zone.radius * effect.scale;
 
@@ -165,6 +167,13 @@ export function getFireZoneBounds(
 }
 
 export function sanitizeFireZone(zone: FireZone): FireZone {
+  if (zone.kind === "line") {
+    assertFinitePoint(zone.end);
+    return { ...zone, width: clampPositive(zone.width, 1) };
+  }
+  if (zone.kind === "cone") {
+    return { ...zone, radius: clampPositive(zone.radius, 1), direction: Number.isFinite(zone.direction) ? ((zone.direction % 360) + 360) % 360 : 0 };
+  }
   if (zone.kind === "circle") {
     const radius = clampPositive(zone.radius, 1);
     const innerRadiusRatio = clampUnit(zone.innerRadiusRatio);
@@ -181,6 +190,7 @@ export function sanitizeFireZone(zone: FireZone): FireZone {
 }
 
 function translateCellZone(zone: FireZone, from: WorldPoint, to: WorldPoint): FireZone {
+  if (zone.kind === "line") return { ...zone, end: { x: zone.end.x + to.x - from.x, y: zone.end.y + to.y - from.y } };
   if (zone.kind !== "cells" || (from.x === to.x && from.y === to.y)) {
     return zone;
   }

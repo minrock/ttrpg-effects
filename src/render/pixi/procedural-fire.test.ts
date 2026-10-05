@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Container, Mesh, Texture, UniformGroup } from "pixi.js";
-import { createAnimatedFireEffect, moveAnimatedFireEffect } from "../../domain/effects/fire";
+import { createAnimatedFireEffect, createDrawnFireEffect, moveAnimatedFireEffect } from "../../domain/effects/fire";
+import { fireOutline } from "../../domain/effects/fire-shapes";
 import type { SceneFireEffect } from "../../domain/sessions/scene-document";
 import { getGridCellAtPoint, getGridCellHeight } from "../../domain/grid/grid-cell";
 import { PixiViewport } from "./PixiViewport";
@@ -52,6 +53,17 @@ function createViewportHarness() {
 }
 
 describe("procedural fire footprint", () => {
+  it("adapts detail to thin lines and small cones instead of washing out their fuel", () => {
+    const line = createDrawnFireEffect("thin", "line", { x: 0, y: 0 }, { x: 100000, y: 0 }, 4);
+    const cone = createDrawnFireEffect("small", "cone", { x: 0, y: 0 }, { x: 10, y: 0 }, 100);
+    expect(getFireFootprint(line, 100)?.detail).toBe(4);
+    expect(getFireFootprint(cone, 100)?.detail).toBe(10);
+    for (const effect of [line, cone]) {
+      const footprint = getFireFootprint(effect, 100)!;
+      expect(footprint.textureWidth).toBeGreaterThan(0); expect(footprint.textureWidth).toBeLessThanOrEqual(1024);
+      expect(footprint.textureHeight).toBeGreaterThan(0); expect(footprint.textureHeight).toBeLessThanOrEqual(1024);
+    }
+  });
   it("has positive bounded texture dimensions even for huge, thin regions", () => {
     const huge = { ...fire, zone: { kind: "cells" as const, radius: 10, cells: [{ x: 0, y: 0, size: 1 }, { x: 1e6, y: 0, size: 1 }] } };
     for (const effect of [fire, huge]) {
@@ -99,6 +111,28 @@ describe("procedural fire footprint", () => {
 });
 
 describe("procedural fire resources", () => {
+  it.each(["line", "cone"] as const)("rasterizes %s once and reuses its GPU resources through redraw, opacity, zoom and rotation", shape => {
+    const { viewport, layer, renderer } = createViewportHarness();
+    const context = { scale: vi.fn(), translate: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(), fill: vi.fn(), fillStyle: "", filter: "" };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(((id: string) => id === "2d" ? context : null) as HTMLCanvasElement["getContext"]);
+    const effect = createDrawnFireEffect(`shape-${shape}`, shape, { x: 20, y: 30 }, { x: 500, y: 120 }, 80);
+    viewport.effects = [effect]; viewport.drawEffectsLayer();
+    const original = layer.children[0]!, mesh = original.children[0] as Mesh;
+    const fuel = mesh.shader!.resources.uFuel;
+    expect(context.lineTo).toHaveBeenCalledTimes(fireOutline(effect).length - 1);
+    expect(context.fill).toHaveBeenCalledTimes(1);
+    expect(original.effects).toHaveLength(0); expect(mesh.effects).toHaveLength(0);
+    layer.rotation = Math.PI / 2; layer.scale.set(0.1);
+    viewport.effects = [{ ...effect, opacity: 0.3, lightRadius: 250 }];
+    for (let frame = 0; frame < 300; frame++) { renderer.update(frame * 16.7); viewport.drawEffectsLayer(); }
+    expect(layer.children[0]).toBe(original); expect(context.fill).toHaveBeenCalledTimes(1);
+    expect(mesh.shader!.resources.uFuel).toBe(fuel);
+    viewport.effects = [moveAnimatedFireEffect(effect, { x: 200, y: 100 })]; viewport.drawEffectsLayer();
+    expect(original.destroyed).toBe(true); expect(context.fill).toHaveBeenCalledTimes(2);
+    expect(renderer.meshCount).toBe(1);
+    viewport.effects = []; viewport.drawEffectsLayer(); expect(renderer.meshCount).toBe(0);
+  });
+
   it("joins the same wall-clock phase on first load and after reopening a map", () => {
     let now = 1_791_000_000_000;
     const dm = createRenderer(() => now);
@@ -281,5 +315,11 @@ describe("procedural fire resources", () => {
     expect(selection.children).toHaveLength(0);
     viewport.setViewRole("dm");
     expect(selection.children).toHaveLength(1);
+  });
+  it.each(["line", "cone"] as const)("keeps %s editor guides out of Player View", shape => {
+    const { viewport, selection } = createViewportHarness();
+    viewport.effects = [createDrawnFireEffect("f", shape, { x: 0, y: 0 }, { x: 300, y: 100 }, 80)];
+    viewport.drawSelectionLayer(); expect(selection.children).toHaveLength(1);
+    viewport.setViewRole("player"); expect(selection.children).toHaveLength(0);
   });
 });

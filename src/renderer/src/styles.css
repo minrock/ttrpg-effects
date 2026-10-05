@@ -5703,6 +5703,10 @@ body {
   width: 100%;
 }
 
+.fire-tools {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .lightning-tools button {
   display: flex;
   align-items: center;

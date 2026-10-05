@@ -1,5 +1,9 @@
 # Spec - Sidebar y Propiedades
 
+## Herramientas de fuego
+
+Ampliacion de spec 10 aceptada para 2.6.0: fila compacta de Linea, Cono, Circulo y Pintar (lapiz) en Efectos lateral y contextual. Estado activo y tooltip por icono. Propiedades segun variante, largo/radio medido, ancho de linea y direccion del cono sin apertura editable. Mantener controles visuales y de luz existentes.
+
 ## Borrado en arbol de anotaciones
 
 Las filas de terrenos/trampas incluyen una papelera con tooltip y accion por ID, independiente de la seleccion del mapa. Backspace/Delete con foco en la fila usa esa misma accion sin propagacion al canvas. Areas bloqueadas conservan proteccion y tooltip para desbloquear; buscadores y editores conservan su borrado de texto. Titulo y acciones van en dos lineas para mantener legibilidad. Contrato y pruebas en spec/plan 22; aceptado para cierre 1.10.0 el 2026-09-02.

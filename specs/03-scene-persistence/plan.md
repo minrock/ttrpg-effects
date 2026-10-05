@@ -205,6 +205,10 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [x] Probar defaults antiguos, round trip en gruesas, valores invalidos y deteccion de contenido.
 - [x] Cierre de grosor autorizado para 1.9.0 con round trip automatizado; sin afirmar un smoke nativo adicional.
 
+## Ampliacion de fuego (2.6.0)
+
+Ampliacion de fuego implementada y aceptada (spec/plan 10): union compartida con line/cone y validacion de geometria antes de importar/sincronizar. Round-trip entre mapas, efectos historicos y snapshot de Player cubiertos por tests; sin subir version de formato ni persistir caches.
+
 ## Integracion con Relampagos (Spec 35)
 
 Spec 35 incorpora `kind: lightning` a efectos de cada mapa, con geometria mundial, parametros, semilla y reloj; sin vertices ni borradores. Formato 2 aditivo, validacion Zod y round-trip; lectores antiguos pueden rechazar este tipo desconocido.

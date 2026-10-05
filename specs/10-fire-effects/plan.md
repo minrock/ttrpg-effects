@@ -1,6 +1,48 @@
 # Plan - Efectos de Fuego
 
-Estado: fuego procedural aprobado, implementado e integrado en main desde `codex/realistic-fire` el 2026-10-03. Version 2.5.3 por indicacion explicita del usuario; instalador construido y verificado, cambios preparados para publicacion autorizada en remoto.
+Estado: base procedural cerrada en 2.5.3. Ampliacion de formas aceptada por el usuario el 2026-10-03 para 2.6.0, rama `codex/fire-shape-tools`, sobre main 2.5.4. Integracion a main autorizada el 2026-10-05 junto con el fix de darkvision 2.6.1 (spec 08).
+
+## Ampliacion de herramientas (2026-10-03)
+
+1. Extender `SceneFireZone`, helpers puros y esquema compartido con linea (end/width en mundo) y cono (radius/direction, apertura fija 60). Validar medidas finitas y no degeneradas, normalizar direccion y conservar circle/cells sin migracion. Traslacion mueve ambos extremos; escala se aplica respecto al origen.
+2. Agregar dominio `fire-shapes.ts` para dibujo en dos puntos, medida, extremos/manivelas, huella poligonal y hit testing. Reutilizar mediciones y snap existentes; no depender de React/Pixi.
+3. Integrar borradores y edicion en el ciclo de interaccion de efectos del viewport: preview local por frame, confirmacion unica, Escape/blur/lost capture/cambio de mapa y pan con Espacio. Conservar manivelas historicas de circulo/luz y pintado agrupado por frame.
+4. Extender raster de combustible y fallback con las nuevas huellas. Mantener un mesh por fuego, ruido/reloj compartidos, textura <=1024 por lado y cache por geometria; sin filtros/FBO nuevos ni IPC por frame. Luz y darkvision deben seguir toda la huella de lineas/conos.
+5. Extraer `FireTools` y propiedades geometricas; cuatro iconos Lucide con tooltip/aria en ambos menus. Medidas en unidad de grilla, direccion (no apertura), ancho de linea, controles existentes y arbol con nombres por variante. Agregar preview del pincel libre.
+6. Probar geometria/escala/movimiento/snap, schema V1/V2 y Player, caches/recursos/luces, interaccion/cancelacion y regresiones de relampago. Ejecutar suite, typecheck, lint y build; revisar UI/animacion en navegador y Electron.
+7. Dejar laboratorio y app disponibles para revision. Registrar resultados reales al final; no confundir las validaciones historicas de 2.5.3 con esta ampliacion. Tras la aprobacion, preparar 2.6.0 con changelog, commit, push de la rama y DMG; no integrar a main sin orden explicita.
+
+### Implementacion de la ampliacion
+
+- [x] Dominio `fire-shapes.ts`, validacion de dimensiones/overflow, medidas, escala, traslado y seleccion por huella real.
+- [x] Zonas line/cone en esquema compartido y snapshot Player; circulos/celdas existentes conservados.
+- [x] `EffectDraft` y edicion local comunes a fuego/relampago, con callbacks separados al confirmar. Se mantiene `setLightningTool` como adaptador compatible.
+- [x] Mascara de combustible estatica unica para nuevas formas, cache y fallback acotado. Detalle adaptado al ancho de bandas finas y al radio de conos pequenos.
+- [x] Halo de luz calculado como expansion convexa del contorno, con esquinas redondeadas; no usar strokes mas gruesos que la figura, que producen triangulos cruzados. Mismo contorno para luz, borrado de oscuridad y recuperacion de color en darkvision.
+- [x] `FireTools` de cuatro iconos en ambos menus, propiedades extraidas, medidas en unidades de grilla, ancho, direccion y pincel en cuadros. El largo de linea se lee segun reglas tacticas y se edita con extremos, evitando un segundo valor euclidiano contradictorio.
+- [x] Preview del pincel y extension de una zona pintada existente. Laboratorio actualizado con linea, cono, circulo, anillo y pintado.
+- [x] Revision del usuario y autorizacion de nueva version, commit, push y DMG. Version minor 2.6.0 por las nuevas herramientas; integracion a main autorizada posteriormente para el cierre 2.6.1.
+
+Las secciones siguientes documentan la base de 2.5.3; las decisiones de esta ampliacion sustituyen unicamente las restricciones a circle/cells y a sus herramientas antiguas.
+
+### Verificacion de la ampliacion
+
+- Regresion del cursor al finalizar: el viewport limpiaba `effectDraft` antes del callback a React, y la posterior sincronizacion de seleccion era un no-op. Ahora actualiza el cursor en la misma transicion que confirma la geometria. Pruebas para linea/cono/circulo de fuego y relampago comprueban restauracion inmediata, Escape posterior y ausencia de una segunda creacion; cancelar un circulo pendiente limpia tambien el preview encolado.
+- Verificacion del fix de cursor: los seis casos de confirmacion fallaron antes del cambio (`crosshair` en lugar de `default`) y pasan con la correccion. Suite completa de 492 tests, typecheck, lint y diff check correctos. En la app del navegador se verificaron cursor normal, boton de circulo desactivado y conteo estable de efectos despues de Escape y otro clic.
+
+- 2026-10-03: 484 tests en 68 archivos, `pnpm typecheck` (tambien ejecutado por build), `pnpm lint`, `pnpm build` y `git diff --check` correctos. Permanecen avisos preexistentes `use client` en Radix/Lucide.
+- Navegador, app real: menus lateral/contextual, linea medida, cono con direccion 270 grados, pintado ampliado de 4 a 6 celdas conservando un solo objeto y pincel visible. Sin errores de consola durante el smoke.
+- Laboratorio `fire-lab.html`, renderer real en rol Player: linea, cono, circulo, anillo y pintado animados, sin controles DM; revisado tras el ultimo cambio de detalle. La lectura puntual de FPS de laboratorio no es un benchmark de proyeccion.
+- Regresiones nuevas: geometria/escala/snap, contorno de luz convexo con halos anchos, guardado entre mapas, validacion IPC, transitorios/cancelacion y cache de mascara durante 300 updates, recursos y privacidad de guias; siguen pasando las regresiones de relampago.
+- Pendiente: smoke nativo DM/Player de esta ampliacion. Electron de desarrollo arranco, pero Computer Use agoto el tiempo de respuesta al acceder a su ventana, incluso tras reiniciar la instancia propia. El log registro un aviso GPU `SharedImageManager::ProduceSkia` por mailbox inexistente; no se determina aqui su causa ni se declara resuelto. No se declara verificado visualmente en Electron ni medido rendimiento prolongado. La prueba visual y consola limpia descritas arriba corresponden al navegador.
+- Revision de desarrollo realizada en `http://localhost:5173/fire-lab.html` y la app en `http://localhost:5173/`. El instalador 2.5.4 construido antes corresponde exclusivamente al cierre de relampagos; esta ampliacion se entrega en 2.6.0.
+
+### Cierre 2.6.0 (2026-10-03)
+
+- Validacion final: 492 tests en 68 archivos, `pnpm lint`, `pnpm typecheck` y `git diff --check` correctos.
+- `./scripts/build-dmg.sh` completo correctamente la compilacion y el empaquetado arm64. Se mantienen avisos de `use client` en Radix/Lucide, metadata de autor ausente y dependencias opcionales de otras plataformas; no impidieron construir el instalador.
+- Generado `dist/TTRPG Effects-2.6.0-arm64.dmg`. `hdiutil verify` confirma integridad y `CFBundleShortVersionString` del bundle confirma 2.6.0. Build personal/interno sin firma de distribucion ni notarizacion; `dist/` permanece fuera de git.
+- Entrega en `codex/fire-shape-tools`, con commit y push autorizados. No se integra a main en esta entrega. Sigue pendiente el smoke nativo y la medicion prolongada descritos arriba; verificar el DMG no sustituye esas pruebas.
 
 ## Arquitectura
 
