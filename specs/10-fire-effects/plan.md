@@ -1,6 +1,6 @@
 # Plan - Efectos de Fuego
 
-Estado: base procedural cerrada en 2.5.3. Ampliacion de formas aceptada por el usuario el 2026-10-03 para 2.6.0, rama `codex/fire-shape-tools`, sobre main 2.5.4. Integracion a main autorizada el 2026-10-05 junto con el fix de darkvision 2.6.1 (spec 08).
+Estado: base procedural cerrada en 2.5.3. Ampliacion de formas aceptada por el usuario el 2026-10-03 para 2.6.0, rama `codex/fire-shape-tools`, sobre main 2.5.4. Integrada a main el 2026-10-05 junto con el fix de darkvision 2.6.1 (spec 08).
 
 ## Ampliacion de herramientas (2026-10-03)
 
@@ -43,6 +43,11 @@ Las secciones siguientes documentan la base de 2.5.3; las decisiones de esta amp
 - `./scripts/build-dmg.sh` completo correctamente la compilacion y el empaquetado arm64. Se mantienen avisos de `use client` en Radix/Lucide, metadata de autor ausente y dependencias opcionales de otras plataformas; no impidieron construir el instalador.
 - Generado `dist/TTRPG Effects-2.6.0-arm64.dmg`. `hdiutil verify` confirma integridad y `CFBundleShortVersionString` del bundle confirma 2.6.0. Build personal/interno sin firma de distribucion ni notarizacion; `dist/` permanece fuera de git.
 - Entrega en `codex/fire-shape-tools`, con commit y push autorizados. No se integra a main en esta entrega. Sigue pendiente el smoke nativo y la medicion prolongada descritos arriba; verificar el DMG no sustituye esas pruebas.
+
+### Integracion a main (2026-10-05)
+
+- Integracion autorizada y publicada mediante el merge `b3b1e2e` de `codex/fix-player-darkvision`, que incluye las herramientas 2.6.0 y el fix 2.6.1. DMG 2.6.1 construido y verificado despues del merge; evidencia en el plan de spec 08.
+- El smoke nativo de darkvision documentado en spec 08 no equivale a una bateria completa de todas las herramientas de fuego ni a una medicion prolongada de rendimiento.
 
 ## Arquitectura
 

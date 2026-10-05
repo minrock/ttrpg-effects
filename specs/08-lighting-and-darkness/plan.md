@@ -2,7 +2,7 @@
 
 ## Fix de snapshots con darkvision (2.6.1)
 
-Implementado y aceptado para cierre 2.6.1 el 2026-10-05. El usuario autoriza commit, push, integracion a main y un nuevo DMG. Rama de cierre: `codex/fix-player-darkvision`, basada en las herramientas de fuego 2.6.0.
+Implementado, aceptado e integrado a main como 2.6.1 el 2026-10-05. Fix `151fe35` desde `codex/fix-player-darkvision`, basada en las herramientas de fuego 2.6.0; merge `b3b1e2e`. Ambas ramas publicadas en origin y DMG construido despues del merge.
 
 1. Reproducir en Electron con `tomb-of-wayward-souls.ttrpgscene`, mapa `library-and-traps`, vision en oscuridad activa, abriendo Player y creando figuras en el DM. Revisar tambien `tomb-entrance` con norte a 270 grados y filtro nocturno.
 2. Mantener `updateBaseMapVisibility` limitado al mapa base y su filtro. La limpieza de `colorMapSprite.visible/mask` pertenece a `drawDarkvisionLayer`, despues de comparar la firma de iluminacion y junto con la destruccion de la mascara anterior.
@@ -15,6 +15,13 @@ Implementado y aceptado para cierre 2.6.1 el 2026-10-05. El usuario autoriza com
 - Seis regresiones fallaron antes del fix por sprite oculto/mascara desconectada y pasaron con la correccion. La cobertura final de `darkvision-render.test.ts` tiene 13 casos; la suite completa pasa 505 tests en 69 archivos. Lint, typecheck, build y diff check correctos; permanecen los avisos de `use client` de Radix/Lucide al compilar.
 - Smoke nativo posterior: Player conserva gris y recuperacion de color con cono, linea y circulo en `library-and-traps`, y con relampago en `tomb-entrance` rotado. Cambio de mapa y zoom local del jugador responden sin corrupcion visual. No se guardaron cambios en el archivo de escena original.
 - No se observaron excepciones JavaScript ni errores WebGL en los renderers durante el smoke. Persisten avisos de CSP de desarrollo y del menu nativo de Electron; no se declaran corregidos por este cambio.
+
+### Cierre e instalador 2.6.1
+
+- Validacion final repetida antes del commit: 505 tests en 69 archivos, `pnpm lint`, `pnpm typecheck` y `git diff --check` correctos.
+- `./scripts/build-dmg.sh` completo compilacion y empaquetado arm64 desde main despues del merge. Permanecen avisos de `use client`, metadata de autor ausente, dependencias opcionales de otras plataformas y deprecacion de procesos del empaquetador; no impidieron generar el instalador.
+- Generado `dist/TTRPG Effects-2.6.1-arm64.dmg`. `hdiutil verify` confirma integridad y `CFBundleShortVersionString` confirma 2.6.1. SHA-256: `c59adc1167e4bbb975f1e25a8907b4be90dda0808b0ca6c17152466d5f8fd9b0`.
+- Instalador personal/interno sin firma de distribucion ni notarizacion; `dist/` permanece fuera de git. La verificacion del paquete no sustituye el smoke nativo documentado arriba ni afirma reproducido el apagado negro completo.
 
 ## Integracion con grilla hexagonal
 
