@@ -2,6 +2,7 @@ import { app, BrowserWindow, net, protocol, screen } from "electron";
 import { join } from "node:path";
 import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron-scene-file-storage";
 import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
+import { fetchMapAsset } from "../infrastructure/file-system/map-asset-url";
 import { ElectronMonsterTemplateRepository } from "../infrastructure/file-system/electron-monster-template-repository";
 import { SqliteEntityLibraryRepository } from "../infrastructure/database/sqlite-entity-library-repository";
 import { SqliteMonsterLibraryRepository } from "../infrastructure/database/sqlite-monster-library-repository";
@@ -63,10 +64,9 @@ function createMainWindow(): void {
 app.whenReady().then(async () => {
   app.dock?.setIcon(appIconPath);
 
-  protocol.handle("map-asset", (request) => {
-    const fileUrl = request.url.replace("map-asset:", "file:");
-    return net.fetch(fileUrl);
-  });
+  protocol.handle("map-asset", (request) =>
+    fetchMapAsset(request.url, (url, options) => net.fetch(url, options))
+  );
 
   const mapImageStorage = new ElectronMapImageStorage(() => mainWindow);
   const sceneFileStorage = new ElectronSceneFileStorage(() => mainWindow);
@@ -93,7 +93,7 @@ app.whenReady().then(async () => {
       await rebuildAppMenu(menuOptions);
     }
   });
-  registerMapIpc(mapImageStorage);
+  registerMapIpc(mapImageStorage, { getMainWindow: () => mainWindow });
   registerAsideIpc(mapImageStorage);
   registerMonsterTemplateIpc(monsterTemplateRepository);
   registerMonsterLibraryIpc(monsterLibraryRepository);

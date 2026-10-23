@@ -29,6 +29,9 @@ export function PlayerApp(): JSX.Element {
   const hasInitializedCameraRef = useRef(false);
   const cameraSyncKeyRef = useRef<number | null>(null);
   const mapLoadKeyRef = useRef<string | null>(null);
+  const [viewportIdentity, setViewportIdentity] = useState<string | null>(null);
+  const viewportIdentityRef = useRef<string | null>(null);
+  const requestedImageUrlRef = useRef<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isViewportReady, setIsViewportReady] = useState(false);
   const [isZoomLocked, setIsZoomLocked] = useState(true);
@@ -166,22 +169,28 @@ export function PlayerApp(): JSX.Element {
 
     setScene(snapshot.scene);
     setMapImageUrl(snapshot.mapImageUrl);
+    requestedImageUrlRef.current = snapshot.mapImageUrl;
     setTokenImageUrls(snapshot.tokenImageUrls);
     setShowZoomIndicator(snapshot.showZoomIndicator ?? false);
     setIsHydrated(true);
     setInformationAreaHighlightResetKey(snapshot.informationAreaHighlightResetKey ?? 0);
+    // DM increments cameraSyncKey on scene loads/navigation, including scenes
+    // with empty or reused IDs. Image replacement keeps that epoch unchanged.
+    const nextCameraSyncKey = snapshot.cameraSyncKey ?? 0;
+    const nextViewportIdentity = JSON.stringify([nextCameraSyncKey, snapshot.scene.id, snapshot.scene.activeMapId]);
+    const changesViewport = viewportIdentityRef.current !== nextViewportIdentity;
+    viewportIdentityRef.current = nextViewportIdentity;
+    setViewportIdentity(nextViewportIdentity);
     const nextMapLoadKey =
       snapshot.scene.map.imagePath !== null && snapshot.mapImageUrl !== null
         ? `${snapshot.scene.map.imagePath}:${snapshot.mapImageUrl}`
         : null;
     if (nextMapLoadKey === null) {
-      mapLoadKeyRef.current = null;
       setIsViewportReady(true);
-    } else if (mapLoadKeyRef.current !== nextMapLoadKey) {
-      mapLoadKeyRef.current = nextMapLoadKey;
+    } else if (changesViewport || mapLoadKeyRef.current === null) {
       setIsViewportReady(false);
     }
-    const nextCameraSyncKey = snapshot.cameraSyncKey ?? 0;
+    mapLoadKeyRef.current = nextMapLoadKey;
     if (!hasInitializedCameraRef.current || cameraSyncKeyRef.current !== nextCameraSyncKey) {
       const normalized = normalizeCameraSnapshot(snapshot.camera);
       latestPlayerCameraRef.current = normalized;
@@ -273,13 +282,14 @@ export function PlayerApp(): JSX.Element {
     () =>
       scene.map.imagePath !== null && mapImageUrl !== null
         ? {
+            mapId: scene.activeMapId ?? undefined,
             imagePath: scene.map.imagePath,
             imageUrl: mapImageUrl,
             position: scene.map.position,
             scale: scene.map.scale
           }
         : null,
-    [scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
+    [scene.activeMapId, scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
   );
   const renderedTokens = useMemo(
     () =>
@@ -306,9 +316,18 @@ export function PlayerApp(): JSX.Element {
     },
     [queuePlayerCameraReport]
   );
-  const handlePlayerMapReady = useCallback((): void => {
+  const handlePlayerMapReady = useCallback(({ imageUrl }: { imageUrl: string }): void => {
+    if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
+      imageUrl !== requestedImageUrlRef.current) return;
     setIsViewportReady(true);
-  }, []);
+    void window.ttrpg?.reportPlayerMapImageStatus({ imageUrl, ok: true });
+  }, [viewportIdentity]);
+  const handlePlayerMapError = useCallback(({ imageUrl, error }: { imageUrl: string; error: string }): void => {
+    if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
+      imageUrl !== requestedImageUrlRef.current) return;
+    setIsViewportReady(true);
+    void window.ttrpg?.reportPlayerMapImageStatus({ imageUrl, ok: false, error: error.slice(0, 500) });
+  }, [viewportIdentity]);
 
   useEffect(() => {
     if (isHydrated && isViewportReady) {
@@ -321,6 +340,7 @@ export function PlayerApp(): JSX.Element {
     <main ref={shellRef} className="player-shell" aria-label="TTRPG Effects jugador">
       {isHydrated ? (
         <MapViewport
+          key={viewportIdentity}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}
@@ -369,8 +389,10 @@ export function PlayerApp(): JSX.Element {
           onContextMenuRequest={noop}
           onElementSelect={noop}
           onGridCellSizeChange={noop}
-          onMapRenderError={handlePlayerMapReady}
-          onMapRendered={handlePlayerMapReady}
+          onMapRenderError={noop}
+          onMapRendered={noop}
+          onMapImageLoaded={handlePlayerMapReady}
+          onMapImageError={handlePlayerMapError}
           onMapPositionChange={noop}
           onElementMove={noop}
           onLightDirectionChange={noop}

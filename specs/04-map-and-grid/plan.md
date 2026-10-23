@@ -1,5 +1,9 @@
 # Plan - Mapa y Grilla
 
+## Extension aceptada - Actualizar imagen
+
+Ver [plan 36](../36-replace-map-image/plan.md), implementado localmente el 2026-10-22. Preparar un recurso nuevo antes de sustituir el anterior, refrescar incluso una misma ruta y mantener camara/grilla independientes de la resolucion. Incluye metadata opcional de dimensiones y preservacion de precision de escala para evitar deriva al guardar. No reutilizar la factory de mapa nuevo ni invalidar todo el viewport durante el reemplazo.
+
 ## Extension hexagonal - cierre 1.10.0
 
 Rama de implementacion: `feature/hexagonal-grid`. Extension aceptada el 2026-09-02 para commit, merge a main y version 1.10.0. No forma parte del cierre historico 1.9.0.

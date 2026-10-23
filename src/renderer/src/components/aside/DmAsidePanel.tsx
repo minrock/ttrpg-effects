@@ -52,6 +52,8 @@ interface DmAsidePanelProps {
   readonly onDeleteMap: (mapId: string) => void;
   readonly onAddMap: () => void;
   readonly onImportSceneAsMap: () => void;
+  readonly onReplaceMapImage: (mapId: string) => void;
+  readonly isReplacingImage?: boolean;
   readonly onSelectObject: (entry: SceneObjectEntry) => void;
   readonly onLocateObject: (entry: SceneObjectEntry) => void;
   readonly onDeleteObject: (entry: SceneObjectEntry) => void;
@@ -89,6 +91,8 @@ export function DmAsidePanel({
   onDeleteMap,
   onAddMap,
   onImportSceneAsMap,
+  onReplaceMapImage,
+  isReplacingImage = false,
   onSelectObject,
   onLocateObject,
   onDeleteObject,
@@ -197,6 +201,8 @@ export function DmAsidePanel({
                 onDelete={onDeleteMap}
                 onAddMap={onAddMap}
                 onImportScene={onImportSceneAsMap}
+                onReplaceMapImage={onReplaceMapImage}
+                isReplacingImage={isReplacingImage}
               />
             </AccordionSection>
             <AccordionSection

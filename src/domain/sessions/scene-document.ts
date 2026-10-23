@@ -5,6 +5,7 @@ import type { SceneDaytimeFilter, SceneDaytimeMask } from "../environment/daytim
 import type { GridCell } from "../grid/grid-cell";
 import type { CompassOrientation } from "../map/compass-orientation";
 import type { MapBackgroundColor } from "../map/map-background";
+import type { MapImageDimensions } from "../map/map-image";
 import type { SceneCounter } from "../counters/scene-counters";
 
 export const LEGACY_SCENE_DOCUMENT_VERSION = 1;
@@ -16,6 +17,7 @@ export type DiagonalMode = "dnd5e-default" | "dnd5e-alternating" | "manhattan" |
 
 export interface SceneMap {
   readonly imagePath: string | null;
+  readonly imageSize?: MapImageDimensions;
   readonly position: {
     readonly x: number;
     readonly y: number;

@@ -2,9 +2,16 @@ export const supportedMapImageExtensions = ["png", "jpg", "jpeg", "webp", "heic"
 
 export type SupportedMapImageExtension = (typeof supportedMapImageExtensions)[number];
 
+export interface MapImageDimensions {
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface MapImageState {
+  readonly mapId?: string;
   readonly imagePath: string | null;
   readonly imageUrl: string | null;
+  readonly imageSize?: MapImageDimensions;
   readonly position: {
     readonly x: number;
     readonly y: number;
@@ -47,5 +54,14 @@ export function sanitizeMapScale(scale: number): number {
     return MAP_SCALE_DEFAULT;
   }
 
-  return Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, Math.round(scale * 100) / 100));
+  return Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, scale));
+}
+
+export function isMapImageDimensions(value: unknown): value is MapImageDimensions {
+  if (typeof value !== "object" || value === null) return false;
+  const dimensions = value as Partial<MapImageDimensions>;
+  return (
+    typeof dimensions.width === "number" && Number.isSafeInteger(dimensions.width) && dimensions.width > 0 &&
+    typeof dimensions.height === "number" && Number.isSafeInteger(dimensions.height) && dimensions.height > 0
+  );
 }

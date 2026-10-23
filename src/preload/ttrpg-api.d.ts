@@ -1,6 +1,7 @@
 import type { SceneDocument, SceneOperationResult } from "../domain/sessions/scene-document";
 import type { InformationAreaHighlightBroadcast } from "../domain/annotations/map-annotations";
 import type { MapOpenResult } from "../domain/map/map-image";
+import type { MapImageReplacementResult } from "../application/services/map-image-storage";
 import type { TokenOpenResult } from "../domain/tokens/token-image";
 import type {
   ArcanePointerBroadcast,
@@ -44,6 +45,8 @@ export interface TtrpgAppInfo {
 }
 
 export interface TtrpgApi {
+  reportPlayerMapImageStatus: (report: { imageUrl: string; ok: boolean; error?: string }) => Promise<void>;
+  onPlayerMapImageStatus: (handler: (report: { imageUrl: string; ok: boolean; error?: string }) => void) => () => void;
   getAppInfo: () => TtrpgAppInfo;
   saveScene: (
     scene: SceneDocument,
@@ -80,6 +83,7 @@ export interface TtrpgApi {
   getPlayerCharacterLibraryEntry: (id: string) => Promise<PlayerCharacterLibraryGetResult>;
   savePlayerCharacterLibraryEntry: (entry: PlayerCharacterLibrarySaveInput) => Promise<PlayerCharacterLibrarySaveResult>;
   openMapImage: () => Promise<MapOpenResult>;
+  selectReplacementMapImage: () => Promise<MapImageReplacementResult>;
   resolveMapUrl: (imagePath: string) => Promise<string | null>;
   openTokenImage: () => Promise<TokenOpenResult>;
   resolveTokenUrl: (imagePath: string) => Promise<string | null>;

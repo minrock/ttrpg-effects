@@ -1,5 +1,9 @@
 # Plan de implementacion tecnica - 29 Escenas con multiples mapas
 
+## Extension aceptada - Reemplazo de imagen
+
+Ver [plan 36](../36-replace-map-image/plan.md), implementado localmente el 2026-10-22. Operacion por `mapId` separada de `addSceneMap`/importacion, sincronizando primero los campos runtime del activo y preservando el resto del documento. Incluye imagenes de mapas inactivos y reparacion individual de rutas perdidas; esta ultima deja de estar fuera de alcance solo para esta extension, no implica relocalizacion masiva. No cambiar camaras ni claves de navegacion al renovar un recurso visual.
+
 ## 1. Resumen
 
 - **Spec fuente:** `./specs/29-multi-map-scenes/spec.md`

@@ -87,6 +87,7 @@ import { createLightningEffect, editLightningHandle, hitTestLightning, lightning
 import type { EffectDraft } from "../../domain/interaction/interaction-state";
 import { drawLightningEditor, drawLightningGuide, hitTestLightningHandle } from "./lightning-guides";
 import { LightningVisual, lightningVertexBudget } from "./lightning-visual";
+import { acquireImageResource, MapImageResourceError, registerMapImageTextureLimit, validateMapImageTexture, type ImageResourceLease } from "./map-image-resource";
 
 const MAP_INFORMATION_PIN_RADIUS = 32;
 const MAP_INFORMATION_PIN_HIT_RADIUS = 46;
@@ -177,6 +178,8 @@ export interface PixiViewportOptions {
   readonly onGridCellSizeChange?: (cellSizeWorld: number) => void;
   readonly onMapRenderError?: (message: string) => void;
   readonly onMapRendered?: (message: string) => void;
+  readonly onMapImageLoaded?: (payload: { imagePath: string; imageUrl: string; width: number; height: number }) => void;
+  readonly onMapImageError?: (payload: { imageUrl: string; error: string }) => void;
   readonly onMapPositionChange?: (x: number, y: number) => void;
   readonly onElementMove?: (elementId: string, x: number, y: number) => void;
   readonly onLightDirectionChange?: (elementId: string, direction: number) => void;
@@ -230,6 +233,10 @@ export class PixiViewport {
   private readonly resizeObserver: ResizeObserver;
   private camera: CameraState = createCameraState();
   private map: MapImageState | null = null;
+  private requestedMap: MapImageState | null = null;
+  private mapResource: ImageResourceLease | null = null;
+  private pendingMapResource: ImageResourceLease | null = null;
+  private releaseMapTextureLimit: (() => void) | null = null;
   private grid: SceneGrid | null = null;
   private gridWindowCache: { readonly window: GridWindow; readonly style: string } | null = null;
   private settings: SceneSettings | null = null;
@@ -246,7 +253,7 @@ export class PixiViewport {
   private loadedMapUrl: string | null = null;
   private isMapImageLoading = false;
   private shouldDrawEffectsAfterMapLoad = false;
-  private loadedTokenUrls = new Set<string>();
+  private readonly tokenResources = new Map<string, ImageResourceLease>();
   private firePatternSource: FirePatternAnimation | null = null;
   private proceduralFireSource: ProceduralFireRenderer | null = null;
   private readonly lightningVisuals = new Map<string, LightningVisual>();
@@ -809,15 +816,24 @@ export class PixiViewport {
   }
 
   setMap(map: MapImageState | null): void {
-    const prevUrl = this.map?.imageUrl ?? null;
-    this.map = map;
+    if (this.disposed) return;
+    const previous = this.requestedMap;
+    this.requestedMap = map;
+    const sameMap = isSameMap(previous, map);
 
-    if (map?.imageUrl !== prevUrl) {
+    if (!sameMap || map?.imageUrl !== previous?.imageUrl) {
+      if (!sameMap) {
+        this.clearMapImage();
+        this.map = map;
+      }
       this.isMapImageLoading = map !== null;
       this.shouldDrawEffectsAfterMapLoad = false;
       void this.drawMapImage();
     } else {
-      if (this.mapSprite !== null && map !== null) {
+      // Repeated snapshots may already contain the candidate's scale. Only
+      // change the visible transform when its resource is actually displayed.
+      if (this.mapSprite !== null && map !== null && map.imageUrl === this.loadedMapUrl) {
+        this.map = map;
         this.mapSprite.position.set(map.position.x, map.position.y);
         this.mapSprite.scale.set(map.scale);
         this.colorMapSprite?.position.set(map.position.x, map.position.y);
@@ -887,6 +903,12 @@ export class PixiViewport {
     }
 
     this.disposed = true;
+    this.mapLoadVersion++;
+    this.tokenLoadVersion++;
+    this.pendingMapResource?.release();
+    this.pendingMapResource = null;
+    this.releaseMapTextureLimit?.();
+    this.releaseMapTextureLimit = null;
     this.resizeObserver.disconnect();
     this.removeInputListeners();
     this.cancelScheduledFogRedraw();
@@ -910,10 +932,11 @@ export class PixiViewport {
     this.daytimeFeedbackTexture = null;
     this.daytimeFeedbackTextureSourceScale = 1;
     this.daytimeFeedbackSignature = "";
-    for (const url of this.loadedTokenUrls) {
-      void Assets.unload(url);
-    }
-    this.loadedTokenUrls.clear();
+    // Detach leased sprites before Application.destroy can destroy textures.
+    this.clearMapImage();
+    clearContainerChildren(this.getLayer("tokens"));
+    for (const lease of this.tokenResources.values()) lease.release();
+    this.tokenResources.clear();
     this.tokenTextureCache.clear();
     for (const visual of this.lightningVisuals.values()) visual.destroy();
     this.lightningVisuals.clear();
@@ -969,7 +992,13 @@ export class PixiViewport {
 
     this.app.canvas.className = "pixi-canvas";
     if (this.app.renderer.type === RendererType.WEBGL) {
+      if ("gl" in this.app.renderer) {
+        const { gl } = this.app.renderer;
+        this.releaseMapTextureLimit = registerMapImageTextureLimit(gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
+      }
       this.proceduralFireSource = new ProceduralFireRenderer();
+    } else if ("gpu" in this.app.renderer) {
+      this.releaseMapTextureLimit = registerMapImageTextureLimit(this.app.renderer.gpu.device.limits.maxTextureDimension2D);
     }
     this.app.canvas.tabIndex = 0;
     this.host.append(this.app.canvas);
@@ -3096,10 +3125,10 @@ export class PixiViewport {
         .filter((url): url is string => typeof url === "string" && url.length > 0)
     );
 
-    for (const url of this.loadedTokenUrls) {
+    for (const [url, lease] of this.tokenResources) {
       if (!currentUrls.has(url)) {
-        void Assets.unload(url);
-        this.loadedTokenUrls.delete(url);
+        lease.release();
+        this.tokenResources.delete(url);
         this.tokenTextureCache.delete(url);
       }
     }
@@ -3115,13 +3144,22 @@ export class PixiViewport {
 
     await Promise.all(
       imageUrls.map(async (url) => {
+        let lease = this.tokenResources.get(url);
+        if (lease === undefined) {
+          lease = acquireImageResource(url);
+          this.tokenResources.set(url, lease);
+        }
         try {
           const cachedTexture = this.tokenTextureCache.get(url);
-          const texture = cachedTexture ?? await Assets.load<Texture>(url);
+          const texture = cachedTexture ?? await lease.ready;
+          if (this.disposed || loadVersion !== this.tokenLoadVersion || this.tokenResources.get(url) !== lease) return;
           this.tokenTextureCache.set(url, texture);
           textures.set(url, texture);
-          this.loadedTokenUrls.add(url);
         } catch {
+          if (this.tokenResources.get(url) === lease) {
+            this.tokenResources.delete(url);
+            lease.release();
+          }
           textures.delete(url);
         }
       })
@@ -4655,9 +4693,9 @@ export class PixiViewport {
     for (const visual of this.lightningVisuals.values()) visual.update(now);
   };
 
-  private async drawMapImage(): Promise<void> {
+  private clearMapImage(): void {
     const layer = this.getLayer("map");
-    const loadVersion = ++this.mapLoadVersion;
+    clearContainerChildren(this.getLayer("daytimeFilter"));
     this.daytimeFeedbackTexture?.destroy();
     this.daytimeFeedbackTexture = null;
     this.daytimeFeedbackTextureSourceScale = 1;
@@ -4670,13 +4708,20 @@ export class PixiViewport {
     this.mapSprite = null;
     this.colorMapSprite = null;
     this.darkvisionMask = null;
+    this.darkvisionSignature = "";
+    this.mapResource?.release();
+    this.mapResource = null;
+    this.loadedMapUrl = null;
+  }
 
-    if (this.loadedMapUrl !== null) {
-      await Assets.unload(this.loadedMapUrl);
-      this.loadedMapUrl = null;
-    }
+  private async drawMapImage(): Promise<void> {
+    const loadVersion = ++this.mapLoadVersion;
+    const requested = this.requestedMap;
+    const url = requested?.imageUrl;
+    this.pendingMapResource?.release();
+    this.pendingMapResource = null;
 
-    if (this.map === null) {
+    if (requested === null) {
       this.isMapImageLoading = false;
       this.drawMapPlaceholder();
       this.drawFogOfWarLayer();
@@ -4684,59 +4729,90 @@ export class PixiViewport {
       return;
     }
 
-    if (typeof this.map.imageUrl !== "string" || this.map.imageUrl.length === 0) {
+    if (typeof url !== "string" || url.length === 0) {
       this.isMapImageLoading = false;
-      this.drawMapPlaceholder();
+      if (this.mapSprite === null) this.drawMapPlaceholder();
       this.drawFogOfWarLayer();
       this.drawEffectsLayerAfterMapLoad();
-      this.options.onMapRenderError?.("La imagen del mapa no tiene una URL valida para renderizar.");
+      const error = "La imagen del mapa no tiene una URL valida para renderizar.";
+      if (typeof url === "string") this.options.onMapImageError?.({ imageUrl: url, error });
+      this.options.onMapRenderError?.(error);
       return;
     }
 
+    const lease = acquireImageResource(url);
+    this.pendingMapResource = lease;
+    let texture: Texture;
     try {
-      const texture = await Assets.load(this.map.imageUrl);
-
-      if (this.disposed || loadVersion !== this.mapLoadVersion) {
-        return;
-      }
-
+      texture = await lease.ready;
+      validateMapImageTexture(texture);
+    } catch (error) {
+      lease.release();
+      if (this.disposed || loadVersion !== this.mapLoadVersion) return;
+      this.pendingMapResource = null;
       this.isMapImageLoading = false;
-      this.loadedMapUrl = this.map.imageUrl;
-      const sprite = new Sprite(texture);
-      const colorSprite = new Sprite(texture);
-      sprite.anchor.set(0.5);
-      sprite.position.set(this.map.position.x, this.map.position.y);
-      sprite.scale.set(this.map.scale);
-      colorSprite.anchor.set(0.5);
-      colorSprite.position.set(this.map.position.x, this.map.position.y);
-      colorSprite.scale.set(this.map.scale);
-      colorSprite.visible = false;
-      this.mapSprite = sprite;
-      this.colorMapSprite = colorSprite;
-      this.updateBaseMapVisibility();
-      layer.addChild(sprite);
-      layer.addChild(colorSprite);
+      if (this.mapSprite === null) this.drawMapPlaceholder();
+      this.drawFogOfWarLayer();
+      this.drawEffectsLayerAfterMapLoad();
+      const message = error instanceof MapImageResourceError
+        ? error.message
+        : "No se pudo decodificar la imagen del mapa. Si es HEIC, puede depender del soporte del sistema.";
+      this.options.onMapImageError?.({ imageUrl: url, error: message });
+      this.options.onMapRenderError?.(message);
+      return;
+    }
+
+    if (this.disposed || loadVersion !== this.mapLoadVersion) {
+      lease.release();
+      return;
+    }
+
+    // No awaits between publishing the texture/transform and rebuilding its
+    // protection layers. The next frame sees the complete replacement.
+    const map = this.requestedMap!;
+    const previousResource = this.mapResource;
+    const layer = this.getLayer("map");
+    if (this.mapSprite === null || this.colorMapSprite === null) {
+      clearContainerChildren(layer);
+      this.mapSprite = layer.addChild(new Sprite(texture));
+      this.colorMapSprite = layer.addChild(new Sprite(texture));
+      this.colorMapSprite.visible = false;
       this.darkvisionSignature = "";
-      this.drawDarkvisionLayer();
-      this.drawDaytimeFilterLayer();
-      this.drawGrid();
-      this.drawDarknessLayer();
-      this.drawFogOfWarLayer();
-      this.drawEffectsLayerAfterMapLoad();
+    }
+    this.map = map;
+    this.mapResource = lease;
+    this.pendingMapResource = null;
+    this.loadedMapUrl = url;
+    this.isMapImageLoading = false;
+    for (const sprite of [this.mapSprite, this.colorMapSprite]) {
+      sprite.texture = texture;
+      sprite.anchor.set(0.5);
+      sprite.position.set(map.position.x, map.position.y);
+      sprite.scale.set(map.scale);
+    }
+    this.updateBaseMapVisibility();
+    this.drawDarkvisionLayer();
+    this.drawDaytimeFilterLayer();
+    this.drawGrid();
+    this.cancelScheduledDarknessRedraw();
+    this.cancelScheduledFogRedraw();
+    this.drawDarknessLayer();
+    this.drawFogOfWarLayer();
+    this.drawSelectionLayer();
+    this.drawEffectsLayerAfterMapLoad();
+    previousResource?.release();
+    if (map.imagePath !== null) {
+      this.options.onMapImageLoaded?.({ imagePath: map.imagePath, imageUrl: url, width: texture.width, height: texture.height });
+    }
+    if (!this.disposed && loadVersion === this.mapLoadVersion) {
       this.options.onMapRendered?.(`Mapa renderizado (${texture.width} x ${texture.height})`);
-    } catch {
-      this.isMapImageLoading = false;
-      this.drawMapPlaceholder();
-      this.drawFogOfWarLayer();
-      this.drawEffectsLayerAfterMapLoad();
-      this.options.onMapRenderError?.(
-        "No se pudo decodificar la imagen del mapa. Si es HEIC, puede depender del soporte del sistema."
-      );
     }
   }
 
   private shouldDeferEffectsUntilMapReady(): boolean {
-    return this.viewRole === "player" && this.map !== null && (this.mapSprite === null || this.isMapImageLoading);
+    const isReplacement = this.requestedMap != null && isSameMap(this.map, this.requestedMap);
+    return this.viewRole === "player" && this.map !== null
+      && (this.mapSprite === null || (this.isMapImageLoading && !isReplacement));
   }
 
   private drawEffectsLayerAfterMapLoad(): void {
@@ -4854,6 +4930,15 @@ function destroyRemovedChildren(children: Container[], reusedContainers: Readonl
       destroyDisplayObject(child);
     }
   }
+}
+
+function isSameMap(previous: MapImageState | null, next: MapImageState | null): boolean {
+  if (previous === null || next === null) return previous === next;
+  if (previous.mapId !== undefined || next.mapId !== undefined) {
+    return previous.mapId !== undefined && previous.mapId === next.mapId;
+  }
+  // Legacy callers without map IDs may retain only an identifiable same path.
+  return previous.imagePath !== null && previous.imagePath === next.imagePath;
 }
 
 function destroyStaleCachedContainers(

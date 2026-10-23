@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { sanitizeInformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import { sanitizePlayerWindowSnapshot } from "../../domain/player/player-window-snapshot";
+import { sanitizePlayerMapImageStatus } from "../../domain/player/map-image-report";
 import {
   sanitizePlayerCameraCommand,
   sanitizePlayerCameraReport,
@@ -24,6 +25,14 @@ let isPlayerWindowReady = false;
 let shouldShowPlayerWindowWhenReady = false;
 
 export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
+  ipcMain.handle("player-window:map-image-status", (event: IpcMainInvokeEvent, value: unknown) => {
+    if (!isFromPlayerWindow(event)) return;
+    const report = sanitizePlayerMapImageStatus(value);
+    const snapshot = sanitizePlayerWindowSnapshot(latestSnapshot);
+    if (report !== null && report.imageUrl === snapshot?.mapImageUrl) {
+      notifyDmWindows("player-window:map-image-status", report);
+    }
+  });
   ipcMain.handle("player-window:open", (event: IpcMainInvokeEvent, snapshot: unknown) => {
     if (!isFromDmWindow(event)) {
       return { ok: false, error: "Solo la ventana del DM puede abrir la ventana de jugador." };

@@ -14,6 +14,8 @@ import {
   type ContextMenuPosition
 } from "./context-menu-position";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
+import { useMapImageReplacement } from "./hooks/useMapImageReplacement";
+import { ReplaceMapImageModal } from "./components/aside/ReplaceMapImageModal";
 import logoUrl from "../../../assets/logo/ttrpg-effects-icon.png";
 import * as Switch from "@radix-ui/react-switch";
 import {
@@ -443,6 +445,19 @@ export function App(): JSX.Element {
   selectedElementIdRef.current = interaction.selectedElementId;
   sceneRef.current = scene;
 
+  const handleMapImageApplied = useCallback(() => {
+    setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
+    setPathDraft({ points: [], hoverPoint: null });
+    setWaterDraft({ points: [], hoverPoint: null });
+    setIsDaytimeMaskPaintMode(false);
+    setIsGridAdjustMode(false);
+  }, []);
+  const mapReplacement = useMapImageReplacement({
+    scene, sceneRef, setScene, mapImageUrl, setMapImageUrl,
+    onFeedback: setFeedback, onApplied: handleMapImageApplied
+  });
+  const resetMapImageSession = mapReplacement.resetSession;
+
   useEffect(() => {
     syncSceneEntityCounters(sceneRef.current);
   }, [syncSceneEntityCounters]);
@@ -468,19 +483,6 @@ export function App(): JSX.Element {
       }
     });
   }, [currentFilePath, scene.mapAnnotations.sceneLinks]);
-
-  // Phase 1: Reconstruct the runtime map URL on mount if the scene has a map but no URL yet.
-  // This covers renderer remounts where scene was restored from sessionStorage but mapImageUrl was lost.
-  useEffect(() => {
-    if (scene.map.imagePath === null || mapImageUrl !== null || window.ttrpg === undefined) {
-      return;
-    }
-    window.ttrpg.resolveMapUrl(scene.map.imagePath).then((url) => {
-      if (url !== null) {
-        setMapImageUrl(url);
-      }
-    });
-  }, [scene.map.imagePath, mapImageUrl]);
 
   useEffect(() => {
     if (window.ttrpg === undefined || scene.tokens.length === 0) {
@@ -1344,13 +1346,14 @@ export function App(): JSX.Element {
     () =>
       scene.map.imagePath !== null && mapImageUrl !== null
         ? {
+            mapId: scene.activeMapId ?? undefined,
             imagePath: scene.map.imagePath,
             imageUrl: mapImageUrl,
             position: scene.map.position,
             scale: scene.map.scale
           }
         : null,
-    [scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
+    [scene.activeMapId, scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
   );
 
   const canCreateNewScene = useMemo(
@@ -1502,6 +1505,7 @@ export function App(): JSX.Element {
   }
 
   const resetToNewScene = useCallback((): void => {
+    resetMapImageSession();
     const defaultScene = createEmptyScene();
     sessionStorage.removeItem("ttrpg:session-scene");
     setScene(defaultScene);
@@ -1542,7 +1546,7 @@ export function App(): JSX.Element {
     lastSavedSceneJsonRef.current = null;
     refreshPlayerCameraControl();
     sendPlayerCameraCommand("scene-change");
-  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, setGridAdjustMode]);
+  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, setGridAdjustMode, resetMapImageSession]);
 
   const handleRequestNewScene = useCallback((): void => {
     if (!canCreateNewScene) {
@@ -1944,6 +1948,7 @@ export function App(): JSX.Element {
         return;
       }
 
+      if (actionLabel === "cargada") resetMapImageSession(result.mapImageUrls, result.scene);
       setScene(result.scene);
       setMapAnnotationModal(null);
       setSceneLinkModalId(null);
@@ -3353,6 +3358,13 @@ export function App(): JSX.Element {
           </div>
         </div>
       </header>
+      {mapReplacement.draft !== null && <ReplaceMapImageModal
+        key={mapReplacement.draft.imageUrl}
+        draft={mapReplacement.draft}
+        error={mapReplacement.error}
+        onConfirm={mapReplacement.confirm}
+        onCancel={mapReplacement.cancel}
+      />}
       {needsResave && (
         <div className="resave-banner" role="alert">
           <span>
@@ -3378,6 +3390,8 @@ export function App(): JSX.Element {
       )}
       <aside className="scene-status" aria-label="Estado de escena">
         <span className="scene-status__primary">{feedback}</span>
+        {mapReplacement.busyMapId !== null && mapReplacement.draft === null && <span role="status">Preparando imagen...</span>}
+        {mapReplacement.playerError !== null && <span role="alert">{mapReplacement.playerError} <button type="button" onClick={() => void mapReplacement.retryPlayer()}>Reintentar imagen del jugador</button></span>}
         <span>{scene.activeMapId === null ? "Sin mapas" : `${scene.name ?? "Mapa activo"} (${scene.maps.length})`}</span>
         <span>{scene.map.imagePath ?? "Sin mapa cargado"}</span>
         <span>{currentFilePath ?? "Sin archivo seleccionado"}</span>
@@ -3415,6 +3429,8 @@ export function App(): JSX.Element {
           onDeleteMap={handleDeleteSceneMap}
           onAddMap={() => void handleAddSceneMap()}
           onImportSceneAsMap={() => void handleImportSceneAsMap()}
+          onReplaceMapImage={(mapId) => void mapReplacement.begin(mapId)}
+          isReplacingImage={isBusy || mapReplacement.busyMapId !== null}
           onSelectObject={handleSelectSceneObject}
           onLocateObject={handleLocateSceneObject}
           onDeleteObject={handleDeleteSceneObject}
@@ -3508,6 +3524,7 @@ export function App(): JSX.Element {
           onGridCellSizeChange={handleGridCellSizeChange}
           onMapRenderError={handleMapRenderError}
           onMapRendered={handleMapRendered}
+          onMapImageLoaded={mapReplacement.onImageLoaded}
           onMapPositionChange={handleMapPositionChange}
           onElementMove={handleElementMove}
           onLightDirectionChange={handleLightDirectionChange}

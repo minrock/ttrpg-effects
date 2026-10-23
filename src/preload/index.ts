@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld("ttrpg", {
   getPlayerCharacterLibraryEntry: (id: string) => ipcRenderer.invoke("player-character-library:get", id),
   savePlayerCharacterLibraryEntry: (entry: unknown) => ipcRenderer.invoke("player-character-library:save", entry),
   openMapImage: () => ipcRenderer.invoke("map:open-image"),
+  selectReplacementMapImage: () => ipcRenderer.invoke("map:select-replacement-image"),
   resolveMapUrl: (imagePath: string) => ipcRenderer.invoke("map:resolve-url", imagePath),
   openTokenImage: () => ipcRenderer.invoke("token:open-image"),
   resolveTokenUrl: (imagePath: string) => ipcRenderer.invoke("token:resolve-url", imagePath),
@@ -55,6 +56,13 @@ contextBridge.exposeInMainWorld("ttrpg", {
   publishPlayerCamera: (camera: unknown) => ipcRenderer.invoke("player-window:publish-camera", camera),
   commandPlayerCamera: (command: unknown) => ipcRenderer.invoke("player-window:camera-command", command),
   reportPlayerCamera: (report: unknown) => ipcRenderer.invoke("player-window:camera-report", report),
+  reportPlayerMapImageStatus: (report: { imageUrl: string; ok: boolean; error?: string }) =>
+    ipcRenderer.invoke("player-window:map-image-status", report),
+  onPlayerMapImageStatus: (handler: (report: { imageUrl: string; ok: boolean; error?: string }) => void) => {
+    const listener = (_event: IpcRendererEvent, report: { imageUrl: string; ok: boolean; error?: string }): void => handler(report);
+    ipcRenderer.on("player-window:map-image-status", listener);
+    return () => ipcRenderer.removeListener("player-window:map-image-status", listener);
+  },
   publishPlayerPointer: (pointer: unknown) => ipcRenderer.invoke("player-window:publish-pointer", pointer),
   publishPlayerInformationAreaHighlight: (highlight: unknown) =>
     ipcRenderer.invoke("player-window:publish-information-area-highlight", highlight),

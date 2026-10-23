@@ -10,6 +10,19 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.7.0] - 2026-10-22
+
+### Added
+
+- Actualizar la imagen de cualquier mapa de la escena desde su fila, sin perder marcadores, conexiones, objetos, mascaras, configuracion ni identidad. Actualizar un mapa inactivo no cambia el mapa proyectado.
+- Modal de comparacion y confirmacion con dimensiones y politicas de escala. Las imagenes de distinta resolucion y misma proporcion conservan por defecto el tamano mundial; los cambios de proporcion o limites requieren confirmacion explicita.
+
+### Changed
+
+- Carga preparada y sustitucion coordinada del fondo en DM y Player View, conservando camara auxiliar, zoom, darkvision, niebla y filtros. Las revisiones de recursos permiten refrescar archivos sobrescritos en la misma ruta.
+- Dimensiones opcionales por mapa y escala persistente de precision completa, compatibles con escenas existentes y formato 2. Las miniaturas y URLs temporales no se guardan en el archivo de escena.
+- Cierre del spec 36 con cobertura de dominio, persistencia, IPC, render, cancelaciones, resultados asincronos y Player View.
+
 ## [2.6.1] - 2026-10-05
 
 ### Fixed

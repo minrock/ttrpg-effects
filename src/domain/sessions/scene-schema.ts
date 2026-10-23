@@ -404,6 +404,10 @@ export const sceneDocumentV1Schema = z.object({
   version: z.literal(LEGACY_SCENE_DOCUMENT_VERSION),
   map: z.object({
     imagePath: z.string().min(1).nullable(),
+    imageSize: z.object({
+      width: positiveNumber.int(),
+      height: positiveNumber.int()
+    }).optional(),
     position: worldPointSchema,
     scale: positiveNumber.transform(sanitizeMapScale)
   }),
