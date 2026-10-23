@@ -120,6 +120,8 @@ interface MapViewportProps {
   readonly onGridCellSizeChange: (cellSizeWorld: number) => void;
   readonly onMapRenderError: (message: string) => void;
   readonly onMapRendered: (message: string) => void;
+  readonly onMapImageLoaded?: import("../../../render/pixi/PixiViewport").PixiViewportOptions["onMapImageLoaded"];
+  readonly onMapImageError?: import("../../../render/pixi/PixiViewport").PixiViewportOptions["onMapImageError"];
   readonly onMapPositionChange: (x: number, y: number) => void;
   readonly onElementMove: (elementId: string, x: number, y: number) => void;
   readonly onLightDirectionChange: (elementId: string, direction: number) => void;
@@ -227,6 +229,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   onGridCellSizeChange,
   onMapRenderError,
   onMapRendered,
+  onMapImageLoaded,
+  onMapImageError,
   onMapPositionChange,
   onElementMove,
   onLightDirectionChange,
@@ -264,6 +268,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
   const mapRef = useRef(map);
+  const mapImageLoadedRef = useRef(onMapImageLoaded);
+  mapImageLoadedRef.current = onMapImageLoaded;
+  const mapImageErrorRef = useRef(onMapImageError);
+  mapImageErrorRef.current = onMapImageError;
   const compassOrientationRef = useRef(compassOrientation);
   const backgroundColorRef = useRef(backgroundColor);
   const lightningToolRef = useRef({ lightningTool, fireTool, lightningResetKey });
@@ -305,6 +313,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onGridCellSizeChange,
       onMapRenderError,
       onMapRendered,
+      onMapImageLoaded: (image) => mapImageLoadedRef.current?.(image),
+      onMapImageError: (failure) => mapImageErrorRef.current?.(failure),
       onMapPositionChange,
       onElementMove,
       onLightDirectionChange,

@@ -1,5 +1,9 @@
 # Spec - Mapa y Grilla
 
+## Extension aceptada - Actualizar imagen sin perder preparacion
+
+La [spec 36](../36-replace-map-image/spec.md), aceptada para cierre 2.7.0 el 2026-10-22, permite reemplazar el fondo de un mapa existente sin recrearlo ni recalibrar su grilla. Conservar posicion mundial, objetos y camaras; compensar resolucion modifica solo la escala de la imagen cuando mantiene la proporcion.
+
 ## Grilla hexagonal - version 1.10.0
 
 Estado: implementada y aceptada por el usuario el 2026-09-02 para cierre 1.10.0 y merge de `feature/hexagonal-grid` a main. Incluye borrado de areas por teclado y arbol (spec 22).

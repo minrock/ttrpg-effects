@@ -1,5 +1,9 @@
 # Spec 29 - Escenas con multiples mapas
 
+## Extension aceptada - Actualizar imagen de mapa
+
+La [spec 36](../36-replace-map-image/spec.md), aceptada para cierre 2.7.0 el 2026-10-22, agrega `Actualizar imagen` a cada mapa existente. Sustituye solo el fondo bajo el mismo ID, conservando anotaciones, conexiones, objetos, configuracion y camaras. No equivale a agregar/importar un mapa ni debe activar uno inactivo. El flujo, las garantias y la politica para resoluciones distintas se definen alli.
+
 ## Estado
 
 Draft funcional para revision.

@@ -1,4 +1,4 @@
-import { GripVertical, Map, Plus, Trash2 } from "lucide-react";
+import { GripVertical, ImageUp, Map, Plus, Trash2 } from "lucide-react";
 import type { JSX } from "react";
 import { useState } from "react";
 import type { SceneMapDocument } from "../../../../domain/sessions/scene-document";
@@ -12,6 +12,8 @@ interface SceneMapsSectionProps {
   readonly onDelete: (mapId: string) => void;
   readonly onAddMap: () => void;
   readonly onImportScene: () => void;
+  readonly onReplaceMapImage: (mapId: string) => void;
+  readonly isReplacingImage?: boolean;
 }
 
 export function SceneMapsSection({
@@ -22,7 +24,9 @@ export function SceneMapsSection({
   onReorder,
   onDelete,
   onAddMap,
-  onImportScene
+  onImportScene,
+  onReplaceMapImage,
+  isReplacingImage = false
 }: SceneMapsSectionProps): JSX.Element {
   const [draggedMapId, setDraggedMapId] = useState<string | null>(null);
   const [dropTargetMapId, setDropTargetMapId] = useState<string | null>(null);
@@ -103,6 +107,18 @@ export function SceneMapsSection({
                 onChange={(event) => onRename(map.id, event.currentTarget.value)}
               />
               <div className="scene-map-list__actions">
+                <button
+                  type="button"
+                  title="Actualizar imagen"
+                  aria-label={`Actualizar imagen de ${map.name}`}
+                  disabled={isReplacingImage}
+                  draggable={false}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onDragStart={(event) => { event.preventDefault(); event.stopPropagation(); }}
+                  onClick={(event) => { event.stopPropagation(); onReplaceMapImage(map.id); }}
+                >
+                  <ImageUp aria-hidden="true" />
+                </button>
                 <button type="button" title="Eliminar mapa" aria-label={`Eliminar ${map.name}`} onClick={() => onDelete(map.id)}>
                   <Trash2 aria-hidden="true" />
                 </button>
