@@ -130,7 +130,7 @@ Agregar `replaceSceneMapImage(scene, mapId, replacement)` en `domain/sessions/sc
 - [x] Resultados y limitaciones reales registrados en este plan.
 - [x] Revision del usuario antes de commit/merge/release.
 
-Version minor 2.7.0 en `package.json` y entrada correspondiente en `CHANGELOG.md`. Formato de escena 2 sin migracion incompatible. Integracion y DMG autorizados; registrar su verificacion al concluir.
+Version minor 2.7.0 en `package.json` y entrada correspondiente en `CHANGELOG.md`. Formato de escena 2 sin migracion incompatible. Integracion y DMG completados; ver verificacion de entrega abajo.
 
 ## 11. Implementacion y verificacion local - 2026-10-22
 
@@ -147,3 +147,12 @@ Version minor 2.7.0 en `package.json` y entrada correspondiente en `CHANGELOG.md
 - Limites de esta verificacion: no se midieron FPS/memoria con mapas de gran formato, ni se recorrio manualmente toda la matriz de orientaciones/grillas, HEIC y permisos de archivo. Los escenarios de error y preservacion restantes tienen cobertura automatizada, no equivalen a una certificacion de todos los drivers GPU.
 - En la consola nativa se observaron avisos `SharedImageManager::ProduceSkia` durante recargas/destruccion de vistas, sin pantalla negra observada en el reemplazo. No aparecio el anterior error de framebuffer de tamano cero en esta prueba. Este aviso de Chromium queda registrado para seguimiento, no se declara resuelto por esta spec.
 - La fase de revision no genero commits, publicacion ni instalador. El usuario autorizo posteriormente el cierre 2.7.0, merge a main, push y DMG.
+
+## 12. Verificacion de entrega 2.7.0 - 2026-10-22
+
+- Implementacion: commit `0c54aeb`; merge a main: `5284d9d`.
+- Verificacion de cierre: 650 tests en 81 archivos, lint y diff check correctos. `./scripts/build-dmg.sh` completo con typecheck y build de produccion correctos.
+- Instalador: `dist/TTRPG Effects-2.7.0-arm64.dmg`, aproximadamente 142 MiB; `hdiutil verify` correcto.
+- Aplicacion empaquetada: `CFBundleShortVersionString` 2.7.0 y ejecutable Mach-O arm64. Build local sin firma Developer ID ni notarizacion; no se genero instalador Intel.
+- SHA-256 del DMG: `4ff01cf83b8ede76295d08464f1d1aebac19da2defefb913f65d53588742dc4a`.
+- Los avisos de empaquetado sobre autor ausente, dependencias opcionales de otras plataformas y firma deshabilitada no impidieron completar el instalador.
