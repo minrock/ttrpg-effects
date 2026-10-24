@@ -118,3 +118,7 @@ Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en la
 Relampagos procedurales de spec 35: dos meshes por efecto, ticker existente, presupuesto agregado de vertices y sin filtros/FBO propios. Guia en efectos debajo de niebla; medidas y handles solo en seleccion DM.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Three.js se usa exclusivamente para dados 3D en un canvas transparente sobre el viewport. Pixi sigue renderizando mapa, niebla, oscuridad y efectos. Los dados no cambian coordenadas, camara ni mascaras del mapa; su animacion se detiene en reposo. Contrato: [spec 37](../37-dm-dice-rolls/spec.md).

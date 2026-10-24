@@ -293,3 +293,11 @@ Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en la
 Spec 35 comparte descargas y guias estables de cono/circulo, pero nunca previews, etiquetas de medidas ni handles. Semilla/origen/offset de reloj sincronizan ventanas sin IPC por frame. El snapshot se valida con Zod al abrir/publicar en main; niebla oculta guia y efecto.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Player recibe exclusivamente tiradas abiertas de spec 37. Overlay 3D transparente sobre el mapa, independiente de zoom, norte, oscuridad y camara. Resumen y etiquetas numericas dependen del permiso del DM; las caras impresas siguen visibles en tiradas abiertas. Nunca recibe historial ni payload de tiradas ocultas. Abrir tarde recupera solo presentacion publica vigente. [Spec 37](../37-dm-dice-rolls/spec.md).
+
+Los dados asentados y el resumen autorizado permanecen sin caducidad. La X del resumen DM retira ambos para esa misma tirada en Player, incluso cuando su resumen estaba oculto; Player no tiene control de cierre. Se mantienen las reglas de reemplazo/navegacion y privacidad entre tiradas diferentes.
+
+Un 20 natural conservado en una tirada abierta muestra rayos por encima del dado y a su alrededor, dejando una abertura circular pequena solo para leer el 20, y `Crítico` durante tres segundos desde el reposo compartido, incluso sin resumen numerico. No se envia ninguna celebracion de tiradas ocultas. La reapertura tardia no reinicia el efecto; el cierre DM lo retira junto con su tirada. Con movimiento reducido los rayos son estaticos. No cambia valores ni aplica reglas de dano.

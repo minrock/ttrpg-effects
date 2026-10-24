@@ -10,6 +10,26 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.8.0] - 2026-10-24
+
+### Added
+
+- Pestana Dados en el panel derecho del DM para lanzar d4, d6, d8, d10, d12, d20 y percentiles 3D sobre el mapa, con colores, materiales Resina/Mate/Metal y fuerza ajustable.
+- Tiradas abiertas compartidas con Player View y ocultas exclusivamente para el DM; resumen numerico publico opcional e historial privado durante la sesion.
+- Composicion por dados o formulas como `2d6 + 3d4 + 2`, agrupacion y colores por tipo de dano, modificadores independientes y subtotales por grupo.
+- Chequeos d20 exclusivos, normales, con ventaja o desventaja, con modificador propio y cara conservada separada del dano preparado.
+- Celebracion de 20 natural conservado con rayos sobre el dado, abertura pequena para leer el numero y texto Critico; respeta tiradas privadas/abiertas y movimiento reducido.
+
+### Changed
+
+- Dados y resultados permanecen sobre el tablero hasta cerrar el resumen con la X del DM; el cierre se sincroniza con Player View sin borrar el historial.
+- Simulacion fisica unica en worker y reproduccion compartida entre ventanas, independiente de zoom, norte y camara; render 3D bajo demanda y recursos locales sin CDN.
+- Cierre del spec 37 y actualizacion de specs/planes de paneles, render, Player View y persistencia. Sin cambios en el formato `.ttrpgscene`; dados e historial no se guardan en escenas.
+
+### Fixed
+
+- Los modificadores finales se incluyen una sola vez en cada subtotal y en el resultado d20. La comprobacion de protocolo impide lanzar con un proceso Electron antiguo que descarte campos del formulario actualizado.
+
 ## [2.7.0] - 2026-10-22
 
 ### Added

@@ -16,6 +16,8 @@ import { getPlayerWindowRendererIndexPath, preloadPlayerWindow, registerPlayerWi
 import { registerSceneIpc } from "./ipc/scene-ipc";
 import { registerSceneNavigationLinksIpc } from "./ipc/scene-navigation-links-ipc";
 import { RecentScenesStore } from "./recent-scenes-store";
+import { registerDiceIpc } from "./ipc/dice-ipc";
+import { getPlayerWindow } from "./ipc/player-window-ipc";
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "map-asset", privileges: { bypassCSP: true, corsEnabled: true, secure: true, stream: true, supportFetchAPI: true } }
@@ -118,6 +120,8 @@ app.whenReady().then(async () => {
   };
   registerPlayerWindowIpc(playerWindowOptions);
   createMainWindow();
+  const disposeDice = registerDiceIpc({ getDmWindow: () => mainWindow, getPlayerWindow });
+  app.once("before-quit", disposeDice);
   preloadPlayerWindow(playerWindowOptions);
 });
 

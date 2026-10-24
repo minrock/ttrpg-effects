@@ -258,6 +258,10 @@ import {
 } from "./components/annotations/MapAnnotationModal";
 import { MapAnnotationsSection } from "./components/annotations/MapAnnotationsSection";
 import { SceneLinkModal } from "./components/annotations/SceneLinkModal";
+import { useDiceSession } from "./hooks/useDiceSession";
+import { DiceOverlay } from "./components/dice/DiceOverlay";
+import { DicePanel } from "./components/dice/DicePanel";
+import { RightSidebarTabs } from "./components/dice/RightSidebarTabs";
 import {
   renameSceneLinkMarker,
   type MapSceneLinkMarker,
@@ -335,6 +339,7 @@ export function App(): JSX.Element {
   const contextMenuRef = useRef<HTMLElement | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<ContextMenuPosition | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [rightTab, setRightTab] = useState<"properties" | "dice">("properties");
   const [isAsidePanelVisible, setIsAsidePanelVisible] = useState(true);
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
@@ -342,6 +347,15 @@ export function App(): JSX.Element {
   const [arcanePointerCreatureSize, setArcanePointerCreatureSize] =
     useState<ArcanePointerCreatureSize>("medium");
   const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
+  const [diceSessionId] = useState(() => crypto.randomUUID());
+  const diceContext = useMemo(() => ({
+    token: `${diceSessionId}:${arcanePointerResetKey}:${scene.activeMapId ?? "empty"}`,
+    sceneId: diceSessionId,
+    mapId: scene.activeMapId ?? "",
+    sceneName: currentFilePath ? getFileBaseName(currentFilePath).slice(0, 200) : "Escena sin guardar",
+    mapName: (scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa").slice(0, 200)
+  }), [diceSessionId, arcanePointerResetKey, scene.activeMapId, scene.maps, currentFilePath]);
+  const diceSession = useDiceSession(diceContext);
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
   const [showPlayerZoomIndicator, setShowPlayerZoomIndicator] = useState(false);
@@ -570,12 +584,14 @@ export function App(): JSX.Element {
   }, [interaction.contextMenu]);
 
   const handleElementSelect = useCallback((elementId: string | null) => {
+    if (elementId !== null) setRightTab("properties");
     selectedElementIdRef.current = elementId;
     setInteraction((current) => selectElement(current, elementId));
   }, []);
 
   const sceneObjects = useMemo(() => listSceneObjects(scene.lights, scene.effects, scene.shapes), [scene.lights, scene.effects, scene.shapes]);
   const handleSelectSceneObject = useCallback((entry: SceneObjectEntry) => {
+    setRightTab("properties");
     setInteraction((current) => selectElement(setActiveTool(current, "select"), entry.id));
     setIsSidebarVisible(true);
   }, []);
@@ -1533,6 +1549,7 @@ export function App(): JSX.Element {
     setArcanePointerResetKey((current) => current + 1);
     setInformationAreaHighlightResetKey((current) => current + 1);
     setIsSelectedPropertiesOpen(true);
+    setRightTab("properties");
     nextShapeId.current = 1;
     nextLightId.current = 1;
     nextEffectId.current = 1;
@@ -3560,6 +3577,7 @@ export function App(): JSX.Element {
           showCompass={mapState !== null}
           overlay={
             <>
+          <DiceOverlay envelope={diceSession.state.envelope} onDismiss={diceSession.dismiss} />
               <DmDarknessStatusBadge darkness={scene.darkness} />
               <SceneCountersOverlay
                 counters={scene.counters}
@@ -3580,6 +3598,11 @@ export function App(): JSX.Element {
           onToggleDefeated={handleToggleCombatParticipantDefeated}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
+          <RightSidebarTabs value={rightTab} onChange={setRightTab} />
+          <div id="right-panel-dice" role="tabpanel" aria-labelledby="right-tab-dice" hidden={rightTab !== "dice"}>
+            <DicePanel controller={diceSession} />
+          </div>
+          <div className="right-properties-content" id="right-panel-properties" role="tabpanel" aria-labelledby="right-tab-properties" hidden={rightTab !== "properties"}>
           <div className="control-sidebar-header">Capas</div>
           {hasSelectedObject ? (
             <SidebarAccordion
@@ -4704,6 +4727,7 @@ export function App(): JSX.Element {
               Reset niebla
             </button>
           </SidebarAccordion>
+          </div>
         </aside>
         <button
           className="sidebar-visibility-toggle"

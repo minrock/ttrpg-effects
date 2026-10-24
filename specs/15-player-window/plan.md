@@ -284,3 +284,11 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 Spec 35 comparte descargas y guias estables de cono/circulo, pero nunca previews, etiquetas de medidas ni handles. Semilla/origen/offset de reloj sincronizan ventanas sin IPC por frame. El snapshot se valida con Zod al abrir/publicar en main; niebla oculta guia y efecto.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Canales dice separados del snapshot de escena, sender/frame validado y revisiones por rol. usePublicDice se hidrata tras readiness, rechaza otro mapa y admite canvas sin mapa. Ambas ventanas reproducen las mismas poses calculadas en un worker del DM; no hay fisica independiente ni trafico por frame. Smoke nativo con darkvision y mapa girado registrado en [plan 37](../37-dm-dice-rolls/plan.md#14-verificacion-de-implementacion).
+
+El cierre manual usa `dice:dismiss`, exclusivo del DM. Main publica un envelope publico nulo solo si coincide el rollId; Player retira mallas/etiquetas/resumen con `present(null)`. Sin `expiresAt` ni timer de retiro; RAF se detiene en la pose final. La reapertura recupera esa pose mientras no se haya cerrado, reemplazado o cambiado de contexto.
+
+Criticos visuales (revision 20 del plan 37): main deriva `DicePresentation.critical.dieId` del d20 natural conservado, antes de filtrar el resultado numerico. Solo se publica para tiradas abiertas; `settledAt` fija una ventana absoluta de 3000 ms. `CriticalDiceLightning` reutiliza geometria procedural en Canvas2D acotado, sin redibujar Pixi/Three ni enviar frames por IPC. Texto React y timers comparten esa ventana; no repetir al reabrir, redimensionar o republicar resultados. El protocolo de dados vigente pasa a 3 y requiere reiniciar main despues de guardar el trabajo abierto.

@@ -10,6 +10,8 @@ import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay";
+import { usePublicDice } from "./hooks/useDiceSession";
+import { DiceOverlay } from "./components/dice/DiceOverlay";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
   sanitizePlayerCameraCommand,
@@ -336,11 +338,14 @@ export function PlayerApp(): JSX.Element {
     }
   }, [isHydrated, isViewportReady, queuePlayerCameraReport]);
 
+  const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
+
   return (
     <main ref={shellRef} className="player-shell" aria-label="TTRPG Effects jugador">
       {isHydrated ? (
         <MapViewport
           key={viewportIdentity}
+          overlay={<DiceOverlay envelope={diceEnvelope} />}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}

@@ -384,3 +384,9 @@ Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en la
 Spec 35 agrega Linea/Cono/Circulo de relampago en Efectos y menu contextual, con iconos y tooltip. Propiedades incluyen direccion del cono (no apertura), alcance/radio, intensidad, velocidad, opacidad, chispas, visibilidad y guia compartida. Cada efecto aparece en Objetos > Efectos.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Se amplian los controles derechos con tabs horizontales Propiedades/Dados. Propiedades conserva los accordions existentes; seleccionar un objeto la activa. Dados conserva composicion, opciones e historial al alternar, en orden propiedades, seleccion, lanzar e historial. La antigua exclusion de tabs no aplica a esta extension. [Spec 37](../37-dm-dice-rolls/spec.md).
+
+En Dados, activar chequeo d20 muestra su modificador propio y deshabilita el editor de dano sin perder la composicion. El lanzamiento resuelve solo el chequeo; al desactivarlo se oculta su input y se recuperan los controles de dano.

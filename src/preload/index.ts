@@ -8,6 +8,27 @@ const appInfo = {
 } as const;
 
 contextBridge.exposeInMainWorld("ttrpg", {
+  updateDiceContext: (context: unknown) => ipcRenderer.invoke("dice:context", context),
+  updateDicePreferences: (draft: unknown) => ipcRenderer.invoke("dice:preferences", draft),
+  beginDiceRoll: (request: unknown) => ipcRenderer.invoke("dice:begin", request),
+  completeDiceRoll: (rollId: string, simulation: unknown) => ipcRenderer.invoke("dice:complete", { rollId, simulation }),
+  failDiceRoll: (rollId: string) => ipcRenderer.invoke("dice:fail", rollId),
+  getDmDiceSession: () => ipcRenderer.invoke("dice:dm-state"),
+  clearDiceHistory: () => ipcRenderer.invoke("dice:clear-history"),
+  dismissDiceRoll: (rollId: string) => ipcRenderer.invoke("dice:dismiss", rollId),
+  setDiceResultVisibility: (rollId: string, visible: boolean) => ipcRenderer.invoke("dice:result-visibility", { rollId, visible }),
+  getPublicDiceState: () => ipcRenderer.invoke("dice:public-state"),
+  reportDiceRenderStatus: (rollId: string, ok: boolean) => ipcRenderer.invoke("dice:render-status", { rollId, ok }),
+  onDicePresentation: (handler: (value: unknown) => void) => {
+    const listener = (_event: IpcRendererEvent, value: unknown): void => handler(value);
+    ipcRenderer.on("dice:presentation", listener);
+    return () => ipcRenderer.removeListener("dice:presentation", listener);
+  },
+  onDiceRenderError: (handler: (value: string) => void) => {
+    const listener = (_event: IpcRendererEvent, value: string): void => handler(value);
+    ipcRenderer.on("dice:render-error", listener);
+    return () => ipcRenderer.removeListener("dice:render-error", listener);
+  },
   getAppInfo: () => appInfo,
   saveScene: (scene: unknown, options?: { readonly suggestedFilePath?: string | null }) =>
     ipcRenderer.invoke("scene:save", { scene, suggestedFilePath: options?.suggestedFilePath ?? null }),

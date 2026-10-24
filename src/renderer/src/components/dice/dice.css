@@ -1,0 +1,114 @@
+.right-sidebar-tabs { display: grid; grid-template-columns: 1.2fr 1fr; gap: 4px; flex: 0 0 auto; position: sticky; top: 0; z-index: 3; padding: 10px 0 8px; background: var(--editor-panel); border-bottom: 1px solid var(--editor-border); }
+.right-sidebar-tabs button { display: flex; align-items: center; justify-content: center; gap: 7px; border: 0; border-radius: 4px; min-height: 36px; background: transparent; color: var(--editor-muted); font-size: 12px; }
+.right-sidebar-tabs button[aria-selected=true] { color: var(--editor-text); background: var(--editor-surface-raised); box-shadow: inset 0 -2px var(--editor-accent); }
+.right-properties-content:not([hidden]) { display: flex; flex-direction: column; gap: 6px; }
+.dice-panel { padding-top: 8px; font-size: 12px; color: var(--editor-text); }
+.dice-panel fieldset { min-width: 0; margin: 0; border: 0; padding: 12px 0 16px; border-bottom: 1px solid var(--editor-border); display: grid; gap: 12px; }
+.dice-panel legend { padding: 8px 0 0; font-weight: 600; font-size: 13px; }
+.dice-panel button, .dice-mode-dialog button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; letter-spacing: 0; }
+.dice-panel button:disabled { opacity: .5; }
+.dice-panel button:focus-visible, .dice-panel input:focus-visible, .dice-panel select:focus-visible, .dice-mode-dialog button:focus-visible { outline: 2px solid var(--editor-accent); outline-offset: 2px; }
+.dice-panel input, .dice-panel select { color: var(--editor-text); font: inherit; border: 1px solid var(--editor-border-strong); border-radius: 4px; background: var(--editor-surface); min-width: 0; min-height: 30px; }
+.dice-field, .dice-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.dice-field select { max-width: 60%; padding: 5px 7px; }
+.dice-damage-swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 0 1px #ffffff25; flex-shrink: 0; }
+.dice-modifier input { width: 72px; text-align: center; padding: 4px; font-variant-numeric: tabular-nums; }
+.dice-formula-editor { display: grid; gap: 8px; min-width: 0; }
+.dice-formula-editor > label { color: var(--editor-muted); }
+.dice-formula-editor input { box-sizing: border-box; width: 100%; padding: 9px; font-family: ui-monospace, monospace; font-size: 13px; }
+.dice-formula-editor input[aria-invalid=true] { border-color: #db7972; }
+.dice-formula-editor .dice-error { margin: 0; }
+.dice-panel .dice-formula-error-link { color: #ffa69b; background: transparent; border: 0; padding: 4px 0; justify-content: flex-start; text-align: left; }
+.dice-field input[type=range] { width: 48%; min-height: 20px; accent-color: var(--editor-accent); padding: 0; }
+.dice-force output { color: var(--editor-muted); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.dice-toggle input, .dice-d20 input { accent-color: var(--editor-accent); width: 16px; height: 16px; min-height: 16px; flex-shrink: 0; }
+.dice-segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.dice-segmented button { min-height: 34px; border: 1px solid var(--editor-border); border-radius: 4px; background: var(--editor-surface); color: var(--editor-muted); }
+.dice-segmented button[aria-pressed=true] { color: var(--editor-accent); border-color: var(--editor-accent); }
+.dice-field-label { color: var(--editor-muted); margin-bottom: -4px; }
+.dice-swatches { display: grid; grid-template-columns: repeat(9, 24px); gap: 7px; }
+.dice-panel .dice-swatch { width: 24px; height: 24px; min-width: 24px; min-height: 24px; padding: 0; border: 2px solid #12161d; border-radius: 50%; box-shadow: 0 0 0 1px #53606c; }
+.dice-panel .dice-swatch[aria-pressed=true] { box-shadow: 0 0 0 2px var(--editor-accent); }
+.dice-swatch-multi { background: conic-gradient(#b54c54 0 25%, #dbb56f 0 50%, #2eaa8c 0 75%, #5594c0 0); }
+.dice-quantity-list { display: grid; gap: 5px; }
+.dice-quantity-row { display: grid; grid-template-columns: 1fr 30px 40px 30px; align-items: center; gap: 3px; min-height: 36px; }
+.dice-quantity-row > span { display: flex; align-items: center; gap: 10px; }
+.dice-quantity-row svg { color: #8dabb3; }
+.dice-quantity-row small { font-size: 10px; color: var(--editor-muted); }
+.dice-quantity-row input { width: 100%; text-align: center; appearance: textfield; padding: 0; border-color: transparent; background: transparent; font-variant-numeric: tabular-nums; }
+.dice-quantity-row input::-webkit-inner-spin-button { appearance: none; }
+.dice-panel .dice-icon-button, .dice-mode-dialog .dice-icon-button { width: 30px; height: 30px; min-width: 30px; min-height: 30px; border: 1px solid var(--editor-border); padding: 0; border-radius: 4px; color: var(--editor-text-soft); background: var(--editor-surface); flex-shrink: 0; }
+.dice-icon-button svg { margin: 0; flex-shrink: 0; }
+.dice-d20 { display: flex; align-items: center; gap: 10px; }
+.dice-panel .dice-damage-controls { padding: 0; border: 0; }
+.dice-damage-controls:disabled { opacity: .5; }
+.dice-d20 > span { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.dice-d20 small { font-size: 10px; color: var(--editor-muted); }
+.dice-d20 > svg { color: #cd7579; }
+.dice-groups { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px; }
+.dice-groups li { display: grid; grid-template-columns: minmax(60px, 1fr) minmax(80px, 1fr) 30px; gap: 5px; align-items: center; }
+.dice-panel .dice-group-edit { text-align: left; justify-content: flex-start; padding: 5px; min-width: 0; overflow-wrap: anywhere; border: 0; border-radius: 3px; background: transparent; color: var(--editor-text-soft); font-size: 11px; }
+.dice-group-edit[aria-pressed=true] { color: var(--editor-accent); }
+.dice-selection-footer { display: flex; align-items: center; justify-content: space-between; color: var(--editor-muted); font-variant-numeric: tabular-nums; }
+.dice-panel .dice-roll-button, .dice-mode-dialog .dice-roll-button { width: 100%; min-height: 42px; margin: 16px 0; border: 0; border-radius: 5px; padding: 8px 12px; background: var(--editor-accent); color: #211c13; font-weight: 650; font-size: 13px; }
+.dice-roll-button > span { flex: 1; }
+.dice-error { color: #ffa69b; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.dice-status { color: var(--editor-muted); font-size: 12px; }
+.dice-history { border-top: 1px solid var(--editor-border); padding-top: 10px; }
+.dice-history > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dice-history h3 { font-size: 12px; margin: 0; }
+.dice-history h3 small { font-size: 10px; color: var(--editor-muted); font-weight: 400; margin-left: 4px; }
+.dice-history ol { list-style: none; margin: 4px 0 0; padding: 0; }
+.dice-history li { padding: 13px 0; border-bottom: 1px solid var(--editor-border); }
+.dice-history-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--editor-muted); }
+.dice-history-meta > span { display: flex; align-items: center; gap: 5px; }
+.dice-history-origin { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--editor-muted); margin: 6px 0 8px; }
+.dice-result { display: grid; gap: 8px; font-size: 12px; }
+.dice-result-group, .dice-result-check { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; align-items: center; }
+.dice-result-group > span, .dice-result-check > span { overflow-wrap: anywhere; }
+.dice-result small { color: #a2afb7; font-size: 10px; }
+.dice-result-group > span small { margin-left: 4px; }
+.dice-result-values, .dice-result-modifier, .dice-check-values { grid-column: 1 / -1; }
+.dice-result .dice-result-modifier { color: #c3ced4; font-size: 11px; }
+.dice-result-modifier b { color: #f0c383; font-variant-numeric: tabular-nums; }
+.dice-check-values { display: flex; gap: 8px; }
+.dice-check-values s { opacity: .5; }
+.dice-result-check > strong { color: #94c9df; font-size: 21px; }
+.dice-result-total { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid #ffffff18; padding-top: 6px; }
+.dice-result-total strong { color: #f0c383; font-size: 20px; font-variant-numeric: tabular-nums; }
+.dice-panel .dice-publish-result { background: transparent; color: var(--editor-accent); border: 0; padding: 8px 0 0; font-size: 11px; }
+.dice-history-pages { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.dice-overlay { position: absolute; inset: 0; z-index: 4; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 300ms; }
+.dice-overlay.is-visible { opacity: 1; visibility: visible; }
+.dice-overlay-stage { position: absolute; inset: 65px 24px 145px; pointer-events: none; isolation: isolate; }
+.dice-overlay-stage canvas { display: block; width: 100%; height: 100%; }
+.dice-overlay-stage .dice-critical-lightning { position: absolute; z-index: 1; pointer-events: none; }
+.dice-overlay-stage .dice-critical-lightning[hidden] { display: none; }
+.dice-critical-announcement { position: absolute; top: 66px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); color: #ffdc8a; font: 750 32px/1.25 system-ui, sans-serif; letter-spacing: 0; text-align: center; overflow-wrap: anywhere; text-shadow: 0 2px 5px #000, 0 0 16px #57cdea80; pointer-events: none; animation: dice-critical-announcement ease-out both; }
+@keyframes dice-critical-announcement { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.94); } 12%, 72% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(1); } }
+.dice-piece-label { position: absolute; z-index: 2; color: #fff4d8; font: 600 11px/18px system-ui, sans-serif; text-shadow: 0 1px 3px #000, 0 0 4px #000; white-space: nowrap; pointer-events: none; }
+.dice-piece-label.is-discarded { opacity: .65; text-decoration: line-through; }
+.dice-overlay-summary { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); width: min(680px, calc(100% - 36px)); box-sizing: border-box; background: #111719eb; color: #e6edf0; border: 1px solid #8da9af60; border-radius: 6px; padding: 14px 18px; box-shadow: 0 6px 25px #0004; }
+.dice-overlay-summary .dice-result { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 18px; }
+.dice-overlay-summary .dice-result-total { grid-column: 1 / -1; }
+.dice-overlay-summary.is-dismissible { padding-top: 42px; }
+.dice-overlay-close { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-width: 30px; min-height: 30px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #aebcc7; cursor: pointer; pointer-events: auto; }
+.dice-overlay-close:hover { background: #ffffff12; color: #fff; }
+.dice-overlay-close:focus-visible { outline: 2px solid #e3b668; outline-offset: 1px; }
+.dice-overlay-close svg { flex-shrink: 0; margin: 0; }
+.dice-dialog-backdrop { z-index: 1250; }
+.dice-mode-dialog { width: min(440px, calc(100vw - 32px)); background: #171d24; color: #e6ebf2; border: 1px solid #43505e; border-radius: 8px; padding: 20px; box-shadow: 0 24px 80px #0008; }
+.dice-mode-dialog header { display: flex; align-items: center; justify-content: space-between; }
+.dice-mode-dialog h2 { font-size: 18px; margin: 0; }
+.dice-dialog-visibility { display: flex; align-items: center; gap: 8px; color: #aebcc7; font-size: 12px; margin: 14px 0; }
+.dice-dialog-modifier { font-size: 12px; color: #c3ced4; margin: 0 0 14px; }
+.dice-mode-options { display: grid; gap: 7px; }
+.dice-mode-options button { display: flex; justify-content: space-between; width: 100%; background: #202932; color: #e6ebf2; border: 1px solid #3a4856; padding: 12px; border-radius: 5px; }
+.dice-mode-options button[aria-pressed=true] { border-color: #e3b668; color: #f0c383; }
+.dice-mode-options small { color: #aebcc7; }
+.dice-mode-dialog footer { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 18px; }
+.dice-mode-dialog footer > button { min-height: 36px; }
+.dice-mode-dialog footer .dice-roll-button { width: auto; margin: 0; }
+@media (max-height: 600px) { .dice-overlay-stage { inset: 30px 12px 110px; } .dice-overlay-summary { bottom: 38px; padding: 8px 12px; } }
+@media (prefers-reduced-motion: reduce) { .dice-overlay { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .dice-critical-announcement { animation: none; } }
