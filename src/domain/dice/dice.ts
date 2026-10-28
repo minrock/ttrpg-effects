@@ -16,7 +16,7 @@ export const D20_LABELS: Record<D20Mode, string> = { normal: "Normal", advantage
 export const MAX_DICE = 24;
 export const HISTORY_LIMIT = 500;
 export const MAX_MODIFIER = 9999;
-export const DICE_PROTOCOL_VERSION = 3;
+export const DICE_PROTOCOL_VERSION = 4;
 
 const idSchema = z.string().min(1).max(160);
 export const groupSchema = z.object({ id: idSchema, damageType: z.enum(DAMAGE_TYPES), dice: z.partialRecord(z.enum(POOL_DICE), z.number().int().min(0).max(MAX_DICE)), modifier: z.number().int().min(-MAX_MODIFIER).max(MAX_MODIFIER).optional() });

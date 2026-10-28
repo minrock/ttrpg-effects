@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expandDice, resolveDiceRoll, validateSimulation, defaultDiceDraft, type DiceRollRequest } from "../../domain/dice/dice";
 import { DiceFactory } from "../../render/three/dice/vendor/DiceFactory.js";
 import { readDieFace, simulateDice } from "./dice-simulation";
+import { planDiceSounds } from "../../domain/dice/sound";
 
 function randomSource(seed: number): () => number { return () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; }; }
 describe("physical dice simulation", () => {
@@ -10,6 +11,10 @@ describe("physical dice simulation", () => {
     const dice = expandDice(request);
     expect(dice).toHaveLength(mode ? 2 : 7);
     const simulation = simulateDice(dice, 1, randomSource(42));
+    const sounds = planDiceSounds({ rollId: "r", contextToken: "c", sceneId: "s", mapId: "m", dice, appearance: request.draft.appearance, replay: simulation.replay, result: null, startedAt: 0, settledAt: simulation.replay.durationMs });
+    expect(sounds.cues.length).toBeGreaterThan(0);
+    expect(sounds.cues[0].atMs).toBeGreaterThan(0);
+    expect(sounds.cues.at(-1)!.atMs).toBeLessThan(simulation.replay.durationMs);
     expect(validateSimulation(simulation, dice)).toEqual(simulation);
     const result = resolveDiceRoll(request, simulation.values);
     if (mode) expect(result.d20?.values).toHaveLength(2);

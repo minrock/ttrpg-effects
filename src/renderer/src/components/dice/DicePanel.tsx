@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Dices, Diamond, Eye, EyeOff, Gem, Hexagon, Minus, Pentagon, Percent, Plus, Square, SquareFunction, Trash2, Triangle, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Dices, Diamond, Eye, EyeOff, Gem, Hexagon, Minus, Pentagon, Percent, Plus, RotateCcw, Square, SquareFunction, Trash2, Triangle, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { changeGroupType, countPhysicalDice, DAMAGE_LABELS, DAMAGE_TYPES, D20_LABELS, DICE_COLORS, groupFormula, MAX_DICE, MAX_MODIFIER, POOL_DICE, updateGroupModifier, updateGroupQuantity, type D20Mode, type DamageType, type DiceDraft } from "../../../../domain/dice/dice";
@@ -51,7 +51,15 @@ export function DicePanel({ controller }: { controller: DiceController }): JSX.E
       </div>
       <label className="dice-field"><span>Material</span><select value={draft.appearance.material} onChange={event => patch({ appearance: { ...draft.appearance, material: event.target.value as DiceDraft["appearance"]["material"] } })}><option value="resin">Resina</option><option value="matte">Mate</option><option value="metal">Metal</option></select></label>
       <label className="dice-field dice-force"><span>Fuerza <output>{draft.force.toFixed(1)}</output></span><input aria-label="Fuerza de lanzamiento" type="range" min="0.5" max="1.6" step="0.1" value={draft.force} onChange={event => patch({ force: event.target.valueAsNumber })} /></label>
+      {(["dm", "player"] as const).map(view => {
+        const label = view === "dm" ? "Tamano en DM" : "Tamano en Player", scale = controller.diceSizes.sizes[view];
+        return <div key={view} className="dice-size-control">
+          <label className="dice-field dice-force"><span>{label}<output>{Math.round(scale * 100)}%</output></span><input type="range" aria-label={label} min="1" max="2.5" step="0.25" value={scale} disabled={!controller.diceSizes.ready} onChange={event => void controller.diceSizes.setSize({ view, scale: event.target.valueAsNumber })} /></label>
+          <button type="button" className="dice-icon-button" aria-label={`Restablecer ${label.toLowerCase()}`} title={`Restablecer ${label.toLowerCase()} (100%)`} disabled={!controller.diceSizes.ready || scale === 1} onClick={() => void controller.diceSizes.setSize({ view, scale: 1 })}><RotateCcw size={16} aria-hidden="true" /></button>
+        </div>;
+      })}
     </fieldset>
+    <label className="dice-toggle dice-sound-control"><span>{controller.soundEnabled ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />}Sonido de dados</span><input type="checkbox" checked={controller.soundEnabled} onChange={event => controller.setSoundEnabled(event.target.checked)} /></label>
     <fieldset disabled={disabled} className="dice-pool"><legend>Dados</legend>
       <label className="dice-d20"><Hexagon size={22} aria-hidden="true" /><span><strong>d20</strong><small>Chequeo independiente</small></span><input type="checkbox" aria-label="Incluir chequeo d20" checked={draft.includeD20} onChange={event => patch({ includeD20: event.target.checked })} /></label>
       {draft.includeD20 && <DiceModifierInput type="d20" value={draft.d20Modifier} onChange={d20Modifier => patch({ d20Modifier })} onInvalid={setInvalidD20Modifier} />}

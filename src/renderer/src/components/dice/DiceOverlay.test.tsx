@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DiceEnvelope } from "../../../../domain/dice/dice";
 import { DiceOverlay } from "./DiceOverlay";
 
-const render = vi.hoisted(() => ({ present: vi.fn(), dispose: vi.fn() }));
-vi.mock("../../../../render/three/dice/DiceOverlayRenderer", () => ({ DiceOverlayRenderer: class { present = render.present; dispose = render.dispose; } }));
+const render = vi.hoisted(() => ({ present: vi.fn(), dispose: vi.fn(), setSize: vi.fn() }));
+vi.mock("../../../../render/three/dice/DiceOverlayRenderer", () => ({ DiceOverlayRenderer: class { present = render.present; dispose = render.dispose; setSize = render.setSize; } }));
 
 describe("persistent dice results", () => {
   let root: Root, host: HTMLDivElement, envelope: DiceEnvelope;
@@ -17,7 +17,7 @@ describe("persistent dice results", () => {
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
     envelope = { revision: 1, presentation: { rollId: "r", contextToken: "c", sceneId: "s", mapId: "m", dice: [], appearance: { color: "multi", material: "resin" }, replay: { frameCount: 2, stepMs: 1000, durationMs: 1000, frames: [] }, result: { groups: [], poolTotal: 0, d20: { mode: "normal", values: [17], value: 17, selected: 0, modifier: 0, total: 17 } }, startedAt: 10000, settledAt: 11000 } };
   });
-  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   it("keeps dice and summary beyond the previous timeout, then clears them on dismissal", async () => {
     const mapClick = vi.fn();
     const dismiss = vi.fn(() => root.render(<div onClick={mapClick}><DiceOverlay envelope={{ revision: 2, presentation: null }} onDismiss={dismiss} /></div>));
@@ -45,6 +45,26 @@ describe("persistent dice results", () => {
     await act(async () => root.render(<DiceOverlay envelope={{ revision: 2, presentation: null }} />));
     expect(render.present).toHaveBeenLastCalledWith(null);
     expect(host.querySelector(".dice-overlay-summary")).toBeNull();
+  });
+  it("resizes settled dice without a new presentation or restarting the celebration clock", async () => {
+    await act(async () => root.render(<DiceOverlay envelope={envelope} size={1} />));
+    await act(async () => vi.advanceTimersByTime(1010));
+    const calls = render.present.mock.calls.length;
+    await act(async () => root.render(<DiceOverlay envelope={envelope} size={2} />));
+    expect(render.setSize).toHaveBeenLastCalledWith(2);
+    expect(render.present.mock.calls).toHaveLength(calls);
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("17");
+  });
+  it("reserves the measured summary height so wrapped formulas cannot cover enlarged dice or labels", async () => {
+    const bounds = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      return { height: this.classList.contains("dice-overlay-summary") ? 260 : 0, width: 680, x: 0, y: 0, top: 0, left: 0, right: 680, bottom: 260, toJSON() {} };
+    });
+    vi.spyOn(window, "getComputedStyle").mockReturnValue({ bottom: "58px" } as CSSStyleDeclaration);
+    await act(async () => root.render(<DiceOverlay envelope={envelope} size={2.5} />));
+    await act(async () => vi.advanceTimersByTime(1010));
+    expect(host.querySelector<HTMLElement>(".dice-overlay-stage")!.style.bottom).toBe("330px");
+    expect(host.querySelector<HTMLElement>(".dice-overlay-summary")!.style.getPropertyValue("--dice-summary-columns")).toBe("1");
+    expect(bounds).toHaveBeenCalled();
   });
   it("does not reveal a summary when the DM disabled it for Player", async () => {
     envelope = { ...envelope, presentation: { ...envelope.presentation!, result: null } };

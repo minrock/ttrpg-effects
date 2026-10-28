@@ -19,7 +19,7 @@ describe("dice IPC authorization", () => {
   }
   it("rejects players and unrelated windows for every private operation", () => {
     const { call, dm, player, outsider } = setup();
-    for (const channel of ["context", "preferences", "begin", "complete", "fail", "dm-state", "clear-history", "result-visibility", "dismiss"]) {
+    for (const channel of ["context", "preferences", "begin", "complete", "fail", "dm-state", "clear-history", "result-visibility", "dismiss", "set-size"]) {
       expect(call(`dice:${channel}`, player, {})).toMatchObject({ ok: false });
       expect(call(`dice:${channel}`, outsider, {})).toMatchObject({ ok: false });
     }
@@ -29,6 +29,18 @@ describe("dice IPC authorization", () => {
   it("rejects an iframe inside the DM window", () => {
     const { dm, event } = setup();
     expect(handlers.get("dice:dm-state")!({ ...event(dm), senderFrame: {} } as IpcMainInvokeEvent)).toMatchObject({ ok: false });
+  });
+  it("shares only size preferences, hydrates both roles and validates all senders and scales", () => {
+    const { call, dm, player, outsider, event } = setup();
+    expect(call("dice:get-sizes", outsider)).toMatchObject({ ok: false });
+    expect(handlers.get("dice:get-sizes")!({ ...event(player), senderFrame: {} } as IpcMainInvokeEvent)).toMatchObject({ ok: false });
+    expect(call("dice:set-size", dm, { view: "player", scale: 2 })).toEqual({ ok: true, value: { revision: 1, dm: 1, player: 2 } });
+    for (const window of [dm, player]) {
+      expect(window.webContents.send).toHaveBeenCalledExactlyOnceWith("dice:sizes", { revision: 1, dm: 1, player: 2 });
+      expect(call("dice:get-sizes", window)).toEqual({ ok: true, value: { revision: 1, dm: 1, player: 2 } });
+    }
+    expect(call("dice:set-size", dm, { view: "player", scale: 2.1 })).toMatchObject({ ok: false });
+    expect(call("dice:public-state", player)).toMatchObject({ value: { presentation: null } });
   });
   it("never broadcasts a hidden roll, even to a preloaded player", () => {
     const { dm, player, call } = setup();

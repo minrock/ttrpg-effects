@@ -1,6 +1,10 @@
 import type { DiceContext, DiceDraft, DiceEnvelope, DiceReply, DiceRollRequest, DiceSessionState, DiceSimulation } from "../domain/dice/dice";
+import type { DiceSizeChange, DiceSizes } from "../domain/dice/size";
 
 export interface DiceApi {
+  getDiceSizes(): Promise<DiceReply<DiceSizes>>;
+  setDiceSize(change: DiceSizeChange): Promise<DiceReply<DiceSizes>>;
+  onDiceSizes(handler: (value: DiceSizes) => void): () => void;
   updateDiceContext(context: DiceContext): Promise<DiceReply<DiceSessionState>>;
   updateDicePreferences(draft: DiceDraft): Promise<DiceReply<DiceDraft>>;
   beginDiceRoll(request: DiceRollRequest): Promise<DiceReply<{ rollId: string }>>;

@@ -6,6 +6,10 @@ Implementado y aceptado por el usuario el 2026-10-24 para cierre en la version m
 
 Rama autorizada: `feature/dm-dice-rolls`. Base de producto: 2.7.0; entrega 2.8.0. Commit, publicacion en GitHub y DMG autorizados. La integracion en main requiere confirmacion separada; registrar su resultado en el plan. Evidencia y limites de verificacion en el plan.
 
+Extension del 2026-10-25: sonido de rodado implementado para revision, posterior al instalador 2.8.0 ya generado. No forma parte de ese binario ni implica nueva autorizacion de commit, push o release.
+
+Extension del 2026-10-28: tamano visual configurable de dados, especialmente en Player View, aceptado para implementacion y entrega patch 2.8.1 por solicitud expresa del usuario. Incluye el sonido pendiente de la revision anterior. Plan tecnico y verificacion en la revision 23 del plan; integracion en main no autorizada en esta entrega.
+
 Decisiones confirmadas por el usuario:
 
 - El resultado del d20 se presenta separado del total de dano.
@@ -28,6 +32,8 @@ Permitir al DM preparar y lanzar dados 3D directamente sobre el mapa, decidir si
 - Celebracion visual de 20 natural conservado: rayos alrededor de ese dado y texto `Crítico`, con privacidad por tirada.
 - Color, material, fuerza, control del resumen en Player View e historial privado de sesion.
 - Animacion y resultados consistentes entre ventanas con diferentes tamanos y camaras.
+- Sonidos locales de uno o varios dados sincronizados con sus rebotes, con control para silenciar.
+- Tamano visual independiente para DM y Player View, ajustable por el DM para mejorar la lectura de las caras en la mesa proyectada.
 
 Fuera de alcance: tiradas iniciadas por jugadores, red/multijugador remoto, formulas con funciones/parentesis/multiplicacion/division/dados negativos, macros, dados explosivos, aplicar dano o resistencias a tokens, duplicar automaticamente el dano critico o determinar aciertos/fallos, iniciativas, multiples chequeos d20 en una tirada, guardar/exportar logs, volver a reproducir una tirada historica, hacer publica posteriormente una tirada oculta y arrastrar dados individuales con el mouse.
 
@@ -43,7 +49,7 @@ Fuera de alcance: tiradas iniciadas por jugadores, red/multijugador remoto, form
 
 ### Orden vertical en Dados
 
-1. Propiedades de la tirada: abierta/oculta, resultado para jugadores, acabado/color, material y fuerza.
+1. Propiedades de la tirada y visualizacion: abierta/oculta, resultado para jugadores, acabado/color, material, fuerza, tamano DM/Player y sonido.
 2. Seleccion de dados: modo Por dados/Formula, grupo de dano activo, cantidades y modificador o formula, resumen de grupos y selector independiente de d20.
 3. Boton `Lanzar`, con resumen de lo que se va a lanzar y su visibilidad.
 4. Historial de tiradas, recientes primero.
@@ -59,12 +65,14 @@ El panel tiene scroll propio, ancho estable y controles compactos del sistema vi
 | Color | Automatico por tipo de dano para grupos tipados. `Por tipo de dado` o un swatch manual afectan solo a Sin tipo y al chequeo d20; el control se identifica como Color sin tipo / d20. |
 | Material | `Resina`, `Mate` o `Metal`. Resina por defecto. |
 | Fuerza | Slider con valor numerico, rango inicial 0.5 a 1.6 y default 1.0, como el laboratorio. Afecta al lanzamiento fisico, no suma un modificador. |
+| Sonido de dados | Activado por defecto en la ventana DM, silenciable incluso durante una tirada. Preferencia local de sesion, independiente de la configuracion y resultados de la tirada. |
+| Tamano en DM / Tamano en Player | Dos sliders independientes con porcentaje visible, en propiedades de Dados, despues de Fuerza. De 100% a 250%, pasos de 25%, inicial 100% en ambas vistas. Cada uno permite restablecer 100% mediante icono con tooltip y nombre accesible. |
 
 Paleta inicial propuesta: rubi, carmesi, coral, naranja, ambar, oro, lima, jade, esmeralda, cian, azul, violeta, rosa, blanco, plata y grafito. Se conserva la opcion multicolor por tipo. Las caras deben tener contraste suficiente con todos los colores/materiales; el metal no puede volver ilegibles los numeros.
 
 No existe selector de superficie: el fondo es el mapa actual. No se dibuja tapete, bandeja opaca ni imagen de mesa. Los dados conservan volumen, sombras discretas y rebotes.
 
-Las preferencias afectan a futuras tiradas y se mantienen durante la sesion. Cambiarlas no altera los resultados historicos. Durante la preparacion/animacion se congela la configuracion de esa tirada; los controles de composicion quedan temporalmente deshabilitados, sin bloquear las herramientas del mapa.
+Las preferencias afectan a futuras tiradas y se mantienen durante la sesion. Cambiarlas no altera los resultados historicos. Durante la preparacion/animacion se congela la configuracion de esa tirada; los controles de composicion quedan temporalmente deshabilitados, sin bloquear las herramientas del mapa. Excepciones de presentacion: el sonido puede silenciarse durante el rodado y el tamano puede actualizar los dados ya asentados segun la seccion 6.
 
 ## 3. Composicion y tipos de dano
 
@@ -127,6 +135,16 @@ Ejemplo: con Fuego y Frio preparados, activar d20 con modificador +3 y elegir ve
 - Cerrar la tirada, reemplazarla o navegar retira texto y rayos siguiendo las mismas reglas de privacidad del overlay. Una oculta no modifica una celebracion publica distinta.
 - Con movimiento reducido: halo de rayos estatico y texto, sin parpadeo ni movimiento, con la misma duracion. Un fallo WebGL no impide mostrar el aviso textual autorizado.
 
+### Sonido del rodado
+
+- Sonidos grabados de dados contra una superficie, con bancos diferentes para una pieza fisica y varias. Un d% y un chequeo con ventaja/desventaja usan el banco de varios; un chequeo normal usa el de uno aunque haya dano preparado.
+- El sonido sigue los contactos de la trayectoria, no comienza un loop continuo al pulsar Lanzar. Variar suavemente muestra/velocidad y volumen segun el impacto, con volumen acotado independiente del numero de piezas. No sonar durante preparacion fallida/cancelada, vuelo inicial o reposo.
+- Terminar al asentarse, cerrar, reemplazar la tirada, cambiar de mapa/escena o cerrar DM. Mantener los dados sobre el mapa no mantiene sonido. Pan, zoom, resize y alternar resumen no reinician audio; tampoco una tirada historica o una presentacion recuperada ya terminada.
+- Desactivar `Sonido de dados` detiene el audio pendiente inmediatamente; reactivarlo afecta al siguiente lanzamiento y no repite contactos de la tirada anterior.
+- Salida inicial elegida: solo DM para evitar audio duplicado de las dos ventanas en el mismo equipo. Player View no reproduce ni recibe instrucciones de audio, incluso en tiradas abiertas. Las ocultas conservan privacidad de payload. Esto no aisla acusticamente unos altavoces compartidos: silenciar o usar auriculares para que otros no oigan una tirada privada.
+- Audio empaquetado y disponible sin red; usar recursos con licencia compatible incluida. Un fallo de carga, decodificacion o dispositivo no bloquea la animacion ni el resultado. No altera formato de escena, protocolo de dados ni historial.
+- La celebracion de critico sigue sin sonido propio; este audio es exclusivamente el rodado previo al reposo.
+
 ## 5. Visibilidad y confidencialidad
 
 | Tirada | DM | Player View |
@@ -162,6 +180,17 @@ Ejemplo: con Fuego y Frio preparados, activar d20 con modificador +3 y elegir ve
 - Abrir/reabrir Player View muestra solo una tirada abierta aun vigente para ese contexto, en su instante actual o resultado final. No reproduce tiradas pasadas ni ocultas.
 - Redimensionar, minimizar/restaurar o cambiar de pestana no recalcula resultados ni hace otra tirada.
 - Un fallo de render no vuelve negra la mesa ni borra la escena. Conservar el resultado ya resuelto y mostrarlo como resumen textual a quien corresponda; avisar al DM del fallo visual.
+
+### Tamano configurable por vista
+
+- El DM controla por separado `Tamano en DM` y `Tamano en Player` desde el panel derecho, pestana Dados. Aumentar Player no agranda el tablero privado del DM ni agrega controles a la pantalla del jugador. Ambos ajustes estan disponibles aunque Player este cerrado o la siguiente tirada sea oculta.
+- El porcentaje expresa escala visual lineal respecto del tamano base actual de cada viewport: 200% busca duplicar ancho y alto de cada dado, no solo su area ni el espacio total del overlay. Se aplica a todos los poliedros, incluidas ambas piezas de d%, conservando sus proporciones y la legibilidad de las caras. No es zoom del mapa ni depende de su grilla, norte o camara.
+- La preferencia se mantiene durante la sesion al cambiar de mapa/escena, alternar paneles, redimensionar y cerrar/reabrir Player View. No se guarda por mapa, en `.ttrpgscene` ni como parte del resultado historico. Una reapertura usa el ultimo tamano elegido para Player, sin publicar tiradas ocultas.
+- El cambio afecta a futuras tiradas y tambien, de inmediato, a los dados ya asentados y aun visibles en la vista correspondiente. No requiere relanzar, no cierra el resumen y no reproduce sonidos ni reinicia la celebracion de critico. Si no hay dados visibles, solo conserva la preferencia. Mientras haya una tirada preparandose o rodando en cualquiera de las vistas, ambos controles permanecen deshabilitados para evitar saltos de escala durante la animacion.
+- Es un ajuste exclusivamente visual: no altera fuerza, caras, seleccion de ventaja/desventaja, modificadores, totales, duracion ni historial; no vuelve a ejecutar la simulacion fisica. Una tirada abierta conserva los mismos dados y resultados aunque DM y Player utilicen tamanos distintos.
+- Mantener dados dentro del viewport util, fuera de paneles y del resumen, sin recortarlos ni provocar nuevas superposiciones al agrandarlos. En ventanas pequenas o tiradas numerosas, limitar la ampliacion al maximo que permita el encuadre y mostrar el porcentaje efectivo junto al solicitado si difieren, de forma discreta en la vista afectada. Conservar el valor solicitado para recuperarlo cuando haya espacio; no reducirlo silenciosamente ni anular una ampliacion que si cabe. Durante el rodado se encuadra la trayectoria completa sin variar por frame; al asentarse se aprovecha el espacio de las posiciones finales. Con una o dos piezas, aumentar a 200% debe producir una diferencia claramente visible cuando el viewport lo permita.
+- Recalcular posicion de etiquetas, sombras y bounds de la celebracion sobre el dado agrandado, manteniendo la abertura proporcional que deja leer el 20. No ampliar el toast, los paneles, el texto `Crítico` ni otros controles junto con la geometria. El resumen sigue respetando el permiso del DM y su cierre manual.
+- Aplicar el cambio sin iniciar un render continuo en reposo ni redibujar el mapa. Validar uno, dos, ocho y 24 dados, viewport horizontal/vertical y distintas resoluciones. Rango 100%..250% aceptado con la orden de implementar; valor inicial 100% en ambas vistas.
 
 ## 7. Historial del DM
 
@@ -213,6 +242,9 @@ La implementacion es compatible y se entrega como version minor 2.8.0, autorizad
 18. Los dados de un mismo dano comparten color en DM/Player; el resumen y log conservan formula, modificador y subtotal, sin alterar la privacidad.
 19. Solo un 20 natural conservado activa rayos y `Crítico`: probar normal, ventaja, desventaja, empate, 17+3 y 20-4. Oculta solo DM; abierta ambas vistas aun sin resumen numerico.
 20. La celebracion termina a los tres segundos sin retirar dados; cierre anticipado, resize, reapertura tardia, movimiento reducido y cambio de visibilidad del resumen no la prolongan ni la repiten.
+21. El DM puede agrandar Player sin modificar su propia vista, y viceversa. Con espacio suficiente, 200% duplica aproximadamente las dimensiones proyectadas respecto de 100%; restablecer recupera el tamano base. Cubrir todos los poliedros y d%.
+22. Cambiar el tamano con dados asentados actualiza su presentacion sin relanzar, alterar valores, cerrar resultados, reproducir audio ni reiniciar rayos. Durante preparacion/rodado los controles estan deshabilitados; zoom, norte y camara del mapa no cambian el ajuste.
+23. En tiradas de hasta 24 piezas y ventanas horizontales/verticales no se recortan dados ni se invaden resumen/controles. Si se limita la ampliacion, se informa el porcentaje efectivo conservando el solicitado. Reabrir Player y navegar entre mapas conservan su preferencia durante la sesion, sin revelar tiradas ocultas.
 
 ## 11. Defaults aceptados
 

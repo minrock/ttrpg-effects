@@ -10,6 +10,13 @@ const appInfo = {
 contextBridge.exposeInMainWorld("ttrpg", {
   updateDiceContext: (context: unknown) => ipcRenderer.invoke("dice:context", context),
   updateDicePreferences: (draft: unknown) => ipcRenderer.invoke("dice:preferences", draft),
+  getDiceSizes: () => ipcRenderer.invoke("dice:get-sizes"),
+  setDiceSize: (change: unknown) => ipcRenderer.invoke("dice:set-size", change),
+  onDiceSizes: (handler: (value: import("../domain/dice/size").DiceSizes) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, value: import("../domain/dice/size").DiceSizes) => handler(value);
+    ipcRenderer.on("dice:sizes", listener);
+    return () => ipcRenderer.removeListener("dice:sizes", listener);
+  },
   beginDiceRoll: (request: unknown) => ipcRenderer.invoke("dice:begin", request),
   completeDiceRoll: (rollId: string, simulation: unknown) => ipcRenderer.invoke("dice:complete", { rollId, simulation }),
   failDiceRoll: (rollId: string) => ipcRenderer.invoke("dice:fail", rollId),

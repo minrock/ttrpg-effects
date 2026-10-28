@@ -3577,7 +3577,7 @@ export function App(): JSX.Element {
           showCompass={mapState !== null}
           overlay={
             <>
-          <DiceOverlay envelope={diceSession.state.envelope} onDismiss={diceSession.dismiss} />
+          <DiceOverlay envelope={diceSession.state.envelope} size={diceSession.diceSizes.sizes.dm} onDismiss={diceSession.dismiss} />
               <DmDarknessStatusBadge darkness={scene.darkness} />
               <SceneCountersOverlay
                 counters={scene.counters}

@@ -88,8 +88,15 @@
 @keyframes dice-critical-announcement { 0% { opacity: 0; transform: translate(-50%, 8px) scale(.94); } 12%, 72% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -8px) scale(1); } }
 .dice-piece-label { position: absolute; z-index: 2; color: #fff4d8; font: 600 11px/18px system-ui, sans-serif; text-shadow: 0 1px 3px #000, 0 0 4px #000; white-space: nowrap; pointer-events: none; }
 .dice-piece-label.is-discarded { opacity: .65; text-decoration: line-through; }
+.dice-sound-control > span { display: inline-flex; align-items: center; gap: 8px; }
+.dice-size-control { display: grid; grid-template-columns: minmax(0, 1fr) 28px; gap: 8px; align-items: end; }
+.dice-size-control .dice-field { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.dice-size-control .dice-field > span { display: flex; justify-content: space-between; gap: 8px; }
+.dice-size-control .dice-icon-button { margin-bottom: 2px; }
+.dice-size-control .dice-field input[type=range] { width: 100%; min-width: 0; }
+.dice-size-limit { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); padding: 2px 7px; border-radius: 4px; background: #111719d9; color: #d5e1e5; font: 12px/16px system-ui, sans-serif; pointer-events: none; }
 .dice-overlay-summary { position: absolute; bottom: 58px; left: 50%; transform: translateX(-50%); width: min(680px, calc(100% - 36px)); box-sizing: border-box; background: #111719eb; color: #e6edf0; border: 1px solid #8da9af60; border-radius: 6px; padding: 14px 18px; box-shadow: 0 6px 25px #0004; }
-.dice-overlay-summary .dice-result { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 18px; }
+.dice-overlay-summary .dice-result { grid-template-columns: repeat(var(--dice-summary-columns, 1), minmax(0, 1fr)); gap: 10px 18px; }
 .dice-overlay-summary .dice-result-total { grid-column: 1 / -1; }
 .dice-overlay-summary.is-dismissible { padding-top: 42px; }
 .dice-overlay-close { position: absolute; top: 6px; right: 6px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-width: 30px; min-height: 30px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #aebcc7; cursor: pointer; pointer-events: auto; }

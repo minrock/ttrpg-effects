@@ -2,6 +2,7 @@ import { AmbientLight, Box3, Color, DirectionalLight, Mesh, OrthographicCamera, 
 import type { DicePresentation } from "../../../domain/dice/dice";
 import { physicalDieColor } from "../../../domain/dice/appearance";
 import { criticalIsActive } from "../../../domain/dice/critical";
+import { diceReplayBounds, fitDiceView, DICE_VIEW_UP_Y, DICE_VIEW_UP_Z, type DiceBounds } from "../../../domain/dice/size";
 import { CriticalDiceLightning, type DieScreenBounds } from "./CriticalDiceLightning";
 import { DiceFactory, type DiceMesh } from "./vendor/DiceFactory.js";
 
@@ -23,10 +24,14 @@ export class DiceOverlayRenderer {
   private disposed = false;
   private critical: CriticalDiceLightning | null = null;
   private readonly nextQuaternion = new Quaternion();
+  private requestedSize = 1;
+  private fitKey = "";
+  private rollingBounds: DiceBounds | null = null;
+  private settledBounds: DiceBounds | null = null;
   private readonly onVisibility = (): void => { cancelAnimationFrame(this.frame); this.critical?.pause(); if (!document.hidden) this.draw(); };
   private readonly onContextLost = (event: Event): void => { event.preventDefault(); cancelAnimationFrame(this.frame); this.critical?.clear(); this.onError(); };
 
-  constructor(private readonly host: HTMLElement, private readonly onError: () => void) {
+  constructor(private readonly host: HTMLElement, private readonly onError: () => void, private readonly onSize: (effective: number) => void = () => {}) {
     this.renderer = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: "low-power" });
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -80,6 +85,13 @@ export class DiceOverlayRenderer {
           this.host.append(label); this.labels.push(label);
           return mesh;
         });
+        const radii = this.meshes.map(mesh => {
+          mesh.geometry.computeBoundingSphere();
+          const sphere = mesh.geometry.boundingSphere!;
+          return (sphere.radius + sphere.center.length()) * SCALE;
+        });
+        this.rollingBounds = diceReplayBounds(value.replay, radii, false);
+        this.settledBounds = diceReplayBounds(value.replay, radii, true);
       }
     }
     this.presentation = value;
@@ -87,16 +99,36 @@ export class DiceOverlayRenderer {
     this.draw();
   }
 
+  setSize(scale: number): void {
+    const requested = Number.isFinite(scale) ? Math.max(1, Math.min(2.5, scale)) : 1;
+    if (requested === this.requestedSize) return;
+    this.requestedSize = requested;
+    cancelAnimationFrame(this.frame); this.draw();
+  }
+
   private resize(): void {
     const { width, height } = this.host.getBoundingClientRect();
     if (width < 1 || height < 1 || this.disposed) return;
     this.renderer.setSize(width, height, false);
-    const aspect = width / height, halfHeight = Math.max(5.8, 9.8 / aspect);
-    this.camera.left = -halfHeight * aspect; this.camera.right = halfHeight * aspect;
-    this.camera.top = halfHeight; this.camera.bottom = -halfHeight;
-    this.camera.updateProjectionMatrix();
     cancelAnimationFrame(this.frame);
     this.draw();
+  }
+
+  private fitCamera(settled: boolean): void {
+    const width = this.host.clientWidth, height = this.host.clientHeight;
+    const key = `${width}:${height}:${this.requestedSize}:${settled}`;
+    if (key === this.fitKey) return;
+    this.fitKey = key;
+    const fit = fitDiceView(width, height, this.requestedSize, settled ? this.settledBounds : this.rollingBounds);
+    this.camera.left = -fit.halfWidth; this.camera.right = fit.halfWidth;
+    this.camera.top = fit.halfHeight; this.camera.bottom = -fit.halfHeight;
+    this.camera.zoom = fit.scale;
+    this.camera.position.set(fit.x, -2 + fit.y * DICE_VIEW_UP_Y, 32 + fit.y * DICE_VIEW_UP_Z);
+    this.camera.lookAt(fit.x, fit.y * DICE_VIEW_UP_Y, fit.y * DICE_VIEW_UP_Z);
+    this.camera.updateProjectionMatrix(); this.camera.updateMatrixWorld();
+    this.host.dataset.requestedSize = String(this.requestedSize);
+    this.host.dataset.effectiveSize = String(fit.scale);
+    this.onSize(fit.scale);
   }
 
   private draw = (): void => {
@@ -113,6 +145,7 @@ export class DiceOverlayRenderer {
       mesh.quaternion.slerp(this.nextQuaternion, mix);
     }
     try {
+      this.fitCamera(elapsed >= replay.durationMs);
       this.renderer.render(this.scene, this.camera);
       this.host.dataset.diceCount = String(this.meshes.length);
       this.host.dataset.rollId = this.presentation.rollId;
@@ -163,7 +196,7 @@ export class DiceOverlayRenderer {
     this.critical.present(value, this.screenBounds(mesh), reduced);
   }
 
-  private clearMeshes(): void { for (const mesh of this.meshes) { this.scene.remove(mesh); mesh.material.forEach(mat => mat.dispose()); } this.meshes = []; this.labels.forEach(label => label.remove()); this.labels = []; }
+  private clearMeshes(): void { for (const mesh of this.meshes) { this.scene.remove(mesh); mesh.material.forEach(mat => mat.dispose()); } this.meshes = []; this.labels.forEach(label => label.remove()); this.labels = []; this.fitKey = ""; this.rollingBounds = null; this.settledBounds = null; }
   private clearTextures(): void { for (const entry of Object.values(this.factory.materials_cache)) { entry.composite.dispose(); entry.bump?.dispose(); } this.factory.materials_cache = {}; }
   dispose(): void {
     this.disposed = true; cancelAnimationFrame(this.frame); this.observer.disconnect();

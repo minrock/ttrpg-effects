@@ -152,4 +152,27 @@ describe("dice session privacy and lifecycle", () => {
     expect(new DiceRollSession(() => {}).getDmState().history).toEqual([]);
     session.clearHistory(); expect(session.getDmState().history).toEqual([]);
   });
+  it("keeps independent sizes across contexts, without changing history or publishing hidden rolls", () => {
+    session.setSize({ view: "player", scale: 2 });
+    session.setSize({ view: "dm", scale: 1.5 });
+    const id = roll(); now += 1000;
+    const before = session.getDmState(), publicBefore = session.getPublicState(); events = [];
+    session.setSize({ view: "player", scale: 2.5 });
+    expect(session.getDmState()).toEqual(before); expect(session.getPublicState()).toBe(publicBefore);
+    expect(events).toEqual([]); expect(session.getDmState().history[0].id).toBe(id);
+    session.setContext({ ...context, token: "b", mapId: "b" });
+    expect(session.getSizes()).toEqual({ revision: 3, dm: 1.5, player: 2.5 });
+    session.setSize({ view: "dm", scale: 1.5 });
+    expect(session.getSizes().revision).toBe(3);
+    expect(new DiceRollSession(() => {}).getSizes()).toEqual({ revision: 0, dm: 1, player: 1 });
+  });
+  it("rejects size changes while preparing or animating and accepts them after resting", () => {
+    const { rollId } = session.begin(request());
+    expect(() => session.setSize({ view: "dm", scale: 2 })).toThrow("Espera");
+    session.complete(rollId, simulation);
+    expect(() => session.setSize({ view: "player", scale: 2 })).toThrow("Espera");
+    now += 1000; expect(session.setSize({ view: "player", scale: 2 }).player).toBe(2);
+    expect(() => session.setSize({ view: "player", scale: 5 })).toThrow();
+    expect(session.getSizes().player).toBe(2);
+  });
 });

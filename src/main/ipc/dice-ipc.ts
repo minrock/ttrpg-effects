@@ -23,6 +23,13 @@ export function registerDiceIpc(options: DiceIpcOptions): () => void {
   };
   handle("dice:context", "dm", value => { session.setContext(value); return session.getDmState(); });
   handle("dice:preferences", "dm", value => session.setDraft(value));
+  handle("dice:set-size", "dm", value => {
+    const sizes = session.setSize(value);
+    send("dm", "dice:sizes", sizes); send("player", "dice:sizes", sizes);
+    return sizes;
+  });
+  ipcMain.handle("dice:get-sizes", event => authorized(event, "dm") || authorized(event, "player")
+    ? { ok: true, value: session.getSizes() } : { ok: false, error: "Operacion de dados no autorizada." });
   handle("dice:begin", "dm", value => session.begin(value));
   handle("dice:complete", "dm", value => {
     const data = z.object({ rollId: z.string().min(1).max(160), simulation: z.unknown() }).parse(value);

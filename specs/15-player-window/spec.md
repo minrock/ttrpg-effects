@@ -300,4 +300,8 @@ Player recibe exclusivamente tiradas abiertas de spec 37. Overlay 3D transparent
 
 Los dados asentados y el resumen autorizado permanecen sin caducidad. La X del resumen DM retira ambos para esa misma tirada en Player, incluso cuando su resumen estaba oculto; Player no tiene control de cierre. Se mantienen las reglas de reemplazo/navegacion y privacidad entre tiradas diferentes.
 
+Extension de sonido (2026-10-25): el rodado se reproduce solamente desde DM para evitar duplicacion acustica en el mismo equipo. Player conserva sus animaciones abiertas pero no crea audio; las tiradas ocultas siguen sin publicar ningun evento. Ver alcance y control de silencio en spec 37.
+
+Tamano de dados (2026-10-28): el DM puede ajustar Player entre 100% y 250%, independientemente del tamano privado y del zoom del mapa. La preferencia dura toda la sesion y se recupera al reabrir Player. Reencuadrar dados abiertos asentados sin relanzar ni revelar resultados ocultos. Si no cabe la ampliacion solicitada, mostrar porcentaje efectivo/solicitado en el overlay; Player no agrega herramientas de edicion. Detalles en spec 37.
+
 Un 20 natural conservado en una tirada abierta muestra rayos por encima del dado y a su alrededor, dejando una abertura circular pequena solo para leer el 20, y `Crítico` durante tres segundos desde el reposo compartido, incluso sin resumen numerico. No se envia ninguna celebracion de tiradas ocultas. La reapertura tardia no reinicia el efecto; el cierre DM lo retira junto con su tirada. Con movimiento reducido los rayos son estaticos. No cambia valores ni aplica reglas de dano.

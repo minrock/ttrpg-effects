@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { defaultDiceDraft, DICE_PROTOCOL_VERSION, draftSchema, expandDice, requestSchema, type D20Mode, type DiceContext, type DiceDraft, type DiceEnvelope, type DiceReply, type DiceSessionState } from "../../../domain/dice/dice";
 import type { DiceApi } from "../../../preload/dice-api";
+import { DiceRollAudio } from "../../../render/audio/DiceRollAudio";
+import { useDiceSizes } from "./useDiceSizes";
 
 const emptyState = (): DiceSessionState => ({ protocolVersion: DICE_PROTOCOL_VERSION, draft: defaultDiceDraft(), history: [], envelope: { revision: -1, presentation: null }, publicRollId: null, publicResultVisible: false, busyUntil: 0 });
 function unwrap<T>(reply: DiceReply<T>): T { if (!reply.ok) throw new Error(reply.error); return reply.value; }
 class DiceProtocolMismatchError extends Error {
-  constructor() { super("El motor de dados esta desactualizado y no soporta los chequeos y modificadores actuales. Guarda la escena y reinicia Electron antes de lanzar."); }
+  constructor() { super("El motor de dados esta desactualizado y no soporta la configuracion actual. Guarda la escena y reinicia Electron antes de lanzar."); }
 }
 function unwrapSession(reply: DiceReply<DiceSessionState>): DiceSessionState {
   const value = unwrap(reply);
@@ -15,12 +17,16 @@ function unwrapSession(reply: DiceReply<DiceSessionState>): DiceSessionState {
 function diceApi(): DiceApi { if (!window.ttrpg?.beginDiceRoll) throw new Error("Mesa de dados no disponible."); return window.ttrpg; }
 
 export function useDiceSession(context: DiceContext) {
+  const diceSizes = useDiceSizes();
   const [state, setState] = useState<DiceSessionState>(emptyState);
   const [draft, setDraft] = useState(defaultDiceDraft);
   const [ready, setReady] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now);
+  const [soundEnabled, setSoundEnabledState] = useState(true);
+  const soundEnabledRef = useRef(true);
+  const audio = useRef<DiceRollAudio | null>(null);
   const controller = useRef<AbortController | null>(null);
   const contextRef = useRef(context); contextRef.current = context;
   const hydrated = useRef(false);
@@ -35,12 +41,13 @@ export function useDiceSession(context: DiceContext) {
     if (!window.ttrpg?.onDicePresentation) return;
     const off = window.ttrpg.onDicePresentation(envelope => setState(current => envelope.revision > current.envelope.revision ? { ...current, envelope } : current));
     const offError = window.ttrpg.onDiceRenderError(setError);
-    return () => { alive.current = false; controller.current?.abort(); off(); offError(); };
+    return () => { alive.current = false; controller.current?.abort(); audio.current?.dispose(); audio.current = null; off(); offError(); };
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     controller.current?.abort(); controller.current = null;
+    audio.current?.stop();
     setPreparing(false); setReady(false); setError(null);
     if (!window.ttrpg?.updateDiceContext) return;
     void window.ttrpg.updateDiceContext(contextRef.current).then(reply => {
@@ -62,6 +69,14 @@ export function useDiceSession(context: DiceContext) {
     const timer = setTimeout(() => setNow(Date.now()), state.busyUntil - Date.now() + 20);
     return () => clearTimeout(timer);
   }, [state.busyUntil]);
+  useEffect(() => {
+    const value = state.envelope.presentation;
+    audio.current?.present(value?.contextToken === context.token ? value : null);
+  }, [state.envelope.presentation, context.token]);
+
+  const setSoundEnabled = (enabled: boolean): void => {
+    soundEnabledRef.current = enabled; setSoundEnabledState(enabled); audio.current?.setEnabled(enabled);
+  };
 
   const updateDraft = (next: DiceDraft): void => {
     const parsed = draftSchema.safeParse(next);
@@ -75,6 +90,9 @@ export function useDiceSession(context: DiceContext) {
     setPreparing(true); setError(null);
     try {
       const request = requestSchema.parse({ requestId: crypto.randomUUID(), contextToken: captured.token, draft: selection, d20 });
+      audio.current ??= new DiceRollAudio();
+      audio.current.setEnabled(soundEnabledRef.current);
+      audio.current.unlock();
       setDraft(request.draft);
       await import("../../../render/three/dice/DiceOverlayRenderer");
       if (abort.signal.aborted) return;
@@ -95,7 +113,7 @@ export function useDiceSession(context: DiceContext) {
   const action = async (operation: () => Promise<DiceReply<DiceSessionState>>): Promise<void> => {
     try { acceptState(unwrapSession(await operation())); } catch (caught) { setError(caught instanceof Error ? caught.message : "No fue posible completar la accion."); }
   };
-  return { state, draft, ready, busy: preparing || state.busyUntil > now, preparing, error, updateDraft, roll,
+  return { state, draft, ready, busy: preparing || state.busyUntil > now, preparing, error: error ?? diceSizes.error, updateDraft, roll, soundEnabled, setSoundEnabled, diceSizes,
     clearHistory: () => action(() => diceApi().clearDiceHistory()),
     dismiss: (rollId: string) => action(() => diceApi().dismissDiceRoll(rollId)),
     showResult: (rollId: string, visible: boolean) => action(() => diceApi().setDiceResultVisibility(rollId, visible)) };

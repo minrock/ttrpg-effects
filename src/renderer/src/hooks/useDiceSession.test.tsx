@@ -4,14 +4,19 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultDiceDraft, DICE_PROTOCOL_VERSION, type DiceContext, type DiceEnvelope } from "../../../domain/dice/dice";
 import { useDiceSession, usePublicDice } from "./useDiceSession";
+import { DiceRollAudio } from "../../../render/audio/DiceRollAudio";
 
 vi.mock("../../../render/three/dice/DiceOverlayRenderer", () => ({}));
+vi.mock("../../../render/audio/DiceRollAudio", () => ({ DiceRollAudio: vi.fn(class {
+  unlock = vi.fn(); present = vi.fn(); stop = vi.fn(); dispose = vi.fn(); setEnabled = vi.fn();
+}) }));
 
 describe("dice window lifecycle", () => {
   let root: Root, host: HTMLDivElement, receive: (value: DiceEnvelope) => void;
   const presentation = (mapId: string): DiceEnvelope => ({ revision: 3, presentation: { rollId: "roll", contextToken: "context", sceneId: "scene", mapId, dice: [], appearance: { color: "multi", material: "resin" }, replay: null, result: null, startedAt: 0, settledAt: 0 } });
   const initial = { protocolVersion: DICE_PROTOCOL_VERSION, draft: defaultDiceDraft(), history: [], envelope: { revision: 0, presentation: null }, publicRollId: null, publicResultVisible: false, busyUntil: 0 };
   beforeEach(() => {
+    vi.clearAllMocks();
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
     Object.defineProperty(window, "ttrpg", { configurable: true, value: {
@@ -29,6 +34,7 @@ describe("dice window lifecycle", () => {
     expect(host.textContent).toBe("roll");
     await act(async () => receive({ revision: 4, presentation: null }));
     expect(host.textContent).toBe("none");
+    expect(DiceRollAudio).not.toHaveBeenCalled();
   });
   it("rejects presentation from a different map", async () => {
     await act(async () => root.render(<Player mapId="next-map" />));
@@ -67,5 +73,27 @@ describe("dice window lifecycle", () => {
     expect(begin).not.toHaveBeenCalled();
     expect(controller!.ready).toBe(false);
     expect(host.textContent).toContain("Guarda la escena y reinicia Electron");
+  });
+  it("unlocks on launch, receives DM-only events and stops when changing context or unmounting", async () => {
+    Object.assign(window.ttrpg!, { beginDiceRoll: vi.fn(async () => ({ ok: false, error: "test cancellation" })) });
+    let controller: ReturnType<typeof useDiceSession>;
+    function DM({ token = "c" }: { token?: string }) { controller = useDiceSession({ token, sceneId: "s", mapId: "m", sceneName: "S", mapName: "M" }); return null; }
+    await act(async () => root.render(<DM />));
+    expect(DiceRollAudio).not.toHaveBeenCalled();
+    await act(async () => controller!.roll(null, { ...defaultDiceDraft(), groups: [{ id: "g", damageType: "none", dice: { d6: 1 } }] }));
+    const audio = vi.mocked(DiceRollAudio).mock.results[0].value as DiceRollAudio;
+    expect(audio.unlock).toHaveBeenCalledOnce();
+    const current = { ...presentation("m"), presentation: { ...presentation("m").presentation!, contextToken: "c" } };
+    await act(async () => receive(current));
+    expect(audio.present).toHaveBeenLastCalledWith(current.presentation);
+    await act(async () => controller!.setSoundEnabled(false));
+    expect(audio.setEnabled).toHaveBeenLastCalledWith(false);
+    await act(async () => root.render(<DM token="next" />));
+    expect(audio.stop).toHaveBeenCalledOnce();
+    expect(controller!.soundEnabled).toBe(false);
+    await act(async () => receive({ ...current, revision: 4 }));
+    expect(audio.present).toHaveBeenLastCalledWith(null);
+    await act(async () => root.render(null));
+    expect(audio.dispose).toHaveBeenCalledOnce();
   });
 });

@@ -1,5 +1,6 @@
 import { contextSchema, defaultDiceDraft, DICE_PROTOCOL_VERSION, draftSchema, expandDice, HISTORY_LIMIT, requestSchema, resolveDiceRoll, validateSimulation, type DiceContext, type DiceDraft, type DiceEnvelope, type DiceHistoryEntry, type DicePresentation, type DiceRollRequest, type DiceSessionState } from "../../domain/dice/dice";
 import { naturalTwenty } from "../../domain/dice/critical";
+import { defaultDiceSizes, diceSizeChangeSchema, type DiceSizes } from "../../domain/dice/size";
 
 type Role = "dm" | "player";
 interface PendingRoll { readonly id: string; readonly request: DiceRollRequest; readonly context: DiceContext; readonly createdAt: number }
@@ -12,6 +13,7 @@ export class DiceRollSession {
   private latestPublic: DiceHistoryEntry | null = null;
   private publicResultVisible = false;
   private busyUntil = 0;
+  private sizes = defaultDiceSizes();
   private readonly requests = new Map<string, string>();
   private envelopes: Record<Role, DiceEnvelope> = { dm: { revision: 0, presentation: null }, player: { revision: 0, presentation: null } };
 
@@ -36,6 +38,14 @@ export class DiceRollSession {
     } else this.context = context;
   }
   setDraft(value: unknown): DiceDraft { this.draft = draftSchema.parse(value); return this.draft; }
+  getSizes(): DiceSizes { return this.sizes; }
+  setSize(value: unknown): DiceSizes {
+    this.sweep();
+    const { view, scale } = diceSizeChangeSchema.parse(value);
+    if (this.pending || this.now() < this.busyUntil) throw new Error("Espera a que termine la tirada para cambiar el tamano.");
+    if (this.sizes[view] !== scale) this.sizes = { ...this.sizes, [view]: scale, revision: this.sizes.revision + 1 };
+    return this.sizes;
+  }
   begin(value: unknown): { rollId: string } {
     this.sweep();
     const request = requestSchema.parse(value);

@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "2.8.0",
+  "version": "2.8.1",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -33,6 +33,11 @@
         "from": "src/render/three/dice/vendor",
         "to": "licenses/dice-box-threejs",
         "filter": ["LICENSE", "README.md"]
+      },
+      {
+        "from": "assets/dice/audio",
+        "to": "licenses/kenney-casino-audio",
+        "filter": ["License.txt", "README.md"]
       }
     ],
     "mac": {

@@ -12,7 +12,7 @@ describe("dice panel", () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     host = document.createElement("div"); document.body.append(host); root = createRoot(host); draft = defaultDiceDraft();
-    controller = { draft, state: { protocolVersion: DICE_PROTOCOL_VERSION, draft, history: [], envelope: { revision: 0, presentation: null }, publicRollId: null, publicResultVisible: false, busyUntil: 0 }, ready: true, busy: false, preparing: false, error: null, updateDraft: vi.fn(next => { draft = next; controller.draft = next; root.render(<DicePanel controller={controller} />); }), roll: vi.fn(async () => {}), clearHistory: vi.fn(async () => {}), showResult: vi.fn(async () => {}), dismiss: vi.fn(async () => {}) };
+    controller = { draft, diceSizes: { sizes: { revision: 0, dm: 1, player: 1 }, ready: true, error: null, setSize: vi.fn(async () => {}) }, state: { protocolVersion: DICE_PROTOCOL_VERSION, draft, history: [], envelope: { revision: 0, presentation: null }, publicRollId: null, publicResultVisible: false, busyUntil: 0 }, ready: true, busy: false, preparing: false, error: null, soundEnabled: true, setSoundEnabled: vi.fn(), updateDraft: vi.fn(next => { draft = next; controller.draft = next; root.render(<DicePanel controller={controller} />); }), roll: vi.fn(async () => {}), clearHistory: vi.fn(async () => {}), showResult: vi.fn(async () => {}), dismiss: vi.fn(async () => {}) };
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
   const click = async (selector: string): Promise<void> => { const button = document.querySelector<HTMLButtonElement>(selector); expect(button).not.toBeNull(); await act(async () => button!.click()); };
@@ -34,6 +34,30 @@ describe("dice panel", () => {
     expect(host.querySelectorAll(".dice-swatch")).toHaveLength(17);
     expect(host.querySelector('[aria-label="Agregar d20"]')).toBeNull();
     expect(host.querySelector<HTMLInputElement>('[aria-label="Incluir chequeo d20"]')?.type).toBe("checkbox");
+  });
+  it("can mute the sound while a roll is busy without editing its draft", async () => {
+    controller.busy = true;
+    await act(async () => root.render(<DicePanel controller={controller} />));
+    const toggle = host.querySelector<HTMLInputElement>(".dice-sound-control input")!;
+    expect(toggle.matches(":disabled")).toBe(false); expect(toggle.checked).toBe(true);
+    await act(async () => toggle.click());
+    expect(controller.setSoundEnabled).toHaveBeenCalledExactlyOnceWith(false);
+    expect(controller.updateDraft).not.toHaveBeenCalled();
+  });
+  it("changes each viewport size independently, resets it, and locks both during rolling", async () => {
+    await act(async () => root.render(<DicePanel controller={controller} />));
+    await fill('[aria-label="Tamano en Player"]', "2");
+    expect(controller.diceSizes.setSize).toHaveBeenLastCalledWith({ view: "player", scale: 2 });
+    await fill('[aria-label="Tamano en DM"]', "1.5");
+    expect(controller.diceSizes.setSize).toHaveBeenLastCalledWith({ view: "dm", scale: 1.5 });
+    expect(controller.updateDraft).not.toHaveBeenCalled();
+    controller.diceSizes.sizes = { revision: 1, dm: 1.5, player: 2 };
+    await act(async () => root.render(<DicePanel controller={controller} />));
+    await click('[aria-label="Restablecer tamano en player"]');
+    expect(controller.diceSizes.setSize).toHaveBeenLastCalledWith({ view: "player", scale: 1 });
+    controller.busy = true;
+    await act(async () => root.render(<DicePanel controller={controller} />));
+    for (const input of host.querySelectorAll('.dice-size-control input, .dice-size-control button')) expect(input.matches(":disabled")).toBe(true);
   });
   it("asks for d20 mode, cancel does not roll, and advantage is sent once", async () => {
     controller.draft = { ...draft, includeD20: true };

@@ -10,6 +10,22 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [2.8.1] - 2026-10-28
+
+### Fixed
+
+- Legibilidad de dados pequenos: tamano independiente de 100% a 250% para DM y Player View, con controles en el panel de Dados y restablecimiento a 100%.
+- Encuadre automatico de la trayectoria y las poses finales, con limite visible cuando no cabe toda la ampliacion; conserva caras, resultados, distancias relativas y cierre manual sin recortar dados ni alterar el zoom del mapa.
+
+### Added
+
+- Sonidos locales CC0 de Kenney para uno o varios dados, incluyendo percentiles y ventaja/desventaja, sincronizados con rebotes y con control de silencio en DM.
+
+### Changed
+
+- Preferencias de tamano conservadas durante la sesion y recuperadas al reabrir Player; IPC compacto separado de las tiradas, sin repetir simulacion, audio ni celebracion al cambiar tamano.
+- Spec y plan de dados/Player actualizados. Protocolo de dados 4; sin cambios de formato `.ttrpgscene`. Version patch por solicitud expresa del usuario.
+
 ## [2.8.0] - 2026-10-24
 
 ### Added

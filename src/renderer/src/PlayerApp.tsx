@@ -11,6 +11,7 @@ import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay";
 import { usePublicDice } from "./hooks/useDiceSession";
+import { useDiceSizes } from "./hooks/useDiceSizes";
 import { DiceOverlay } from "./components/dice/DiceOverlay";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
@@ -339,13 +340,14 @@ export function PlayerApp(): JSX.Element {
   }, [isHydrated, isViewportReady, queuePlayerCameraReport]);
 
   const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
+  const { sizes: diceSizes } = useDiceSizes();
 
   return (
     <main ref={shellRef} className="player-shell" aria-label="TTRPG Effects jugador">
       {isHydrated ? (
         <MapViewport
           key={viewportIdentity}
-          overlay={<DiceOverlay envelope={diceEnvelope} />}
+          overlay={<DiceOverlay envelope={diceEnvelope} size={diceSizes.player} />}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}
