@@ -16,7 +16,9 @@ import {
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import { useMapImageReplacement } from "./hooks/useMapImageReplacement";
 import { ReplaceMapImageModal } from "./components/aside/ReplaceMapImageModal";
-import logoUrl from "../../../assets/logo/ttrpg-effects-icon.png";
+import { WorkspaceHeader } from "./components/workspace/WorkspaceHeader";
+import { WorkspaceTools } from "./components/workspace/WorkspaceTools";
+import { version as appVersion } from "../../../package.json";
 import * as Switch from "@radix-ui/react-switch";
 import {
   ArrowDown,
@@ -27,22 +29,15 @@ import {
   Camera,
   Compass,
   CloudFog,
-  Crosshair,
-  FilePlus,
   Flame,
-  FolderOpen,
   Grid3X3,
   Hexagon,
   MapPin,
-  Monitor,
   Minus,
   Moon,
   Sun,
-  Save,
   Shapes,
   Sparkles,
-  Swords,
-  Timer,
   LocateFixed,
   Ruler,
   ZoomIn,
@@ -268,11 +263,6 @@ import {
   type SceneLinkValidationStatus
 } from "../../domain/annotations/scene-navigation-links";
 
-const fallbackAppInfo = {
-  name: "TTRPG Effects",
-  version: "0.0.0"
-} as const;
-
 type SidebarSectionId = "grid" | "figures" | "effects" | "tokens" | "darkness" | "fog" | "annotations" | "daytime";
 
 type SidebarOpenState = Record<SidebarSectionId, boolean>;
@@ -299,7 +289,6 @@ const SESSION_AUTOSAVE_DELAY_MS = 1000;
 const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
 
 export function App(): JSX.Element {
-  const appInfo = window.ttrpg?.getAppInfo() ?? fallbackAppInfo;
   const [scene, setSceneState] = useState<SceneDocument>(() => {
     try {
       const snapshot = sessionStorage.getItem("ttrpg:session-scene");
@@ -338,9 +327,11 @@ export function App(): JSX.Element {
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
   const contextMenuRef = useRef<HTMLElement | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<ContextMenuPosition | null>(null);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(() => window.innerWidth >= 1100);
   const [rightTab, setRightTab] = useState<"properties" | "dice">("properties");
-  const [isAsidePanelVisible, setIsAsidePanelVisible] = useState(true);
+  const [isAsidePanelVisible, setIsAsidePanelVisible] = useState(() => window.innerWidth >= 1100);
+  const [isPanToolActive, setIsPanToolActive] = useState(false);
+  const [dmZoom, setDmZoom] = useState(1);
   const [isSelectedPropertiesOpen, setIsSelectedPropertiesOpen] = useState(true);
   const [isSpaceDragActive, setIsSpaceDragActive] = useState(false);
   const [isGridAdjustMode, setIsGridAdjustMode] = useState(false);
@@ -645,6 +636,7 @@ export function App(): JSX.Element {
 
   const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
     dmCameraRef.current = normalizeCameraSnapshot(camera);
+    setDmZoom(current => current === camera.zoom ? current : camera.zoom);
   }, []);
 
   const handlePlayerCameraControlMove = useCallback(
@@ -1171,8 +1163,8 @@ export function App(): JSX.Element {
   }
   navigateSceneLinkRef.current = handleNavigateSceneLink;
 
-  const handleCreateShape = (kind: TacticalShapeKind): void => {
-    if (interaction.contextMenu === null) {
+  const handleCreateShape = (kind: TacticalShapeKind, position = interaction.contextMenu?.world): void => {
+    if (position === undefined) {
       return;
     }
 
@@ -1180,7 +1172,7 @@ export function App(): JSX.Element {
     const shape = createTacticalShape({
       id,
       kind,
-      position: interaction.contextMenu.world,
+      position,
       grid: scene.grid,
       settings: scene.settings
     });
@@ -1192,13 +1184,13 @@ export function App(): JSX.Element {
     setInteraction((current) => selectElement(closeContextMenu(current), id));
   };
 
-  const handleCreateLight = (kind: LightKind): void => {
-    if (interaction.contextMenu === null) {
+  const handleCreateLight = (kind: LightKind, position = interaction.contextMenu?.world): void => {
+    if (position === undefined) {
       return;
     }
 
     const id = getNextAvailableSceneId(sceneRef.current, [`${kind}-light-`], nextLightId);
-    const light = createLightSource(id, kind, interaction.contextMenu.world);
+    const light = createLightSource(id, kind, position);
 
     setScene((current) => ({
       ...current,
@@ -1222,13 +1214,13 @@ export function App(): JSX.Element {
     setInteraction((current) => selectElement(closeContextMenu(current), id));
   };
 
-  const handleCreateMagicalDarkness = (): void => {
-    if (interaction.contextMenu === null) {
+  const handleCreateMagicalDarkness = (position = interaction.contextMenu?.world): void => {
+    if (position === undefined) {
       return;
     }
 
     const id = getNextAvailableSceneId(sceneRef.current, ["magical-darkness-"], nextEffectId);
-    const effect = createMagicalDarknessEffect(id, interaction.contextMenu.world);
+    const effect = createMagicalDarknessEffect(id, position);
 
     setScene((current) => ({
       ...current,
@@ -1237,13 +1229,13 @@ export function App(): JSX.Element {
     setInteraction((current) => selectElement(closeContextMenu(current), id));
   };
 
-  const handleCreateDynamicLight = (): void => {
-    if (interaction.contextMenu === null) {
+  const handleCreateDynamicLight = (position = interaction.contextMenu?.world): void => {
+    if (position === undefined) {
       return;
     }
 
     const id = getNextAvailableSceneId(sceneRef.current, ["dynamic-light-"], nextEffectId);
-    const effect = createDynamicLightEffect(id, interaction.contextMenu.world);
+    const effect = createDynamicLightEffect(id, position);
 
     setScene((current) => ({
       ...current,
@@ -1283,13 +1275,13 @@ export function App(): JSX.Element {
     setFeedback("Luz dinamica clonada.");
   };
 
-  const handleCreateLabel = (): void => {
-    if (interaction.contextMenu === null) {
+  const handleCreateLabel = (position = interaction.contextMenu?.world): void => {
+    if (position === undefined) {
       return;
     }
 
     const id = getNextAvailableSceneId(sceneRef.current, ["label-"], nextLabelId);
-    const label = createSceneLabel(id, interaction.contextMenu.world);
+    const label = createSceneLabel(id, position);
 
     setScene((current) => ({
       ...current,
@@ -1744,6 +1736,8 @@ export function App(): JSX.Element {
         }
         return;
       }
+
+      if (event.key === "Escape") setIsPanToolActive(false);
 
       if (isNewSceneDialogOpen) {
         if (event.key === "Escape") {
@@ -2984,7 +2978,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    setIsSidebarVisible(true);
+    if (window.innerWidth >= 1100) setIsSidebarVisible(true);
     setIsSelectedPropertiesOpen(true);
     if (selectedMapAnnotation !== undefined) {
       setOpenSidebarSections((current) => ({ ...current, annotations: true }));
@@ -3267,114 +3261,83 @@ export function App(): JSX.Element {
     [sortedTokens, tokenImageUrls]
   );
 
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 1099px)");
+    const collapse = (): void => {
+      if (media?.matches) { setIsSidebarVisible(false); setIsAsidePanelVisible(false); }
+    };
+    media?.addEventListener("change", collapse);
+    return () => media?.removeEventListener("change", collapse);
+  }, []);
+  useEffect(() => {
+    if (isSidebarVisible && window.innerWidth < 1100) setIsAsidePanelVisible(false);
+  }, [isSidebarVisible]);
+  useEffect(() => {
+    if (interaction.activeTool !== "select" || isGridAdjustMode || isDaytimeMaskPaintMode) setIsPanToolActive(false);
+  }, [interaction.activeTool, isGridAdjustMode, isDaytimeMaskPaintMode]);
+
+  function openInspector(): void {
+    setIsSidebarVisible(true);
+    if (window.innerWidth < 1100) setIsAsidePanelVisible(false);
+  }
+  function toggleInspector(): void {
+    setIsSidebarVisible(current => !current);
+    if (window.innerWidth < 1100) setIsAsidePanelVisible(false);
+  }
+  function toggleExplorer(): void {
+    setIsAsidePanelVisible(current => !current);
+    if (window.innerWidth < 1100) setIsSidebarVisible(false);
+  }
+  function prepareWorkspaceTool(): void {
+    setIsPanToolActive(false);
+    setGridAdjustMode(false);
+    setIsDaytimeMaskPaintMode(false);
+    setPathDraft({ points: [], hoverPoint: null });
+    setWaterDraft({ points: [], hoverPoint: null });
+    setInteraction(current => setMapAdjustMode(setActiveTool(closeContextMenu(current), "select"), false));
+    if (window.innerWidth < 1100) { setIsSidebarVisible(false); setIsAsidePanelVisible(false); }
+  }
+  function openWorkspaceSettings(section: "fog" | "daytime" | "grid"): void {
+    setRightTab("properties");
+    setOpenSidebarSections(current => ({ ...current, [section]: true }));
+    openInspector();
+    requestAnimationFrame(() => document.getElementById(`${section}-controls-panel-header`)?.scrollIntoView({ block: "nearest" }));
+  }
+  function changeDmZoom(direction: "in" | "out"): void {
+    if (interaction.isZoomLocked) return;
+    const camera = zoomPlayerCamera(dmCameraRef.current, direction);
+    dmCameraRef.current = camera;
+    setDmZoom(camera.zoom);
+    viewportHandleRef.current?.setCameraSnapshot(camera);
+  }
+  function centerDmMap(): void {
+    const { position, imageSize, scale } = scene.map;
+    viewportHandleRef.current?.centerOnWorldPoint({
+      x: position.x + (imageSize?.width ?? 0) * scale / 2,
+      y: position.y + (imageSize?.height ?? 0) * scale / 2
+    });
+  }
+
   return (
-    <main className="app-shell" aria-label="TTRPG Effects">
-      <header className="app-toolbar">
-        <div className="brand">
-          <img className="toolbar-logo" src={logoUrl} alt="" />
-          <div>
-            <h1>{appInfo.name}</h1>
-          </div>
-        </div>
-        <div className="scene-actions" aria-label="Acciones de escena">
-          <div className="scene-actions__group scene-actions__group--tools">
-            <button
-              type="button"
-              className={interaction.activeTool === "arcane-pointer" ? "is-active" : ""}
-              onClick={handleToggleArcanePointerMode}
-              aria-pressed={interaction.activeTool === "arcane-pointer"}
-            >
-              <Crosshair size={15} aria-hidden="true" />
-              {interaction.activeTool === "arcane-pointer" ? "Apuntador activo" : "Apuntador"}
-            </button>
-          </div>
-          <div className="scene-actions__divider" aria-hidden="true" />
-          <div className="scene-actions__group scene-actions__group--player">
-            <button type="button" onClick={() => void handleOpenPlayerWindow()} disabled={isBusy}>
-              <Monitor size={15} aria-hidden="true" />
-              Ventana de jugador
-            </button>
-            <div
-              className={`player-camera-toolbar is-${playerCameraSyncStatus}`}
-              aria-label={`Camara de jugador: ${getPlayerCameraStatusLabel(playerCameraSyncStatus)}`}
-            >
-              <Camera size={15} aria-hidden="true" />
-              <span>{getPlayerCameraStatusLabel(playerCameraSyncStatus)}</span>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
-                title={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
-                aria-pressed={showPlayerZoomIndicator}
-                disabled={isBusy}
-                onClick={() => setShowPlayerZoomIndicator((current) => !current)}
-              >
-                <Ruler size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label="Alejar camara de jugador"
-                title="Alejar camara de jugador"
-                disabled={!isPlayerWindowOpen || isBusy}
-                onClick={() => handlePlayerCameraZoom("out")}
-              >
-                <ZoomOut size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label="Acercar camara de jugador"
-                title="Acercar camara de jugador"
-                disabled={!isPlayerWindowOpen || isBusy}
-                onClick={() => handlePlayerCameraZoom("in")}
-              >
-                <ZoomIn size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label="Recentrar vista de jugador"
-                title="Recentrar vista de jugador"
-                disabled={playerCameraSyncStatus !== "desynchronized" || isBusy}
-                onClick={handleRecenterPlayerCamera}
-              >
-                <LocateFixed size={14} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-          <div className="scene-actions__spacer" />
-          <div className="scene-actions__group scene-actions__group--files">
-            {canCreateNewScene ? (
-              <button type="button" className="is-quiet" onClick={handleRequestNewScene} disabled={isBusy}>
-                <FilePlus size={15} aria-hidden="true" />
-                Nueva escena
-              </button>
-            ) : null}
-            <button type="button" onClick={handleSaveScene} disabled={isBusy}>
-              <Save size={15} aria-hidden="true" />
-              Guardar escena
-            </button>
-            <button type="button" className="is-quiet" onClick={handleLoadScene} disabled={isBusy}>
-              <FolderOpen size={15} aria-hidden="true" />
-              Cargar escena
-            </button>
-            <button
-              type="button"
-              className={`is-battle${scene.combatTracker.active ? " is-active" : ""}`}
-              onClick={() => setIsCombatSetupOpen(true)}
-              disabled={isBusy}
-            >
-              <Swords size={15} aria-hidden="true" />
-              {scene.combatTracker.active ? "Batalla activa" : "Iniciar batalla"}
-            </button>
-            <button type="button" className="is-quiet" onClick={() => setIsSceneCounterManagerOpen(true)} disabled={isBusy}>
-              <Timer size={15} aria-hidden="true" />
-              Contadores
-            </button>
-          </div>
-        </div>
-      </header>
+    <main className="app-shell vtt-interface" aria-label="TTRPG Effects">
+      <WorkspaceHeader
+        sceneName={currentFilePath ? getFileBaseName(currentFilePath) : "Escena sin guardar"}
+        mapName={scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa"}
+        busy={isBusy}
+        canCreate={canCreateNewScene}
+        battleActive={scene.combatTracker.active}
+        explorerVisible={isAsidePanelVisible}
+        inspectorVisible={isSidebarVisible}
+        onNew={handleRequestNewScene}
+        onLoad={() => void handleLoadScene()}
+        onSave={() => void handleSaveScene()}
+        onPlayer={() => void handleOpenPlayerWindow()}
+        onBattle={() => setIsCombatSetupOpen(true)}
+        onCounters={() => setIsSceneCounterManagerOpen(true)}
+        onDice={() => { setRightTab("dice"); openInspector(); }}
+        onExplorer={toggleExplorer}
+        onInspector={toggleInspector}
+      />
       {mapReplacement.draft !== null && <ReplaceMapImageModal
         key={mapReplacement.draft.imageUrl}
         draft={mapReplacement.draft}
@@ -3428,12 +3391,29 @@ export function App(): JSX.Element {
             ? "Sin seleccion"
             : `Seleccion: ${interaction.selectedElementId}`}
         </span>
-        <span className="scene-status__version">v{scene.version}</span>
+        <span className="scene-status__version">v{appVersion}</span>
         {warnings.map((warning) => (
           <strong key={warning}>{warning}</strong>
         ))}
       </aside>
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}${isAsidePanelVisible ? "" : " is-aside-hidden"}`}>
+        <WorkspaceTools
+          activeTool={interaction.activeTool} pan={isPanToolActive} busy={isBusy}
+          fogEnabled={scene.fogOfWar.enabled} fogCells={scene.fogOfWar.revealRadius / scene.grid.cellSizeWorld}
+          onPrepare={prepareWorkspaceTool} onSelect={() => setInteraction(current => cancelInteraction(current))}
+          onPan={() => setIsPanToolActive(true)}
+          onShape={kind => handleCreateShape(kind, dmCameraRef.current.center)}
+          onLight={kind => handleCreateLight(kind, dmCameraRef.current.center)}
+          onDynamicLight={() => handleCreateDynamicLight(dmCameraRef.current.center)}
+          onMagicalDarkness={() => handleCreateMagicalDarkness(dmCameraRef.current.center)}
+          onPath={handleStartPathDrawing} onWater={handleStartWaterDrawing}
+          onFire={handleStartFireDrawing} onLightning={handleStartLightningDrawing}
+          onPin={handleStartRoomPin} onArea={handleStartInformationArea} onLink={handleStartSceneLink}
+          onLabel={() => handleCreateLabel(dmCameraRef.current.center)} onToken={handleRequestSidebarNewToken}
+          onPointer={handleToggleArcanePointerMode} onFog={handleToggleFogRevealMode}
+          onFogCells={handleFogRevealRadiusChange} onSettings={openWorkspaceSettings}
+          onConfirmDrawing={interaction.activeTool === "water" ? confirmWaterDrawing : confirmPathDrawing}
+        />
         <DmAsidePanel
           objects={sceneObjects}
           maps={scene.maps}
@@ -3474,7 +3454,7 @@ export function App(): JSX.Element {
           type="button"
           aria-pressed={!isAsidePanelVisible}
           aria-label={isAsidePanelVisible ? "Ocultar panel de escena" : "Mostrar panel de escena"}
-          onClick={() => setIsAsidePanelVisible((v) => !v)}
+          onClick={toggleExplorer}
         >
           {isAsidePanelVisible ? <ChevronLeft aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
         </button>
@@ -3501,7 +3481,7 @@ export function App(): JSX.Element {
           isZoomLocked={interaction.isZoomLocked}
           isMapAdjustMode={interaction.isMapAdjustMode}
           isGridAdjustMode={isGridAdjustMode}
-          isGrabMode={isSpaceDragActive}
+          isGrabMode={isSpaceDragActive || isPanToolActive}
           viewRole="dm"
           isReadOnly={false}
           isNavigationEnabled={false}
@@ -3578,6 +3558,63 @@ export function App(): JSX.Element {
           overlay={
             <>
           <DiceOverlay envelope={diceSession.state.envelope} size={diceSession.diceSizes.sizes.dm} onDismiss={diceSession.dismiss} />
+              <div className="workspace-camera-dock" aria-label="Camaras">
+                <div className="workspace-dm-camera" aria-label="Camara DM">
+                  <Camera size={14} aria-hidden="true" /><span>DM</span>
+                  <button type="button" title="Alejar mapa DM" aria-label="Alejar mapa DM" disabled={interaction.isZoomLocked} onClick={() => changeDmZoom("out")}><ZoomOut size={15} /></button>
+                  <output aria-label="Zoom DM">{Math.round(dmZoom * 100)}%</output>
+                  <button type="button" title="Acercar mapa DM" aria-label="Acercar mapa DM" disabled={interaction.isZoomLocked} onClick={() => changeDmZoom("in")}><ZoomIn size={15} /></button>
+                  <button type="button" title="Centrar mapa DM" aria-label="Centrar mapa DM" disabled={mapState === null} onClick={centerDmMap}><LocateFixed size={15} /></button>
+                </div>
+            <div
+              className={`player-camera-toolbar is-${playerCameraSyncStatus}`}
+              aria-label={`Camara de jugador: ${getPlayerCameraStatusLabel(playerCameraSyncStatus)}`}
+            >
+              <Camera size={15} aria-hidden="true" />
+              <span>{getPlayerCameraStatusLabel(playerCameraSyncStatus)}</span>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
+                title={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
+                aria-pressed={showPlayerZoomIndicator}
+                disabled={isBusy}
+                onClick={() => setShowPlayerZoomIndicator((current) => !current)}
+              >
+                <Ruler size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label="Alejar camara de jugador"
+                title="Alejar camara de jugador"
+                disabled={!isPlayerWindowOpen || isBusy}
+                onClick={() => handlePlayerCameraZoom("out")}
+              >
+                <ZoomOut size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label="Acercar camara de jugador"
+                title="Acercar camara de jugador"
+                disabled={!isPlayerWindowOpen || isBusy}
+                onClick={() => handlePlayerCameraZoom("in")}
+              >
+                <ZoomIn size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="player-camera-toolbar__icon"
+                aria-label="Recentrar vista de jugador"
+                title="Recentrar vista de jugador"
+                disabled={playerCameraSyncStatus !== "desynchronized" || isBusy}
+                onClick={handleRecenterPlayerCamera}
+              >
+                <LocateFixed size={14} aria-hidden="true" />
+              </button>
+            </div>
+              </div>
               <DmDarknessStatusBadge darkness={scene.darkness} />
               <SceneCountersOverlay
                 counters={scene.counters}
@@ -4734,7 +4771,7 @@ export function App(): JSX.Element {
           type="button"
           aria-pressed={!isSidebarVisible}
           aria-label={isSidebarVisible ? "Ocultar menú lateral" : "Mostrar menú lateral"}
-          onClick={() => setIsSidebarVisible((current) => !current)}
+          onClick={toggleInspector}
         >
           {isSidebarVisible ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
         </button>
@@ -4916,7 +4953,7 @@ export function App(): JSX.Element {
               <button type="button" onClick={handleCloneDynamicLight}>Clonar luz</button>
             ) : null}
             <hr aria-hidden="true" />
-            <button type="button" onClick={handleCreateLabel}>
+            <button type="button" onClick={() => handleCreateLabel()}>
               Crear label DM
             </button>
             <li className="has-submenu">
@@ -4949,8 +4986,8 @@ export function App(): JSX.Element {
                 <li className="lightning-context-tools"><span>Fuego</span><FireTools active={interaction.activeTool === "fire-paint" ? "paint" : getFireTool(interaction.activeTool)} onSelect={handleStartFireDrawing} /></li>
                 <button type="button" onClick={() => handleCreateElement("pointLight")}>Luz puntual</button>
                 <button type="button" onClick={() => handleCreateElement("coneLight")}>Luz cónica</button>
-                <button type="button" onClick={handleCreateDynamicLight}>Luz dinamica</button>
-                <button type="button" onClick={handleCreateMagicalDarkness}>Oscuridad magica</button>
+                <button type="button" onClick={() => handleCreateDynamicLight()}>Luz dinamica</button>
+                <button type="button" onClick={() => handleCreateMagicalDarkness()}>Oscuridad magica</button>
                 <button type="button" onClick={handleStartWaterDrawing}>Agua</button>
                 <li className="lightning-context-tools"><span>Relampago</span><LightningTools active={getLightningTool(interaction.activeTool)} onSelect={handleStartLightningDrawing} /></li>
               </menu>

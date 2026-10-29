@@ -10,6 +10,32 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [3.0.0] - 2026-10-28
+
+### Changed
+
+- Nueva interfaz de mesa para DM: cabecera compacta, barra vertical de herramientas con opciones contextuales, explorador Escena/Mapa e inspector Propiedades/Dados. Conserva las acciones de escena, anotaciones, entidades, efectos, combate y contadores.
+- Paneles adaptables a ventanas estrechas, navegacion accesible entre pestanas y controles separados para camara DM y jugador. Ocultar paneles no reinicia el canvas ni la tirada de dados activa.
+- Player View adopta el mismo lenguaje visual con controles discretos de navegacion, zoom, brujula y herramientas locales.
+
+### Added
+
+- Mediciones de linea y caminos, circulos, cuadrados, rectangulos y conos locales en Player View, con propiedades, seleccion, arrastre, borrado y limpieza. Se pueden ocultar los controles sin perder las figuras.
+- Las herramientas del jugador son efimeras y privadas de esa ventana: no modifican objetos del DM, no publican ni guardan cambios en la escena y se limpian al cambiar de mapa o escena.
+- Laboratorios de interfaz DM y Player para desarrollo, con mapa original generado y pruebas de aislamiento. No se incluyen como entradas del instalador.
+
+### Fixed
+
+- Brujula con norte diferenciado y N legible; en Player siempre apunta hacia arriba, independientemente de la orientacion del mapa.
+- Coordenadas de puntero, arrastre y manivelas alineadas con el norte rotado en Player; etiquetas de medida siempre derechas.
+- Callbacks y capas estables para evitar recreaciones del viewport durante la edicion local de figuras.
+
+### Compatibility
+
+- Version mayor por solicitud expresa del usuario para este cierre de interfaz. No hay ruptura ni migracion nueva de `.ttrpgscene`; se conserva el formato y la compatibilidad de escenas existentes.
+- La integracion en `main` incluye las versiones de dados 2.8.0 y 2.8.1 documentadas abajo. No se modifican los algoritmos de fuego, relampagos, luces o filtros horarios en este rediseño.
+- Cierre de specs 38 y 39; actualizacion de specs/planes de paneles, brujula y Player View.
+
 ## [2.8.1] - 2026-10-28
 
 ### Fixed

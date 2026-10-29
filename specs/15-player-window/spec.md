@@ -1,5 +1,14 @@
 # Spec - Ventana de Jugador
 
+## Interfaz y herramientas locales 3.0.0
+
+Extension aceptada el 2026-10-28. Ver alcance completo en spec/plan 39. Las restricciones historicas de ausencia de toolbar y edicion descritas abajo quedan limitadas a la escena compartida del DM; no impiden las herramientas locales de esta extension.
+
+- Interfaz compacta con controles ocultables y dock de camara, zoom y brujula; conserva dados, contadores e informacion publica.
+- Lineas de medicion, caminos, circulos, cuadrados, rectangulos y conos locales con seleccion, propiedades, arrastre y borrado. Usan unidades/grilla del mapa y coordenadas correctas con norte rotado; medidas siempre legibles.
+- Estado efimero exclusivo de Player View, sin guardar ni publicar hacia DM. Cambiar mapa/escena lo limpia; snapshots ordinarios y reemplazo de imagen lo conservan.
+- La escena y los objetos del DM siguen siendo read-only. No se habilita edicion de tokens, luces, efectos, niebla ni contenido privado.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
@@ -32,7 +41,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Agregar un boton principal en la ventana del DM para abrir la `Ventana de jugador`.
 - Crear una segunda ventana Electron real (`BrowserWindow`) para la vista de jugadores.
 - La ventana de jugador debe ocupar el 100% del viewport del mapa disponible en esa ventana.
-- La ventana de jugador no muestra toolbar, sidebar, status bar, menus contextuales ni modales de edicion.
+- La ventana de jugador no muestra sidebar, status bar, menus contextuales ni modales de edicion de la escena DM. Solo incorpora los controles locales definidos en la extension 3.0.0.
 - La ventana de jugador es read-only para edicion de escena, pero permite navegar su propia vista.
 - La camara de jugador es independiente de la camara del DM:
   - el pan/zoom normal del viewport DM no mueve al jugador;
@@ -58,7 +67,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - tokens;
   - emojis o patrones asociados a efectos/formas;
   - apuntador arcano.
-- Las interacciones y ediciones solo ocurren desde la ventana del DM.
+- Las ediciones de la escena compartida solo ocurren desde la ventana del DM; las herramientas efimeras del jugador no modifican esa escena.
 - Si la ventana de jugador esta cerrada y se vuelve a abrir, debe cargar el estado actual completo del DM.
 
 ### Diferencias entre vista DM y vista jugador

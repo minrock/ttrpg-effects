@@ -32,9 +32,9 @@ export function SceneMapsSection({
   const [dropTargetMapId, setDropTargetMapId] = useState<string | null>(null);
 
   function handleDrop(targetMapId: string): void {
+    setDraggedMapId(null);
+    setDropTargetMapId(null);
     if (draggedMapId === null || draggedMapId === targetMapId) {
-      setDraggedMapId(null);
-      setDropTargetMapId(null);
       return;
     }
 
@@ -46,8 +46,6 @@ export function SceneMapsSection({
     if (id === undefined) return;
     ids.splice(targetIndex, 0, id);
     onReorder(ids);
-    setDraggedMapId(null);
-    setDropTargetMapId(null);
   }
 
   return (
@@ -76,6 +74,11 @@ export function SceneMapsSection({
               ].filter(Boolean).join(" ")}
               draggable
               onDragStart={(event) => {
+                if (event.target instanceof Element && event.target.closest("button, input")) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  return;
+                }
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", map.id);
                 setDraggedMapId(map.id);
@@ -98,11 +101,22 @@ export function SceneMapsSection({
               <span className="scene-map-list__drag" title="Arrastrar para ordenar" aria-hidden="true">
                 <GripVertical />
               </span>
-              <button type="button" className="scene-map-list__select" onClick={() => onSelect(map.id)}>
+              <button
+                type="button"
+                className="scene-map-list__select"
+                title={`Seleccionar ${map.name}`}
+                data-tooltip="Seleccionar mapa"
+                aria-label={`Seleccionar ${map.name}`}
+                aria-pressed={map.id === activeMapId}
+                draggable={false}
+                onClick={() => onSelect(map.id)}
+              >
                 <Map aria-hidden="true" />
               </button>
               <input
                 aria-label={`Nombre de ${map.name}`}
+                title={map.name}
+                draggable={false}
                 value={map.name}
                 onChange={(event) => onRename(map.id, event.currentTarget.value)}
               />
@@ -110,6 +124,7 @@ export function SceneMapsSection({
                 <button
                   type="button"
                   title="Actualizar imagen"
+                  data-tooltip="Actualizar imagen"
                   aria-label={`Actualizar imagen de ${map.name}`}
                   disabled={isReplacingImage}
                   draggable={false}
@@ -119,7 +134,14 @@ export function SceneMapsSection({
                 >
                   <ImageUp aria-hidden="true" />
                 </button>
-                <button type="button" title="Eliminar mapa" aria-label={`Eliminar ${map.name}`} onClick={() => onDelete(map.id)}>
+                <button
+                  type="button"
+                  title="Eliminar mapa"
+                  data-tooltip="Eliminar mapa"
+                  aria-label={`Eliminar ${map.name}`}
+                  draggable={false}
+                  onClick={() => onDelete(map.id)}
+                >
                   <Trash2 aria-hidden="true" />
                 </button>
               </div>

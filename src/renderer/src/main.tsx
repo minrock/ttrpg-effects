@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { PlayerApp } from "./PlayerApp";
 import "./styles.css";
+import "./components/workspace/workspace.css";
 
 const params = new URLSearchParams(window.location.search);
 const RootApp = params.get("view") === "player" ? PlayerApp : App;

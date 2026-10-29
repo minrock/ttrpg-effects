@@ -43,6 +43,7 @@ import { CompassOverlay } from "./CompassOverlay";
 import type { DaytimeBrushTopology, DaytimeMaskStrokeMode, SceneDaytimeFilter, SceneDaytimeMask } from "../../../domain/environment/daytime-filter";
 
 export interface MapViewportHandle {
+  setCameraSnapshot: (camera: ViewportCameraSnapshot) => void;
   getRandomVisibleWorldPoint: () => { readonly x: number; readonly y: number };
   getNearbyVisibleWorldPoint: (
     origin: { readonly x: number; readonly y: number },
@@ -82,6 +83,7 @@ interface MapViewportProps {
   readonly isGrabMode: boolean;
   readonly viewRole?: ViewportViewRole;
   readonly isReadOnly?: boolean;
+  readonly localEditableShapeIds?: readonly string[];
   readonly isNavigationEnabled?: boolean;
   readonly fogPresentation?: FogPresentation;
   readonly hiddenTokenPolicy?: HiddenTokenPolicy;
@@ -191,6 +193,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   isGrabMode,
   viewRole = "dm",
   isReadOnly = false,
+  localEditableShapeIds,
   isNavigationEnabled = false,
   fogPresentation = "dm-preview",
   hiddenTokenPolicy = "show-with-indicator",
@@ -282,6 +285,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   backgroundColorRef.current = backgroundColor;
 
   useImperativeHandle(ref, () => ({
+    setCameraSnapshot: (camera) => viewportRef.current?.setCameraSnapshot(camera),
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
     getNearbyVisibleWorldPoint: (origin, excludedElementId) =>
       viewportRef.current?.getNearbyVisibleWorldPoint(origin, excludedElementId) ?? origin,
@@ -380,6 +384,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setZoomLocked(isZoomLocked);
       createdViewport.setViewRole(viewRole);
       createdViewport.setReadOnly(isReadOnly);
+      createdViewport.setLocalEditableShapeIds(localEditableShapeIds);
       createdViewport.setNavigationEnabled(isNavigationEnabled);
       createdViewport.setFogPresentation(fogPresentation);
       createdViewport.setHiddenTokenPolicy(hiddenTokenPolicy);
@@ -451,6 +456,10 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setShapes(shapes);
   }, [shapes]);
+
+  useEffect(() => {
+    viewportRef.current?.setLocalEditableShapeIds(localEditableShapeIds);
+  }, [localEditableShapeIds]);
 
   useEffect(() => {
     viewportRef.current?.setLights(lights);

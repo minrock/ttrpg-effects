@@ -1,10 +1,11 @@
-import { useCallback, useState, type JSX } from "react";
+import { useCallback, useId, useRef, useState, type JSX, type KeyboardEvent } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Diamond,
   Layers,
   Map,
+  RotateCcw,
   Skull,
   StickyNote,
   UserRound,
@@ -39,6 +40,7 @@ import type { SceneLinkValidationStatus } from "../../../../domain/annotations/s
 import type { SceneObjectEntry } from "../../../../domain/sessions/scene-objects";
 import { SceneObjectsTree } from "./SceneObjectsTree";
 import { SceneMapsSection } from "./SceneMapsSection";
+import "./interface-explorer.css";
 
 interface DmAsidePanelProps {
   readonly objects: readonly SceneObjectEntry[];
@@ -76,8 +78,12 @@ interface DmAsidePanelProps {
   readonly hidden?: boolean;
 }
 
-type SectionKey = "objects" | "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
+type SectionKey = "maps" | "objects" | "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
 type AsideTab = "scene" | "map";
+const ASIDE_TABS = [
+  { id: "scene", label: "Escena", icon: Layers },
+  { id: "map", label: "Mapa", icon: Map }
+] as const;
 
 export function DmAsidePanel({
   objects,
@@ -115,9 +121,29 @@ export function DmAsidePanel({
   hidden
 }: DmAsidePanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<AsideTab>("scene");
+  const panelId = useId();
+  const tabRefs = useRef<Partial<Record<AsideTab, HTMLButtonElement | null>>>({});
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(
-    new Set<SectionKey>(["objects", "annotations", "monsters", "npcs", "playerCharacters", "notes"])
+    new Set<SectionKey>(["maps", "objects", "annotations", "monsters", "npcs", "playerCharacters", "notes"])
   );
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, tab: AsideTab): void {
+    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    const index = ASIDE_TABS.findIndex((item) => item.id === tab);
+    let nextIndex: number;
+    switch (event.key) {
+      case "ArrowRight": nextIndex = (index + 1) % ASIDE_TABS.length; break;
+      case "ArrowLeft": nextIndex = (index + ASIDE_TABS.length - 1) % ASIDE_TABS.length; break;
+      case "Home": nextIndex = 0; break;
+      case "End": nextIndex = ASIDE_TABS.length - 1; break;
+      default: return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const nextTab = ASIDE_TABS[nextIndex].id;
+    setActiveTab(nextTab);
+    tabRefs.current[nextTab]?.focus();
+  }
 
   const toggleSection = useCallback((key: SectionKey) => {
     setOpenSections((prev) => {
@@ -175,152 +201,174 @@ export function DmAsidePanel({
   return (
     <aside className="dm-aside-panel" aria-label="Panel de escena" hidden={hidden}>
       <div className="dm-aside-header">
-        <span className="dm-aside-title">Escena</span>
+        <span className="dm-aside-title">Explorador</span>
       </div>
       <div className="dm-aside-tabs" role="tablist" aria-label="Contenido del panel izquierdo">
-        <button type="button" role="tab" aria-selected={activeTab === "scene"} className={activeTab === "scene" ? "is-active" : ""} onClick={() => setActiveTab("scene")}>
-          <Layers aria-hidden="true" />
-          Escena
-        </button>
-        <button type="button" role="tab" aria-selected={activeTab === "map"} className={activeTab === "map" ? "is-active" : ""} onClick={() => setActiveTab("map")}>
-          <Map aria-hidden="true" />
-          Mapa
-        </button>
+        {ASIDE_TABS.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            ref={(element) => { tabRefs.current[id] = element; }}
+            type="button"
+            role="tab"
+            id={`${panelId}-${id}-tab`}
+            aria-controls={`${panelId}-${id}-panel`}
+            aria-selected={activeTab === id}
+            tabIndex={activeTab === id ? 0 : -1}
+            className={activeTab === id ? "is-active" : ""}
+            onClick={() => setActiveTab(id)}
+            onKeyDown={(event) => handleTabKeyDown(event, id)}
+          >
+            <Icon aria-hidden="true" />
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="dm-aside-content">
-        {activeTab === "scene" ? (
-          <>
-            <AccordionSection title="Mapas" icon={Map} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={maps.length} onToggle={toggleSection}>
-              <SceneMapsSection
-                maps={maps}
-                activeMapId={activeMapId}
-                onSelect={onSelectMap}
-                onRename={onRenameMap}
-                onReorder={onReorderMaps}
-                onDelete={onDeleteMap}
-                onAddMap={onAddMap}
-                onImportScene={onImportSceneAsMap}
-                onReplaceMapImage={onReplaceMapImage}
-                isReplacingImage={isReplacingImage}
-              />
-            </AccordionSection>
-            <AccordionSection
-              title="Monstruos"
-              icon={Skull}
-              tone="monster"
-              sectionKey="monsters"
-              open={openSections.has("monsters")}
-              badge={aside.monsters.length}
-              onToggle={toggleSection}
+        <div
+          className="dm-aside-tabpanel"
+          role="tabpanel"
+          id={`${panelId}-scene-panel`}
+          aria-labelledby={`${panelId}-scene-tab`}
+          hidden={activeTab !== "scene"}
+        >
+          <AccordionSection title="Mapas" icon={Map} tone="annotation" sectionKey="maps" open={openSections.has("maps")} badge={maps.length} onToggle={toggleSection}>
+            <SceneMapsSection
+              maps={maps}
+              activeMapId={activeMapId}
+              onSelect={onSelectMap}
+              onRename={onRenameMap}
+              onReorder={onReorderMaps}
+              onDelete={onDeleteMap}
+              onAddMap={onAddMap}
+              onImportScene={onImportSceneAsMap}
+              onReplaceMapImage={onReplaceMapImage}
+              isReplacingImage={isReplacingImage}
+            />
+          </AccordionSection>
+          <AccordionSection
+            title="Monstruos"
+            icon={Skull}
+            tone="monster"
+            sectionKey="monsters"
+            open={openSections.has("monsters")}
+            badge={aside.monsters.length}
+            onToggle={toggleSection}
+          >
+            <MonsterSection
+              monsters={aside.monsters}
+              templates={monsterTemplates}
+              onAdd={handleAddMonster}
+              onUpdate={handleUpdateMonster}
+              onRemove={handleRemoveMonster}
+              onToggleVisibility={handleToggleMonsterVisibility}
+            />
+          </AccordionSection>
+          <AccordionSection title="NPCs" icon={UserRound} tone="npc" sectionKey="npcs" open={openSections.has("npcs")} badge={aside.npcs.length} onToggle={toggleSection}>
+            <NpcSection
+              npcs={aside.npcs}
+              onAdd={handleAddNpc}
+              onUpdate={handleUpdateNpc}
+              onRemove={handleRemoveNpc}
+              onToggleVisibility={handleToggleNpcVisibility}
+            />
+          </AccordionSection>
+          <AccordionSection
+            title="Personajes"
+            icon={UsersRound}
+            tone="player"
+            sectionKey="playerCharacters"
+            open={openSections.has("playerCharacters")}
+            badge={aside.playerCharacters.length}
+            onToggle={toggleSection}
+          >
+            <PlayerCharacterSection
+              characters={aside.playerCharacters}
+              onAdd={handleAddPlayerCharacter}
+              onUpdate={handleUpdatePlayerCharacter}
+              onRemove={handleRemovePlayerCharacter}
+            />
+          </AccordionSection>
+          <AccordionSection title="Notas" icon={StickyNote} tone="note" sectionKey="notes" open={openSections.has("notes")} badge={aside.notes.length} onToggle={toggleSection}>
+            <NotesSection
+              notes={aside.notes}
+              onAdd={handleAddNote}
+              onUpdate={handleUpdateNote}
+              onRemove={handleRemoveNote}
+            />
+          </AccordionSection>
+        </div>
+        <div
+          className="dm-aside-tabpanel"
+          role="tabpanel"
+          id={`${panelId}-map-panel`}
+          aria-labelledby={`${panelId}-map-tab`}
+          hidden={activeTab !== "map"}
+        >
+          <section className="map-settings-panel" aria-label="Ajustes de mapa">
+            <div className="map-settings-panel__header">
+              <Map aria-hidden="true" />
+              <span>Mapa</span>
+            </div>
+            <label className="map-background-control">
+              <span>Fondo</span>
+              <span className="map-background-picker">
+                <span
+                  className="map-background-picker__swatch"
+                  style={{ backgroundColor }}
+                  aria-hidden="true"
+                />
+                <span className="map-background-picker__value">{backgroundColor}</span>
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  disabled={activeMapId === null}
+                  onChange={(event) => onBackgroundColorChange(event.currentTarget.value)}
+                  aria-label="Color de fondo infinito"
+                />
+              </span>
+            </label>
+            <button
+              type="button"
+              className="map-background-reset"
+              title="Restablecer fondo"
+              aria-label="Restablecer fondo"
+              data-tooltip="Restablecer fondo"
+              disabled={activeMapId === null || backgroundColor === DEFAULT_MAP_BACKGROUND_COLOR}
+              onClick={() => onBackgroundColorChange(DEFAULT_MAP_BACKGROUND_COLOR)}
             >
-              <MonsterSection
-                monsters={aside.monsters}
-                templates={monsterTemplates}
-                onAdd={handleAddMonster}
-                onUpdate={handleUpdateMonster}
-                onRemove={handleRemoveMonster}
-                onToggleVisibility={handleToggleMonsterVisibility}
-              />
-            </AccordionSection>
-            <AccordionSection title="NPCs" icon={UserRound} tone="npc" sectionKey="npcs" open={openSections.has("npcs")} badge={aside.npcs.length} onToggle={toggleSection}>
-              <NpcSection
-                npcs={aside.npcs}
-                onAdd={handleAddNpc}
-                onUpdate={handleUpdateNpc}
-                onRemove={handleRemoveNpc}
-                onToggleVisibility={handleToggleNpcVisibility}
-              />
-            </AccordionSection>
-            <AccordionSection
-              title="Personajes"
-              icon={UsersRound}
-              tone="player"
-              sectionKey="playerCharacters"
-              open={openSections.has("playerCharacters")}
-              badge={aside.playerCharacters.length}
-              onToggle={toggleSection}
-            >
-              <PlayerCharacterSection
-                characters={aside.playerCharacters}
-                onAdd={handleAddPlayerCharacter}
-                onUpdate={handleUpdatePlayerCharacter}
-                onRemove={handleRemovePlayerCharacter}
-              />
-            </AccordionSection>
-            <AccordionSection title="Notas" icon={StickyNote} tone="note" sectionKey="notes" open={openSections.has("notes")} badge={aside.notes.length} onToggle={toggleSection}>
-              <NotesSection
-                notes={aside.notes}
-                onAdd={handleAddNote}
-                onUpdate={handleUpdateNote}
-                onRemove={handleRemoveNote}
-              />
-            </AccordionSection>
-          </>
-        ) : (
-          <>
-            <section className="map-settings-panel" aria-label="Ajustes de mapa">
-              <div className="map-settings-panel__header">
-                <Map aria-hidden="true" />
-                <span>Mapa</span>
-              </div>
-              <label className="map-background-control">
-                <span>Fondo</span>
-                <span className="map-background-picker">
-                  <span
-                    className="map-background-picker__swatch"
-                    style={{ backgroundColor }}
-                    aria-hidden="true"
-                  />
-                  <span className="map-background-picker__value">{backgroundColor}</span>
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    disabled={activeMapId === null}
-                    onChange={(event) => onBackgroundColorChange(event.currentTarget.value)}
-                    aria-label="Color de fondo infinito"
-                  />
-                </span>
-              </label>
-              <button
-                type="button"
-                className="map-background-reset"
-                disabled={activeMapId === null || backgroundColor === DEFAULT_MAP_BACKGROUND_COLOR}
-                onClick={() => onBackgroundColorChange(DEFAULT_MAP_BACKGROUND_COLOR)}
-              >
-                Reset
-              </button>
-            </section>
-            <AccordionSection title="Objetos" icon={Diamond} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={objects.length} onToggle={toggleSection}>
-              <SceneObjectsTree objects={objects} selectedElementId={selectedElementId} onSelect={onSelectObject} onLocate={onLocateObject} onDelete={onDeleteObject} />
-            </AccordionSection>
-            <AccordionSection
-              title="Anotaciones"
-              icon={Diamond}
-              tone="annotation"
-              sectionKey="annotations"
-              open={openSections.has("annotations")}
-              badge={annotations.pins.length + annotations.areas.length + annotations.sceneLinks.length}
-              onToggle={toggleSection}
-            >
-              <MapAnnotationsTree
-                annotations={annotations}
-                selectedElementId={selectedElementId}
-                onSelect={onSelectAnnotation}
-                onDeleteArea={onDeleteInformationArea}
-                onGoTo={onGoToAnnotation}
-                onEdit={onEditAnnotation}
-                onToggleLock={onToggleAnnotationLock}
-                onHighlightArea={onHighlightInformationArea}
-                activeTool={activeAnnotationTool}
-                onStartPin={onStartRoomPin}
-                onStartArea={onStartInformationArea}
-                onStartSceneLink={onStartSceneLink}
-                sceneLinkStatuses={sceneLinkStatuses}
-              />
-            </AccordionSection>
-          </>
-        )}
+              <RotateCcw size={14} aria-hidden="true" />
+            </button>
+          </section>
+          <AccordionSection title="Objetos" icon={Diamond} tone="annotation" sectionKey="objects" open={openSections.has("objects")} badge={objects.length} onToggle={toggleSection}>
+            <SceneObjectsTree objects={objects} selectedElementId={selectedElementId} onSelect={onSelectObject} onLocate={onLocateObject} onDelete={onDeleteObject} />
+          </AccordionSection>
+          <AccordionSection
+            title="Anotaciones"
+            icon={Diamond}
+            tone="annotation"
+            sectionKey="annotations"
+            open={openSections.has("annotations")}
+            badge={annotations.pins.length + annotations.areas.length + annotations.sceneLinks.length}
+            onToggle={toggleSection}
+          >
+            <MapAnnotationsTree
+              annotations={annotations}
+              selectedElementId={selectedElementId}
+              onSelect={onSelectAnnotation}
+              onDeleteArea={onDeleteInformationArea}
+              onGoTo={onGoToAnnotation}
+              onEdit={onEditAnnotation}
+              onToggleLock={onToggleAnnotationLock}
+              onHighlightArea={onHighlightInformationArea}
+              activeTool={activeAnnotationTool}
+              onStartPin={onStartRoomPin}
+              onStartArea={onStartInformationArea}
+              onStartSceneLink={onStartSceneLink}
+              sceneLinkStatuses={sceneLinkStatuses}
+            />
+          </AccordionSection>
+        </div>
       </div>
     </aside>
   );
@@ -336,10 +384,15 @@ function AccordionSection({ title, icon: Icon, tone, sectionKey, open, badge, on
   onToggle: (key: SectionKey) => void;
   children: React.ReactNode;
 }): JSX.Element {
+  const sectionId = useId();
   return (
     <div className="dm-aside-accordion">
       <button
+        type="button"
+        id={`${sectionId}-heading`}
         className="dm-aside-accordion-header"
+        aria-expanded={open}
+        aria-controls={`${sectionId}-body`}
         onClick={() => onToggle(sectionKey)}
       >
         <span className="dm-aside-accordion-title">
@@ -353,11 +406,15 @@ function AccordionSection({ title, icon: Icon, tone, sectionKey, open, badge, on
           {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         </span>
       </button>
-      {open && (
-        <div className="dm-aside-accordion-body">
-          {children}
-        </div>
-      )}
+      <div
+        id={`${sectionId}-body`}
+        className="dm-aside-accordion-body"
+        role="group"
+        aria-labelledby={`${sectionId}-heading`}
+        hidden={!open}
+      >
+        {children}
+      </div>
     </div>
   );
 }

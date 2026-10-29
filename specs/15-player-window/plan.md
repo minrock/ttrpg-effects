@@ -1,5 +1,15 @@
 # Plan - Ventana de Jugador
 
+## Interfaz y herramientas locales 3.0.0
+
+Extension implementada y aceptada el 2026-10-28; secuencia, pruebas y cierre en plan 39. Este contrato amplia los controles locales del plan historico sin conceder permisos sobre la escena DM.
+
+- `usePlayerTools` mantiene figuras y borradores efimeros con callbacks estables, independientes de SceneDocument y de persistencia/IPC.
+- `PlayerTools` aporta controles compactos; `PlayerApp` combina shapes publicas y locales solo al renderizar, con `isReadOnly=true` y allowlist explicita `localEditableShapeIds`.
+- Pixi limita picking, drag y handles a esa allowlist. Conversiones compartidas de mundo/pantalla respetan norte; etiquetas reciben contrarrotacion. Aplicar shapes y allowlist antes de seleccion.
+- Reiniciar por identidad de viewport, no por cada snapshot. Hover imperativo y arrays estables evitan recrear el canvas mientras se dibuja.
+- Regresiones de aislamiento, rotacion 0/90/180/270, estado local y ciclo de vida; smoke Electron y Player real en laboratorio, sin nuevos canales privilegiados ni cambios de formato.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.

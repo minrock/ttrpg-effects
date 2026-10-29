@@ -298,6 +298,7 @@ export class PixiViewport {
   private backgroundColor: MapBackgroundColor = DEFAULT_MAP_BACKGROUND_COLOR;
   private viewRole: ViewportViewRole = "dm";
   private isReadOnly = false;
+  private localEditableShapeIds: ReadonlySet<string> | null = null;
   private fogPresentation: FogPresentation = "dm-preview";
   private hiddenTokenPolicy: HiddenTokenPolicy = "show-with-indicator";
   private pathPreviewPoints: readonly WorldPoint[] = [];
@@ -364,6 +365,7 @@ export class PixiViewport {
   private isPlayerCameraControlHovered = false;
   private cameraInteractionEndTimer: number | null = null;
   private areaToolUiZoom = this.camera.zoom;
+  private areaToolUiRotation = 0;
 
   private constructor(host: HTMLElement, options: PixiViewportOptions) {
     this.host = host;
@@ -388,6 +390,12 @@ export class PixiViewport {
   setShapes(shapes: readonly SceneShape[]): void {
     this.shapes = shapes;
     this.previewShapes.clear();
+    if (this.isReadOnly && this.localEditableShapeIds !== null && this.dragState?.elementId !== undefined &&
+      !this.isLocalEditableShapeId(this.dragState.elementId)) this.cancelLocalDrag();
+    if (this.isReadOnly && this.localEditableShapeIds !== null &&
+      this.selectedElementId !== null && !this.isLocalEditableShapeId(this.selectedElementId)) {
+      this.selectedElementId = null;
+    }
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
   }
@@ -474,7 +482,9 @@ export class PixiViewport {
   }
 
   setSelectedElementId(selectedElementId: string | null): void {
-    this.selectedElementId = selectedElementId;
+    this.selectedElementId = this.isReadOnly && this.localEditableShapeIds !== null &&
+      selectedElementId !== null && !this.isLocalEditableShapeId(selectedElementId)
+      ? null : selectedElementId;
     this.pathHoverZone = null;
     this.drawSelectionLayer();
   }
@@ -630,7 +640,37 @@ export class PixiViewport {
 
   setReadOnly(isReadOnly: boolean): void {
     this.isReadOnly = isReadOnly;
+    if (isReadOnly && this.dragState?.mode !== "pan") this.cancelLocalDrag();
+    this.setSelectedElementId(this.selectedElementId);
     this.updateCursor();
+  }
+
+  setLocalEditableShapeIds(ids: readonly string[] | undefined): void {
+    const nextIds = ids === undefined ? null : new Set(ids);
+    if (nextIds === null && this.localEditableShapeIds === null) return;
+    if (nextIds !== null && this.localEditableShapeIds !== null &&
+      nextIds.size === this.localEditableShapeIds.size &&
+      [...nextIds].every((id) => this.localEditableShapeIds?.has(id))) return;
+    this.localEditableShapeIds = nextIds;
+    if (this.isReadOnly) {
+      this.cancelLocalDrag();
+      this.setSelectedElementId(this.selectedElementId);
+    }
+    this.updateCursor();
+  }
+
+  private isLocalEditableShapeId(id: string): boolean {
+    return this.localEditableShapeIds?.has(id) === true &&
+      this.shapes.some((shape) => shape.id === id &&
+        (shape.type === "measurement" || shape.type === "path" || shape.type === "circle" ||
+          shape.type === "cone" || shape.type === "rectangle"));
+  }
+
+  private cancelLocalDrag(): void {
+    if (this.dragState === null || this.dragState.mode === "pan") return;
+    this.dragState = null;
+    this.clearElementMovePreview();
+    this.clearDragPreviews();
   }
 
   setFogPresentation(fogPresentation: FogPresentation): void {
@@ -754,12 +794,12 @@ export class PixiViewport {
       y: viewport.height * (0.25 + Math.random() * 0.5)
     };
 
-    return screenToWorld(screenPoint, this.camera, viewport);
+    return this.screenToWorldPoint(screenPoint);
   }
 
   getNearbyVisibleWorldPoint(origin: WorldPoint, excludedElementId?: string): WorldPoint {
     const viewport = this.getViewportSize();
-    const sourceScreen = worldToScreen(origin.x, origin.y, this.camera, viewport);
+    const sourceScreen = this.worldToScreenPoint(origin);
     const margin = Math.min(48, Math.max(16, Math.min(viewport.width, viewport.height) * 0.08));
     const cellSizeScreen = (this.grid?.cellSizeWorld ?? 100) * this.camera.zoom;
     const maximumSpacing = Math.max(64, Math.min(viewport.width, viewport.height) * 0.36);
@@ -776,7 +816,7 @@ export class PixiViewport {
     ];
     const occupied = this.getSelectableElements()
       .filter((element) => element.id !== excludedElementId)
-      .map((element) => worldToScreen(element.position.x, element.position.y, this.camera, viewport));
+      .map((element) => this.worldToScreenPoint(element.position));
     let bestCandidate: ScreenPoint | null = null;
     let bestClearance = -Infinity;
 
@@ -812,7 +852,7 @@ export class PixiViewport {
       };
     }
 
-    return screenToWorld(bestCandidate, this.camera, viewport);
+    return this.screenToWorldPoint(bestCandidate);
   }
 
   setMap(map: MapImageState | null): void {
@@ -1488,11 +1528,11 @@ export class PixiViewport {
     const screenPoint = this.eventToScreenPoint(event);
 
     if (this.isFogRevealMode && this.fogOfWar?.enabled) {
-      this.fogRevealPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+      this.fogRevealPointerWorldPoint = this.screenToWorldPoint(screenPoint);
       this.drawSelectionLayer();
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const area = [...this.mapAnnotations.areas]
       .reverse()
       .find((candidate) => hitTestInformationArea(candidate.cells, worldPoint));
@@ -1532,8 +1572,11 @@ export class PixiViewport {
   private readonly handlePointerDown = (event: PointerEvent): void => {
     event.preventDefault();
     this.app.canvas.focus();
-    const canNavigateReadOnly = this.isNavigationEnabled && this.isSpaceNavigationActive && event.button === 0;
-    if (this.isReadOnly && !canNavigateReadOnly) {
+    const canNavigateReadOnly = event.button === 0 &&
+      ((this.isNavigationEnabled && this.isSpaceNavigationActive) ||
+        (this.localEditableShapeIds !== null && this.isGrabMode));
+    const canUseLocalTools = event.button === 0 && this.localEditableShapeIds !== null;
+    if (this.isReadOnly && !canNavigateReadOnly && !canUseLocalTools) {
       return;
     }
     this.app.canvas.setPointerCapture(event.pointerId);
@@ -1549,11 +1592,11 @@ export class PixiViewport {
       if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
         this.app.canvas.style.cursor = "grabbing";
-      } else if (this.effectDraft !== null) {
+      } else if (this.effectDraft !== null && !this.isReadOnly) {
         mode = "idle";
       } else if (this.hitTestPlayerCameraControl(point)) {
         mode = "player-camera-move";
-        const worldPoint = screenToWorld(point, this.camera, this.getViewportSize());
+        const worldPoint = this.screenToWorldPoint(point);
         const primaryCenter = this.playerCameraControlState?.primaryCamera.center;
         if (primaryCenter !== undefined) {
           grabOffset = {
@@ -1566,30 +1609,30 @@ export class PixiViewport {
           });
         }
         this.app.canvas.style.cursor = "grabbing";
-      } else if (this.isFogRevealMode && this.fogOfWar?.enabled) {
+      } else if (!this.isReadOnly && this.isFogRevealMode && this.fogOfWar?.enabled) {
         mode = "fog-reveal";
         this.startFogRevealStroke(point);
-      } else if (this.isDaytimeMaskPaintMode) {
+      } else if (!this.isReadOnly && this.isDaytimeMaskPaintMode) {
         mode = "daytime-mask-paint";
         this.startDaytimeMaskStroke(point);
-      } else if (this.isFirePaintMode) {
+      } else if (!this.isReadOnly && this.isFirePaintMode) {
         mode = "fire-paint";
         this.paintFireAtScreenPoint(point);
-      } else if (this.isInformationAreaMode) {
+      } else if (!this.isReadOnly && this.isInformationAreaMode) {
         mode = "information-area-paint";
-        this.informationAreaStrokePoints = [screenToWorld(point, this.camera, this.getViewportSize())];
+        this.informationAreaStrokePoints = [this.screenToWorldPoint(point)];
         this.drawSelectionLayer();
-      } else if (this.isPathDrawingMode || this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode) {
+      } else if (this.isPathDrawingMode || (!this.isReadOnly && (this.isWaterDrawingMode || this.isArcanePointerMode || this.isRoomPinMode || this.isSceneLinkMode))) {
         mode = "idle";
       } else {
-        const hitFireZoneResizeElementId = this.hitTestFireZoneResizeHandle(point);
-        const hitFireLightResizeElementId = this.hitTestFireLightResizeHandle(point);
-        const hitMagicalDarknessResizeElementId = this.hitTestMagicalDarknessResizeHandle(point);
-        const hitDynamicLightDirectionElementId = this.hitTestDynamicLightDirectionHandle(point);
-        const hitWaterLineRotationElementId = this.hitTestWaterLineRotationHandle(point);
-        const hitWaterPatternRotationElementId = this.hitTestWaterPatternRotationHandle(point);
-        const hitLightResizeElementId = this.hitTestLightResizeHandle(point);
-        const hitRotationElementId = this.hitTestConeRotationHandle(point);
+        const hitFireZoneResizeElementId = this.isReadOnly ? null : this.hitTestFireZoneResizeHandle(point);
+        const hitFireLightResizeElementId = this.isReadOnly ? null : this.hitTestFireLightResizeHandle(point);
+        const hitMagicalDarknessResizeElementId = this.isReadOnly ? null : this.hitTestMagicalDarknessResizeHandle(point);
+        const hitDynamicLightDirectionElementId = this.isReadOnly ? null : this.hitTestDynamicLightDirectionHandle(point);
+        const hitWaterLineRotationElementId = this.isReadOnly ? null : this.hitTestWaterLineRotationHandle(point);
+        const hitWaterPatternRotationElementId = this.isReadOnly ? null : this.hitTestWaterPatternRotationHandle(point);
+        const hitLightResizeElementId = this.isReadOnly ? null : this.hitTestLightResizeHandle(point);
+        const hitRotationElementId = this.isReadOnly ? null : this.hitTestConeRotationHandle(point);
         const hitShapeRotationElementId = this.hitTestLinearShapeRotationHandle(point);
         const hitShapeEndElementId = this.hitTestLinearShapeEndHandle(point);
         const hitCircleResizeElementId = this.hitTestCircleResizeHandle(point);
@@ -1599,15 +1642,15 @@ export class PixiViewport {
         const hitPathHandles = this.hitTestPathHandles(point);
         const hitElementId = this.hitTestElement(point);
 
-        const selectedLightning = this.getRenderableEffects().find(
+        const selectedLightning = this.isReadOnly ? undefined : this.getRenderableEffects().find(
           (effect): effect is SceneLightningEffect => effect.kind === "lightning" && effect.id === this.selectedElementId
         );
         const hitLightning = selectedLightning === undefined ? null : hitTestLightningHandle(
-          selectedLightning, screenToWorld(point, this.camera, this.getViewportSize()), this.camera.zoom
+          selectedLightning, this.screenToWorldPoint(point), this.camera.zoom
         );
-        const selectedFire = this.getSelectedFireEffect();
+        const selectedFire = this.isReadOnly ? null : this.getSelectedFireEffect();
         const hitFire = selectedFire && (selectedFire.zone.kind === "line" || selectedFire.zone.kind === "cone")
-          ? hitTestFireHandle(selectedFire, screenToWorld(point, this.camera, this.getViewportSize()), this.camera.zoom) : null;
+          ? hitTestFireHandle(selectedFire, this.screenToWorldPoint(point), this.camera.zoom) : null;
         if (hitFire !== null && selectedFire) {
           mode = "effect-edit";
           elementId = selectedFire.id;
@@ -1691,7 +1734,7 @@ export class PixiViewport {
           const pathShape = this.shapes.find((s) => s.id === hitPathHandles.elementId);
           const firstPoint = pathShape?.points[0];
           if (firstPoint !== undefined) {
-            const grabWorld = screenToWorld(point, this.camera, this.getViewportSize());
+            const grabWorld = this.screenToWorldPoint(point);
             grabOffset = { x: grabWorld.x - firstPoint.x, y: grabWorld.y - firstPoint.y };
           }
         } else if (hitRectCornerIndex !== null && this.selectedElementId !== null) {
@@ -1707,16 +1750,16 @@ export class PixiViewport {
           elementId = hitElementId;
           moveStartPosition = selectedElementPosition;
           if (selectedElementPosition !== undefined) {
-            const grabWorld = screenToWorld(point, this.camera, this.getViewportSize());
+            const grabWorld = this.screenToWorldPoint(point);
             grabOffset = {
               x: grabWorld.x - selectedElementPosition.x,
               y: grabWorld.y - selectedElementPosition.y
             };
           }
           this.options.onElementSelect?.(hitElementId);
-        } else if (this.isMapAdjustMode && this.mapSprite !== null) {
+        } else if (!this.isReadOnly && this.isMapAdjustMode && this.mapSprite !== null) {
           mode = "map-move";
-        } else if (this.isGridAdjustMode && this.hitTestCalibrationHandle(point)) {
+        } else if (!this.isReadOnly && this.isGridAdjustMode && this.hitTestCalibrationHandle(point)) {
           mode = "calibrate";
         }
       }
@@ -1737,17 +1780,17 @@ export class PixiViewport {
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
-    if (this.isReadOnly && this.dragState?.mode !== "pan") {
+    if (this.isReadOnly && this.localEditableShapeIds === null && this.dragState?.mode !== "pan") {
       return;
     }
 
     const screenPoint = this.eventToScreenPoint(event);
 
-    if (this.effectDraft !== null && !this.isGrabMode) {
+    if (!this.isReadOnly && this.effectDraft !== null && !this.isGrabMode) {
       this.scheduleViewportUpdate("effect-pointer", () => {
         if (this.effectDraft === null || this.grid === null || this.settings === null) return;
         this.effectDraft = { ...this.effectDraft, pointer: (this.effectDraft.kind === "fire" ? firePoint : lightningPoint)(
-          screenToWorld(screenPoint, this.camera, this.getViewportSize()), this.effectDraft.shape, this.grid, this.settings
+          this.screenToWorldPoint(screenPoint), this.effectDraft.shape, this.grid, this.settings
         ) };
         this.drawSelectionLayer();
       });
@@ -1760,25 +1803,25 @@ export class PixiViewport {
       });
     }
 
-    if (this.isWaterDrawingMode) {
+    if (!this.isReadOnly && this.isWaterDrawingMode) {
       const point = this.snapScreenPointToCellCenter(screenPoint);
       this.scheduleViewportUpdate("water-pointer-preview", () => {
         this.options.onWaterPointerMove?.(point);
       });
     }
 
-    if (this.isFogRevealMode && this.fogOfWar?.enabled) {
-      this.fogRevealPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    if (!this.isReadOnly && this.isFogRevealMode && this.fogOfWar?.enabled) {
+      this.fogRevealPointerWorldPoint = this.screenToWorldPoint(screenPoint);
       this.drawSelectionLayer();
     }
 
-    if (this.isDaytimeMaskPaintMode) {
-      this.daytimeMaskPointerWorldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    if (!this.isReadOnly && this.isDaytimeMaskPaintMode) {
+      this.daytimeMaskPointerWorldPoint = this.screenToWorldPoint(screenPoint);
       this.drawSelectionLayer();
     }
 
-    if (this.isFirePaintMode) {
-      this.firePaintPointer = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    if (!this.isReadOnly && this.isFirePaintMode) {
+      this.firePaintPointer = this.screenToWorldPoint(screenPoint);
       this.scheduleViewportUpdate("fire-brush-preview", () => this.drawSelectionLayer());
     }
 
@@ -1803,7 +1846,7 @@ export class PixiViewport {
     const nextPoint = screenPoint;
 
     if (this.dragState.mode === "calibrate") {
-      const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const worldPoint = this.screenToWorldPoint(nextPoint);
       const origin = this.getCalibrationOrigin();
       const cellSize = Math.abs(worldPoint.x - origin.x);
       this.scheduleViewportUpdate("grid-cell-size", () => {
@@ -1819,7 +1862,7 @@ export class PixiViewport {
       this.mapSprite.position.y += dy;
       this.colorMapSprite?.position.set(this.mapSprite.position.x, this.mapSprite.position.y);
     } else if (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
-      const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const worldPoint = this.screenToWorldPoint(nextPoint);
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
       this.applyElementMovePreview(this.dragState.elementId, targetPoint, this.dragState.moveStartPosition);
     } else if (this.dragState.mode === "effect-edit" && this.dragState.elementId !== undefined && this.dragState.effectHandle !== undefined) {
@@ -1827,7 +1870,7 @@ export class PixiViewport {
       const handle = this.dragState.effectHandle;
       this.scheduleViewportUpdate("effect-edit", () => this.updateEffectHandle(id, handle, nextPoint));
     } else if (this.dragState.mode === "player-camera-move" && this.primaryPlayerCameraControl !== null) {
-      const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const worldPoint = this.screenToWorldPoint(nextPoint);
       const targetPoint = subtractGrabOffset(worldPoint, this.dragState.grabOffset);
       this.primaryPlayerCameraControl.position.set(targetPoint.x, targetPoint.y);
       this.movePrimaryViewportPreview({
@@ -1849,7 +1892,7 @@ export class PixiViewport {
     } else if (this.dragState.mode === "fire-paint") {
       this.paintFireAtScreenPoint(nextPoint);
     } else if (this.dragState.mode === "information-area-paint") {
-      const worldPoint = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const worldPoint = this.screenToWorldPoint(nextPoint);
       const previous = this.informationAreaStrokePoints[this.informationAreaStrokePoints.length - 1];
       if (previous === undefined || Math.hypot(worldPoint.x - previous.x, worldPoint.y - previous.y) >= 4 / this.camera.zoom) {
         this.informationAreaStrokePoints.push(worldPoint);
@@ -1877,7 +1920,7 @@ export class PixiViewport {
       this.updatePathPointFromScreenPoint(this.dragState.elementId, this.dragState.handleIndex, nextPoint);
     } else if (this.dragState.mode === "path-move" && this.dragState.elementId !== undefined && this.dragState.grabOffset !== undefined) {
       this.app.canvas.style.cursor = "grabbing";
-      const currentWorld = screenToWorld(nextPoint, this.camera, this.getViewportSize());
+      const currentWorld = this.screenToWorldPoint(nextPoint);
       const elementId = this.dragState.elementId;
       const x = currentWorld.x - this.dragState.grabOffset.x;
       const y = currentWorld.y - this.dragState.grabOffset.y;
@@ -1923,13 +1966,13 @@ export class PixiViewport {
       pendingMovePosition:
         (this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) ||
         this.dragState.mode === "player-camera-move"
-          ? subtractGrabOffset(screenToWorld(nextPoint, this.camera, this.getViewportSize()), this.dragState.grabOffset)
+          ? subtractGrabOffset(this.screenToWorldPoint(nextPoint), this.dragState.grabOffset)
           : this.dragState.pendingMovePosition
     };
   };
 
   private readonly handlePointerUp = (event: PointerEvent): void => {
-    if (this.isReadOnly && this.dragState?.mode !== "pan") {
+    if (this.isReadOnly && this.localEditableShapeIds === null && this.dragState?.mode !== "pan") {
       return;
     }
 
@@ -1961,7 +2004,7 @@ export class PixiViewport {
       const screen = this.eventToClientPoint(event);
       this.options.onContextMenu?.({
         screen,
-        world: screenToWorld(releasePoint, this.camera, this.getViewportSize()),
+        world: this.screenToWorldPoint(releasePoint),
         targetElementId: this.hitTestElement(releasePoint)
       });
     }
@@ -1979,7 +2022,7 @@ export class PixiViewport {
     }
 
     if (this.dragState.mode === "information-area-paint") {
-      const worldPoint = screenToWorld(releasePoint, this.camera, this.getViewportSize());
+      const worldPoint = this.screenToWorldPoint(releasePoint);
       this.informationAreaStrokePoints.push(worldPoint);
       const cells = rasterizeInformationAreaStroke(
         this.informationAreaStrokePoints,
@@ -2001,7 +2044,7 @@ export class PixiViewport {
     if (!isClick && this.dragState.mode === "element-move" && this.dragState.elementId !== undefined) {
       const pendingPosition =
         this.dragState.pendingMovePosition ??
-        screenToWorld(releasePoint, this.camera, this.getViewportSize());
+        this.screenToWorldPoint(releasePoint);
       this.clearElementMovePreview();
       this.options.onElementMove?.(this.dragState.elementId, pendingPosition.x, pendingPosition.y);
     } else if (this.dragState.mode === "element-move") {
@@ -2012,7 +2055,7 @@ export class PixiViewport {
       const pendingPosition =
         this.dragState.pendingMovePosition ??
         subtractGrabOffset(
-          screenToWorld(releasePoint, this.camera, this.getViewportSize()),
+          this.screenToWorldPoint(releasePoint),
           this.dragState.grabOffset
         );
       this.holdPrimaryViewportPreview({
@@ -2031,9 +2074,9 @@ export class PixiViewport {
     }
 
     if (isClick && this.dragState.button === 0 && this.dragState.mode === "idle") {
-      if (this.effectDraft !== null && this.grid !== null && this.settings !== null) {
+      if (!this.isReadOnly && this.effectDraft !== null && this.grid !== null && this.settings !== null) {
         const { kind, shape, anchor } = this.effectDraft;
-        const point = (kind === "fire" ? firePoint : lightningPoint)(screenToWorld(releasePoint, this.camera, this.getViewportSize()), shape, this.grid, this.settings);
+        const point = (kind === "fire" ? firePoint : lightningPoint)(this.screenToWorldPoint(releasePoint), shape, this.grid, this.settings);
         if (anchor === null) {
           this.effectDraft = { kind, shape, anchor: point, pointer: point };
         } else if ((kind === "fire" ? fireZone(shape, anchor, point, this.grid.cellSizeWorld) : lightningZone(shape, anchor, point)) !== null) {
@@ -2045,20 +2088,20 @@ export class PixiViewport {
         this.drawSelectionLayer();
       } else if (this.isPathDrawingMode) {
         this.options.onPathPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
-      } else if (this.isWaterDrawingMode) {
+      } else if (!this.isReadOnly && this.isWaterDrawingMode) {
         this.options.onWaterPointAdd?.(this.snapScreenPointToCellCenter(releasePoint));
-      } else if (this.isArcanePointerMode) {
+      } else if (!this.isReadOnly && this.isArcanePointerMode) {
         const position = this.snapScreenPointToCellCenter(releasePoint);
         const pointer = createArcanePointerBroadcast(position, this.arcanePointerCreatureSize);
         this.spawnArcanePointer(pointer);
         this.options.onArcanePointerTrigger?.(pointer);
-      } else if (this.isRoomPinMode) {
+      } else if (!this.isReadOnly && this.isRoomPinMode) {
         this.options.onRoomPinPlace?.(
-          screenToWorld(releasePoint, this.camera, this.getViewportSize())
+          this.screenToWorldPoint(releasePoint)
         );
-      } else if (this.isSceneLinkMode) {
+      } else if (!this.isReadOnly && this.isSceneLinkMode) {
         this.options.onSceneLinkPlace?.(
-          screenToWorld(releasePoint, this.camera, this.getViewportSize())
+          this.screenToWorldPoint(releasePoint)
         );
       } else {
         this.options.onElementSelect?.(this.hitTestElement(releasePoint));
@@ -2272,7 +2315,9 @@ export class PixiViewport {
     if (this.isGrabMode || (this.isNavigationEnabled && this.isSpaceNavigationActive)) {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
-      this.app.canvas.style.cursor = "default";
+      this.app.canvas.style.cursor = this.localEditableShapeIds !== null && this.isPathDrawingMode
+        ? "crosshair"
+        : this.localEditableShapeIds !== null && this.pathHoverZone !== null ? "grab" : "default";
     } else if (this.effectDraft !== null) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isPlayerCameraControlHovered) {
@@ -2398,8 +2443,9 @@ export class PixiViewport {
 
   private applyCamera(emit = true): void {
     const viewport = this.getViewportSize();
-    const shouldRefreshAreaToolUi = Math.abs(this.areaToolUiZoom - this.camera.zoom) > 0.0001;
     const rotation = this.getPresentationRotationRadians();
+    const shouldRefreshAreaToolUi = Math.abs(this.areaToolUiZoom - this.camera.zoom) > 0.0001 ||
+      this.areaToolUiRotation !== rotation;
     this.world.scale.set(this.camera.zoom);
     this.world.rotation = rotation;
     this.world.pivot.set(this.camera.center.x, this.camera.center.y);
@@ -2409,6 +2455,7 @@ export class PixiViewport {
     this.updatePlayerCameraControlScale();
     if (shouldRefreshAreaToolUi) {
       this.areaToolUiZoom = this.camera.zoom;
+      this.areaToolUiRotation = rotation;
       this.updateAreaToolLabelScale();
       this.drawSelectionLayer();
     }
@@ -2434,6 +2481,22 @@ export class PixiViewport {
     return {
       x: this.camera.center.x + offset.x / this.camera.zoom,
       y: this.camera.center.y + offset.y / this.camera.zoom
+    };
+  }
+
+  private worldToScreenPoint(worldPoint: WorldPoint): ScreenPoint {
+    const rotation = this.getPresentationRotationRadians();
+    if (rotation === 0) {
+      return worldToScreen(worldPoint.x, worldPoint.y, this.camera, this.getViewportSize());
+    }
+    const dx = (worldPoint.x - this.camera.center.x) * this.camera.zoom;
+    const dy = (worldPoint.y - this.camera.center.y) * this.camera.zoom;
+    const viewport = this.getViewportSize();
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    return {
+      x: viewport.width / 2 + dx * cos - dy * sin,
+      y: viewport.height / 2 + dx * sin + dy * cos
     };
   }
 
@@ -2478,7 +2541,7 @@ export class PixiViewport {
   }
 
   private snapScreenPointToCellCenter(screenPoint: ScreenPoint): WorldPoint {
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
 
     if (this.grid === null) {
       return worldPoint;
@@ -2546,6 +2609,7 @@ export class PixiViewport {
         for (const nestedChild of child.children) {
           if (nestedChild instanceof Text && nestedChild.label === AREA_TOOL_LABEL) {
             nestedChild.scale.set(uiScale);
+            nestedChild.rotation = -this.getPresentationRotationRadians();
           }
         }
       }
@@ -3446,7 +3510,7 @@ export class PixiViewport {
   }
 
   private startFogRevealStroke(screenPoint: ScreenPoint): void {
-    this.fogRevealStrokePoints = [screenToWorld(screenPoint, this.camera, this.getViewportSize())];
+    this.fogRevealStrokePoints = [this.screenToWorldPoint(screenPoint)];
     this.scheduleFogOfWarRedraw();
   }
 
@@ -3456,7 +3520,7 @@ export class PixiViewport {
   }
 
   private appendDaytimeMaskStrokePoint(screenPoint: ScreenPoint): void {
-    const point = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const point = this.screenToWorldPoint(screenPoint);
     if (this.daytimeBrushTopology === "topology") {
       for (const cell of getGridCellsInBrush(point, this.daytimeBrushRadius, this.grid ?? 100)) {
         this.daytimeMaskStrokeCells.set(getGridCellKey(cell), cell);
@@ -3493,7 +3557,7 @@ export class PixiViewport {
   }
 
   private appendFogRevealStrokePoint(screenPoint: ScreenPoint): void {
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const previous = this.fogRevealStrokePoints[this.fogRevealStrokePoints.length - 1];
 
     if (previous === undefined) {
@@ -3530,7 +3594,7 @@ export class PixiViewport {
       return;
     }
 
-    this.scheduleFirePaint(cells, screenToWorld(screenPoint, this.camera, this.getViewportSize()));
+    this.scheduleFirePaint(cells, this.screenToWorldPoint(screenPoint));
   }
 
   private getFirePaintCells(screenPoint: ScreenPoint): readonly FireCell[] {
@@ -3538,7 +3602,7 @@ export class PixiViewport {
       return [];
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = this.getFirePaintRadius();
     return getGridCellsInBrush(worldPoint, radius, this.grid);
   }
@@ -3558,7 +3622,7 @@ export class PixiViewport {
   }
 
   private hitTestElement(screenPoint: ScreenPoint): string | null {
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
 
     for (const element of [...this.getSelectableElements()].reverse()) {
       if (element.kind === "lightning") {
@@ -3627,7 +3691,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const distance = Math.hypot(worldPoint.x - firstPoint.x, worldPoint.y - firstPoint.y);
     const uiScale = getAreaToolUiScale(this.camera.zoom);
     const pointTolerance = 18 * uiScale;
@@ -3657,7 +3721,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const distance = Math.hypot(worldPoint.x - light.position.x, worldPoint.y - light.position.y);
 
     const uiScale = getAreaToolUiScale(this.camera.zoom);
@@ -3673,7 +3737,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const handle = getLightResizeHandlePosition(light);
 
     return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18 * getAreaToolUiScale(this.camera.zoom)
@@ -3694,7 +3758,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
     return Math.hypot(worldPoint.x - endPoint.x, worldPoint.y - endPoint.y) <= hitTolerance
       ? selectedShape.id
@@ -3709,7 +3773,7 @@ export class PixiViewport {
     }
 
     const anchor = getShapeAnchor(selectedShape);
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
     const uiScale = getAreaToolUiScale(this.camera.zoom);
     const ringRadius = LINEAR_ROTATION_RING_RADIUS * uiScale;
@@ -3727,7 +3791,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     return getFireResizeTarget(selectedFire, worldPoint, this.camera.zoom) === "fire" ? selectedFire.id : null;
   }
 
@@ -3738,7 +3802,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     return getFireResizeTarget(selectedFire, worldPoint, this.camera.zoom) === "light" ? selectedFire.id : null;
   }
 
@@ -3749,7 +3813,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const distance = Math.hypot(
       worldPoint.x - selectedMagicalDarkness.position.x,
       worldPoint.y - selectedMagicalDarkness.position.y
@@ -3767,7 +3831,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const ringRadius = getDynamicLightDirectionRingRadius(this.grid?.cellSizeWorld ?? 100, this.camera.zoom);
     const distance = Math.hypot(
       worldPoint.x - selectedDynamicLight.position.x,
@@ -3879,7 +3943,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const direction =
       (Math.atan2(worldPoint.y - light.position.y, worldPoint.x - light.position.x) * 180) / Math.PI;
     this.previewLights.set(elementId, { ...light, direction });
@@ -3893,7 +3957,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = Math.hypot(worldPoint.x - light.position.x, worldPoint.y - light.position.y);
     const nextRadius = Math.max(10, radius);
     this.previewLights.set(elementId, { ...light, radius: nextRadius });
@@ -3913,7 +3977,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const direction =
       (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) /
       Math.PI;
@@ -3927,7 +3991,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = this.grid?.layout === "hexagonal" ? this.snapScreenPointToCellCenter(screenPoint) : screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.grid?.layout === "hexagonal" ? this.snapScreenPointToCellCenter(screenPoint) : this.screenToWorldPoint(screenPoint);
     this.previewShapes.set(elementId, { ...shape, points: [shape.points[0], worldPoint] });
     this.drawShapePreviewLayers();
   }
@@ -3955,7 +4019,7 @@ export class PixiViewport {
     }
 
     const anchor = getShapeAnchor(shape);
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const direction = (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
     this.previewShapes.set(elementId, { ...rotateLinearShape(shape, direction, this.grid ?? undefined), direction });
     this.drawShapePreviewLayers();
@@ -3971,7 +4035,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const visualRadius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
     const radius = Math.max(1, visualRadius / effect.scale);
     this.previewEffects.set(elementId, { ...effect, zone: { ...effect.zone, radius } });
@@ -3988,7 +4052,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
     const nextRadius = Math.max(1, radius);
     this.previewEffects.set(elementId, { ...effect, lightRadius: nextRadius });
@@ -4005,7 +4069,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = Math.hypot(worldPoint.x - effect.position.x, worldPoint.y - effect.position.y);
     const nextRadius = Math.max(1, radius);
     this.previewEffects.set(elementId, { ...effect, radius: nextRadius });
@@ -4021,7 +4085,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const rotation =
       (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) / Math.PI;
     this.previewEffects.set(elementId, { ...effect, patternRotation: rotation });
@@ -4037,7 +4101,7 @@ export class PixiViewport {
       return;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const rotation =
       (Math.atan2(worldPoint.y - effect.position.y, worldPoint.x - effect.position.x) * 180) / Math.PI;
     this.previewEffects.set(elementId, { ...effect, lineRotation: rotation });
@@ -4058,7 +4122,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const handle = getWaterLineRotationHandlePosition(effect, this.camera.zoom);
 
     return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18 * getAreaToolUiScale(this.camera.zoom)
@@ -4080,7 +4144,7 @@ export class PixiViewport {
       return null;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const handle = getWaterPatternRotationHandlePosition(effect, this.camera.zoom);
 
     return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 18 * getAreaToolUiScale(this.camera.zoom)
@@ -4098,7 +4162,7 @@ export class PixiViewport {
     const anchor = shape.points[0];
     if (anchor === undefined) return null;
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = shape.radius ?? 1;
     const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
     const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
@@ -4120,7 +4184,7 @@ export class PixiViewport {
     const direction = ((shape.direction ?? 0) * Math.PI) / 180;
     const tipX = anchor.x + Math.cos(direction) * radius;
     const tipY = anchor.y + Math.sin(direction) * radius;
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
 
     return Math.hypot(worldPoint.x - tipX, worldPoint.y - tipY) <= hitTolerance ? shape.id : null;
@@ -4136,7 +4200,7 @@ export class PixiViewport {
     const anchor = shape.points[0];
     if (anchor === undefined) return null;
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const distance = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
     const uiScale = getAreaToolUiScale(this.camera.zoom);
     const ringRadius = SHAPE_CONE_ROTATION_RING_RADIUS * uiScale;
@@ -4166,7 +4230,7 @@ export class PixiViewport {
       { x: anchor.x + halfW, y: anchor.y + halfH },
       { x: anchor.x - halfW, y: anchor.y + halfH }
     ];
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const hitTolerance = 18 * getAreaToolUiScale(this.camera.zoom);
 
     for (let i = 0; i < corners.length; i++) {
@@ -4189,7 +4253,7 @@ export class PixiViewport {
     const anchor = shape.points[0];
     if (anchor === undefined) return;
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
     const nextRadius = Math.max(10, radius);
     this.previewShapes.set(elementId, { ...shape, radius: nextRadius });
@@ -4203,7 +4267,7 @@ export class PixiViewport {
     const anchor = shape.points[0];
     if (anchor === undefined) return;
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const radius = Math.hypot(worldPoint.x - anchor.x, worldPoint.y - anchor.y);
     const nextRadius = Math.max(10, radius);
     this.previewShapes.set(elementId, { ...shape, radius: nextRadius });
@@ -4217,7 +4281,7 @@ export class PixiViewport {
     const anchor = shape.points[0];
     if (anchor === undefined) return;
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const direction =
       (Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x) * 180) / Math.PI;
     this.previewShapes.set(elementId, { ...shape, direction });
@@ -4246,7 +4310,7 @@ export class PixiViewport {
     const fixed = corners[(cornerIndex + 2) % 4];
     if (fixed === undefined) return;
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const newWidth = Math.max(10, Math.abs(worldPoint.x - fixed.x));
     const newHeight = Math.max(10, Math.abs(worldPoint.y - fixed.y));
     const anchorX = (worldPoint.x + fixed.x) / 2;
@@ -4263,7 +4327,7 @@ export class PixiViewport {
   private updateEffectHandle(id: string, handle: LightningHandle, screen: ScreenPoint): void {
     const effect = this.effects.find(candidate => candidate.id === id && (candidate.kind === "lightning" || candidate.kind === "fire"));
     if (!effect || !this.grid || !this.settings) return;
-    const point = screenToWorld(screen, this.camera, this.getViewportSize());
+    const point = this.screenToWorldPoint(screen);
     if (effect.kind === "fire") {
       this.previewEffects.set(id, editFireHandle(effect, handle, point, this.grid, this.settings));
       this.drawEffectPreviewLayers();
@@ -4275,6 +4339,11 @@ export class PixiViewport {
   }
 
   private getSelectableElements(): readonly SelectableRenderElement[] {
+    if (this.isReadOnly && this.localEditableShapeIds !== null) {
+      return this.getRenderableShapes()
+        .filter((shape) => this.isLocalEditableShapeId(shape.id))
+        .map((shape) => ({ id: shape.id, kind: shape.type, position: getShapeAnchor(shape) }));
+    }
     return [
       ...this.elements,
       ...(this.viewRole === "dm" && this.showMapAnnotations
@@ -4625,12 +4694,7 @@ export class PixiViewport {
       return false;
     }
 
-    const markerScreen = worldToScreen(
-      this.primaryPlayerCameraControl.position.x,
-      this.primaryPlayerCameraControl.position.y,
-      this.camera,
-      this.getViewportSize()
-    );
+    const markerScreen = this.worldToScreenPoint(this.primaryPlayerCameraControl.position);
     return Math.hypot(screenPoint.x - markerScreen.x, screenPoint.y - markerScreen.y) <= 28;
   }
 
@@ -4873,7 +4937,7 @@ export class PixiViewport {
       return false;
     }
 
-    const worldPoint = screenToWorld(screenPoint, this.camera, this.getViewportSize());
+    const worldPoint = this.screenToWorldPoint(screenPoint);
     const origin = this.getCalibrationOrigin();
     const handle = {
       x: origin.x + this.grid.cellSizeWorld,

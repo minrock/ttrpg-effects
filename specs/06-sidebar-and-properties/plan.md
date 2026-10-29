@@ -1,5 +1,9 @@
 # Plan - Sidebar y Propiedades
 
+## Integracion de interfaz (spec 39)
+
+Ver `specs/39-vtt-interface/plan.md`. Reutilizar DmAsidePanel, SceneMapsSection, RightSidebarTabs y DicePanel; estilos acotados por `.vtt-interface`. WorkspaceHeader y WorkspaceTools delegan a callbacks de App. Mantener pestañas montadas, sin reconstruir MapViewport ni controladores de dados. La navegacion por teclado del explorador usa tabs/tabpanel vinculados y foco itinerante.
+
 ## Herramientas de fuego (2.6.0)
 
 La ampliacion de spec/plan 10 reutiliza `FireTools` en Efectos lateral/contextual y extrae `FireProperties` para controles por variante. Conectar herramientas con borradores locales del viewport y casos puros de geometria; confirmar a estado de escena una sola vez. Arbol con nombre y centro derivados de cada variante; no crear copias de los efectos para la UI. Cuatro iconos Lucide, tooltips/aria y pista de seleccion, sin botones de texto duplicados.

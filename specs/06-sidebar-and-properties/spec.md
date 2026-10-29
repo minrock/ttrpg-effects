@@ -1,5 +1,9 @@
 # Spec - Sidebar y Propiedades
 
+## Interfaz integrada (spec 39)
+
+La propuesta aprobada del laboratorio 38 se integra segun `specs/39-vtt-interface/spec.md`: explorador Escena/Mapa compacto, inspector Propiedades/Dados, rail de herramientas y controles de camara junto al canvas. Se conservan todos los controles de esta especificacion. Tabs y colapso mantienen estado, con un solo drawer a la vez en pantallas estrechas. No cambia la logica de efectos o persistencia.
+
 ## Herramientas de fuego
 
 Ampliacion de spec 10 aceptada para 2.6.0: fila compacta de Linea, Cono, Circulo y Pintar (lapiz) en Efectos lateral y contextual. Estado activo y tooltip por icono. Propiedades segun variante, largo/radio medido, ancho de linea y direccion del cono sin apertura editable. Mantener controles visuales y de luz existentes.

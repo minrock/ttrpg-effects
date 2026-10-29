@@ -2,6 +2,14 @@
 
 Aplicacion desktop para proyectar mapas y efectos visuales en sesiones TTRPG presenciales.
 
+## Interfaz de mesa
+
+La version 3.0.0 incorpora una cabecera compacta, una barra vertical de herramientas y paneles plegables: explorador `Escena`/`Mapa` e inspector `Propiedades`/`Dados`. Los controles de camara DM y jugador permanecen separados.
+
+Player View mantiene la escena del DM protegida y agrega mediciones de linea/camino y areas locales (circulo, cuadrado, rectangulo y cono). Estas figuras solo viven en esa ventana, se pueden editar o borrar y se limpian al cambiar de mapa o escena. El boton de herramientas oculta los controles sin borrar las figuras.
+
+El salto mayor es una decision de lanzamiento; las escenas `.ttrpgscene` existentes siguen siendo compatibles. Alcance y verificaciones en [spec 39](specs/39-vtt-interface/spec.md) y su [plan](specs/39-vtt-interface/plan.md).
+
 ## Requisitos
 
 - Node.js compatible con el toolchain actual.
@@ -36,7 +44,7 @@ El bootstrap inicial crea una ventana Electron segura con `contextIsolation: tru
 
 ## Motor visual
 
-La app muestra un viewport PixiJS con capas de prueba para validar el orden base de render. Puedes arrastrar el canvas para hacer pan y usar la rueda del mouse para hacer zoom centrado en el cursor.
+La app muestra el mapa y sus capas visuales en un viewport PixiJS. Puedes arrastrar el canvas para hacer pan y usar la rueda del mouse para hacer zoom centrado en el cursor.
 
 ## Interaccion
 
@@ -52,7 +60,7 @@ Puedes probar interacciones sin cargar un mapa:
 
 ## Mapa y grilla
 
-Puedes cargar un mapa real desde `Cargar mapa`.
+Puedes agregar un mapa desde el explorador `Escena`, en la seccion `Mapas`, y actualizar su imagen desde las acciones de su fila sin perder los elementos preparados.
 
 - Formatos esperados: PNG, JPG/JPEG, WEBP y HEIC.
 - La grilla se puede activar/desactivar, ajustar por opacidad y cambiar por tamano numerico de celda.
@@ -122,3 +130,7 @@ La pestana `Dados` del panel derecho permite preparar tiradas 3D sobre el mapa, 
 - Historial privado durante la sesion, sin guardar dados ni logs en `.ttrpgscene`. Cerrar la aplicacion borra el historial.
 
 Detalle funcional y tecnico en [spec 37](specs/37-dm-dice-rolls/spec.md) y su [plan](specs/37-dm-dice-rolls/plan.md). El motor y las texturas se empaquetan localmente, sin CDN. La atribucion de la geometria adaptada se incluye en `Resources/licenses/dice-box-threejs` del instalador.
+
+## Laboratorios de interfaz
+
+Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en memoria y `/player-lab.html` monta Player View con un adaptador local. En este ultimo, `?north=90`, `180` o `270` permite comprobar herramientas con el mapa rotado. Son entradas de desarrollo, sin persistencia ni inclusion en el instalador.
