@@ -194,3 +194,7 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 Relampagos procedurales de spec 35: dos meshes por efecto, ticker existente, presupuesto agregado de vertices y sin filtros/FBO propios. Guia en efectos debajo de niebla; medidas y handles solo en seleccion DM.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Integrado `DiceOverlay` mediante el slot de MapViewport, sin modificar PixiViewport. Renderer Three diferido con recursos propios, resize positivo, RAF bajo demanda y disposal. Fisica Cannon en worker, replay por tirada, no IPC por frame. Evidencia y limites: [plan 37](../37-dm-dice-rolls/plan.md#14-verificacion-de-implementacion).

@@ -2,6 +2,14 @@
 
 Aplicacion desktop para proyectar mapas y efectos visuales en sesiones TTRPG presenciales.
 
+## Interfaz de mesa
+
+La version 3.0.0 incorpora una cabecera compacta, una barra vertical de herramientas y paneles plegables: explorador `Escena`/`Mapa` e inspector `Propiedades`/`Dados`. Los controles de camara DM y jugador permanecen separados.
+
+Player View mantiene la escena del DM protegida y agrega mediciones de linea/camino y areas locales (circulo, cuadrado, rectangulo y cono). Estas figuras solo viven en esa ventana, se pueden editar o borrar y se limpian al cambiar de mapa o escena. El boton de herramientas oculta los controles sin borrar las figuras.
+
+El salto mayor es una decision de lanzamiento; las escenas `.ttrpgscene` existentes siguen siendo compatibles. Alcance y verificaciones en [spec 39](specs/39-vtt-interface/spec.md) y su [plan](specs/39-vtt-interface/plan.md).
+
 ## Requisitos
 
 - Node.js compatible con el toolchain actual.
@@ -36,7 +44,7 @@ El bootstrap inicial crea una ventana Electron segura con `contextIsolation: tru
 
 ## Motor visual
 
-La app muestra un viewport PixiJS con capas de prueba para validar el orden base de render. Puedes arrastrar el canvas para hacer pan y usar la rueda del mouse para hacer zoom centrado en el cursor.
+La app muestra el mapa y sus capas visuales en un viewport PixiJS. Puedes arrastrar el canvas para hacer pan y usar la rueda del mouse para hacer zoom centrado en el cursor.
 
 ## Interaccion
 
@@ -52,7 +60,7 @@ Puedes probar interacciones sin cargar un mapa:
 
 ## Mapa y grilla
 
-Puedes cargar un mapa real desde `Cargar mapa`.
+Puedes agregar un mapa desde el explorador `Escena`, en la seccion `Mapas`, y actualizar su imagen desde las acciones de su fila sin perder los elementos preparados.
 
 - Formatos esperados: PNG, JPG/JPEG, WEBP y HEIC.
 - La grilla se puede activar/desactivar, ajustar por opacidad y cambiar por tamano numerico de celda.
@@ -110,3 +118,19 @@ La UI incluye acciones para guardar y cargar escenas locales con extension `.ttr
 - `Guardar escena` abre un dialogo nativo y escribe un JSON versionado.
 - `Cargar escena` abre un dialogo nativo, valida el JSON y muestra errores recuperables.
 - Si la escena referencia una imagen local que no existe, la app muestra un warning y conserva el resto de la escena.
+
+## Dados del DM
+
+La pestana `Dados` del panel derecho permite preparar tiradas 3D sobre el mapa, abiertas para ambas ventanas u ocultas solo para el DM.
+
+- Composicion por cantidades o formulas por tipo de dano, con colores representativos, modificadores y subtotales independientes.
+- Chequeo d20 exclusivo: normal, ventaja o desventaja, con su propio modificador. Un 20 natural conservado muestra rayos y un aviso de critico segun la privacidad de la tirada.
+- Resina, mate o metal, paleta ampliada y fuerza configurable. d% usa dos d10 emparejados.
+- Dados y resumen permanecen hasta cerrar con la X del DM; el resumen numerico publico es opcional. Las caras siguen visibles en una tirada abierta aunque se oculte el resumen.
+- Historial privado durante la sesion, sin guardar dados ni logs en `.ttrpgscene`. Cerrar la aplicacion borra el historial.
+
+Detalle funcional y tecnico en [spec 37](specs/37-dm-dice-rolls/spec.md) y su [plan](specs/37-dm-dice-rolls/plan.md). El motor y las texturas se empaquetan localmente, sin CDN. La atribucion de la geometria adaptada se incluye en `Resources/licenses/dice-box-threejs` del instalador.
+
+## Laboratorios de interfaz
+
+Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en memoria y `/player-lab.html` monta Player View con un adaptador local. En este ultimo, `?north=90`, `180` o `270` permite comprobar herramientas con el mapa rotado. Son entradas de desarrollo, sin persistencia ni inclusion en el instalador.

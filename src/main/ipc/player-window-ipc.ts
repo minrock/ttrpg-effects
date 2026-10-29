@@ -24,6 +24,8 @@ let latestCameraCommand: PlayerCameraCommand | null = null;
 let isPlayerWindowReady = false;
 let shouldShowPlayerWindowWhenReady = false;
 
+export function getPlayerWindow(): BrowserWindow | null { return playerWindow; }
+
 export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
   ipcMain.handle("player-window:map-image-status", (event: IpcMainInvokeEvent, value: unknown) => {
     if (!isFromPlayerWindow(event)) return;

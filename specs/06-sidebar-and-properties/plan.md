@@ -1,5 +1,9 @@
 # Plan - Sidebar y Propiedades
 
+## Integracion de interfaz (spec 39)
+
+Ver `specs/39-vtt-interface/plan.md`. Reutilizar DmAsidePanel, SceneMapsSection, RightSidebarTabs y DicePanel; estilos acotados por `.vtt-interface`. WorkspaceHeader y WorkspaceTools delegan a callbacks de App. Mantener pestañas montadas, sin reconstruir MapViewport ni controladores de dados. La navegacion por teclado del explorador usa tabs/tabpanel vinculados y foco itinerante.
+
 ## Herramientas de fuego (2.6.0)
 
 La ampliacion de spec/plan 10 reutiliza `FireTools` en Efectos lateral/contextual y extrae `FireProperties` para controles por variante. Conectar herramientas con borradores locales del viewport y casos puros de geometria; confirmar a estado de escena una sola vez. Arbol con nombre y centro derivados de cada variante; no crear copias de los efectos para la UI. Cuatro iconos Lucide, tooltips/aria y pista de seleccion, sin botones de texto duplicados.
@@ -409,3 +413,9 @@ Validacion de rama (2026-09-02): typecheck, lint, 322 tests y build correctos. S
 Spec 35 agrega Linea/Cono/Circulo de relampago en Efectos y menu contextual, con iconos y tooltip. Propiedades incluyen direccion del cono (no apertura), alcance/radio, intensidad, velocidad, opacidad, chispas, visibilidad y guia compartida. Cada efecto aparece en Objetos > Efectos.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Integracion localizada en App: RightSidebarTabs y paneles ocultables, sin reemplazar accordions ni el panel izquierdo. DicePanel usa swatches, steppers, select de dano/material y dialogo d20 accesible. El hook de sesion queda fuera de las tabs para no cancelar animacion al alternarlas. Pruebas y alcance en [plan 37](../37-dm-dice-rolls/plan.md).
+
+El chequeo d20 ahora activa exclusivamente su propio lanzamiento. Su input de modificador se monta solo cuando esta activo; el fieldset de dano queda deshabilitado sin desmontarse, conservando formulas y modificadores. El detalle de dominio, contratos y regresiones se registra en la revision 19 del plan 37.

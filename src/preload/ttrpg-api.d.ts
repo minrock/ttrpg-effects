@@ -2,6 +2,7 @@ import type { SceneDocument, SceneOperationResult } from "../domain/sessions/sce
 import type { InformationAreaHighlightBroadcast } from "../domain/annotations/map-annotations";
 import type { MapOpenResult } from "../domain/map/map-image";
 import type { MapImageReplacementResult } from "../application/services/map-image-storage";
+import type { DiceApi } from "./dice-api";
 import type { TokenOpenResult } from "../domain/tokens/token-image";
 import type {
   ArcanePointerBroadcast,
@@ -44,7 +45,7 @@ export interface TtrpgAppInfo {
   status: "Bootstrap listo";
 }
 
-export interface TtrpgApi {
+export interface TtrpgApi extends DiceApi {
   reportPlayerMapImageStatus: (report: { imageUrl: string; ok: boolean; error?: string }) => Promise<void>;
   onPlayerMapImageStatus: (handler: (report: { imageUrl: string; ok: boolean; error?: string }) => void) => () => void;
   getAppInfo: () => TtrpgAppInfo;

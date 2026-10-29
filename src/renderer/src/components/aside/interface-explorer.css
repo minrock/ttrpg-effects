@@ -1,0 +1,325 @@
+.vtt-interface .dm-aside-panel {
+  --explorer-bg: #232528;
+  --explorer-line: #3c4045;
+  --explorer-text: #ebedef;
+  --explorer-muted: #aab0b8;
+  --explorer-mint: #8ed5b6;
+  --explorer-active: #8ed5b61c;
+  border-color: var(--explorer-line);
+  background: var(--explorer-bg);
+  color: var(--explorer-text);
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-header {
+  min-height: 38px;
+  padding: 10px 12px 6px;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-title {
+  color: var(--explorer-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-tabs {
+  gap: 4px;
+  padding: 0 10px;
+  border-color: var(--explorer-line);
+  background: transparent;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 4px;
+  background: transparent;
+  color: var(--explorer-muted);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-tabs button.is-active {
+  border-bottom-color: var(--explorer-mint);
+  background: transparent;
+  color: #c4edda;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-content {
+  gap: 0;
+  padding: 0 0 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #53585f transparent;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-tabpanel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vtt-interface .dm-aside-panel[hidden],
+.vtt-interface .dm-aside-panel .dm-aside-tabpanel[hidden],
+.vtt-interface .dm-aside-panel .dm-aside-accordion-body[hidden] {
+  display: none;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion,
+.vtt-interface .dm-aside-panel .map-settings-panel {
+  overflow: visible;
+  border: 0;
+  border-bottom: 1px solid var(--explorer-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion-header {
+  min-height: 36px;
+  padding: 7px 12px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion-title {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 7px;
+  min-width: 0;
+  color: #c7cbd1;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 0;
+  color: var(--explorer-muted);
+  background: transparent;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion-icon[data-tone="monster"] { color: #d9958d; }
+.vtt-interface .dm-aside-panel .dm-aside-accordion-icon[data-tone="npc"] { color: #99c7df; }
+.vtt-interface .dm-aside-panel .dm-aside-accordion-icon[data-tone="player"] { color: var(--explorer-mint); }
+.vtt-interface .dm-aside-panel .dm-aside-accordion-icon[data-tone="note"] { color: #e3bf7b; }
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion-badge {
+  padding: 0 4px;
+  color: var(--explorer-muted);
+  background: transparent;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtt-interface .dm-aside-panel .dm-aside-accordion-body {
+  min-width: 0;
+  padding: 0 10px 10px;
+  color: var(--explorer-text);
+}
+
+.vtt-interface .dm-aside-panel .scene-maps-section {
+  gap: 6px;
+  padding: 0;
+}
+
+.vtt-interface .dm-aside-panel .scene-maps-actions {
+  gap: 2px;
+}
+
+.vtt-interface .dm-aside-panel .scene-maps-actions button,
+.vtt-interface .dm-aside-panel .annotation-tree-create-actions > button {
+  justify-content: start;
+  min-height: 30px;
+  border: 0;
+  border-radius: 3px;
+  padding: 6px 8px;
+  color: #c4c8cd;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.vtt-interface .dm-aside-panel .scene-maps-actions svg { width: 14px; height: 14px; }
+
+.vtt-interface .dm-aside-panel .scene-map-list { gap: 2px; }
+
+.vtt-interface .dm-aside-panel .scene-map-list li {
+  grid-template-columns: 12px 26px minmax(0, 1fr) auto;
+  gap: 2px;
+  min-height: 34px;
+  padding: 2px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list > .is-active,
+.vtt-interface .dm-aside-panel .scene-object-row.is-selected,
+.vtt-interface .dm-aside-panel .annotation-tree__leaf.is-selected {
+  border-color: transparent;
+  background: var(--explorer-active);
+  box-shadow: inset 2px 0 var(--explorer-mint);
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list li.is-drop-target {
+  background: #99c7df20;
+  box-shadow: inset 0 2px #99c7df;
+}
+
+.vtt-interface .dm-aside-panel .annotation-tree__leaf.is-broken {
+  border-color: #d97a6c61;
+  border-left-color: #d97a6c;
+  box-shadow: inset 2px 0 #d97a6c;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list__drag svg { width: 12px; height: 14px; }
+
+.vtt-interface .dm-aside-panel .scene-map-list input {
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--explorer-text);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list input:focus {
+  border-color: var(--explorer-mint);
+  background: #191b1e;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list__actions {
+  grid-template-columns: repeat(2, 26px);
+  gap: 1px;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list button,
+.vtt-interface .dm-aside-panel .map-background-reset {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  color: var(--explorer-muted);
+  background: transparent;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list__select[aria-pressed="true"] { color: var(--explorer-mint); }
+
+.vtt-interface .dm-aside-panel .map-settings-panel {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  padding: 12px;
+}
+
+.vtt-interface .dm-aside-panel .map-settings-panel__header {
+  grid-column: 1 / -1;
+  color: #c7cbd1;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vtt-interface .dm-aside-panel .map-settings-panel__header svg { color: var(--explorer-muted); }
+.vtt-interface .dm-aside-panel .map-background-control { min-width: 0; color: var(--explorer-muted); font-size: 12px; }
+.vtt-interface .dm-aside-panel .map-background-picker__value { letter-spacing: 0; }
+
+.vtt-interface .dm-aside-panel .map-background-picker,
+.vtt-interface .dm-aside-panel .annotation-tree-search {
+  border-color: #42464c;
+  border-radius: 4px;
+  color: var(--explorer-muted);
+  background: #191b1e;
+  box-shadow: none;
+}
+
+.vtt-interface .dm-aside-panel .annotation-tree-search input { color: var(--explorer-text); background: transparent; }
+.vtt-interface .dm-aside-panel .annotation-tree-search input::placeholder { color: var(--explorer-muted); }
+.vtt-interface .dm-aside-panel .annotation-tree-create-actions { gap: 2px; }
+
+.vtt-interface .dm-aside-panel .annotation-tree-create-actions > button.is-active {
+  color: var(--explorer-mint);
+  background: var(--explorer-active);
+}
+
+.vtt-interface .dm-aside-panel .annotation-tree ul,
+.vtt-interface .dm-aside-panel .annotation-tree__leaf::before,
+.vtt-interface .dm-aside-panel .scene-object-tree > li > ul { border-color: var(--explorer-line); }
+
+.vtt-interface .dm-aside-panel .annotation-tree__branch-label > span { color: var(--explorer-muted); }
+.vtt-interface .dm-aside-panel .annotation-tree__branch-label small { border-radius: 3px; background: transparent; }
+
+.vtt-interface .dm-aside-panel .annotation-tree__actions button {
+  border: 0;
+  color: var(--explorer-muted);
+  background: transparent;
+}
+
+.vtt-interface .dm-aside-panel .scene-object-select,
+.vtt-interface .dm-aside-panel .scene-object-group,
+.vtt-interface .dm-aside-panel .scene-object-action { color: var(--explorer-text); }
+
+.vtt-interface .dm-aside-panel .dm-aside-tabs button:hover,
+.vtt-interface .dm-aside-panel .dm-aside-accordion-header:hover,
+.vtt-interface .dm-aside-panel .scene-maps-actions button:hover:not(:disabled),
+.vtt-interface .dm-aside-panel .scene-map-list button:hover:not(:disabled),
+.vtt-interface .dm-aside-panel .map-background-reset:hover:not(:disabled),
+.vtt-interface .dm-aside-panel .annotation-tree-create-actions > button:hover,
+.vtt-interface .dm-aside-panel .annotation-tree__actions button:hover:not(:disabled),
+.vtt-interface .dm-aside-panel .scene-object-action:hover,
+.vtt-interface .dm-aside-panel .scene-object-select:hover {
+  color: var(--explorer-text);
+  background: #ffffff0b;
+}
+
+.vtt-interface .dm-aside-panel button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.vtt-interface .dm-aside-panel button:focus-visible,
+.vtt-interface .dm-aside-panel input:focus-visible {
+  outline: 2px solid var(--explorer-mint);
+  outline-offset: -2px;
+}
+
+.vtt-interface .dm-aside-panel .annotation-tree-search:focus-within,
+.vtt-interface .dm-aside-panel .map-background-picker:focus-within {
+  border-color: var(--explorer-mint);
+  color: var(--explorer-mint);
+  box-shadow: none;
+}
+
+.vtt-interface .dm-aside-panel [data-tooltip] { position: relative; }
+
+.vtt-interface .dm-aside-panel [data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: none;
+  width: max-content;
+  max-width: 170px;
+  border: 1px solid #494e54;
+  border-radius: 4px;
+  padding: 5px 7px;
+  color: var(--explorer-text);
+  background: #101215;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.vtt-interface .dm-aside-panel .scene-map-list__select::after { right: auto; left: 0; }
+.vtt-interface .dm-aside-panel [data-tooltip]:hover::after,
+.vtt-interface .dm-aside-panel [data-tooltip]:focus-visible::after { display: block; }

@@ -1,5 +1,14 @@
 # Spec - Ventana de Jugador
 
+## Interfaz y herramientas locales 3.0.0
+
+Extension aceptada el 2026-10-28. Ver alcance completo en spec/plan 39. Las restricciones historicas de ausencia de toolbar y edicion descritas abajo quedan limitadas a la escena compartida del DM; no impiden las herramientas locales de esta extension.
+
+- Interfaz compacta con controles ocultables y dock de camara, zoom y brujula; conserva dados, contadores e informacion publica.
+- Lineas de medicion, caminos, circulos, cuadrados, rectangulos y conos locales con seleccion, propiedades, arrastre y borrado. Usan unidades/grilla del mapa y coordenadas correctas con norte rotado; medidas siempre legibles.
+- Estado efimero exclusivo de Player View, sin guardar ni publicar hacia DM. Cambiar mapa/escena lo limpia; snapshots ordinarios y reemplazo de imagen lo conservan.
+- La escena y los objetos del DM siguen siendo read-only. No se habilita edicion de tokens, luces, efectos, niebla ni contenido privado.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
@@ -32,7 +41,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
 - Agregar un boton principal en la ventana del DM para abrir la `Ventana de jugador`.
 - Crear una segunda ventana Electron real (`BrowserWindow`) para la vista de jugadores.
 - La ventana de jugador debe ocupar el 100% del viewport del mapa disponible en esa ventana.
-- La ventana de jugador no muestra toolbar, sidebar, status bar, menus contextuales ni modales de edicion.
+- La ventana de jugador no muestra sidebar, status bar, menus contextuales ni modales de edicion de la escena DM. Solo incorpora los controles locales definidos en la extension 3.0.0.
 - La ventana de jugador es read-only para edicion de escena, pero permite navegar su propia vista.
 - La camara de jugador es independiente de la camara del DM:
   - el pan/zoom normal del viewport DM no mueve al jugador;
@@ -58,7 +67,7 @@ Actualmente el viewport del DM incluye controles, sidebar, toolbar, seleccion, h
   - tokens;
   - emojis o patrones asociados a efectos/formas;
   - apuntador arcano.
-- Las interacciones y ediciones solo ocurren desde la ventana del DM.
+- Las ediciones de la escena compartida solo ocurren desde la ventana del DM; las herramientas efimeras del jugador no modifican esa escena.
 - Si la ventana de jugador esta cerrada y se vuelve a abrir, debe cargar el estado actual completo del DM.
 
 ### Diferencias entre vista DM y vista jugador
@@ -293,3 +302,15 @@ Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en la
 Spec 35 comparte descargas y guias estables de cono/circulo, pero nunca previews, etiquetas de medidas ni handles. Semilla/origen/offset de reloj sincronizan ventanas sin IPC por frame. El snapshot se valida con Zod al abrir/publicar en main; niebla oculta guia y efecto.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Player recibe exclusivamente tiradas abiertas de spec 37. Overlay 3D transparente sobre el mapa, independiente de zoom, norte, oscuridad y camara. Resumen y etiquetas numericas dependen del permiso del DM; las caras impresas siguen visibles en tiradas abiertas. Nunca recibe historial ni payload de tiradas ocultas. Abrir tarde recupera solo presentacion publica vigente. [Spec 37](../37-dm-dice-rolls/spec.md).
+
+Los dados asentados y el resumen autorizado permanecen sin caducidad. La X del resumen DM retira ambos para esa misma tirada en Player, incluso cuando su resumen estaba oculto; Player no tiene control de cierre. Se mantienen las reglas de reemplazo/navegacion y privacidad entre tiradas diferentes.
+
+Extension de sonido (2026-10-25): el rodado se reproduce solamente desde DM para evitar duplicacion acustica en el mismo equipo. Player conserva sus animaciones abiertas pero no crea audio; las tiradas ocultas siguen sin publicar ningun evento. Ver alcance y control de silencio en spec 37.
+
+Tamano de dados (2026-10-28): el DM puede ajustar Player entre 100% y 250%, independientemente del tamano privado y del zoom del mapa. La preferencia dura toda la sesion y se recupera al reabrir Player. Reencuadrar dados abiertos asentados sin relanzar ni revelar resultados ocultos. Si no cabe la ampliacion solicitada, mostrar porcentaje efectivo/solicitado en el overlay; Player no agrega herramientas de edicion. Detalles en spec 37.
+
+Un 20 natural conservado en una tirada abierta muestra rayos por encima del dado y a su alrededor, dejando una abertura circular pequena solo para leer el 20, y `Crítico` durante tres segundos desde el reposo compartido, incluso sin resumen numerico. No se envia ninguna celebracion de tiradas ocultas. La reapertura tardia no reinicia el efecto; el cierre DM lo retira junto con su tirada. Con movimiento reducido los rayos son estaticos. No cambia valores ni aplica reglas de dano.

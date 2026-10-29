@@ -179,3 +179,7 @@
 Descargas y guias compartidas de spec 35 pertenecen al mismo mundo que el mapa, por lo que la orientacion cardinal de Player se aplica a ambas. Rotar norte no modifica geometria persistida, direccion relativa del cono, medidas ni reloj.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Representacion compartida (Spec 39)
+
+El [plan 39](../39-vtt-interface/plan.md) actualiza `CompassOverlay` y sus estilos propios para reemplazar el bitmap por geometria cardinal nativa compartida con el laboratorio. La [spec 39](../39-vtt-interface/spec.md#brujula) define el contrato visual y las pruebas por orientacion y rol. No modifica dominio, persistencia ni transformaciones de PixiJS de este plan.

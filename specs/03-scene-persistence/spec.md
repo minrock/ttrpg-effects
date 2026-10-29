@@ -140,3 +140,7 @@ Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en la
 Spec 35 incorpora `kind: lightning` a efectos de cada mapa, con geometria mundial, parametros, semilla y reloj; sin vertices ni borradores. Formato 2 aditivo, validacion Zod y round-trip; lectores antiguos pueden rechazar este tipo desconocido.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Dados, preferencias y log de spec 37 son efimeros durante la ejecucion de la app. No pertenecen al mapa/escena, no se serializan ni provocan guardado/dirty/undo. No hay cambio de version de `.ttrpgscene` ni migracion. [Spec 37](../37-dm-dice-rolls/spec.md).

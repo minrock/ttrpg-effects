@@ -201,3 +201,7 @@ Al cargar escenas antiguas o mapas sin este campo, la app debe asumir `0` sin re
 Descargas y guias compartidas de spec 35 pertenecen al mismo mundo que el mapa, por lo que la orientacion cardinal de Player se aplica a ambas. Rotar norte no modifica geometria persistida, direccion relativa del cono, medidas ni reloj.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Representacion compartida (Spec 39)
+
+La [spec 39](../39-vtt-interface/spec.md#brujula) sustituye la representacion bitmap descrita aqui por geometria nativa compartida entre laboratorio y produccion. Define aguja norte prominente, N con posicion cardinal y texto vertical, y norte fijo hacia arriba en el componente de Player View. Se conservan las reglas de orientacion, persistencia y transformacion del mapa de esta spec.

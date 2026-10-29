@@ -1,15 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Compass, Lock, Unlock } from "lucide-react";
+import { Compass, Lock, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { getTokensForRole, normalizeCameraSnapshot, type ArcanePointerBroadcast, type PlayerWindowSnapshot, type ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { sortTokensByOrder } from "../../domain/tokens/tokens";
 import type { SceneDocument } from "../../domain/sessions/scene-document";
 import type { MapImageState } from "../../domain/map/map-image";
-import { MapViewport } from "./components/MapViewport";
+import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
+import { PlayerTools } from "./components/workspace/PlayerTools";
+import { usePlayerTools } from "./hooks/usePlayerTools";
+import { zoomPlayerCamera } from "../../domain/player/player-camera-control";
 import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay";
+import { usePublicDice } from "./hooks/useDiceSession";
+import { useDiceSizes } from "./hooks/useDiceSizes";
+import { DiceOverlay } from "./components/dice/DiceOverlay";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
   sanitizePlayerCameraCommand,
@@ -17,8 +23,14 @@ import {
   type PlayerCameraReportOrigin
 } from "../../domain/player/player-camera-control";
 
+const EMPTY_ITEMS = [] as const;
+const EMPTY_MAP_ANNOTATIONS = { pins: EMPTY_ITEMS, areas: EMPTY_ITEMS, sceneLinks: EMPTY_ITEMS };
+const EMPTY_LINK_STATUSES = {};
+
 export function PlayerApp(): JSX.Element {
   const shellRef = useRef<HTMLElement | null>(null);
+  const viewportRef = useRef<MapViewportHandle | null>(null);
+  const [showTools, setShowTools] = useState(true);
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
@@ -336,34 +348,53 @@ export function PlayerApp(): JSX.Element {
     }
   }, [isHydrated, isViewportReady, queuePlayerCameraReport]);
 
+  const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
+  const { sizes: diceSizes } = useDiceSizes();
+  const tools = usePlayerTools(viewportIdentity, scene.grid, scene.settings);
+  const shapes = useMemo(() => [...scene.shapes, ...tools.shapes], [scene.shapes, tools.shapes]);
+  const handlePathHover = useCallback((point: { readonly x: number; readonly y: number } | null): void => {
+    viewportRef.current?.setPathHoverPoint(point);
+  }, []);
+  const zoomLocal = (direction: "in" | "out"): void => {
+    if (isZoomLocked) return;
+    const next = zoomPlayerCamera(latestPlayerCameraRef.current, direction);
+    viewportRef.current?.setCameraSnapshot(next);
+    setActiveZoom(next.zoom);
+    queuePlayerCameraReport(next, "local-navigation", true);
+  };
+
   return (
-    <main ref={shellRef} className="player-shell" aria-label="TTRPG Effects jugador">
+    <main ref={shellRef} className="player-shell player-workspace-root" aria-label="TTRPG Effects jugador">
       {isHydrated ? (
         <MapViewport
+          ref={viewportRef}
           key={viewportIdentity}
+          overlay={<DiceOverlay envelope={diceEnvelope} size={diceSizes.player} />}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}
           darkness={scene.darkness}
           fogOfWar={scene.fogOfWar}
-          elements={[]}
-          shapes={scene.shapes}
+          elements={EMPTY_ITEMS}
+          shapes={shapes}
+          localEditableShapeIds={showTools ? tools.editableIds : undefined}
           lights={scene.lights}
           effects={scene.effects}
           tokens={renderedTokens}
-          labels={[]}
-          mapAnnotations={{ pins: [], areas: [], sceneLinks: [] }}
+          labels={EMPTY_ITEMS}
+          mapAnnotations={EMPTY_MAP_ANNOTATIONS}
+          sceneLinkStatuses={EMPTY_LINK_STATUSES}
           compassOrientation={scene.compassOrientation}
           backgroundColor={scene.backgroundColor}
           daytimeFilter={scene.daytimeFilter}
           daytimeMask={scene.daytimeMask}
           showCompass={showCompass}
           showMapAnnotations={false}
-          selectedElementId={null}
+          selectedElementId={tools.selectedId}
           isZoomLocked={isZoomLocked}
           isMapAdjustMode={false}
           isGridAdjustMode={false}
-          isGrabMode={false}
+          isGrabMode={tools.tool === "pan"}
           viewRole="player"
           isReadOnly
           isNavigationEnabled
@@ -372,7 +403,7 @@ export function PlayerApp(): JSX.Element {
           cameraSnapshot={camera}
           isFogRevealMode={false}
           isFirePaintMode={false}
-          isPathDrawingMode={false}
+          isPathDrawingMode={tools.isDrawing}
           isWaterDrawingMode={false}
           isArcanePointerMode={false}
           isRoomPinMode={false}
@@ -382,31 +413,31 @@ export function PlayerApp(): JSX.Element {
           arcanePointerEvent={arcanePointerEvent}
           informationAreaHighlightEvent={informationAreaHighlightEvent}
           informationAreaHighlightResetKey={informationAreaHighlightResetKey}
-          pathPreviewPoints={[]}
+          pathPreviewPoints={tools.points}
           pathPreviewHoverPoint={null}
-          waterPreviewPoints={[]}
+          waterPreviewPoints={EMPTY_ITEMS}
           waterPreviewHoverPoint={null}
           onContextMenuRequest={noop}
-          onElementSelect={noop}
+          onElementSelect={tools.select}
           onGridCellSizeChange={noop}
           onMapRenderError={noop}
           onMapRendered={noop}
           onMapImageLoaded={handlePlayerMapReady}
           onMapImageError={handlePlayerMapError}
           onMapPositionChange={noop}
-          onElementMove={noop}
+          onElementMove={tools.move}
           onLightDirectionChange={noop}
           onLightRadiusChange={noop}
-          onShapeEndMove={noop}
-          onPathPointAdd={noop}
-          onPathPointerMove={noop}
+          onShapeEndMove={tools.moveEnd}
+          onPathPointAdd={tools.addPoint}
+          onPathPointerMove={handlePathHover}
           onWaterPointAdd={noop}
           onWaterPointerMove={noop}
-          onPathPointMove={noop}
-          onPathMove={noop}
-          onShapeDirectionChange={noop}
-          onShapeRadiusChange={noop}
-          onShapeRectResize={noop}
+          onPathPointMove={tools.movePoint}
+          onPathMove={tools.movePath}
+          onShapeDirectionChange={tools.direction}
+          onShapeRadiusChange={tools.radius}
+          onShapeRectResize={tools.resize}
           onFogRevealStroke={noop}
           onFirePaint={noop}
           onFireZoneRadiusChange={noop}
@@ -422,6 +453,23 @@ export function PlayerApp(): JSX.Element {
           onMapAnnotationPreview={noop}
         />
       ) : null}
+      {isHydrated && showTools && <PlayerTools
+        tool={tools.tool}
+        selectedShape={tools.selectedShape}
+        count={tools.shapes.length}
+        draftCount={tools.points.length}
+        disabled={!isViewportReady}
+        grid={scene.grid}
+        settings={scene.settings}
+        onTool={tools.chooseTool}
+        onArea={kind => tools.createArea(kind, latestPlayerCameraRef.current.center)}
+        onFinish={tools.finish}
+        onCancel={tools.cancel}
+        onUndoPoint={tools.undoPoint}
+        onDelete={tools.remove}
+        onClear={tools.clear}
+        onPatch={tools.patch}
+      />}
       {isHydrated && (
         <PlayerAsideOverlay aside={scene.sceneAside ?? createDefaultSceneAside()} />
       )}
@@ -448,28 +496,37 @@ export function PlayerApp(): JSX.Element {
         </div>
       )}
       <div className="player-controls" aria-label="Controles de vista de jugador">
+        <button type="button" className={`player-control-button${showTools ? " is-active" : ""}`}
+          title={showTools ? "Ocultar herramientas" : "Mostrar herramientas"}
+          aria-label={showTools ? "Ocultar herramientas" : "Mostrar herramientas"} aria-pressed={showTools}
+          onClick={() => { tools.cancel(); setShowTools(current => !current); }}>
+          <Wrench aria-hidden="true" size={17} />
+        </button>
+        <button type="button" className="player-control-button" title="Alejar vista local" aria-label="Alejar vista local"
+          disabled={isZoomLocked || !isViewportReady} onClick={() => zoomLocal("out")}><ZoomOut aria-hidden="true" size={17} /></button>
+        <button type="button" className="player-control-button" title="Acercar vista local" aria-label="Acercar vista local"
+          disabled={isZoomLocked || !isViewportReady} onClick={() => zoomLocal("in")}><ZoomIn aria-hidden="true" size={17} /></button>
         <button
           className={`player-control-button${isZoomLocked ? " is-locked" : ""}`}
           type="button"
-          tabIndex={-1}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setIsZoomLocked((current) => !current)}
           title={isZoomLocked ? "Desbloquear zoom local" : "Bloquear zoom local"}
+          aria-label={isZoomLocked ? "Desbloquear zoom local" : "Bloquear zoom local"}
+          aria-pressed={isZoomLocked}
         >
           {isZoomLocked ? <Lock aria-hidden="true" size={15} /> : <Unlock aria-hidden="true" size={15} />}
-          <span>{isZoomLocked ? "Zoom bloqueado" : "Zoom desbloqueado"}</span>
         </button>
         <button
           className={`player-control-button${showCompass ? " is-active" : ""}`}
           type="button"
-          tabIndex={-1}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => setShowCompass((current) => !current)}
           title={showCompass ? "Ocultar brujula" : "Mostrar brujula"}
+          aria-label={showCompass ? "Ocultar brujula" : "Mostrar brujula"}
           aria-pressed={showCompass}
         >
           <Compass aria-hidden="true" size={15} />
-          <span>{showCompass ? "Brujula visible" : "Brujula oculta"}</span>
         </button>
       </div>
     </main>

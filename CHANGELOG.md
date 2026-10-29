@@ -10,6 +10,68 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [3.0.0] - 2026-10-28
+
+### Changed
+
+- Nueva interfaz de mesa para DM: cabecera compacta, barra vertical de herramientas con opciones contextuales, explorador Escena/Mapa e inspector Propiedades/Dados. Conserva las acciones de escena, anotaciones, entidades, efectos, combate y contadores.
+- Paneles adaptables a ventanas estrechas, navegacion accesible entre pestanas y controles separados para camara DM y jugador. Ocultar paneles no reinicia el canvas ni la tirada de dados activa.
+- Player View adopta el mismo lenguaje visual con controles discretos de navegacion, zoom, brujula y herramientas locales.
+
+### Added
+
+- Mediciones de linea y caminos, circulos, cuadrados, rectangulos y conos locales en Player View, con propiedades, seleccion, arrastre, borrado y limpieza. Se pueden ocultar los controles sin perder las figuras.
+- Las herramientas del jugador son efimeras y privadas de esa ventana: no modifican objetos del DM, no publican ni guardan cambios en la escena y se limpian al cambiar de mapa o escena.
+- Laboratorios de interfaz DM y Player para desarrollo, con mapa original generado y pruebas de aislamiento. No se incluyen como entradas del instalador.
+
+### Fixed
+
+- Brujula con norte diferenciado y N legible; en Player siempre apunta hacia arriba, independientemente de la orientacion del mapa.
+- Coordenadas de puntero, arrastre y manivelas alineadas con el norte rotado en Player; etiquetas de medida siempre derechas.
+- Callbacks y capas estables para evitar recreaciones del viewport durante la edicion local de figuras.
+
+### Compatibility
+
+- Version mayor por solicitud expresa del usuario para este cierre de interfaz. No hay ruptura ni migracion nueva de `.ttrpgscene`; se conserva el formato y la compatibilidad de escenas existentes.
+- La integracion en `main` incluye las versiones de dados 2.8.0 y 2.8.1 documentadas abajo. No se modifican los algoritmos de fuego, relampagos, luces o filtros horarios en este rediseño.
+- Cierre de specs 38 y 39; actualizacion de specs/planes de paneles, brujula y Player View.
+
+## [2.8.1] - 2026-10-28
+
+### Fixed
+
+- Legibilidad de dados pequenos: tamano independiente de 100% a 250% para DM y Player View, con controles en el panel de Dados y restablecimiento a 100%.
+- Encuadre automatico de la trayectoria y las poses finales, con limite visible cuando no cabe toda la ampliacion; conserva caras, resultados, distancias relativas y cierre manual sin recortar dados ni alterar el zoom del mapa.
+
+### Added
+
+- Sonidos locales CC0 de Kenney para uno o varios dados, incluyendo percentiles y ventaja/desventaja, sincronizados con rebotes y con control de silencio en DM.
+
+### Changed
+
+- Preferencias de tamano conservadas durante la sesion y recuperadas al reabrir Player; IPC compacto separado de las tiradas, sin repetir simulacion, audio ni celebracion al cambiar tamano.
+- Spec y plan de dados/Player actualizados. Protocolo de dados 4; sin cambios de formato `.ttrpgscene`. Version patch por solicitud expresa del usuario.
+
+## [2.8.0] - 2026-10-24
+
+### Added
+
+- Pestana Dados en el panel derecho del DM para lanzar d4, d6, d8, d10, d12, d20 y percentiles 3D sobre el mapa, con colores, materiales Resina/Mate/Metal y fuerza ajustable.
+- Tiradas abiertas compartidas con Player View y ocultas exclusivamente para el DM; resumen numerico publico opcional e historial privado durante la sesion.
+- Composicion por dados o formulas como `2d6 + 3d4 + 2`, agrupacion y colores por tipo de dano, modificadores independientes y subtotales por grupo.
+- Chequeos d20 exclusivos, normales, con ventaja o desventaja, con modificador propio y cara conservada separada del dano preparado.
+- Celebracion de 20 natural conservado con rayos sobre el dado, abertura pequena para leer el numero y texto Critico; respeta tiradas privadas/abiertas y movimiento reducido.
+
+### Changed
+
+- Dados y resultados permanecen sobre el tablero hasta cerrar el resumen con la X del DM; el cierre se sincroniza con Player View sin borrar el historial.
+- Simulacion fisica unica en worker y reproduccion compartida entre ventanas, independiente de zoom, norte y camara; render 3D bajo demanda y recursos locales sin CDN.
+- Cierre del spec 37 y actualizacion de specs/planes de paneles, render, Player View y persistencia. Sin cambios en el formato `.ttrpgscene`; dados e historial no se guardan en escenas.
+
+### Fixed
+
+- Los modificadores finales se incluyen una sola vez en cada subtotal y en el resultado d20. La comprobacion de protocolo impide lanzar con un proceso Electron antiguo que descarte campos del formulario actualizado.
+
 ## [2.7.0] - 2026-10-22
 
 ### Added

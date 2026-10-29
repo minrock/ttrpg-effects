@@ -1,5 +1,15 @@
 # Plan - Ventana de Jugador
 
+## Interfaz y herramientas locales 3.0.0
+
+Extension implementada y aceptada el 2026-10-28; secuencia, pruebas y cierre en plan 39. Este contrato amplia los controles locales del plan historico sin conceder permisos sobre la escena DM.
+
+- `usePlayerTools` mantiene figuras y borradores efimeros con callbacks estables, independientes de SceneDocument y de persistencia/IPC.
+- `PlayerTools` aporta controles compactos; `PlayerApp` combina shapes publicas y locales solo al renderizar, con `isReadOnly=true` y allowlist explicita `localEditableShapeIds`.
+- Pixi limita picking, drag y handles a esa allowlist. Conversiones compartidas de mundo/pantalla respetan norte; etiquetas reciben contrarrotacion. Aplicar shapes y allowlist antes de seleccion.
+- Reiniciar por identidad de viewport, no por cada snapshot. Hover imperativo y arrays estables evitan recrear el canvas mientras se dibuja.
+- Regresiones de aislamiento, rotacion 0/90/180/270, estado local y ciclo de vida; smoke Electron y Player real en laboratorio, sin nuevos canales privilegiados ni cambios de formato.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
@@ -284,3 +294,15 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 Spec 35 comparte descargas y guias estables de cono/circulo, pero nunca previews, etiquetas de medidas ni handles. Semilla/origen/offset de reloj sincronizan ventanas sin IPC por frame. El snapshot se valida con Zod al abrir/publicar en main; niebla oculta guia y efecto.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Canales dice separados del snapshot de escena, sender/frame validado y revisiones por rol. usePublicDice se hidrata tras readiness, rechaza otro mapa y admite canvas sin mapa. Ambas ventanas reproducen las mismas poses calculadas en un worker del DM; no hay fisica independiente ni trafico por frame. Smoke nativo con darkvision y mapa girado registrado en [plan 37](../37-dm-dice-rolls/plan.md#14-verificacion-de-implementacion).
+
+El cierre manual usa `dice:dismiss`, exclusivo del DM. Main publica un envelope publico nulo solo si coincide el rollId; Player retira mallas/etiquetas/resumen con `present(null)`. Sin `expiresAt` ni timer de retiro; RAF se detiene en la pose final. La reapertura recupera esa pose mientras no se haya cerrado, reemplazado o cambiado de contexto.
+
+Audio de rodado (revision 22 del plan 37): integrar `DiceRollAudio` exclusivamente en `useDiceSession`, nunca en `DiceOverlay` compartido ni `usePublicDice`. Sin nuevos canales ni cambio de protocolo. Cubrir por regresion que los eventos publicos y la hidratacion de Player no instancian AudioContext; la salida unica DM evita duplicacion al tener ambas ventanas abiertas.
+
+Tamano independiente (revision 23 del plan 37, protocolo de dados 4): `useDiceSizes` recibe solo preferencias compactas mediante `dice:get-sizes`/`dice:sizes`; solo DM puede escribir con `dice:set-size`. Reabrir/hidratar descarta revisiones obsoletas. Player aplica su escala a la camara ortografica de DiceOverlay con bounds de replay y poses finales; no vuelve a ejecutar fisica ni altera zoom, camara o escena Pixi. Cambiar tamano no repite audio/criticos ni transforma una tirada oculta en publica.
+
+Criticos visuales (revision 20 del plan 37): main deriva `DicePresentation.critical.dieId` del d20 natural conservado, antes de filtrar el resultado numerico. Solo se publica para tiradas abiertas; `settledAt` fija una ventana absoluta de 3000 ms. `CriticalDiceLightning` reutiliza geometria procedural en Canvas2D acotado, sin redibujar Pixi/Three ni enviar frames por IPC. Texto React y timers comparten esa ventana; no repetir al reabrir, redimensionar o republicar resultados. Esta revision introdujo el protocolo de dados 3, sustituido por el 4 para tamano independiente. La actualizacion requiere reiniciar main despues de guardar el trabajo abierto.

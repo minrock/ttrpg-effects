@@ -214,3 +214,7 @@ Ampliacion de fuego implementada y aceptada (spec/plan 10): union compartida con
 Spec 35 incorpora `kind: lightning` a efectos de cada mapa, con geometria mundial, parametros, semilla y reloj; sin vertices ni borradores. Formato 2 aditivo, validacion Zod y round-trip; lectores antiguos pueden rechazar este tipo desconocido.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Coordinador de dados en memoria de main, sin repositorio SQLite ni campos nuevos en SceneDocument. El historial sobrevive a navegar y recargar renderer, pero no a cerrar la app; los replays se liberan al cerrar manualmente el resumen, reemplazar la tirada o cambiar de contexto, no por tiempo. Ver [plan 37](../37-dm-dice-rolls/plan.md).
