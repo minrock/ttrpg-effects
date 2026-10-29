@@ -101,3 +101,16 @@ Extension implementada y aceptada por el usuario para el cierre 3.0.0.
 - Integrar en main conservando el historial de dados 2.8.x que forma parte de la base de esta rama.
 - Ejecutar `./scripts/build-dmg.sh` desde main; comprobar version empaquetada e integridad del DMG y registrar resultados efectivos.
 - Conservar el laboratorio como entrada de desarrollo. Sin nueva publicacion remota, tag ni cambios incompatibles de persistencia.
+
+### Resultado del cierre
+
+2026-10-28. Commit de implementacion `9698182`; integrado en `main` mediante merge `7241501`, sin conflictos. Incluye el historial de dados 2.8.0/2.8.1 que aun no estaba en main. Specs 38 y 39 cerradas con aprobacion del usuario.
+
+- Validacion repetida para release: `pnpm lint`, `pnpm typecheck`, `pnpm test` (107 archivos, 991 tests) y `git diff --check` correctos.
+- `./scripts/build-dmg.sh` ejecutado desde main: typecheck, compilacion electron-vite y empaquetado electron-builder correctos; Electron 39.8.10, macOS arm64.
+- Artefacto: `dist/TTRPG Effects-3.0.0-arm64.dmg`, 149140289 bytes. `hdiutil verify` confirma checksum valido.
+- SHA-256: `5b4c4cafb4cbc79ebd8dbbdd822b54a3118774e6e527ac5cf44808560ad23bf5`.
+- `Info.plist` y package.json dentro de `app.asar` declaran 3.0.0. Binario Mach-O arm64; entradas main/preload/renderer presentes. El archivo ASAR no contiene `ui-lab`, `player-lab` ni `cloister-map`.
+- Instalador personal/interno sin firma Developer ID ni notarizacion, segun configuracion existente. Avisos no bloqueantes del toolchain: directivas `use client`, author ausente, deprecacion de shell y dependencias opcionales de otras plataformas no instaladas. No se cambiaron dependencias para silenciarlos.
+- No se instalo ni se abrio la app empaquetada durante este cierre. El smoke visual Electron y navegador de la implementacion se registra arriba; no se altero la instancia de desarrollo del usuario.
+- Sin push ni tag. DMG y salidas de compilacion permanecen ignorados por git.
