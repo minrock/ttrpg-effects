@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useEffect, useState, type JSX } from "react";
 import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { ModalBackdrop } from "./ModalBackdrop";
@@ -18,12 +19,13 @@ export function NpcDetailModal({
   onEdit,
   onNotesChange
 }: NpcDetailModalProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (npc.imagePath === null) { setImageUrl(null); return; }
-    void window.ttrpg?.resolveAsideUrl(npc.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [npc.imagePath]);
+    void imagesApi?.resolveAsideUrl(npc.imagePath).then((url) => setImageUrl(url ?? null));
+  }, [npc.imagePath, imagesApi]);
 
   return (
     <ModalBackdrop onClose={onClose} large>

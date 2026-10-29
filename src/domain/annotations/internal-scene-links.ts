@@ -55,6 +55,9 @@ export function connectInternalSceneLink(
   const sourceMarker = findMarker(sourceMap, request.sourceMarkerId);
   const targetMarker = findMarker(targetMap, request.targetMarkerId);
 
+  if ([sourceMarker, targetMarker].some((marker) => marker.connection !== null && marker.connection.peer.mapId === undefined)) {
+    throw new Error("Usa Desligar para liberar la conexión con otra escena antes de conectar mapas internos.");
+  }
   if (sourceMarker.locked || targetMarker.locked) {
     throw new Error("No se puede conectar un marcador bloqueado.");
   }

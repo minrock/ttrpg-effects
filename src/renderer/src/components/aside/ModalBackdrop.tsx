@@ -1,3 +1,4 @@
+import { usePortalTarget } from "../../client/PortalTarget";
 import { type JSX, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -13,6 +14,7 @@ interface ModalBackdropProps {
 }
 
 export function ModalBackdrop({ onClose, children, wide = false, large = false, fitContent = false, documentLayout = false }: ModalBackdropProps): JSX.Element {
+  const portalTarget = usePortalTarget();
   const panelStyle: React.CSSProperties = documentLayout
     ? {
         width: "min(1240px, calc(100vw - 48px))",
@@ -81,6 +83,6 @@ export function ModalBackdrop({ onClose, children, wide = false, large = false, 
         {children}
       </div>
     </div>,
-    document.body
+    portalTarget
   );
 }

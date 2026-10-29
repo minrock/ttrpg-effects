@@ -1,3 +1,4 @@
+import { isServiceAssetUrl } from "../../shared/contracts/service-references";
 import { Assets, type Texture } from "pixi.js";
 
 export interface ImageResourceLease {
@@ -65,7 +66,7 @@ export function acquireImageResource(url: string): ImageResourceLease {
     const ready = Promise.resolve(previousUnload).then(async () => {
       // Assets loaded outside this registry have an unknown owner.
       next.borrowed = Assets.cache.has(url);
-      const texture = await Assets.load<Texture>(url);
+      const texture = await Assets.load<Texture>(isServiceAssetUrl(url) ? { src: url, parser: "loadTextures" } : url);
       next.loaded = true;
       if (texture.destroyed || !Number.isInteger(texture.width) || !Number.isInteger(texture.height)
         || texture.width <= 0 || texture.height <= 0) {

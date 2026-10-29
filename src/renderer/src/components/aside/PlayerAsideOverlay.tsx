@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useEffect, useState, type JSX } from "react";
 import type { SceneMonster, SceneNpc } from "../../../../domain/sessions/scene-aside";
 import {
@@ -35,13 +36,18 @@ export function PlayerAsideOverlay({ aside }: PlayerAsideOverlayProps): JSX.Elem
 // ---------------------------------------------------------------------------
 
 function MonsterCard({ monster }: { monster: SceneMonster }): JSX.Element | null {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
-    if (monster.imagePath === null) return;
-    void window.ttrpg?.resolveAsideUrl(monster.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [monster.imagePath]);
+    let active = true;
+    setImageUrl(null);
+    if (monster.imagePath !== null) void imagesApi?.resolveAsideUrl(monster.imagePath)
+      .then(url => { if (active) setImageUrl(url ?? null); })
+      .catch(() => { if (active) setImageUrl(null); });
+    return () => { active = false; };
+  }, [monster.imagePath, imagesApi]);
 
   if (imageUrl === null) return null;
 
@@ -75,13 +81,18 @@ function MonsterCard({ monster }: { monster: SceneMonster }): JSX.Element | null
 // ---------------------------------------------------------------------------
 
 function NpcCard({ npc }: { npc: SceneNpc }): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
-    if (npc.imagePath === null) return;
-    void window.ttrpg?.resolveAsideUrl(npc.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [npc.imagePath]);
+    let active = true;
+    setImageUrl(null);
+    if (npc.imagePath !== null) void imagesApi?.resolveAsideUrl(npc.imagePath)
+      .then(url => { if (active) setImageUrl(url ?? null); })
+      .catch(() => { if (active) setImageUrl(null); });
+    return () => { active = false; };
+  }, [npc.imagePath, imagesApi]);
 
   const imgSize = zoomed ? "min(72vw, 72vh)" : "440px";
 

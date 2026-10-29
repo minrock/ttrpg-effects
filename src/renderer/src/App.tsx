@@ -1,3 +1,5 @@
+import type { ServiceWorkspace } from "../../web/workspace";
+import { useTtrpgApi } from "./client/ClientProvider";
 import {
   useCallback,
   useEffect,
@@ -288,8 +290,20 @@ interface NewTokenDraftState {
 const SESSION_AUTOSAVE_DELAY_MS = 1000;
 const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
 
-export function App(): JSX.Element {
+export function App({ service }: { readonly service?: ServiceWorkspace } = {}): JSX.Element {
+  const [servicePublished, setServicePublished] = useState(false);
+  useEffect(() => {
+    if (!service) return;
+    const update = () => { if (!service.browser.table.getStatus().published) setServicePublished(false); };
+    update(); return service.browser.table.subscribeStatus(update);
+  }, [service]);
+  const scenesApi = useTtrpgApi("scenes");
+  const imagesApi = useTtrpgApi("images");
+  const playerApi = useTtrpgApi("player");
+  const nativeMenusApi = useTtrpgApi("nativeMenus");
+  const librariesApi = useTtrpgApi("libraries");
   const [scene, setSceneState] = useState<SceneDocument>(() => {
+    if (service) return createEmptyScene();
     try {
       const snapshot = sessionStorage.getItem("ttrpg:session-scene");
       if (snapshot !== null) {
@@ -478,8 +492,8 @@ export function App(): JSX.Element {
         : { state: "validating" as const }
     ])));
 
-    if (currentFilePath === null || markers.length === 0 || window.ttrpg === undefined) return;
-    void window.ttrpg.validateSceneLinks({ scenePath: currentFilePath, markers }).then((result) => {
+    if (currentFilePath === null || markers.length === 0 || scenesApi === undefined) return;
+    void scenesApi.validateSceneLinks({ scenePath: currentFilePath, markers }).then((result) => {
       if (sceneLinkValidationRequestId.current !== requestId) return;
       if (result.ok) {
         setSceneLinkStatuses(result.statuses);
@@ -487,10 +501,10 @@ export function App(): JSX.Element {
         setFeedback(result.error);
       }
     });
-  }, [currentFilePath, scene.mapAnnotations.sceneLinks]);
+  }, [currentFilePath, scene.mapAnnotations.sceneLinks, scenesApi]);
 
   useEffect(() => {
-    if (window.ttrpg === undefined || scene.tokens.length === 0) {
+    if (imagesApi === undefined || scene.tokens.length === 0) {
       return;
     }
 
@@ -502,7 +516,7 @@ export function App(): JSX.Element {
 
     let cancelled = false;
     void Promise.all(
-      missingTokens.map(async (token) => [token.id, await window.ttrpg?.resolveTokenUrl(token.imagePath)] as const)
+      missingTokens.map(async (token) => [token.id, await imagesApi?.resolveTokenUrl(token.imagePath)] as const)
     ).then((entries) => {
       if (cancelled) {
         return;
@@ -524,12 +538,13 @@ export function App(): JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [scene.tokens, tokenImageUrls]);
+  }, [scene.tokens, tokenImageUrls, imagesApi]);
 
   // Phase 2: Autosave scene to sessionStorage on every change (debounced).
   // sessionStorage survives renderer reloads within the same Electron window session
   // but is cleared automatically when the window is closed, preventing cross-session leakage.
   useEffect(() => {
+    if (service) return;
     const handle = setTimeout(() => {
       try {
         sessionStorage.setItem("ttrpg:session-scene", JSON.stringify(scene));
@@ -538,7 +553,7 @@ export function App(): JSX.Element {
       }
     }, SESSION_AUTOSAVE_DELAY_MS);
     return () => clearTimeout(handle);
-  }, [scene]);
+  }, [scene, service]);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     setInteraction((current) => {
@@ -616,7 +631,7 @@ export function App(): JSX.Element {
 
   const sendPlayerCameraCommand = useCallback(
     (reason: PlayerCameraCommandReason): void => {
-      if (!isPlayerWindowOpenRef.current || window.ttrpg === undefined) {
+      if (!isPlayerWindowOpenRef.current || playerApi === undefined) {
         refreshPlayerCameraControl("closed");
         return;
       }
@@ -625,13 +640,13 @@ export function App(): JSX.Element {
       playerCameraCommandRevisionRef.current = revision;
       pendingPlayerCameraCommandRevisionRef.current = revision;
       refreshPlayerCameraControl("pending");
-      void window.ttrpg.commandPlayerCamera({
+      void playerApi.commandPlayerCamera({
         revision,
         camera: playerCameraRef.current,
         reason
       });
     },
-    [refreshPlayerCameraControl]
+    [refreshPlayerCameraControl, playerApi]
   );
 
   const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
@@ -666,9 +681,9 @@ export function App(): JSX.Element {
 
   const handleArcanePointerTrigger = useCallback((pointer: ArcanePointerBroadcast): void => {
     if (isPlayerWindowOpenRef.current) {
-      void window.ttrpg?.publishPlayerPointer(pointer);
+      void playerApi?.publishPlayerPointer(pointer);
     }
-  }, []);
+  }, [playerApi]);
 
   const handleRoomPinPlace = useCallback((position: WorldPoint): void => {
     const id = getNextAvailableSceneId(sceneRef.current, ["room-pin-"], nextPinId);
@@ -705,13 +720,17 @@ export function App(): JSX.Element {
   }, []);
 
   const handleInformationAreaHighlight = useCallback((areaId: string): void => {
+    if (playerApi === undefined) {
+      setFeedback("La proyeccion no esta disponible en este cliente.");
+      return;
+    }
     const area = sceneRef.current.mapAnnotations.areas.find((candidate) => candidate.id === areaId);
     if (area === undefined) return;
-    void window.ttrpg?.publishPlayerInformationAreaHighlight(
+    void playerApi?.publishPlayerInformationAreaHighlight(
       createInformationAreaHighlightBroadcast(area)
     );
     setFeedback(`Area resaltada para jugadores durante 5 segundos.`);
-  }, []);
+  }, [playerApi]);
 
   const setGridAdjustMode = useCallback((enabled: boolean): void => {
     setIsGridAdjustMode(enabled);
@@ -949,14 +968,14 @@ export function App(): JSX.Element {
       setFeedback("Nombre actualizado; se guardara al establecer la ruta de la escena.");
       return true;
     }
-    if (window.ttrpg === undefined) {
+    if (scenesApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return false;
     }
 
     setIsBusy(true);
     try {
-      const saved = await window.ttrpg.saveSceneToPath(
+      const saved = await scenesApi.saveSceneToPath(
         createSceneSavePayload(nextScene, sceneAside),
         currentFilePath
       );
@@ -982,7 +1001,7 @@ export function App(): JSX.Element {
     } finally {
       setIsBusy(false);
     }
-  }, [currentFilePath, sceneAside]);
+  }, [currentFilePath, sceneAside, scenesApi]);
 
   async function persistCurrentSceneForSceneLink(): Promise<string | null> {
     const currentSnapshot = JSON.stringify({ ...sceneRef.current, sceneAside });
@@ -994,7 +1013,7 @@ export function App(): JSX.Element {
     try {
       saved = currentFilePath === null
         ? await saveCurrentScene()
-        : await window.ttrpg?.saveSceneToPath(
+        : await scenesApi?.saveSceneToPath(
             createSceneSavePayload(sceneRef.current, sceneAside),
             currentFilePath
           );
@@ -1020,7 +1039,7 @@ export function App(): JSX.Element {
     successMessage: string,
     targetScenePath?: string
   ): Promise<boolean> {
-    if (window.ttrpg === undefined) {
+    if (scenesApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return false;
     }
@@ -1028,7 +1047,7 @@ export function App(): JSX.Element {
     const scenePath = targetScenePath ?? currentFilePath ?? await persistCurrentSceneForSceneLink();
     if (scenePath === null) return false;
 
-    const saved = await window.ttrpg.saveSceneToPath(createSceneSavePayload(sceneSnapshot, sceneAside), scenePath);
+    const saved = await scenesApi.saveSceneToPath(createSceneSavePayload(sceneSnapshot, sceneAside), scenePath);
     if (!saved.ok) {
       setFeedback(saved.error);
       return false;
@@ -1045,6 +1064,9 @@ export function App(): JSX.Element {
     targetMapId: string,
     targetMarkerId: string
   ): Promise<boolean> {
+    if (marker.connection !== null && marker.connection.peer.mapId === undefined) {
+      throw new Error("Usa Desligar para liberar la conexión con otra escena antes de conectar mapas internos.");
+    }
     const sourceMapId = sceneRef.current.activeMapId;
     if (sourceMapId === null) {
       setFeedback("Selecciona un mapa antes de crear una conexion.");
@@ -1063,8 +1085,9 @@ export function App(): JSX.Element {
         scenePath,
         connectionId: globalThis.crypto.randomUUID()
       });
-      setScene(nextScene);
-      return await saveSceneSnapshotInBackground(nextScene, "Conexion interna guardada.", scenePath);
+      const saved = await saveSceneSnapshotInBackground(nextScene, "Conexion interna guardada.", scenePath);
+      if (saved) setScene(nextScene);
+      return saved;
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "No se pudo crear la conexion interna.");
       return false;
@@ -1073,18 +1096,46 @@ export function App(): JSX.Element {
     }
   }
 
+  async function selectRemoteSceneLinkTarget() {
+    if (!scenesApi || !service) throw new Error("El servicio no está disponible.");
+    const selected=await scenesApi.selectSceneLinkTargetFile();
+    if(!selected.ok)throw new Error(selected.error);
+    if(!selected.filePath)return null;
+    if(selected.filePath===currentFilePath)throw new Error("Para esta misma escena usa Mapa destino.");
+    const result=await scenesApi.listSceneLinkCandidates(selected.filePath);
+    if(!result.ok)throw new Error(result.error);
+    return {...result.candidate,name:service.browser.name(selected.filePath)};
+  }
+  async function handleConnectRemoteSceneLink(marker:MapSceneLinkMarker,targetScenePath:string,targetMarkerId:string):Promise<boolean> {
+    if(!scenesApi)return false;
+    if(marker.connection?.peer.mapId!==undefined)throw new Error("Usa Desligar para liberar la conexión interna antes de conectar otra escena.");
+    setIsBusy(true);
+    try {
+      const sourceScenePath=await persistCurrentSceneForSceneLink();
+      if(!sourceScenePath)return false;
+      const result=await scenesApi.connectSceneLink({sourceScenePath,sourceMarkerId:marker.id,targetScenePath,targetMarkerId});
+      if(!result.ok){setFeedback(result.error);throw new Error(result.error);}
+      setScene(current=>({...current,mapAnnotations:result.mapAnnotations}));
+      lastSavedSceneJsonRef.current=JSON.stringify({...sceneRef.current,sceneAside});
+      setSceneLinkStatuses(current=>({...current,[marker.id]:{state:"valid"}}));
+      setFeedback(result.warning??"Conexión entre escenas guardada.");
+      return true;
+    } finally {setIsBusy(false);}
+  }
+
   async function handleDisconnectSceneLink(marker: MapSceneLinkMarker): Promise<boolean> {
-    if (window.ttrpg === undefined) return false;
+    if (scenesApi === undefined) return false;
     const scenePath = await persistCurrentSceneForSceneLink();
     if (scenePath === null) return false;
     setIsBusy(true);
     try {
       if (marker.connection?.peer.mapId !== undefined && sceneRef.current.activeMapId !== null) {
         const nextScene = disconnectInternalSceneLink(sceneRef.current, sceneRef.current.activeMapId, marker.id);
-        setScene(nextScene);
-        return await saveSceneSnapshotInBackground(nextScene, "Conexion interna desligada.");
+        const saved = await saveSceneSnapshotInBackground(nextScene, "Conexion interna desligada.");
+        if (saved) setScene(nextScene);
+        return saved;
       }
-      const result = await window.ttrpg.disconnectSceneLink({ scenePath, markerId: marker.id });
+      const result = await scenesApi.disconnectSceneLink({ scenePath, markerId: marker.id });
       if (!result.ok) {
         setFeedback(result.error);
         return false;
@@ -1137,7 +1188,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    if (window.ttrpg === undefined) {
+    if (scenesApi === undefined) {
       setSceneLinkModalId(marker.id);
       return;
     }
@@ -1145,7 +1196,7 @@ export function App(): JSX.Element {
     if (scenePath === null) return;
     setIsBusy(true);
     try {
-      const result = await window.ttrpg.loadSceneLinkTarget({
+      const result = await scenesApi.loadSceneLinkTarget({
         scenePath,
         markerId: marker.id
       });
@@ -1387,19 +1438,23 @@ export function App(): JSX.Element {
   );
 
   useEffect(() => {
-    if (!isPlayerWindowOpen) {
+    if (service ? !servicePublished : !isPlayerWindowOpen) {
       return undefined;
     }
 
     const handle = window.setTimeout(() => {
-      void window.ttrpg?.publishPlayerScene(playerWindowSnapshot);
+      void playerApi?.publishPlayerScene(playerWindowSnapshot).then(result => { if (!result.ok) setFeedback(result.error ?? "No se pudo publicar la escena."); });
     }, PLAYER_SCENE_PUBLISH_DELAY_MS);
 
     return () => window.clearTimeout(handle);
-  }, [isPlayerWindowOpen, playerWindowSnapshot]);
+  }, [isPlayerWindowOpen, servicePublished, playerWindowSnapshot, playerApi, service]);
 
   useEffect(() => {
-    const unsubscribeClosed = window.ttrpg?.onPlayerWindowClosed(() => {
+    let cancelled = false;
+    isPlayerWindowOpenRef.current = false;
+    setIsPlayerWindowOpen(false);
+    lastPlayerCameraReportRevisionRef.current = -1;
+    const unsubscribeClosed = playerApi?.onPlayerWindowClosed(() => {
       isPlayerWindowOpenRef.current = false;
       setIsPlayerWindowOpen(false);
       effectivePlayerCameraRef.current = null;
@@ -1408,7 +1463,7 @@ export function App(): JSX.Element {
       acknowledgedPlayerCameraCommandRevisionRef.current = null;
       refreshPlayerCameraControl("closed");
     });
-    const unsubscribeCameraReport = window.ttrpg?.onPlayerCameraReport((report) => {
+    const unsubscribeCameraReport = playerApi?.onPlayerCameraReport((report) => {
       if (!shouldApplyPlayerCameraReport(lastPlayerCameraReportRevisionRef.current, report)) {
         return;
       }
@@ -1427,19 +1482,22 @@ export function App(): JSX.Element {
       }
       refreshPlayerCameraControl();
     });
-    const unsubscribePlayerReady = window.ttrpg?.onPlayerWindowReady(() => {
+    const unsubscribePlayerReady = playerApi?.onPlayerWindowReady(() => {
+      isPlayerWindowOpenRef.current = true;
+      setIsPlayerWindowOpen(true);
       lastPlayerCameraReportRevisionRef.current = -1;
       effectivePlayerCameraRef.current = null;
       effectivePlayerViewportRef.current = null;
       acknowledgedPlayerCameraCommandRevisionRef.current = null;
-      if (isPlayerWindowOpenRef.current) {
+      if (!service) {
         sendPlayerCameraCommand("open");
       } else {
-        refreshPlayerCameraControl("closed");
+        refreshPlayerCameraControl();
       }
     });
 
-    void window.ttrpg?.getPlayerWindowState().then((state) => {
+    void playerApi?.getPlayerWindowState().then((state) => {
+      if (cancelled) return;
       if (state.cameraCommand !== null) {
         playerCameraCommandRevisionRef.current = Math.max(
           playerCameraCommandRevisionRef.current,
@@ -1450,16 +1508,18 @@ export function App(): JSX.Element {
       if (state.isOpen) {
         isPlayerWindowOpenRef.current = true;
         setIsPlayerWindowOpen(true);
-        sendPlayerCameraCommand("open");
+        if (!service) sendPlayerCameraCommand("open");
+        else refreshPlayerCameraControl();
       }
     });
 
     return () => {
+      cancelled = true;
       unsubscribeClosed?.();
       unsubscribeCameraReport?.();
       unsubscribePlayerReady?.();
     };
-  }, [refreshPlayerCameraControl, sendPlayerCameraCommand]);
+  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, playerApi, service]);
 
   useEffect(() => {
     refreshPlayerCameraControl();
@@ -1468,17 +1528,17 @@ export function App(): JSX.Element {
   useEffect(() => {
     void refreshMonsterTemplates();
 
-    const unsubscribe = window.ttrpg?.onOpenMonsterTemplateManager(() => {
+    const unsubscribe = nativeMenusApi?.onOpenMonsterTemplateManager(() => {
       setIsMonsterTemplateManagerOpen(true);
       void refreshMonsterTemplates();
     });
 
     return () => unsubscribe?.();
-  }, []);
+  }, [nativeMenusApi, librariesApi]);
 
   async function refreshMonsterTemplates(): Promise<void> {
-    if (window.ttrpg === undefined) return;
-    const result = await window.ttrpg.listMonsterTemplates();
+    if (librariesApi === undefined) return;
+    const result = await librariesApi.listMonsterTemplates();
     if (result.ok) {
       setMonsterTemplates(result.templates);
     } else {
@@ -1487,11 +1547,11 @@ export function App(): JSX.Element {
   }
 
   async function handleSaveMonsterTemplate(template: MonsterTemplate): Promise<void> {
-    if (window.ttrpg === undefined) {
+    if (librariesApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return;
     }
-    const result = await window.ttrpg.saveMonsterTemplate(template);
+    const result = await librariesApi.saveMonsterTemplate(template);
     if (result.ok) {
       setMonsterTemplates(result.templates);
     } else {
@@ -1500,11 +1560,11 @@ export function App(): JSX.Element {
   }
 
   async function handleDeleteMonsterTemplate(id: string): Promise<void> {
-    if (window.ttrpg === undefined) {
+    if (librariesApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return;
     }
-    const result = await window.ttrpg.deleteMonsterTemplate(id);
+    const result = await librariesApi.deleteMonsterTemplate(id);
     if (result.ok) {
       setMonsterTemplates(result.templates);
     } else {
@@ -1515,7 +1575,7 @@ export function App(): JSX.Element {
   const resetToNewScene = useCallback((): void => {
     resetMapImageSession();
     const defaultScene = createEmptyScene();
-    sessionStorage.removeItem("ttrpg:session-scene");
+    if (!service) sessionStorage.removeItem("ttrpg:session-scene");
     setScene(defaultScene);
     setSceneAside(createDefaultSceneAside());
     playerCameraRef.current = normalizeCameraSnapshot({
@@ -1555,7 +1615,7 @@ export function App(): JSX.Element {
     lastSavedSceneJsonRef.current = null;
     refreshPlayerCameraControl();
     sendPlayerCameraCommand("scene-change");
-  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, setGridAdjustMode, resetMapImageSession]);
+  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, setGridAdjustMode, resetMapImageSession, service]);
 
   const handleRequestNewScene = useCallback((): void => {
     if (!canCreateNewScene) {
@@ -1868,11 +1928,11 @@ export function App(): JSX.Element {
   ]);
 
   async function saveCurrentScene(): Promise<SceneOperationResult> {
-    if (window.ttrpg === undefined) {
+    if (scenesApi === undefined) {
       return { ok: false, error: "La API de preload no esta disponible." };
     }
 
-    return window.ttrpg.saveScene(createSceneSavePayload(sceneRef.current, sceneAside), {
+    return scenesApi.saveScene(createSceneSavePayload(sceneRef.current, sceneAside), {
       suggestedFilePath: currentFilePath
     });
   }
@@ -1901,13 +1961,43 @@ export function App(): JSX.Element {
     }
   }
 
+  async function allowServiceLeave(): Promise<boolean> {
+    if (!service) return true;
+    const snapshot = createSceneSavePayload(sceneRef.current, sceneAside);
+    if ((snapshot.maps.length === 0 && JSON.stringify(snapshot.sceneAside) === JSON.stringify(createDefaultSceneAside())) || lastSavedSceneJsonRef.current === JSON.stringify({ ...sceneRef.current, sceneAside })) return true;
+    const choice = await service.confirmLeave();
+    if (choice === "discard") return true;
+    if (choice !== "save") return false;
+    const saved = await saveCurrentScene();
+    if (!saved.ok) { setFeedback(saved.error); return false; }
+    setCurrentFilePath(saved.filePath);
+    lastSavedSceneJsonRef.current = JSON.stringify({ ...sceneRef.current, sceneAside });
+    return true;
+  }
+  async function handleServiceAction(action: "import" | "export" | "logout"): Promise<void> {
+    if (!service) return;
+    try {
+      if (action === "export") { await service.browser.exportFile(createSceneSavePayload(sceneRef.current, sceneAside), currentFilePath); setFeedback("Archivo exportado. Los assets permanecen en este servicio."); return; }
+      if (!await allowServiceLeave()) return;
+      if (action === "logout") await service.logout();
+      else await runSceneOperation("cargada", service.browser.importFile);
+    } catch (error) { setFeedback(error instanceof Error ? error.message : "No se pudo completar la operación."); }
+  }
+  useEffect(() => {
+    if (!service) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => { if ((sceneRef.current.maps.length > 0 || JSON.stringify(sceneAside) !== JSON.stringify(createDefaultSceneAside())) && lastSavedSceneJsonRef.current !== JSON.stringify({ ...sceneRef.current, sceneAside })) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [service, sceneAside]);
+
   async function handleLoadScene(): Promise<void> {
+    if (!await allowServiceLeave()) return;
     await runSceneOperation("cargada", async () => {
-      if (window.ttrpg === undefined) {
+      if (scenesApi === undefined) {
         return { ok: false, error: "La API de preload no esta disponible." };
       }
 
-      return window.ttrpg.loadScene();
+      return scenesApi.loadScene();
     });
   }
 
@@ -1926,11 +2016,11 @@ export function App(): JSX.Element {
     readonly camera: ViewportCameraSnapshot;
     readonly cameraSyncKey: number;
   }): void {
-    if (!isPlayerWindowOpenRef.current || window.ttrpg === undefined) {
+    if (playerApi === undefined || (service ? !servicePublished : !isPlayerWindowOpenRef.current)) {
       return;
     }
 
-    void window.ttrpg.publishPlayerScene({
+    void playerApi.publishPlayerScene({
       scene: createPlayerSceneSnapshot({ ...loadedScene, sceneAside: loadedSceneAside }),
       mapImageUrl: loadedMapImageUrl,
       tokenImageUrls: loadedTokenImageUrls,
@@ -1948,8 +2038,7 @@ export function App(): JSX.Element {
   ): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
-    // Saving always resolves any outdated-format situation
-    if (actionLabel === "guardada") setNeedsResave(false);
+
 
     try {
       const result = await operation();
@@ -2018,26 +2107,26 @@ export function App(): JSX.Element {
   }
 
   useEffect(() => {
-    const unsubscribe = window.ttrpg?.onRecentSceneOpen((result) => {
+    const unsubscribe = nativeMenusApi?.onRecentSceneOpen((result) => {
       void runSceneOperation("cargada", async () => result);
     });
 
     return () => {
       unsubscribe?.();
     };
-  }, [runSceneOperation]);
+  }, [runSceneOperation, nativeMenusApi]);
 
   async function handleAddSceneMap(): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
 
     try {
-      if (window.ttrpg === undefined) {
+      if (imagesApi === undefined) {
         setFeedback("La API de preload no esta disponible.");
         return;
       }
 
-      const result = await window.ttrpg.openMapImage();
+      const result = await imagesApi.openMapImage();
       if (!result.ok) {
         setFeedback(result.error);
         return;
@@ -2066,7 +2155,7 @@ export function App(): JSX.Element {
   }
 
   async function handleImportSceneAsMap(): Promise<void> {
-    if (window.ttrpg === undefined) {
+    if (scenesApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return;
     }
@@ -2076,7 +2165,7 @@ export function App(): JSX.Element {
 
     try {
       const previousFilePath = currentFilePath;
-      const result = await window.ttrpg.importSceneAsMap(createSceneSavePayload(sceneRef.current, sceneAside));
+      const result = await scenesApi.importSceneAsMap(createSceneSavePayload(sceneRef.current, sceneAside));
       if (!result.ok) {
         setFeedback(result.error);
         return;
@@ -2675,12 +2764,12 @@ export function App(): JSX.Element {
   }
 
   async function handleOpenPlayerWindow(): Promise<void> {
-    if (window.ttrpg === undefined) {
+    if (playerApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return;
     }
 
-    const result = await window.ttrpg.openPlayerWindow({
+    const result = await playerApi.openPlayerWindow({
       ...playerWindowSnapshot,
       camera: playerCameraRef.current
     });
@@ -2690,10 +2779,16 @@ export function App(): JSX.Element {
       return;
     }
 
-    isPlayerWindowOpenRef.current = true;
-    setIsPlayerWindowOpen(true);
+    if (service) {
+      setServicePublished(true);
+      const state = await playerApi.getPlayerWindowState();
+      isPlayerWindowOpenRef.current = state.isOpen; setIsPlayerWindowOpen(state.isOpen);
+      setFeedback("Proyección publicada. Abre Mesa compartida para copiar el enlace del jugador.");
+    } else {
+      isPlayerWindowOpenRef.current = true; setIsPlayerWindowOpen(true);
+      setFeedback("Ventana de jugador lista.");
+    }
     sendPlayerCameraCommand("open");
-    setFeedback("Ventana de jugador lista.");
   }
 
   const handleSetCombatTracker = useCallback((combatTracker: CombatTracker): void => {
@@ -2840,7 +2935,7 @@ export function App(): JSX.Element {
       return;
     }
 
-    if (window.ttrpg === undefined) {
+    if (imagesApi === undefined) {
       setFeedback("La API de preload no esta disponible.");
       return;
     }
@@ -2849,7 +2944,7 @@ export function App(): JSX.Element {
     setWarnings([]);
 
     try {
-      const result = await window.ttrpg.openTokenImage();
+      const result = await imagesApi.openTokenImage();
 
       if (!result.ok) {
         setFeedback(result.error);
@@ -2865,6 +2960,21 @@ export function App(): JSX.Element {
     } finally {
       setIsBusy(false);
     }
+  }
+
+  async function handleReplaceTokenImage(tokenId: string): Promise<void> {
+    const mapId = sceneRef.current.activeMapId;
+    const original = sceneRef.current.tokens.find(token => token.id === tokenId);
+    if (!original || !imagesApi) return;
+    setIsBusy(true);
+    try {
+      const result = await imagesApi.openTokenImage();
+      if (!result.ok) { setFeedback(result.error); return; }
+      if (sceneRef.current.activeMapId !== mapId || !sceneRef.current.tokens.includes(original)) return;
+      setScene(current => ({ ...current, tokens: current.tokens.map(token => token.id === tokenId ? { ...token, imagePath: result.imagePath } : token) }));
+      setTokenImageUrls(current => ({ ...current, [tokenId]: result.imageUrl }));
+      setFeedback(`Imagen de ${original.name} reemplazada`);
+    } finally { setIsBusy(false); }
   }
 
   function handleToggleContextMenuFogMode(): void {
@@ -3321,7 +3431,8 @@ export function App(): JSX.Element {
   return (
     <main className="app-shell vtt-interface" aria-label="TTRPG Effects">
       <WorkspaceHeader
-        sceneName={currentFilePath ? getFileBaseName(currentFilePath) : "Escena sin guardar"}
+        sceneName={currentFilePath ? service?.browser.name(currentFilePath) ?? getFileBaseName(currentFilePath) : "Escena sin guardar"}
+        serviceActions={service ? { onImport: () => void handleServiceAction("import"), onExport: () => void handleServiceAction("export"), onLogout: () => void handleServiceAction("logout"), onTemplates: () => setIsMonsterTemplateManagerOpen(true) } : undefined}
         mapName={scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa"}
         busy={isBusy}
         canCreate={canCreateNewScene}
@@ -3330,7 +3441,7 @@ export function App(): JSX.Element {
         inspectorVisible={isSidebarVisible}
         onNew={handleRequestNewScene}
         onLoad={() => void handleLoadScene()}
-        onSave={() => void handleSaveScene()}
+        onSave={() => handleSaveScene()}
         onPlayer={() => void handleOpenPlayerWindow()}
         onBattle={() => setIsCombatSetupOpen(true)}
         onCounters={() => setIsSceneCounterManagerOpen(true)}
@@ -4541,6 +4652,7 @@ export function App(): JSX.Element {
                           </small>
                         </span>
                       </button>
+                      {service && <button type="button" disabled={isBusy} aria-label={`Reemplazar imagen de ${token.name}`} onClick={() => void handleReplaceTokenImage(token.id)}>Imagen</button>}
                       <button
                         type="button"
                         className="token-visibility-button"
@@ -4906,6 +5018,7 @@ export function App(): JSX.Element {
           )}
           currentScenePath={currentFilePath}
           candidateMaps={sceneLinkCandidateMaps}
+          remote={service ? { select: selectRemoteSceneLinkTarget, connect: (path,id) => handleConnectRemoteSceneLink(sceneLinkModalMarker,path,id) } : undefined}
           onRename={(name) => handleRenameSceneLink(sceneLinkModalMarker.id, name)}
           onConnect={(targetMapId, targetMarkerId) =>
             handleConnectSceneLink(sceneLinkModalMarker, targetMapId, targetMarkerId)

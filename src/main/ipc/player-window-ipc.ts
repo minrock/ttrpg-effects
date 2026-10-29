@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
+import { installNavigationPolicy, localRendererPolicy } from "../window-policy";
 import { sanitizeInformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import { sanitizePlayerWindowSnapshot } from "../../domain/player/player-window-snapshot";
 import { sanitizePlayerMapImageStatus } from "../../domain/player/map-image-report";
@@ -201,6 +202,8 @@ function ensurePlayerWindow(options: PlayerWindowIpcOptions): void {
       sandbox: true
     }
   });
+
+  installNavigationPolicy(playerWindow.webContents, localRendererPolicy(options.rendererUrl, options.rendererIndexPath));
 
   playerWindow.once("ready-to-show", () => {
     isPlayerWindowReady = true;

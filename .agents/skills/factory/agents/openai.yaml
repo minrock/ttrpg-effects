@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fábrica de software"
+  short_description: "Especifica, construye y revisa con subagentes"
+  default_prompt: "Usa $factory para implementar la siguiente funcionalidad siguiendo las convenciones del repositorio."

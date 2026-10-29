@@ -1,6 +1,7 @@
+import { useTtrpgApi } from "../client/ClientProvider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { defaultDiceDraft, DICE_PROTOCOL_VERSION, draftSchema, expandDice, requestSchema, type D20Mode, type DiceContext, type DiceDraft, type DiceEnvelope, type DiceReply, type DiceSessionState } from "../../../domain/dice/dice";
-import type { DiceApi } from "../../../preload/dice-api";
+import type { DiceApi } from "../../../shared/api/dice-api";
 import { DiceRollAudio } from "../../../render/audio/DiceRollAudio";
 import { useDiceSizes } from "./useDiceSizes";
 
@@ -14,9 +15,10 @@ function unwrapSession(reply: DiceReply<DiceSessionState>): DiceSessionState {
   if (value.protocolVersion !== DICE_PROTOCOL_VERSION) throw new DiceProtocolMismatchError();
   return value;
 }
-function diceApi(): DiceApi { if (!window.ttrpg?.beginDiceRoll) throw new Error("Mesa de dados no disponible."); return window.ttrpg; }
+function requireDiceApi(api: DiceApi | undefined): DiceApi { if (!api?.beginDiceRoll) throw new Error("Mesa de dados no disponible."); return api; }
 
 export function useDiceSession(context: DiceContext) {
+  const diceApi = useTtrpgApi("dice");
   const diceSizes = useDiceSizes();
   const [state, setState] = useState<DiceSessionState>(emptyState);
   const [draft, setDraft] = useState(defaultDiceDraft);
@@ -31,6 +33,7 @@ export function useDiceSession(context: DiceContext) {
   const contextRef = useRef(context); contextRef.current = context;
   const hydrated = useRef(false);
   const alive = useRef(true);
+  const clientGeneration = useRef(0);
   const acceptState = useCallback((value: DiceSessionState): void => {
     setState(current => ({ ...value, envelope: value.envelope.revision >= current.envelope.revision ? value.envelope : current.envelope }));
     setNow(Date.now());
@@ -38,32 +41,36 @@ export function useDiceSession(context: DiceContext) {
 
   useEffect(() => {
     alive.current = true;
-    if (!window.ttrpg?.onDicePresentation) return;
-    const off = window.ttrpg.onDicePresentation(envelope => setState(current => envelope.revision > current.envelope.revision ? { ...current, envelope } : current));
-    const offError = window.ttrpg.onDiceRenderError(setError);
-    return () => { alive.current = false; controller.current?.abort(); audio.current?.dispose(); audio.current = null; off(); offError(); };
-  }, []);
+    clientGeneration.current++;
+    hydrated.current = false;
+    setState(emptyState());
+    setDraft(defaultDiceDraft());
+    if (!diceApi?.onDicePresentation) return () => { alive.current = false; clientGeneration.current++; };
+    const off = diceApi.onDicePresentation(envelope => setState(current => envelope.revision > current.envelope.revision ? { ...current, envelope } : current));
+    const offError = diceApi.onDiceRenderError(setError);
+    return () => { alive.current = false; clientGeneration.current++; controller.current?.abort(); audio.current?.dispose(); audio.current = null; off(); offError(); };
+  }, [diceApi]);
 
   useEffect(() => {
     let cancelled = false;
     controller.current?.abort(); controller.current = null;
     audio.current?.stop();
     setPreparing(false); setReady(false); setError(null);
-    if (!window.ttrpg?.updateDiceContext) return;
-    void window.ttrpg.updateDiceContext(contextRef.current).then(reply => {
+    if (!diceApi?.updateDiceContext) return;
+    void diceApi.updateDiceContext(contextRef.current).then(reply => {
       if (cancelled) return;
       const next = unwrapSession(reply); acceptState(next);
       if (!hydrated.current) { hydrated.current = true; setDraft(next.draft); }
       setReady(true);
     }).catch(caught => { if (!cancelled) setError(caught instanceof Error ? caught.message : "No se pudo abrir la mesa de dados."); });
     return () => { cancelled = true; };
-  }, [context.token, acceptState]);
+  }, [context.token, acceptState, diceApi]);
 
   useEffect(() => {
     if (!ready) return;
-    const timer = setTimeout(() => { void diceApi().updateDicePreferences(draft).catch(() => setError("No se pudo conservar la seleccion de dados.")); }, 150);
+    const timer = setTimeout(() => { void requireDiceApi(diceApi).updateDicePreferences(draft).catch(() => setError("No se pudo conservar la seleccion de dados.")); }, 150);
     return () => clearTimeout(timer);
-  }, [draft, ready]);
+  }, [draft, ready, diceApi]);
   useEffect(() => {
     if (state.busyUntil <= Date.now()) return;
     const timer = setTimeout(() => setNow(Date.now()), state.busyUntil - Date.now() + 20);
@@ -96,43 +103,51 @@ export function useDiceSession(context: DiceContext) {
       setDraft(request.draft);
       await import("../../../render/three/dice/DiceOverlayRenderer");
       if (abort.signal.aborted) return;
-      unwrapSession(await diceApi().updateDiceContext(captured));
+      unwrapSession(await requireDiceApi(diceApi).updateDiceContext(captured));
       if (abort.signal.aborted) return;
-      rollId = unwrap(await diceApi().beginDiceRoll(request)).rollId;
+      rollId = unwrap(await requireDiceApi(diceApi).beginDiceRoll(request)).rollId;
       const { browserDiceSimulation } = await import("../../../infrastructure/dice/browser-dice-simulation");
       const simulation = await browserDiceSimulation.prepare(expandDice(request), request.draft.force, abort.signal);
       if (abort.signal.aborted || captured.token !== contextRef.current.token) return;
-      const completed = unwrapSession(await diceApi().completeDiceRoll(rollId, simulation));
+      const completed = unwrapSession(await requireDiceApi(diceApi).completeDiceRoll(rollId, simulation));
       if (!abort.signal.aborted && captured.token === contextRef.current.token && alive.current) acceptState(completed);
     } catch (caught) {
       if (caught instanceof DiceProtocolMismatchError) setReady(false);
-      if (rollId) { const reply = await diceApi().failDiceRoll(rollId).catch(() => null); if (reply?.ok && !abort.signal.aborted && alive.current) acceptState(reply.value); }
+      if (rollId) { const reply = await requireDiceApi(diceApi).failDiceRoll(rollId).catch(() => null); if (reply?.ok && !abort.signal.aborted && alive.current) acceptState(reply.value); }
       if (!abort.signal.aborted && alive.current) setError(caught instanceof Error && !caught.message.startsWith("[") ? caught.message : "Seleccion de dados invalida.");
     } finally { if (controller.current === abort) { controller.current = null; if (alive.current) setPreparing(false); } }
   };
   const action = async (operation: () => Promise<DiceReply<DiceSessionState>>): Promise<void> => {
-    try { acceptState(unwrapSession(await operation())); } catch (caught) { setError(caught instanceof Error ? caught.message : "No fue posible completar la accion."); }
+    const generation = clientGeneration.current;
+    try {
+      const next = unwrapSession(await operation());
+      if (alive.current && generation === clientGeneration.current) acceptState(next);
+    } catch (caught) {
+      if (alive.current && generation === clientGeneration.current) setError(caught instanceof Error ? caught.message : "No fue posible completar la accion.");
+    }
   };
   return { state, draft, ready, busy: preparing || state.busyUntil > now, preparing, error: error ?? diceSizes.error, updateDraft, roll, soundEnabled, setSoundEnabled, diceSizes,
-    clearHistory: () => action(() => diceApi().clearDiceHistory()),
-    dismiss: (rollId: string) => action(() => diceApi().dismissDiceRoll(rollId)),
-    showResult: (rollId: string, visible: boolean) => action(() => diceApi().setDiceResultVisibility(rollId, visible)) };
+    clearHistory: () => action(() => requireDiceApi(diceApi).clearDiceHistory()),
+    dismiss: (rollId: string) => action(() => requireDiceApi(diceApi).dismissDiceRoll(rollId)),
+    showResult: (rollId: string, visible: boolean) => action(() => requireDiceApi(diceApi).setDiceResultVisibility(rollId, visible)) };
 }
 
 export function usePublicDice(sceneMapId: string | null, contextRevision: string, ready: boolean): DiceEnvelope {
+  const diceApi = useTtrpgApi("dice");
   const [envelope, setEnvelope] = useState<DiceEnvelope>({ revision: -1, presentation: null });
   useEffect(() => {
-    if (!window.ttrpg?.onDicePresentation) return;
+    setEnvelope({ revision: -1, presentation: null });
+    if (!diceApi?.onDicePresentation) return;
     const accept = (next: DiceEnvelope): void => setEnvelope(current => next.revision >= current.revision ? next : current);
-    return window.ttrpg.onDicePresentation(accept);
-  }, []);
+    return diceApi.onDicePresentation(accept);
+  }, [diceApi]);
   useEffect(() => {
     let cancelled = false;
     setEnvelope(current => ({ ...current, presentation: null }));
-    if (ready && window.ttrpg?.getPublicDiceState) void window.ttrpg.getPublicDiceState().then(reply => {
+    if (ready && diceApi?.getPublicDiceState) void diceApi.getPublicDiceState().then(reply => {
       if (!cancelled && reply.ok) setEnvelope(current => reply.value.revision >= current.revision ? reply.value : current);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [sceneMapId, contextRevision, ready]);
+  }, [sceneMapId, contextRevision, ready, diceApi]);
   return ready && (!envelope.presentation || envelope.presentation.mapId === (sceneMapId ?? "")) ? envelope : { ...envelope, presentation: null };
 }

@@ -1,3 +1,4 @@
+import { usePortalTarget } from "../../client/PortalTarget";
 import { ArrowLeft, ArrowRight, Dices, Diamond, Eye, EyeOff, Gem, Hexagon, Minus, Pentagon, Percent, Plus, RotateCcw, Square, SquareFunction, Trash2, Triangle, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
@@ -12,6 +13,7 @@ type DiceController = ReturnType<typeof useDiceSession>;
 const ICONS = { d4: Triangle, d6: Square, d8: Diamond, d10: Gem, d12: Pentagon, "d%": Percent };
 
 export function DicePanel({ controller }: { controller: DiceController }): JSX.Element {
+  const portalTarget = usePortalTarget();
   const { draft, state, busy, ready, preparing, error, updateDraft } = controller;
   const [activeGroup, setActiveGroup] = useState<DamageType>("none");
   const [askD20, setAskD20] = useState(false);
@@ -103,7 +105,7 @@ export function DicePanel({ controller }: { controller: DiceController }): JSX.E
       </li>)}</ol>
       {pages > 1 && <nav className="dice-history-pages" aria-label="Paginas del historial"><button type="button" className="dice-icon-button" aria-label="Tiradas mas recientes" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}><ArrowLeft size={16} /></button><span>{currentPage + 1} / {pages}</span><button type="button" className="dice-icon-button" aria-label="Tiradas anteriores" disabled={currentPage >= pages - 1} onClick={() => setPage(currentPage + 1)}><ArrowRight size={16} /></button></nav>}
     </section>
-    {askD20 && createPortal(<D20RollModeDialog draft={draft} onClose={() => setAskD20(false)} onRoll={mode => { setAskD20(false); launch(mode); }} />, document.body)}
+    {askD20 && createPortal(<D20RollModeDialog draft={draft} onClose={() => setAskD20(false)} onRoll={mode => { setAskD20(false); launch(mode); }} />, portalTarget)}
   </div>;
 }
 

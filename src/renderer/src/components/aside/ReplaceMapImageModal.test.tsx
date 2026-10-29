@@ -4,6 +4,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReplacementDraft } from "../../hooks/useMapImageReplacement";
+import { PortalTargetProvider } from "../../client/PortalTarget";
 import { ReplaceMapImageModal } from "./ReplaceMapImageModal";
 
 function createDraft(overrides: Partial<ReplacementDraft> = {}): ReplacementDraft {
@@ -179,4 +180,15 @@ describe("ReplaceMapImageModal", () => {
     expect(onCancel).toHaveBeenCalledOnce();
     expect(onConfirm).not.toHaveBeenCalled();
   });
+  it("oculta también preview y suspende atajos cuando la sesión bloquea su contenedor",()=>{
+    const protectedRoot=document.createElement("div");document.body.append(protectedRoot);
+    try {
+      act(()=>root.render(<PortalTargetProvider target={protectedRoot}><ReplaceMapImageModal draft={createDraft()} error={null} onConfirm={onConfirm} onCancel={onCancel}/></PortalTargetProvider>));
+      protectedRoot.hidden=true;protectedRoot.setAttribute("inert","");
+      expect(document.querySelector('[role="dialog"]')?.closest('[hidden][inert]')).toBe(protectedRoot);
+      const key=new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true});document.dispatchEvent(key);expect(onCancel).not.toHaveBeenCalled();expect(key.defaultPrevented).toBe(false);
+      protectedRoot.hidden=false;protectedRoot.removeAttribute("inert");act(()=>document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true})));expect(onCancel).toHaveBeenCalledOnce();
+    } finally {protectedRoot.remove();}
+  });
+
 });

@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Fábrica de software · TTRPG Effects</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; color: #25352f; background: #f4f6f3; --linea: #dce3dc; --verde: #226344; --suave: #e3f0e6; --ambar: #875211; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; cursor: pointer; }
+    button:focus-visible, a:focus-visible, pre:focus-visible { outline: 3px solid #367453; outline-offset: 3px; }
+    header { padding: 30px 36px 24px; border-bottom: 1px solid var(--linea); background: #fff; }
+    .cabecera, .acciones, .marca, .estado, .pie, .modal-cabecera { display: flex; align-items: center; gap: 12px; }
+    .cabecera, .pie, .modal-cabecera { justify-content: space-between; }
+    .logo { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--verde); color: #fff; font-weight: 750; }
+    .ceja { font-size: 11px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; color: #62736a; }
+    h1 { margin: 6px 0 0; font-size: 25px; letter-spacing: -.04em; }
+    h2 { font-size: 13px; margin: 0; }
+    p { line-height: 1.6; }
+    .boton { border: 1px solid var(--linea); background: #fff; color: inherit; border-radius: 8px; padding: 9px 13px; font-size: 12px; }
+    .boton:hover { background: #edf2ec; }
+    .estado { font-size: 12px; color: #50675a; margin: 23px 0 0; flex-wrap: wrap; }
+    .punto { width: 7px; height: 7px; border-radius: 50%; background: #43835a; flex: none; }
+    #conexion { margin-right: auto; }
+    #conexion.error { color: #a13c27; }
+    main { padding: 24px 36px; }
+    .flujo { font-size: 13px; color: #5c7063; margin: 0 0 24px; }
+    .flujo strong { color: var(--verde); }
+    #aviso-demo { padding: 12px 16px; border: 1px solid #debd80; background: #fff4df; border-radius: 9px; color: #69481b; font-size: 13px; margin: 0 0 20px; }
+    #vacio { text-align: center; padding: 42px 18px; background: white; border: 1px dashed #c3d0c4; border-radius: 12px; margin: 0 0 24px; }
+    #vacio h2 { font-size: 20px; letter-spacing: -.03em; }
+    #vacio p { font-size: 14px; color: #607164; }
+    code { background: #edf2ec; border-radius: 4px; padding: 3px 6px; font-size: 12px; }
+    .tablero-scroll { overflow-x: auto; padding: 3px 3px 16px; }
+    #tablero { display: grid; grid-template-columns: repeat(7, minmax(180px, 1fr)); gap: 14px; min-height: 310px; }
+    .columna { border-top: 2px solid #b9c7bb; padding-top: 14px; }
+    .columna[data-etapa="necesita-persona"] { border-color: #bf842c; }
+    .columna[data-etapa="integrado"] { border-color: #387650; }
+    .titulo-columna { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; }
+    .numero { color: #50675a; background: #e5ebe3; padding: 2px 6px; font-size: 10px; border-radius: 4px; }
+    .sin-trabajos { font-size: 12px; color: #6e7a71; padding: 12px 0; }
+    .tarjeta { text-align: left; display: block; width: 100%; background: white; border: 1px solid var(--linea); border-radius: 10px; padding: 15px; margin-bottom: 12px; color: inherit; box-shadow: 0 2px 3px #1f382108; }
+    .tarjeta:hover { border-color: #7f9d85; box-shadow: 0 4px 14px #29443112; }
+    .tarjeta.atencion { background: #fffbf2; border-color: #dec28e; }
+    .id { display: block; font-size: 10px; color: #66796b; letter-spacing: .03em; margin-bottom: 10px; overflow-wrap: anywhere; }
+    .titulo { display: block; font-weight: 650; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; margin-bottom: 12px; }
+    .rama { display: block; font: 10px ui-monospace, monospace; color: #6b786c; overflow-wrap: anywhere; }
+    .ronda { display: block; border-top: 1px solid #e8ece5; margin-top: 13px; padding-top: 10px; }
+    .ronda-label { display: block; font-size: 10px; color: #667566; margin-bottom: 7px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .chip { display: inline-block; border-radius: 4px; padding: 4px 5px; font-size: 9px; font-weight: 650; background: #eef0ec; color: #606e63; }
+    .chip.aprobado { color: #245d3b; background: #e5f2e5; }
+    .chip.cambios { color: #83501a; background: #ffedd0; }
+    .motivo { display: block; font-size: 11px; color: #785322; line-height: 1.5; margin-top: 12px; overflow-wrap: anywhere; }
+    .pie { color: #657568; font-size: 11px; border-top: 1px solid var(--linea); padding: 19px 0; flex-wrap: wrap; }
+    .leyenda { display: flex; gap: 12px; flex-wrap: wrap; }
+    .pie a { color: var(--verde); }
+    dialog { border: 1px solid var(--linea); border-radius: 14px; padding: 0; width: min(960px, 94vw); max-height: 88vh; color: inherit; box-shadow: 0 24px 80px #152a2230; }
+    dialog::backdrop { background: #192e2566; }
+    .modal-cabecera { padding: 20px 24px; border-bottom: 1px solid var(--linea); }
+    .modal-cabecera h2 { font-size: 18px; margin-top: 6px; overflow-wrap: anywhere; }
+    .lector { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 360px; }
+    #archivos { padding: 16px; border-right: 1px solid var(--linea); max-height: 62vh; overflow: auto; }
+    #archivos button { display: block; width: 100%; border: 0; background: transparent; color: #536958; border-radius: 6px; text-align: left; font-size: 12px; padding: 9px; overflow-wrap: anywhere; }
+    #archivos button[aria-pressed="true"] { background: var(--suave); color: #184f32; font-weight: 650; }
+    .documento { min-width: 0; padding: 24px; }
+    #ruta { margin: 0 0 15px; font-size: 11px; color: #667768; overflow-wrap: anywhere; }
+    #contenido { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.75 ui-monospace, monospace; margin: 0; max-height: 52vh; overflow: auto; }
+    @media (max-width: 700px) { header { padding: 24px 20px; } main { padding: 20px; } .cabecera { align-items: flex-start; gap: 20px; flex-direction: column; } h1 { font-size: 24px; } #tablero { grid-template-columns: 1fr; gap: 20px; } .lector { grid-template-columns: 1fr; } #archivos { max-height: 150px; border-right: 0; border-bottom: 1px solid var(--linea); } .documento { padding: 18px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="cabecera">
+      <div class="marca"><div class="logo" aria-hidden="true">F</div><div><div class="ceja">TTRPG Effects / Desarrollo</div><h1>Fábrica de software</h1></div></div>
+      <div class="acciones"><button class="boton" id="ejemplo">Ver ejemplo</button><button class="boton" id="actualizar">Actualizar</button></div>
+    </div>
+    <div class="estado"><span class="punto" aria-hidden="true"></span><span id="conexion" role="status">Conectando con el tablero…</span><span id="total">0 trabajos</span><span>·</span><span>Lectura local · cada 2 s</span></div>
+  </header>
+  <main>
+    <p class="flujo">Una idea, siete roles, un resultado. <strong>Las cuatro revisiones terminan antes de corregir.</strong> Hasta dos rondas por ciclo.</p>
+    <p id="aviso-demo" hidden>Demostración · Los trabajos y documentos son ficticios. Tu tablero no se modifica.</p>
+    <section id="vacio" hidden><h2>Todo empieza con una idea</h2><p>Abre Codex en este repositorio e inicia un trabajo.</p><code>$factory Describe tu funcionalidad</code><p>También puedes añadirla a backlog.md y usar <code>$factory siguiente</code>.</p></section>
+    <div class="tablero-scroll"><div id="tablero" aria-label="Trabajos por etapa"></div></div>
+    <footer class="pie"><div class="leyenda"><span>✓ Aprobado</span><span>! Cambios</span><span>· Pendiente</span></div><span>Un único orquestador · <a href="README.md">Guía de la fábrica</a></span></footer>
+  </main>
+  <dialog id="detalle" aria-labelledby="detalle-titulo">
+    <div class="modal-cabecera"><div><div class="ceja" id="detalle-id"></div><h2 id="detalle-titulo"></h2></div><button class="boton" id="cerrar" aria-label="Cerrar expediente">Cerrar ×</button></div>
+    <div class="lector"><nav id="archivos" aria-label="Documentos del trabajo"></nav><div class="documento"><p id="ruta"></p><pre id="contenido" tabindex="0" aria-label="Contenido del documento"></pre></div></div>
+  </dialog>
+  <script>
+    (() => {
+      'use strict';
+      const etapas = { especificacion: 'Especificación', construccion: 'Construcción', revision: 'Revisión', aprobacion: 'Aprobación', 'necesita-persona': 'Necesita persona', integracion: 'Integración', integrado: 'Integrado' };
+      const roles = { seguridad: 'Seguridad', ux: 'UX', ui: 'UI', codigo: 'Código' };
+      const estados = { APROBADO: ['✓', 'aprobado', 'Aprobado'], CAMBIOS: ['!', 'cambios', 'Cambios'], pendiente: ['·', '', 'Pendiente'] };
+      const $ = (id) => document.getElementById(id);
+      const demo = new URLSearchParams(location.search).has('demo');
+      let trabajos = [], ultimaFirma = '', solicitudTablero = 0, solicitudDocumento = 0, seleccionado = null;
+      const elemento = (tag, clase, texto) => { const node = document.createElement(tag); node.className = clase; if (texto !== undefined) node.textContent = texto; return node; };
+      const ronda = (numero, valores) => ({ numero, ciclo: 1, revisiones: Object.fromEntries(Object.keys(roles).map((rol, i) => [rol, valores[i]])) });
+      const ejemplos = [
+        { id: '001-regla-diagonal', titulo: 'Diagonales a tu manera', rama: 'feature/factory-001-regla-diagonal', etapa: 'especificacion', ciclo: 1, ronda: 0, rondas: [] },
+        { id: '002-notas-mapa', titulo: 'Notas accesibles sobre el mapa', rama: 'feature/factory-002-notas-mapa', etapa: 'revision', ciclo: 1, ronda: 2, rondas: [ronda(1, ['APROBADO', 'CAMBIOS', 'APROBADO', 'APROBADO']), ronda(2, ['APROBADO', 'APROBADO', 'pendiente', 'pendiente'])] },
+        { id: '003-importar-escena', titulo: 'Recuperar imágenes de una escena', rama: 'fix/factory-003-importar-escena', etapa: 'necesita-persona', ciclo: 1, ronda: 1, rondas: [ronda(1, ['APROBADO', 'APROBADO', 'APROBADO', 'APROBADO'])], motivo: 'Revisión completa. Espera tu orden para integrar.' },
+        { id: '004-contraste', titulo: 'Más contraste en proyección', rama: 'feature/factory-004-contraste', etapa: 'integrado', ciclo: 1, ronda: 1, rondas: [ronda(1, ['APROBADO', 'APROBADO', 'APROBADO', 'APROBADO'])] }
+      ];
+      function validar(tablero) {
+        if (!tablero || tablero.version !== 1 || !Array.isArray(tablero.trabajos)) throw new Error('Formato de tablero incompatible.');
+        const ids = new Set();
+        for (const trabajo of tablero.trabajos) {
+          if (!trabajo || typeof trabajo.id !== 'string' || !/^\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trabajo.id) || ids.has(trabajo.id) || !Object.hasOwn(etapas, trabajo.etapa) || typeof trabajo.titulo !== 'string' || typeof trabajo.rama !== 'string' || !Number.isSafeInteger(trabajo.ciclo) || trabajo.ciclo < 1 || !Number.isSafeInteger(trabajo.ronda) || trabajo.ronda < 0 || !Array.isArray(trabajo.rondas)) throw new Error('Hay un trabajo con formato inválido.');
+          ids.add(trabajo.id);
+          const numeros = new Set();
+          for (const revision of trabajo.rondas) {
+            if (!revision || !Number.isSafeInteger(revision.numero) || revision.numero < 1 || numeros.has(revision.numero) || !Number.isSafeInteger(revision.ciclo) || revision.ciclo < 1 || revision.ciclo > trabajo.ciclo || !revision.revisiones || Object.keys(roles).some((rol) => !Object.hasOwn(estados, revision.revisiones[rol]))) throw new Error('Hay una ronda con formato inválido.');
+            numeros.add(revision.numero);
+          }
+          if (trabajo.ronda !== Math.max(0, ...numeros)) throw new Error('La última ronda no coincide con el historial.');
+        }
+        return tablero.trabajos;
+      }
+      function dibujar() {
+        const foco = document.activeElement?.dataset.trabajo;
+        $('tablero').replaceChildren();
+        $('vacio').hidden = trabajos.length !== 0;
+        $('total').textContent = `${trabajos.length} ${trabajos.length === 1 ? 'trabajo' : 'trabajos'}`;
+        for (const [etapa, nombre] of Object.entries(etapas)) {
+          const columna = elemento('section', 'columna'); columna.dataset.etapa = etapa;
+          const lista = trabajos.filter((trabajo) => trabajo.etapa === etapa);
+          const cabecera = elemento('div', 'titulo-columna'); cabecera.append(elemento('h2', '', nombre), elemento('span', 'numero', lista.length)); columna.append(cabecera);
+          if (!lista.length) columna.append(elemento('p', 'sin-trabajos', 'Sin trabajos'));
+          for (const trabajo of lista) {
+            const tarjeta = elemento('button', `tarjeta${etapa === 'necesita-persona' ? ' atencion' : ''}`); tarjeta.dataset.trabajo = trabajo.id;
+            tarjeta.setAttribute('aria-label', `Abrir ${trabajo.titulo}. ${nombre}`);
+            tarjeta.append(elemento('span', 'id', trabajo.id), elemento('span', 'titulo', trabajo.titulo), elemento('span', 'rama', trabajo.rama));
+            for (const revision of trabajo.rondas) {
+              const fila = elemento('span', 'ronda'); fila.append(elemento('span', 'ronda-label', `Ronda ${revision.numero} · Ciclo ${revision.ciclo}`));
+              const chips = elemento('span', 'chips');
+              for (const [rol, etiqueta] of Object.entries(roles)) {
+                const [icono, clase, estado] = estados[revision.revisiones[rol]];
+                const chip = elemento('span', `chip ${clase}`, `${icono} ${etiqueta}`); chip.title = `${etiqueta}: ${estado}`; chip.setAttribute('aria-label', chip.title); chips.append(chip);
+              }
+              fila.append(chips); tarjeta.append(fila);
+            }
+            if (trabajo.motivo) tarjeta.append(elemento('span', 'motivo', trabajo.motivo));
+            tarjeta.addEventListener('click', () => abrir(trabajo)); columna.append(tarjeta);
+          }
+          $('tablero').append(columna);
+        }
+        if (foco) Array.from(document.querySelectorAll('[data-trabajo]')).find((node) => node.dataset.trabajo === foco)?.focus();
+      }
+      async function actualizar() {
+        const peticion = ++solicitudTablero;
+        try {
+          if (location.protocol === 'file:') throw new Error('Sirve factory/ con python3 -m http.server; no abras el archivo directamente.');
+          const respuesta = demo ? null : await fetch('board.json', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+          if (respuesta && !respuesta.ok) throw new Error(`No se pudo leer board.json (HTTP ${respuesta.status}).`);
+          const tablero = demo ? { version: 1, trabajos: ejemplos } : await respuesta.json();
+          const nuevos = validar(tablero);
+          if (peticion !== solicitudTablero) return;
+          const firma = JSON.stringify(nuevos);
+          trabajos = nuevos;
+          if (firma !== ultimaFirma) { ultimaFirma = firma; dibujar(); }
+          $('conexion').className = '';
+          $('conexion').textContent = demo ? 'Ejemplo · datos ficticios' : `Conectado · consultado a las ${new Date().toLocaleTimeString('es')}`;
+        } catch (error) {
+          if (peticion !== solicitudTablero) return;
+          $('conexion').className = 'error';
+          $('conexion').textContent = `${error.message} Se conserva la última lectura; se reintentará.`;
+        }
+      }
+      function documentos(trabajo) {
+        const archivos = ['solicitud.md', 'spec.md', 'build.md'];
+        for (const revision of trabajo.rondas) archivos.push(`ronda-${revision.numero}/revision.md`, ...Object.keys(roles).map((rol) => `ronda-${revision.numero}/revision-${rol}.md`));
+        for (let ciclo = 2; ciclo <= trabajo.ciclo; ciclo++) archivos.push(`retrabajo-ciclo-${ciclo}.md`, `decision-ciclo-${ciclo - 1}.md`);
+        archivos.push('decision.md');
+        return archivos;
+      }
+      function abrir(trabajo) {
+        seleccionado = trabajo;
+        $('detalle-id').textContent = trabajo.id; $('detalle-titulo').textContent = trabajo.titulo;
+        $('archivos').replaceChildren();
+        for (const archivo of documentos(trabajo)) {
+          const boton = elemento('button', '', archivo); boton.dataset.archivo = archivo; boton.setAttribute('aria-pressed', 'false');
+          boton.addEventListener('click', () => leer(trabajo, archivo)); $('archivos').append(boton);
+        }
+        $('detalle').showModal();
+        leer(trabajo, 'spec.md');
+      }
+      function documentoEjemplo(trabajo, archivo) {
+        const coincidencia = /^ronda-(\d+)\/revision-(seguridad|ux|ui|codigo)\.md$/.exec(archivo);
+        if (coincidencia) {
+          const valor = trabajo.rondas.find((r) => r.numero === Number(coincidencia[1])).revisiones[coincidencia[2]];
+          if (valor === 'pendiente') return 'Informe todavía pendiente.\n\nDemostración ficticia.';
+          return `VEREDICTO: ${valor}\n\n# ${roles[coincidencia[2]]}\n\nDemostración ficticia.\n\n${valor === 'CAMBIOS' ? 'El foco debe volver al control que abrió el diálogo.' : 'Los criterios del área están satisfechos en este ejemplo.'}`;
+        }
+        return `# ${trabajo.titulo}\n\nDocumento: ${archivo}\n\nDEMOSTRACIÓN: este contenido es ficticio y no existe en jobs/.\n\n## Objetivo\nHacer más clara la interacción durante una sesión de mesa.\n\n## Aceptación\n- Flujo accesible por teclado.\n- Conservación de los datos de la escena.\n- Evidencias de las cuatro revisiones.\n\nEl tablero real lee aquí los informes de los agentes.`;
+      }
+      async function leer(trabajo, archivo) {
+        const peticion = ++solicitudDocumento;
+        $('ruta').textContent = `jobs/${trabajo.id}/${archivo}`;
+        $('contenido').textContent = 'Leyendo documento…';
+        for (const boton of $('archivos').children) boton.setAttribute('aria-pressed', String(boton.dataset.archivo === archivo));
+        try {
+          let contenido;
+          if (demo) contenido = documentoEjemplo(trabajo, archivo);
+          else {
+            const respuesta = await fetch(`jobs/${trabajo.id}/${archivo}`, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+            if (!respuesta.ok) {
+              if (respuesta.status === 404) throw new Error('Documento aún no disponible. Se creará cuando termine su agente o se solicite esta acción.');
+              throw new Error(`No se pudo leer el documento (HTTP ${respuesta.status}).`);
+            }
+            contenido = await respuesta.text();
+          }
+          if (peticion === solicitudDocumento && seleccionado?.id === trabajo.id) $('contenido').textContent = contenido;
+        } catch (error) { if (peticion === solicitudDocumento) $('contenido').textContent = error.message; }
+      }
+      $('cerrar').addEventListener('click', () => $('detalle').close());
+      $('detalle').addEventListener('close', () => { seleccionado = null; solicitudDocumento++; });
+      $('actualizar').addEventListener('click', actualizar);
+      $('ejemplo').textContent = demo ? 'Volver al tablero real' : 'Ver ejemplo';
+      $('ejemplo').addEventListener('click', () => { location.href = demo ? 'dashboard.html' : 'dashboard.html?demo'; });
+      $('aviso-demo').hidden = !demo;
+      dibujar();
+      actualizar().finally(function programar() { setTimeout(() => actualizar().finally(programar), 2000); });
+    })();
+  </script>
+</body>
+</html>

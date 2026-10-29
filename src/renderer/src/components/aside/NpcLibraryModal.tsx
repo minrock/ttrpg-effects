@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useState, type JSX } from "react";
+import { useTtrpgApi } from "../../client/ClientProvider";
+import { lazy, Suspense, useEffect, useRef, useState, type JSX } from "react";
 import {
   createSceneNpcFromLibraryEntry,
   type NpcLibraryEntry
@@ -27,6 +28,8 @@ interface NewNpcDraft {
 }
 
 export function NpcLibraryModal({ existingIds, onAddNpc, onClose }: NpcLibraryModalProps): JSX.Element {
+  const librariesApi = useTtrpgApi("libraries");
+  const imagesApi = useTtrpgApi("images");
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<readonly NpcLibraryEntry[]>([]);
   const [imageUrls, setImageUrls] = useState<ReadonlyMap<string, string>>(new Map());
@@ -35,42 +38,47 @@ export function NpcLibraryModal({ existingIds, onAddNpc, onClose }: NpcLibraryMo
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<NewNpcDraft>({ name: "", imagePath: null, imageUrl: null, notes: "" });
 
-  const refresh = useCallback(async (text: string): Promise<void> => {
-    if (window.ttrpg === undefined) {
+  const libraryGeneration = useRef(0);
+  useEffect(() => {
+    libraryGeneration.current++;
+    setIsCreating(false);
+    setDraft({ name: "", imagePath: null, imageUrl: null, notes: "" });
+    return () => { libraryGeneration.current++; };
+  }, [librariesApi, imagesApi]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEntries([]);
+    setImageUrls(new Map());
+    setFeedback(null);
+    setIsLoading(librariesApi !== undefined);
+    if (librariesApi === undefined) {
       setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
       return;
     }
-
-    setIsLoading(true);
-    try {
-      const result = await window.ttrpg.searchNpcLibrary({ text, limit: 60 });
-      if (!result.ok) {
-        setFeedback({ message: result.error, kind: "error" });
-        return;
-      }
-
-      setEntries(result.entries);
-      setFeedback(null);
-      const resolved = await Promise.all(
-        result.entries
+    async function refresh(): Promise<void> {
+      try {
+        const result = await librariesApi!.searchNpcLibrary({ text: query, limit: 60 });
+        if (cancelled) return;
+        if (!result.ok) {
+          setFeedback({ message: result.error, kind: "error" });
+          return;
+        }
+        setEntries(result.entries);
+        const resolved = await Promise.all(result.entries
           .filter((entry) => entry.imagePath !== null)
-          .map(async (entry) => {
-            const url = await window.ttrpg?.resolveAsideUrl(entry.imagePath!);
-            return [entry.id, url] as const;
-          })
-      );
-      setImageUrls(new Map(resolved.filter((pair): pair is [string, string] => typeof pair[1] === "string")));
-    } finally {
-      setIsLoading(false);
+          .map(async (entry) => [entry.id, await imagesApi?.resolveAsideUrl(entry.imagePath!)] as const));
+        if (cancelled) return;
+        setImageUrls(new Map(resolved.filter((pair): pair is [string, string] => typeof pair[1] === "string")));
+      } catch (error) {
+        if (!cancelled) setFeedback({ message: error instanceof Error ? error.message : "No se pudo consultar la biblioteca.", kind: "error" });
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
     }
-  }, []);
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      void refresh(query);
-    }, 180);
-    return () => window.clearTimeout(handle);
-  }, [query, refresh]);
+    const handle = window.setTimeout(() => { void refresh(); }, 180);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+  }, [query, librariesApi, imagesApi]);
 
   function addEntryToScene(entry: NpcLibraryEntry): void {
     onAddNpc(createSceneNpcFromLibraryEntry(entry, existingIds));
@@ -78,7 +86,7 @@ export function NpcLibraryModal({ existingIds, onAddNpc, onClose }: NpcLibraryMo
   }
 
   async function saveNewNpc(): Promise<void> {
-    if (window.ttrpg === undefined) {
+    if (librariesApi === undefined) {
       setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
       return;
     }
@@ -87,11 +95,13 @@ export function NpcLibraryModal({ existingIds, onAddNpc, onClose }: NpcLibraryMo
       return;
     }
 
-    const result = await window.ttrpg.saveNpcLibraryEntry({
+    const generation = libraryGeneration.current;
+    const result = await librariesApi.saveNpcLibraryEntry({
       name: draft.name,
       imagePath: draft.imagePath,
       notes: draft.notes
     });
+    if (generation !== libraryGeneration.current) return;
 
     if (!result.ok) {
       setFeedback({ message: result.error, kind: "error" });

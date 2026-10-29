@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useCallback, useEffect, useState, type JSX } from "react";
 import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { NpcDetailModal } from "./NpcDetailModal";
@@ -116,12 +117,13 @@ export function NpcSection({
 function NpcRow({ npc, onDetail, onRemove, onToggle }: {
   npc: SceneNpc; onDetail: () => void; onRemove: () => void; onToggle: () => void;
 }): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (npc.imagePath === null) { setImageUrl(null); return; }
-    void window.ttrpg?.resolveAsideUrl(npc.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [npc.imagePath]);
+    void imagesApi?.resolveAsideUrl(npc.imagePath).then((url) => setImageUrl(url ?? null));
+  }, [npc.imagePath, imagesApi]);
 
   return (
     <div style={rowStyle}>

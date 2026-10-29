@@ -4288,6 +4288,12 @@ body {
   background: transparent;
 }
 
+.scene-link-backdrop {
+  /* Above the workspace header (30), inside the protected session tree. */
+  position: fixed;
+  z-index: 40;
+}
+
 .scene-link-modal {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;

@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useCallback, useEffect, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
@@ -126,12 +127,13 @@ interface MonsterRowProps {
 }
 
 function MonsterRow({ monster, onDetail, onRemove, onToggle }: MonsterRowProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (monster.imagePath === null) { setImageUrl(null); return; }
-    void window.ttrpg?.resolveAsideUrl(monster.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [monster.imagePath]);
+    void imagesApi?.resolveAsideUrl(monster.imagePath).then((url) => setImageUrl(url ?? null));
+  }, [monster.imagePath, imagesApi]);
 
   return (
     <div style={rowStyle}>

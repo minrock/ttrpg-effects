@@ -5,6 +5,8 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
+        // Mantener __dirname de los módulos main junto al entry y sus rutas relativas.
+        output: { chunkFileNames: "[name]-[hash].js" },
         input: {
           index: resolve(__dirname, "src/main/index.ts")
         }

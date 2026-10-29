@@ -1,3 +1,4 @@
+import { ServiceImage } from "./ServiceImageExtension";
 import type { Extensions } from "@tiptap/core";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -21,6 +22,7 @@ export function createRichTextExtensions(placeholder: string): Extensions {
     TaskItem.configure({ nested: true }),
     TableTaskCheckbox,
     Callout,
+    ServiceImage,
     Markdown.configure({ transformPastedText: false, transformCopiedText: true })
   ];
 }

@@ -1,3 +1,4 @@
+import { useTtrpgApi, useTtrpgClient } from "../../client/ClientProvider";
 import { useEffect, useMemo, useState, type FormEvent, type JSX, type MouseEvent, type ReactNode } from "react";
 import {
   BetweenHorizontalEnd,
@@ -81,6 +82,9 @@ export function NoteEditor({
   titleField,
   variant = "compact"
 }: NoteEditorProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
+  const serviceImages = useTtrpgClient()?.assetReferences === "service";
+  const [imageError, setImageError] = useState("");
   const [linkEditorOpen, setLinkEditorOpen] = useState(false);
   const [linkDraft, setLinkDraft] = useState("");
   const extensions = useMemo(() => createRichTextExtensions(placeholder), [placeholder]);
@@ -169,7 +173,17 @@ export function NoteEditor({
 
   return (
     <section className={`note-editor note-editor--${variant}`} onClick={focusEditorFromDocumentClick}>
+      {imageError && <p role="alert">{imageError}</p>}
       <div className="note-editor__toolbar" role="toolbar" aria-label="Formato del documento" onClick={(event) => event.stopPropagation()}>
+        {serviceImages && imagesApi && <ToolbarButton label="Agregar o reemplazar imagen" active={false} onClick={() => {
+          const currentEditor = editor;
+          void imagesApi.openAsideImage().then(result => {
+            if (!currentEditor || currentEditor.isDestroyed) return;
+            if (!result.ok) { setImageError(result.error); return; }
+            setImageError("");
+            currentEditor.chain().focus().insertContent({ type: "image", attrs: { src: result.imagePath, alt: "Imagen de nota" } }).run();
+          }).catch(() => setImageError("No se pudo cargar la imagen. Reintenta."));
+        }}>Imagen</ToolbarButton>}
         <ToolbarButton label="Encabezado 1" active={toolbarState.heading1} onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}>
           <Heading1 aria-hidden="true" />
         </ToolbarButton>

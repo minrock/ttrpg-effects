@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { assetUrl } from "../../shared/contracts/service-references";
 
 export const mapImageReplacementResultSchema = z.discriminatedUnion("status", [
   z.object({
@@ -15,3 +16,8 @@ export type MapImageReplacementResult = z.infer<typeof mapImageReplacementResult
 export interface MapImageStorage {
   selectReplacementMapImage(): Promise<MapImageReplacementResult>;
 }
+
+export const browserMapImageReplacementResultSchema = z.union([
+  mapImageReplacementResultSchema,
+  z.object({ status: z.literal("ready"), imagePath: z.string(), imageUrl: z.string() }).refine(value => assetUrl(value.imagePath) === value.imageUrl && assetUrl(value.imagePath) !== null)
+]);

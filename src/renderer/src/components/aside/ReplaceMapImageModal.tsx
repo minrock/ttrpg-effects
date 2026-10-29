@@ -1,3 +1,4 @@
+import { usePortalTarget } from "../../client/PortalTarget";
 import { ImageUp, X } from "lucide-react";
 import { useEffect, useRef, useState, type JSX } from "react";
 import { createPortal } from "react-dom";
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ReplaceMapImageModal({ draft, error, onConfirm, onCancel }: Props): JSX.Element {
+  const portalTarget = usePortalTarget();
   const [policy, setPolicy] = useState<MapImageReplacementPolicy>(draft.preserveError === null ? "preserve-world-size" : "keep-scale");
   const [acknowledged, setAcknowledged] = useState(false);
   const dialog = useRef<HTMLElement | null>(null);
@@ -24,6 +26,7 @@ export function ReplaceMapImageModal({ draft, error, onConfirm, onCancel }: Prop
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.current?.querySelector<HTMLButtonElement>("button")?.focus();
     function onKeyDown(event: KeyboardEvent): void {
+      if (dialog.current?.closest("[hidden], [inert]")) return;
       event.stopPropagation();
       if (event.key === "Escape") { event.preventDefault(); onCancel(); return; }
       if (event.key !== "Tab") return;
@@ -60,7 +63,7 @@ export function ReplaceMapImageModal({ draft, error, onConfirm, onCancel }: Prop
           <button type="button" className="map-image-replacement__apply" disabled={needsAcknowledgement && !acknowledged} onClick={() => onConfirm(policy)}><ImageUp aria-hidden="true" />Actualizar imagen</button>
         </footer>
       </section>
-    </div>, document.body
+    </div>, portalTarget
   );
 }
 

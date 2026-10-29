@@ -1,0 +1,3 @@
+Fixtures propios: imagen sólida de 2×2 píxeles RGB (200,40,10), codificada como JPEG y WebP con Pillow 12.2.0. Generados para pruebas del proyecto; CC0. Pillow no es dependencia del servicio ni de la suite.
+
+Corrección de ronda 1: `pixel-lossless.webp` es la misma imagen propia codificada sin pérdida con Pillow 12.2.0. `animated.webp` contiene dos frames propios de 2×2, colores (200,40,10) y (10,40,200), para comprobar el rechazo recuperable de animación. `interlaced.png` contiene el primer color y se generó con sharp 0.35.5 usando PNG progresivo, para comprobar la explicación de conversión. Todos son CC0. Los bytes malformados de la reproducción C-1 están inline en la prueba HTTP.

@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useCallback, useEffect, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
@@ -14,6 +15,7 @@ interface MonsterModalProps {
 }
 
 export function MonsterModal({ initial, existingIds, templates, onSave, onClose }: MonsterModalProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [name, setName] = useState(initial?.name ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [templateId, setTemplateId] = useState<string | null>(initial?.templateId ?? null);
@@ -22,11 +24,11 @@ export function MonsterModal({ initial, existingIds, templates, onSave, onClose 
 
   useEffect(() => {
     if (initial?.imagePath !== undefined && initial.imagePath !== null) {
-      void window.ttrpg?.resolveAsideUrl(initial.imagePath).then((url) => {
+      void imagesApi?.resolveAsideUrl(initial.imagePath).then((url) => {
         setImageUrl(url ?? null);
       });
     }
-  }, [initial?.imagePath]);
+  }, [initial?.imagePath, imagesApi]);
 
   const handleSave = useCallback(() => {
     const trimmed = name.trim();

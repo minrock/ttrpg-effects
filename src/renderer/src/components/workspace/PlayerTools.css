@@ -100,7 +100,7 @@
 .player-workspace-root .player-zoom-indicator ~ .scene-counters-overlay { top: 16px; left: 70px; max-width: calc(100% - 180px); }
 .player-workspace-root:has(.player-tools__options) .scene-counters-overlay { top: 108px; }
 .player-workspace-root .player-zoom-indicator { top: auto; bottom: 16px; left: 70px; }
-.player-workspace-root .combat-turn-bar { top: auto; bottom: 62px; max-width: calc(100% - 140px); }
+.player-shell.player-workspace-root .combat-turn-bar { top: auto; bottom: 62px; max-width: calc(100% - 140px); }
 
 @media (max-width: 600px) {
   .player-workspace-root:has(.player-tools__options) .compass-overlay.compass-overlay--player { top: 108px; }
@@ -111,5 +111,5 @@
   .player-workspace-root .player-zoom-indicator { max-width: calc(100% - 160px); flex-wrap: wrap; }
   .player-workspace-root:has(.player-tools__options) .scene-counters-overlay { top: 172px; }
   .player-workspace-root .player-zoom-indicator { bottom: 62px; left: 16px; max-width: calc(100% - 32px); }
-  .player-workspace-root .combat-turn-bar { bottom: 70px; max-width: calc(100% - 80px); }
+  .player-shell.player-workspace-root .combat-turn-bar { bottom: 70px; max-width: calc(100% - 80px); }
 }

@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { IpcRendererEvent } from "electron";
 
+import { version } from "../../package.json";
+
 const appInfo = {
   name: "TTRPG Effects",
-  version: "0.0.0",
+  version,
   status: "Bootstrap listo"
 } as const;
 

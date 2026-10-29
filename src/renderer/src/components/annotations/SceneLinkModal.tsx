@@ -1,7 +1,9 @@
-import { useState, type JSX } from "react";
+import { rememberDialogFocus, restoreDialogFocus } from "../../client/dialog-focus";
+import { useEffect, useRef, useState, type JSX } from "react";
 import { ExternalLink, Link2, MapPinned, Save, Unlink, X } from "lucide-react";
 import type { InternalSceneLinkCandidateMap } from "../../../../domain/annotations/internal-scene-links";
 import type {
+  SceneLinkCandidateFile,
   MapSceneLinkMarker,
   SceneLinkValidationStatus
 } from "../../../../domain/annotations/scene-navigation-links";
@@ -11,6 +13,7 @@ interface SceneLinkModalProps {
   readonly status: SceneLinkValidationStatus;
   readonly currentScenePath: string | null;
   readonly candidateMaps: readonly InternalSceneLinkCandidateMap[];
+  readonly remote?: { select: () => Promise<(SceneLinkCandidateFile & { name: string }) | null>; connect: (scenePath: string, markerId: string) => Promise<boolean> };
   readonly onRename: (name: string) => Promise<boolean>;
   readonly onConnect: (targetMapId: string, targetMarkerId: string) => Promise<boolean>;
   readonly onDisconnect: () => Promise<boolean>;
@@ -23,12 +26,17 @@ export function SceneLinkModal({
   status,
   currentScenePath,
   candidateMaps,
+  remote,
   onRename,
   onConnect,
   onDisconnect,
   onNavigate,
   onClose
 }: SceneLinkModalProps): JSX.Element {
+  const panel=useRef<HTMLElement>(null);
+  const [remoteScene,setRemoteScene]=useState<(SceneLinkCandidateFile & {name:string})|null>(null);
+  const [remoteMarker,setRemoteMarker]=useState("");
+  useEffect(()=>{const trigger=document.activeElement;panel.current?.querySelector<HTMLInputElement>("input")?.focus();return()=>restoreDialogFocus(trigger);},[]);
   const [name, setName] = useState(marker.name);
   const [selectedMapId, setSelectedMapId] = useState(candidateMaps[0]?.id ?? "");
   const [selectedMarkerId, setSelectedMarkerId] = useState(candidateMaps[0]?.markers.find((item) => item.available)?.id ?? "");
@@ -37,12 +45,29 @@ export function SceneLinkModal({
   const selectedMap = candidateMaps.find((map) => map.id === selectedMapId) ?? null;
   const availableMarkers = selectedMap?.markers.filter((item) => item.available) ?? [];
 
+  const selectRemote = async (): Promise<void> => {
+    if (!remote) return;
+    setBusy(true);setError(null);
+    try {const selected=await remote.select();if(selected){setRemoteScene(selected);setRemoteMarker(selected.markers.find(item=>item.available)?.id??"");}}
+    catch(error){setError(error instanceof Error?error.message:"No se pudo cargar el destino. Vuelve a elegir la escena.");}
+    finally{setBusy(false);}
+  };
+  const connectRemote = async (): Promise<void> => {
+    if(!remote||!remoteScene||!remoteMarker)return;
+    setBusy(true);setError(null);
+    try {if(await remote.connect(remoteScene.filePath,remoteMarker))onClose();else setError("No se pudo guardar la conexión. Conservamos el trabajo; reintenta o elige otro destino.");}
+    catch(error){setError(error instanceof Error?error.message:"No se pudo conectar. Reintenta.");}
+    finally{setBusy(false);}
+  };
   const connect = async (): Promise<void> => {
     if (selectedMapId === "" || selectedMarkerId === "") return;
     setBusy(true);
     setError(null);
     try {
       if (await onConnect(selectedMapId, selectedMarkerId)) onClose();
+      else setError("No se pudo guardar la conexión. Conservamos el enlace anterior; vuelve a intentarlo.");
+    } catch (connectError) {
+      setError(connectError instanceof Error ? connectError.message : "No se pudo conectar. Vuelve a intentarlo.");
     } finally {
       setBusy(false);
     }
@@ -67,14 +92,21 @@ export function SceneLinkModal({
     setError(null);
     try {
       if (await onDisconnect()) onClose();
+      else setError("No se pudo desligar. Conservamos la conexión; vuelve a intentarlo antes de cambiar el destino.");
+    } catch (disconnectError) {
+      setError(disconnectError instanceof Error ? disconnectError.message : "No se pudo desligar. Conservamos la conexión.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="modal-backdrop scene-link-backdrop" onClick={onClose}>
-      <section className="scene-link-modal" role="dialog" aria-modal="true" aria-labelledby="scene-link-title" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-backdrop scene-link-backdrop" onClick={()=>{if(!busy)onClose();}}>
+      <section ref={panel} onKeyDown={event=>{
+        event.stopPropagation();
+        if(event.key==="Escape"){event.preventDefault();if(!busy)onClose();}
+        if(event.key==="Tab"){const controls=[...panel.current!.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled)')];const first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
+      }} className="scene-link-modal" role="dialog" aria-modal="true" aria-labelledby="scene-link-title" onClick={(event) => event.stopPropagation()}>
         <header className="scene-link-modal__header">
           <div className="scene-link-modal__identity">
             <span className="scene-link-modal__icon"><MapPinned aria-hidden="true" /></span>
@@ -83,7 +115,7 @@ export function SceneLinkModal({
               <h2 id="scene-link-title">{marker.name}</h2>
             </div>
           </div>
-          <button type="button" className="scene-link-modal__close" onClick={onClose} aria-label="Cerrar">
+          <button type="button" className="scene-link-modal__close" disabled={busy} onClick={onClose} aria-label="Cerrar">
             <X aria-hidden="true" />
           </button>
         </header>
@@ -97,7 +129,7 @@ export function SceneLinkModal({
               </div>
             </div>
             <div className="scene-link-name-row">
-              <input aria-label="Nombre del punto" value={name} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} />
+              <input aria-label="Nombre del punto" value={name} disabled={busy} maxLength={120} onChange={(event) => setName(event.currentTarget.value)} />
               <button
                 type="button"
                 title="Guardar nombre"
@@ -134,7 +166,7 @@ export function SceneLinkModal({
             ) : null}
 
             {candidateMaps.length === 0 ? (
-              <p className="sidebar-hint">Agrega otro mapa a la escena para poder enlazar este punto.</p>
+              <p className="sidebar-hint">Para enlazar dentro de esta escena, agrega otro mapa.</p>
             ) : (
               <div className="scene-link-candidates">
                 <label>
@@ -174,12 +206,27 @@ export function SceneLinkModal({
               </div>
             )}
           </section>
+          {remote&&<section className="scene-link-panel scene-link-remote">
+            <h3>Otra escena guardada</h3>
+            <p>Se guardarán los cambios de esta escena antes de conectar. Puedes reparar un destino ausente eligiendo uno del servicio.</p>
+            <button type="button" disabled={busy} onClick={event=>{rememberDialogFocus(event.currentTarget);void selectRemote();}}>Elegir escena del servicio</button>
+            {busy&&<p role="status">Preparando conexión…</p>}
+            {remoteScene&&<div className="scene-link-candidates">
+              <p className="service-selected-scene">{remoteScene.name}</p>
+              <label>Marcador de la escena<select aria-label="Marcador de la escena" disabled={busy} value={remoteMarker} onChange={event=>setRemoteMarker(event.target.value)}>
+                <option value="">Selecciona un marcador</option>
+                {remoteScene.markers.map(item=><option key={item.id} value={item.id} disabled={!item.available}>{item.name}{item.available?"":" (ocupado)"}</option>)}
+              </select></label>
+              {!remoteScene.markers.some(item=>item.available)&&<p>No hay marcadores libres. Elige otra escena o libera un marcador en ella.</p>}
+              <button type="button" disabled={busy||!remoteMarker} onClick={()=>void connectRemote()}>Conectar con esta escena</button>
+            </div>}
+          </section>}
         </div>
 
-        {error !== null ? <p className="form-error scene-link-modal__error">{error}</p> : null}
+        {error !== null ? <p role="alert" className="form-error scene-link-modal__error">{error}</p> : null}
 
         <footer className="scene-link-modal__footer">
-          <button type="button" onClick={onClose}>Cancelar</button>
+          <button type="button" disabled={busy} onClick={onClose}>Cancelar</button>
           <div>
             {marker.connection !== null ? (
               <>

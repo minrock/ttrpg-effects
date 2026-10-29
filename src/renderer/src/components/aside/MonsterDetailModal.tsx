@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useMemo, useEffect, useState, type JSX } from "react";
 import {
   getMonsterTemplateRenderClass,
@@ -23,12 +24,13 @@ export function MonsterDetailModal({
   onToggleVisibility,
   onEdit
 }: MonsterDetailModalProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (monster.imagePath === null) { setImageUrl(null); return; }
-    void window.ttrpg?.resolveAsideUrl(monster.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [monster.imagePath]);
+    void imagesApi?.resolveAsideUrl(monster.imagePath).then((url) => setImageUrl(url ?? null));
+  }, [monster.imagePath, imagesApi]);
 
   const notesHtml = useMemo(() => {
     if (monster.notes.trim() === "") return "";

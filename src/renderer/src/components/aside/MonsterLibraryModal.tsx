@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type JSX } from "react";
+import { useTtrpgApi } from "../../client/ClientProvider";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import {
   createSceneMonsterFromLibraryEntry,
@@ -31,6 +32,8 @@ export function MonsterLibraryModal({
   onAddMonster,
   onClose
 }: MonsterLibraryModalProps): JSX.Element {
+  const librariesApi = useTtrpgApi("libraries");
+  const imagesApi = useTtrpgApi("images");
   const [query, setQuery] = useState("");
   const [entries, setEntries] = useState<readonly MonsterLibraryEntry[]>([]);
   const [imageUrls, setImageUrls] = useState<ReadonlyMap<string, string>>(new Map());
@@ -39,42 +42,47 @@ export function MonsterLibraryModal({
   const [isCreating, setIsCreating] = useState(false);
   const [draft, setDraft] = useState<NewMonsterDraft>(() => createEmptyDraft(templates));
 
-  const refresh = useCallback(async (text: string): Promise<void> => {
-    if (window.ttrpg === undefined) {
+  const libraryGeneration = useRef(0);
+  useEffect(() => {
+    libraryGeneration.current++;
+    setIsCreating(false);
+    setDraft(createEmptyDraft(templates));
+    return () => { libraryGeneration.current++; };
+  }, [librariesApi, imagesApi]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setEntries([]);
+    setImageUrls(new Map());
+    setFeedback(null);
+    setIsLoading(librariesApi !== undefined);
+    if (librariesApi === undefined) {
       setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
       return;
     }
-
-    setIsLoading(true);
-    try {
-      const result = await window.ttrpg.searchMonsterLibrary({ text, limit: 60 });
-      if (result.ok) {
+    async function refresh(): Promise<void> {
+      try {
+        const result = await librariesApi!.searchMonsterLibrary({ text: query, limit: 60 });
+        if (cancelled) return;
+        if (!result.ok) {
+          setFeedback({ message: result.error, kind: "error" });
+          return;
+        }
         setEntries(result.entries);
-        setFeedback(null);
-        const resolved = await Promise.all(
-          result.entries
-            .filter((e) => e.imagePath !== null)
-            .map(async (e) => {
-              const url = await window.ttrpg?.resolveAsideUrl(e.imagePath!);
-              return [e.id, url] as const;
-            })
-        );
+        const resolved = await Promise.all(result.entries
+          .filter((entry) => entry.imagePath !== null)
+          .map(async (entry) => [entry.id, await imagesApi?.resolveAsideUrl(entry.imagePath!)] as const));
+        if (cancelled) return;
         setImageUrls(new Map(resolved.filter((pair): pair is [string, string] => typeof pair[1] === "string")));
-      } else {
-        setFeedback({ message: result.error, kind: "error" });
+      } catch (error) {
+        if (!cancelled) setFeedback({ message: error instanceof Error ? error.message : "No se pudo consultar la biblioteca.", kind: "error" });
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      void refresh(query);
-    }, 180);
-
-    return () => window.clearTimeout(handle);
-  }, [query, refresh]);
+    const handle = window.setTimeout(() => { void refresh(); }, 180);
+    return () => { cancelled = true; window.clearTimeout(handle); };
+  }, [query, librariesApi, imagesApi]);
 
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
@@ -102,7 +110,7 @@ export function MonsterLibraryModal({
   }
 
   async function saveNewMonster(): Promise<void> {
-    if (window.ttrpg === undefined) {
+    if (librariesApi === undefined) {
       setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
       return;
     }
@@ -112,13 +120,15 @@ export function MonsterLibraryModal({
       return;
     }
 
-    const result = await window.ttrpg.saveMonsterLibraryEntry({
+    const generation = libraryGeneration.current;
+    const result = await librariesApi.saveMonsterLibraryEntry({
       name: draft.name,
       system: draft.system.trim() === "" ? "Sin sistema" : draft.system,
       templateId: draft.templateId,
       contentMarkdown: draft.contentMarkdown,
       imagePath: draft.imagePath
     });
+    if (generation !== libraryGeneration.current) return;
 
     if (!result.ok) {
       setFeedback({ message: result.error, kind: "error" });

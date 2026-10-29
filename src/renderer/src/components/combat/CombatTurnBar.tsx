@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useEffect, useMemo, useState, type JSX } from "react";
 import {
   getNextActiveParticipant,
@@ -95,6 +96,7 @@ function CombatTurnParticipant({
   onToggleExpanded,
   onToggleDefeated
 }: CombatTurnParticipantProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const isPending = participant.activeFromRound > round;
   const isActive = isParticipantActiveInRound(participant, round);
@@ -108,16 +110,16 @@ function CombatTurnParticipant({
       };
     }
 
-    void window.ttrpg?.resolveAsideUrl(participant.imagePath).then((url) => {
+    void imagesApi?.resolveAsideUrl(participant.imagePath).then((url) => {
       if (mounted) {
         setImageUrl(url ?? null);
       }
-    });
+    }).catch(() => { if (mounted) setImageUrl(null); });
 
     return () => {
       mounted = false;
     };
-  }, [participant.imagePath]);
+  }, [participant.imagePath, imagesApi]);
 
   const className = [
     "combat-turn-card",

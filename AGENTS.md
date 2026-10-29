@@ -34,6 +34,12 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 - **Nunca ejecutes `git add`, `git commit`, `git push` ni ninguna operacion de escritura en el repositorio sin permiso explicito del usuario en esa sesion. Espera siempre la orden antes de escribir en el historial de git.**
 - Cada vez que se mergee un nuevo spec a main, ejecutar `./scripts/build-dmg.sh` para generar un nuevo DMG instalable. El DMG queda en `dist/`.
 
+## Fábrica de software en Codex
+
+Para ejecutar la fábrica usa `$factory` (o pide `/factory` como alias textual) y lee `.agents/skills/factory/SKILL.md`. Esa skill solicita explícitamente subagentes para especificar, construir, revisar seguridad/UX/UI/código y aprobar. Los perfiles están en `.codex/agents/`; el tablero y la cola, en `factory/`. Solo el orquestador escribe `factory/board.json`.
+
+La fábrica conserva las reglas anteriores: ramas `feature/` o `fix/`, commits y merge con autorización explícita, y DMG después de integrar. La aprobación técnica de un agente no equivale a la orden del usuario. Las tareas ordinarias fuera de la fábrica conservan su flujo habitual.
+
 ## Versionado y changelog
 
 La version de la aplicacion vive en `package.json` y debe ser la unica fuente de verdad para builds, empaquetado y nombre/version del DMG.

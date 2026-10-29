@@ -10,6 +10,62 @@ El proyecto sigue versionado semantico:
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
 
+## [3.6.0] - 2026-10-29
+
+### Agregado — feature
+
+- Electron puede conectarse explícitamente al mismo frontend/API privado mediante un modo servicio aislado, sin preload ni IPC local, con sesión efímera y recuperación de conexión.
+- Validación de origen/HTTPS, bloqueo de navegación externa, ventanas, webviews y permisos; protección de las ventanas locales DM/jugador.
+- Comandos de arranque, guía operativa de HTTPS, claves, persistencia y respaldo/restauración; artefactos de Electron separados de API/web. Formato de escena v2 conservado.
+
+## [3.5.0] - 2026-10-29
+
+### Agregado — feature
+
+- Mesa privada sincronizada con HTTP/SSE real, bootstrap y reconexión, presencia principal determinista, cámara independiente y órdenes explícitas, puntero y áreas temporales.
+- Proyección pública construida por campos permitidos y acceso a imágenes limitado al conjunto publicado vigente; revocación de futuras lecturas y exclusión de notas, fichas, mapas y objetos privados.
+- Dados compartidos mediante DiceRollSession y replay existente: tiradas públicas/ocultas, resumen, tamaños e historial privado, idempotencia y recuperación temporal.
+- Enlace de jugador sin credenciales, estados de conexión/carga y errores accesibles. Electron local y formato de escena v2 conservados.
+
+## [3.4.0] - 2026-10-28
+
+### Agregado — feature
+
+- Cliente navegador con el VTT existente, acceso DM/jugador, recuperación de sesión, protección de cambios y adaptador HTTP validado del mismo origen.
+- Guardar/cargar con selector, importar/exportar escenas, múltiples mapas, imágenes de mapas/tokens/notas, reemplazo de fondos, bibliotecas y plantillas persistentes.
+- Enlaces de escenas mediante referencias opacas y transacciones recíprocas; recuperación de imágenes y destinos locales no resolubles.
+- Desarrollo/build web independiente, estáticos confinados y CSP sin evaluación dinámica; pruebas HTTP/UI y humo navegador, Electron aislado y lab.
+- Frontera de sesión incluye portales y selectores pendientes; conexión/reparación de escenas accesible desde el VTT, foco restaurado y nombres largos identificables. Los cambios entre enlaces internos/remotos exigen desligar antes y el modal queda sobre la cabecera a 1024 px.
+- Proyección y dados compartidos se anuncian como pendientes; Electron local conserva su funcionamiento y el formato de escena continúa en versión 2.
+
+## [3.3.0] - 2026-10-28
+
+### Agregado
+
+- Servicio privado Node.js 24 con sesiones DM/jugador, validación de origen/host, límites y contratos HTTP documentados.
+- Escenas CRUD e importación/exportación v1/v2; assets privados con referencias opacas, recuperación de imágenes y almacenamiento SQLite consistente.
+- Bibliotecas y plantillas remotas, comandos de API y pruebas HTTP reales de autorización, persistencia y errores. Electron local conserva su funcionamiento.
+- Validación de escenas/plantillas al leer SQLite y decodificación acotada de imágenes antes de publicar assets; variantes no admitidas explican su conversión.
+
+## [3.2.0] - 2026-10-28
+
+### Agregado
+
+- Contratos compartidos de clientes y composición por raíz React con capacidades explícitas; DM, Player, bibliotecas, imágenes y dados aceptan clientes inyectados.
+- Mapa de paridad documentado para la futura migración al servicio privado, sin implementar transporte HTTP ni cambiar el formato de escenas.
+
+### Corregido
+
+- La información de versión del preload se deriva de `package.json`, también en el bundle sandboxed.
+
+## [3.1.0] - 2026-10-28
+
+### Agregado
+
+- Fábrica de software local para Codex: skill `factory`, siete roles en español, cola y expedientes Markdown; cuatro revisiones completas por ronda, correcciones con el mismo constructor y aprobación técnica separada de la autorización de Git.
+- Tablero HTML autónomo con sondeo del estado, tarjetas por etapa, historial de rondas y lector seguro de informes. Incluye una demostración explícita sin modificar el estado real.
+- Flujo integrado con las specs, pruebas pnpm, versionado y empaquetado DMG existentes. Sin cambios en el formato `.ttrpgscene` ni dependencias adicionales.
+
 ## [3.0.0] - 2026-10-28
 
 ### Changed

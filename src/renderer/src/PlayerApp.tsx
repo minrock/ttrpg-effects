@@ -1,3 +1,4 @@
+import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { Compass, Lock, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
@@ -27,7 +28,9 @@ const EMPTY_ITEMS = [] as const;
 const EMPTY_MAP_ANNOTATIONS = { pins: EMPTY_ITEMS, areas: EMPTY_ITEMS, sceneLinks: EMPTY_ITEMS };
 const EMPTY_LINK_STATUSES = {};
 
-export function PlayerApp(): JSX.Element {
+export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?: string } = {}): JSX.Element {
+  const playerApi = useTtrpgApi("player");
+  const isServiceClient = useTtrpgClient()?.assetReferences === "service";
   const shellRef = useRef<HTMLElement | null>(null);
   const viewportRef = useRef<MapViewportHandle | null>(null);
   const [showTools, setShowTools] = useState(true);
@@ -61,6 +64,8 @@ export function PlayerApp(): JSX.Element {
   const cameraReportRevisionRef = useRef(0);
   const cameraReportTimerRef = useRef<number | null>(null);
   const isCameraReportInFlightRef = useRef(false);
+  const lastCameraReportCompletedAtRef = useRef(-Infinity);
+  const cameraReporterGenerationRef = useRef(0);
   const isCameraReporterActiveRef = useRef(true);
   const pendingCameraReportRef = useRef<{
     readonly camera: ViewportCameraSnapshot;
@@ -77,26 +82,35 @@ export function PlayerApp(): JSX.Element {
     }
     const pending = pendingCameraReportRef.current;
     if (
+      !isCameraReporterActiveRef.current ||
       pending === null ||
-      window.ttrpg === undefined ||
+      playerApi === undefined ||
       isCameraReportInFlightRef.current
     ) {
       return;
     }
 
+    const remaining = 100 - (Date.now() - lastCameraReportCompletedAtRef.current);
+    if (!pending.final && remaining > 0) {
+      cameraReportTimerRef.current = window.setTimeout(flushPlayerCameraReport, remaining);
+      return;
+    }
+    const generation = cameraReporterGenerationRef.current;
     pendingCameraReportRef.current = null;
     isCameraReportInFlightRef.current = true;
     const reportRevision = cameraReportRevisionRef.current + 1;
     cameraReportRevisionRef.current = reportRevision;
-    void window.ttrpg.reportPlayerCamera({
+    void playerApi.reportPlayerCamera({
       reportRevision,
       acknowledgedCommandRevision: acknowledgedCameraCommandRevisionRef.current,
       camera: pending.camera,
       origin: pending.origin,
       final: pending.final,
       ...(pending.viewport === null ? {} : { viewport: pending.viewport })
-    }).finally(() => {
+    }).catch(() => { /* A failed report must not block later camera updates. */ }).finally(() => {
+      if (generation !== cameraReporterGenerationRef.current) return;
       isCameraReportInFlightRef.current = false;
+      lastCameraReportCompletedAtRef.current = Date.now();
       if (
         isCameraReporterActiveRef.current &&
         pendingCameraReportRef.current !== null &&
@@ -105,7 +119,7 @@ export function PlayerApp(): JSX.Element {
         cameraReportTimerRef.current = window.setTimeout(flushPlayerCameraReport, 0);
       }
     });
-  }, []);
+  }, [playerApi]);
 
   const queuePlayerCameraReport = useCallback(
     (
@@ -126,7 +140,7 @@ export function PlayerApp(): JSX.Element {
         return;
       }
       if (cameraReportTimerRef.current === null) {
-        cameraReportTimerRef.current = window.setTimeout(flushPlayerCameraReport, 80);
+        cameraReportTimerRef.current = window.setTimeout(flushPlayerCameraReport, 100);
       }
     },
     [flushPlayerCameraReport]
@@ -174,12 +188,15 @@ export function PlayerApp(): JSX.Element {
     [queuePlayerCameraReport]
   );
 
+  const loadedImageUrlRef = useRef<string | null>(null);
+  const [publicationRevision, setPublicationRevision] = useState(0);
   const applySnapshot = useCallback((snapshot: PlayerWindowSnapshot | null): void => {
     if (snapshot === null) {
       return;
     }
 
     setScene(snapshot.scene);
+    if (isServiceClient) setPublicationRevision(value => value + 1);
     setMapImageUrl(snapshot.mapImageUrl);
     requestedImageUrlRef.current = snapshot.mapImageUrl;
     setTokenImageUrls(snapshot.tokenImageUrls);
@@ -199,8 +216,9 @@ export function PlayerApp(): JSX.Element {
         : null;
     if (nextMapLoadKey === null) {
       setIsViewportReady(true);
-    } else if (changesViewport || mapLoadKeyRef.current === null) {
+    } else if (changesViewport || mapLoadKeyRef.current === null || (isServiceClient && mapLoadKeyRef.current !== nextMapLoadKey)) {
       setIsViewportReady(false);
+      loadedImageUrlRef.current = null;
     }
     mapLoadKeyRef.current = nextMapLoadKey;
     if (!hasInitializedCameraRef.current || cameraSyncKeyRef.current !== nextCameraSyncKey) {
@@ -211,33 +229,37 @@ export function PlayerApp(): JSX.Element {
       hasInitializedCameraRef.current = true;
       cameraSyncKeyRef.current = nextCameraSyncKey;
     }
-  }, []);
+  }, [isServiceClient]);
 
   useEffect(() => {
     let mounted = true;
     isCameraReporterActiveRef.current = true;
-    const offScene = window.ttrpg?.onPlayerScene((snapshot) => {
+    lastCameraCommandRevisionRef.current = -1;
+    acknowledgedCameraCommandRevisionRef.current = null;
+    hasInitializedCameraRef.current = false;
+    setIsHydrated(false);
+    const offScene = playerApi?.onPlayerScene((snapshot) => {
       if (mounted) {
         applySnapshot(snapshot);
       }
     });
-    const offPointer = window.ttrpg?.onPlayerPointer((pointer) => {
+    const offPointer = playerApi?.onPlayerPointer((pointer) => {
       if (mounted) {
         setArcanePointerEvent(pointer);
       }
     });
-    const offInformationAreaHighlight = window.ttrpg?.onPlayerInformationAreaHighlight((highlight) => {
+    const offInformationAreaHighlight = playerApi?.onPlayerInformationAreaHighlight((highlight) => {
       if (mounted) {
         setInformationAreaHighlightEvent(highlight);
       }
     });
-    const offCameraCommand = window.ttrpg?.onPlayerCameraCommand((command) => {
+    const offCameraCommand = playerApi?.onPlayerCameraCommand((command) => {
       if (mounted) {
         applyPlayerCameraCommand(command);
       }
     });
 
-    void window.ttrpg?.getPlayerWindowState().then((state) => {
+    void playerApi?.getPlayerWindowState().then((state) => {
       if (!mounted) {
         return;
       }
@@ -258,6 +280,9 @@ export function PlayerApp(): JSX.Element {
     return () => {
       mounted = false;
       isCameraReporterActiveRef.current = false;
+      cameraReporterGenerationRef.current++;
+      isCameraReportInFlightRef.current = false;
+      pendingCameraReportRef.current = null;
       offScene?.();
       offPointer?.();
       offInformationAreaHighlight?.();
@@ -267,7 +292,7 @@ export function PlayerApp(): JSX.Element {
         cameraReportTimerRef.current = null;
       }
     };
-  }, [applyPlayerCameraCommand, applySnapshot]);
+  }, [applyPlayerCameraCommand, applySnapshot, playerApi]);
 
   useEffect(() => {
     updatePlayerViewportReport();
@@ -331,22 +356,30 @@ export function PlayerApp(): JSX.Element {
   const handlePlayerMapReady = useCallback(({ imageUrl }: { imageUrl: string }): void => {
     if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
       imageUrl !== requestedImageUrlRef.current) return;
+    loadedImageUrlRef.current = imageUrl;
     setIsViewportReady(true);
-    void window.ttrpg?.reportPlayerMapImageStatus({ imageUrl, ok: true });
-  }, [viewportIdentity]);
+    void playerApi?.reportPlayerMapImageStatus({ imageUrl, ok: true });
+  }, [viewportIdentity, playerApi]);
   const handlePlayerMapError = useCallback(({ imageUrl, error }: { imageUrl: string; error: string }): void => {
     if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
       imageUrl !== requestedImageUrlRef.current) return;
+    loadedImageUrlRef.current = null;
     setIsViewportReady(true);
-    void window.ttrpg?.reportPlayerMapImageStatus({ imageUrl, ok: false, error: error.slice(0, 500) });
-  }, [viewportIdentity]);
+    void playerApi?.reportPlayerMapImageStatus({ imageUrl, ok: false, error: error.slice(0, 500) });
+  }, [viewportIdentity, playerApi]);
 
+  const serviceReadyImageUrl = isServiceClient ? mapImageUrl : null;
   useEffect(() => {
     if (isHydrated && isViewportReady) {
-      void window.ttrpg?.notifyPlayerContentReady();
+      if (serviceReadyImageUrl) {
+        if (loadedImageUrlRef.current !== serviceReadyImageUrl) return;
+        // Un bootstrap nuevo necesita confirmar la textura ya cargada en esta conexión.
+        void playerApi?.reportPlayerMapImageStatus({ imageUrl: serviceReadyImageUrl, ok: true });
+      }
+      void playerApi?.notifyPlayerContentReady();
       queuePlayerCameraReport(latestPlayerCameraRef.current, "initialization", true);
     }
-  }, [isHydrated, isViewportReady, queuePlayerCameraReport]);
+  }, [isHydrated, isViewportReady, queuePlayerCameraReport, playerApi, publicationRevision, serviceReadyImageUrl]);
 
   const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
   const { sizes: diceSizes } = useDiceSizes();
@@ -490,9 +523,9 @@ export function PlayerApp(): JSX.Element {
       {isHydrated ? <SceneCountersOverlay counters={scene.counters} viewRole="player" /> : null}
       {!isViewportReady && (
         <div className="player-loading" role="status" aria-live="polite">
-          <div className="player-loading__mark" aria-hidden="true" />
-          <strong>Cargando vista de jugador</strong>
-          <span>{isHydrated ? "Preparando mapa y efectos..." : "Sincronizando escena..."}</span>
+          {!unavailableMessage && <div className="player-loading__mark" aria-hidden="true" />}
+          <strong>{unavailableMessage ? "Acceso jugador" : "Cargando vista de jugador"}</strong>
+          <span>{unavailableMessage ?? (isHydrated ? "Preparando mapa y efectos..." : "Sincronizando escena...")}</span>
         </div>
       )}
       <div className="player-controls" aria-label="Controles de vista de jugador">

@@ -1,4 +1,5 @@
-import { useCallback, type JSX } from "react";
+import { useTtrpgApi } from "../../client/ClientProvider";
+import { useCallback, useState, type JSX } from "react";
 
 interface ImagePickerProps {
   readonly imageUrl: string | null;
@@ -7,15 +8,19 @@ interface ImagePickerProps {
 }
 
 export function ImagePicker({ imageUrl, onImageSelected, onImageRemoved }: ImagePickerProps): JSX.Element {
+  const [error, setError] = useState("");
+  const imagesApi = useTtrpgApi("images");
   const handleClick = useCallback(async () => {
-    const result = await window.ttrpg?.openAsideImage();
+    const result = await imagesApi?.openAsideImage();
+    if (result && !result.ok) setError(result.error);
     if (result?.ok) {
-      const resolvedUrl = await window.ttrpg?.resolveAsideUrl(result.imagePath);
+      setError("");
+      const resolvedUrl = await imagesApi?.resolveAsideUrl(result.imagePath);
       if (resolvedUrl !== null && resolvedUrl !== undefined) {
         onImageSelected(result.imagePath, resolvedUrl);
       }
     }
-  }, [onImageSelected]);
+  }, [onImageSelected, imagesApi]);
 
   const handleDrop = useCallback(
     async (e: React.DragEvent<HTMLDivElement>) => {
@@ -24,12 +29,12 @@ export function ImagePicker({ imageUrl, onImageSelected, onImageRemoved }: Image
       if (file === undefined) return;
       const path = (file as unknown as { path?: string }).path;
       if (typeof path !== "string") return;
-      const resolvedUrl = await window.ttrpg?.resolveAsideUrl(path);
+      const resolvedUrl = await imagesApi?.resolveAsideUrl(path);
       if (resolvedUrl !== null && resolvedUrl !== undefined) {
         onImageSelected(path, resolvedUrl);
       }
     },
-    [onImageSelected]
+    [onImageSelected, imagesApi]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -38,7 +43,10 @@ export function ImagePicker({ imageUrl, onImageSelected, onImageRemoved }: Image
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {error && <p role="alert">{error}</p>}
       <div
+        role="button" tabIndex={0} aria-label="Seleccionar imagen"
+        onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); void handleClick(); } }}
         onClick={() => { void handleClick(); }}
         onDrop={(e) => { void handleDrop(e); }}
         onDragOver={handleDragOver}

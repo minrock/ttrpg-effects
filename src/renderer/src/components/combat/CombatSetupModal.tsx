@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useEffect, useMemo, useState, type DragEvent, type JSX } from "react";
 import {
   CombatTrackerError,
@@ -269,6 +270,7 @@ interface ParticipantThumbProps {
 }
 
 function ParticipantThumb({ imagePath, name }: ParticipantThumbProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -279,7 +281,7 @@ function ParticipantThumb({ imagePath, name }: ParticipantThumbProps): JSX.Eleme
         mounted = false;
       };
     }
-    void window.ttrpg?.resolveAsideUrl(imagePath).then((url) => {
+    void imagesApi?.resolveAsideUrl(imagePath).then((url) => {
       if (mounted) {
         setImageUrl(url ?? null);
       }
@@ -287,7 +289,7 @@ function ParticipantThumb({ imagePath, name }: ParticipantThumbProps): JSX.Eleme
     return () => {
       mounted = false;
     };
-  }, [imagePath]);
+  }, [imagePath, imagesApi]);
 
   return (
     <div className="combat-participant-thumb" aria-hidden="true">

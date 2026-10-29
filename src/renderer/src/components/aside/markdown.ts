@@ -1,3 +1,4 @@
+import { assetUrl } from "../../../../shared/contracts/service-references";
 import { marked, Renderer } from "marked";
 import DOMPurify from "dompurify";
 import { encodeCalloutDirectivesAsBlockquotes, upgradeCalloutBlockquotes } from "./callout";
@@ -8,6 +9,11 @@ import {
 
 const safeRenderer = new Renderer();
 safeRenderer.html = (): string => "";
+safeRenderer.image = ({ href, text }): string => {
+  const url = assetUrl(href);
+  const escaped = (value: string) => value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return url ? `<img src="${url}" alt="${escaped(text)}">` : `<span>Imagen ausente: ${escaped(href)}</span>`;
+};
 
 const UNDERLINE_OPEN_TOKEN = "TTRPGUNDERLINEOPEN";
 const UNDERLINE_CLOSE_TOKEN = "TTRPGUNDERLINECLOSE";

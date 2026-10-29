@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "3.0.0",
+  "version": "3.6.0",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -11,17 +11,26 @@
     "dist:mac": "pnpm build && electron-builder --mac dmg",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:api": "pnpm typecheck && vite build --config src/server/vite.config.ts",
+    "start:api": "node out/api/index.mjs",
+    "dev:api": "pnpm build:api && pnpm start:api",
+    "dev:web": "vite --config src/web/vite.config.ts",
+    "build:web": "pnpm typecheck && vite build --config src/web/vite.config.ts",
+    "dev:service": "TTRPG_ELECTRON_MODE=service electron-vite dev",
+    "start:service": "TTRPG_ELECTRON_MODE=service electron ."
   },
   "build": {
     "appId": "com.luismoncaris.ttrpg-effects",
     "productName": "TTRPG Effects",
-    "copyright": "Copyright © 2026 Luis Moncaris",
+    "copyright": "Copyright \u00a9 2026 Luis Moncaris",
     "directories": {
       "output": "dist"
     },
     "files": [
-      "out/**/*",
+      "out/main/**/*",
+      "out/preload/**/*",
+      "out/renderer/**/*",
       "!out/**/*.map"
     ],
     "extraResources": [
@@ -32,12 +41,18 @@
       {
         "from": "src/render/three/dice/vendor",
         "to": "licenses/dice-box-threejs",
-        "filter": ["LICENSE", "README.md"]
+        "filter": [
+          "LICENSE",
+          "README.md"
+        ]
       },
       {
         "from": "assets/dice/audio",
         "to": "licenses/kenney-casino-audio",
-        "filter": ["License.txt", "README.md"]
+        "filter": [
+          "License.txt",
+          "README.md"
+        ]
       }
     ],
     "mac": {
@@ -100,6 +115,7 @@
     "pixi.js": "^8.18.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sharp": "0.35.5",
     "three": "0.143.0",
     "tiptap-markdown": "^0.9.0",
     "zod": "^4.4.3"

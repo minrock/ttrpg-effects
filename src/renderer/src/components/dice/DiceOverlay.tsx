@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 import { X } from "lucide-react";
 import type { DiceEnvelope } from "../../../../domain/dice/dice";
@@ -7,6 +8,7 @@ import { DiceResultSummary } from "./DiceResultSummary";
 import "./dice.css";
 
 export function DiceOverlay({ envelope, size = 1, onDismiss }: { envelope: DiceEnvelope; size?: number; onDismiss?: (rollId: string) => void }): JSX.Element {
+  const diceApi = useTtrpgApi("dice");
   const host = useRef<HTMLDivElement>(null), renderer = useRef<DiceOverlayRenderer | null>(null);
   const latest = useRef(envelope.presentation); latest.current = envelope.presentation;
   const latestSize = useRef(size); latestSize.current = size;
@@ -45,7 +47,7 @@ export function DiceOverlay({ envelope, size = 1, onDismiss }: { envelope: DiceE
   useEffect(() => {
     if (!loaded || !host.current) return;
     let cancelled = false;
-    const fail = (): void => { if (cancelled) return; setFailed(true); const rollId = latest.current?.rollId; if (rollId) void window.ttrpg?.reportDiceRenderStatus?.(rollId, false); };
+    const fail = (): void => { if (cancelled) return; setFailed(true); const rollId = latest.current?.rollId; if (rollId) void diceApi?.reportDiceRenderStatus?.(rollId, false); };
     void import("../../../../render/three/dice/DiceOverlayRenderer").then(({ DiceOverlayRenderer: Renderer }) => {
       if (cancelled || !host.current) return;
       renderer.current = new Renderer(host.current, fail, setEffectiveSize);
@@ -53,10 +55,10 @@ export function DiceOverlay({ envelope, size = 1, onDismiss }: { envelope: DiceE
       renderer.current.present(latest.current);
     }).catch(fail);
     return () => { cancelled = true; renderer.current?.dispose(); renderer.current = null; };
-  }, [loaded]);
+  }, [loaded, diceApi]);
   useEffect(() => { renderer.current?.setSize(size); }, [size]);
   // Reduced motion has no rolling RAF; the shared settle time still starts its static celebration.
-  useEffect(() => { try { renderer.current?.present(value); } catch { setFailed(true); if (value) void window.ttrpg?.reportDiceRenderStatus?.(value.rollId, false); } }, [value, settled]);
+  useEffect(() => { try { renderer.current?.present(value); } catch { setFailed(true); if (value) void diceApi?.reportDiceRenderStatus?.(value.rollId, false); } }, [value, settled, diceApi]);
   const visible = value !== null;
   const groups = value?.result?.groups.length ?? 0;
   const columns = Math.max(1, Math.floor((Math.min(680, viewportWidth - 36) - 18) / 158));

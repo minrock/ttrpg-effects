@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "actualizado": "2026-10-29T15:36:46.561655+00:00",
+  "trabajos": [
+    {
+      "id": "001-contrato-clientes",
+      "titulo": "Contrato común para clientes web y Electron",
+      "rama": "feature/fabrica-software",
+      "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 2,
+      "constructor": "/root/constructor_001",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "CAMBIOS",
+            "ui": "CAMBIOS",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [],
+      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "backlog": {
+        "linea": 5,
+        "texto": "- [ ] Contrato común para clientes web y Electron — `001-contrato-clientes`"
+      }
+    },
+    {
+      "id": "002-api-privada",
+      "titulo": "API privada, escenas, imágenes y bibliotecas",
+      "rama": "feature/fabrica-software",
+      "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 2,
+      "constructor": "/root/constructor_002",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "CAMBIOS",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "001-contrato-clientes"
+      ],
+      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "backlog": {
+        "linea": 6,
+        "texto": "- [ ] API privada, escenas, imágenes y bibliotecas — `002-api-privada`"
+      }
+    },
+    {
+      "id": "003-cliente-navegador",
+      "titulo": "Cliente web con el frontend VTT existente",
+      "rama": "feature/fabrica-software",
+      "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
+      "etapa": "integracion",
+      "ciclo": 2,
+      "ronda": 3,
+      "constructor": "/root/constructor_003",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "CAMBIOS",
+            "ux": "CAMBIOS",
+            "ui": "CAMBIOS",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "CAMBIOS",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 3,
+          "ciclo": 2,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "002-api-privada"
+      ],
+      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "backlog": {
+        "linea": 7,
+        "texto": "- [ ] Cliente web con el frontend VTT existente — `003-cliente-navegador`"
+      }
+    },
+    {
+      "id": "004-mesa-sincronizada",
+      "titulo": "Sincronización privada entre DM y jugadores",
+      "rama": "feature/fabrica-software",
+      "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
+      "etapa": "integracion",
+      "ciclo": 2,
+      "ronda": 3,
+      "constructor": "/root/constructor_004",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "CAMBIOS",
+            "ux": "CAMBIOS",
+            "ui": "CAMBIOS",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "CAMBIOS",
+            "codigo": "APROBADO"
+          }
+        },
+        {
+          "numero": 3,
+          "ciclo": 2,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "003-cliente-navegador"
+      ],
+      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "backlog": {
+        "linea": 8,
+        "texto": "- [ ] Sincronización privada entre DM y jugadores — `004-mesa-sincronizada`"
+      }
+    },
+    {
+      "id": "005-electron-servicio",
+      "titulo": "Electron como cliente del servicio y entrega operativa",
+      "rama": "feature/fabrica-software",
+      "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 2,
+      "constructor": "/root/constructor_005",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "CAMBIOS",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "004-mesa-sincronizada"
+      ],
+      "motivo": "Aprobada técnicamente y por el usuario. Preparando integración conjunta de001–005 y DMG3.6.0.",
+      "backlog": {
+        "linea": 9,
+        "texto": "- [ ] Electron como cliente del servicio y entrega operativa — `005-electron-servicio`"
+      }
+    }
+  ]
+}

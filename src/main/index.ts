@@ -1,138 +1,27 @@
-import { app, BrowserWindow, net, protocol, screen } from "electron";
-import { join } from "node:path";
-import { ElectronSceneFileStorage } from "../infrastructure/file-system/electron-scene-file-storage";
-import { ElectronMapImageStorage } from "../infrastructure/file-system/electron-map-image-storage";
-import { fetchMapAsset } from "../infrastructure/file-system/map-asset-url";
-import { ElectronMonsterTemplateRepository } from "../infrastructure/file-system/electron-monster-template-repository";
-import { SqliteEntityLibraryRepository } from "../infrastructure/database/sqlite-entity-library-repository";
-import { SqliteMonsterLibraryRepository } from "../infrastructure/database/sqlite-monster-library-repository";
-import { registerAsideIpc } from "./ipc/aside-ipc";
-import { getRecentScenesStoragePath, installAppMenu, rebuildAppMenu, registerRecentScene } from "./app-menu";
-import { registerEntityLibraryIpc } from "./ipc/entity-library-ipc";
-import { registerMapIpc } from "./ipc/map-ipc";
-import { registerMonsterLibraryIpc } from "./ipc/monster-library-ipc";
-import { registerMonsterTemplateIpc } from "./ipc/monster-template-ipc";
-import { getPlayerWindowRendererIndexPath, preloadPlayerWindow, registerPlayerWindowIpc } from "./ipc/player-window-ipc";
-import { registerSceneIpc } from "./ipc/scene-ipc";
-import { registerSceneNavigationLinksIpc } from "./ipc/scene-navigation-links-ipc";
-import { RecentScenesStore } from "./recent-scenes-store";
-import { registerDiceIpc } from "./ipc/dice-ipc";
-import { getPlayerWindow } from "./ipc/player-window-ipc";
-
-protocol.registerSchemesAsPrivileged([
-  { scheme: "map-asset", privileges: { bypassCSP: true, corsEnabled: true, secure: true, stream: true, supportFetchAPI: true } }
-]);
+import { app, dialog, protocol } from "electron";
+import { readElectronConfig } from "./electron-config";
 
 app.setName("TTRPG Effects");
 
-const isDevelopment = Boolean(process.env.ELECTRON_RENDERER_URL);
-const appIconPath = isDevelopment
-  ? join(app.getAppPath(), "assets/logo/ttrpg-effects-icon.png")
-  : join(process.resourcesPath, "assets/logo/ttrpg-effects-icon.png");
-
-let mainWindow: BrowserWindow | null = null;
-
-function createMainWindow(): void {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-
-  mainWindow = new BrowserWindow({
-    width,
-    height,
-    minWidth: 820,
-    minHeight: 520,
-    title: "TTRPG Effects",
-    icon: appIconPath,
-    backgroundColor: "#111315",
-    show: false,
-    webPreferences: {
-      preload: join(__dirname, "../preload/index.cjs"),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
-  });
-
-  mainWindow.once("ready-to-show", () => {
-    mainWindow?.show();
-  });
-
-  if (isDevelopment) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL as string);
+async function start(): Promise<void> {
+  // Resolver antes de importar infraestructura local o registrar su protocolo/IPC.
+  const config = readElectronConfig();
+  if (config.mode === "local") {
+    protocol.registerSchemesAsPrivileged([
+      { scheme: "map-asset", privileges: { bypassCSP: true, corsEnabled: true, secure: true, stream: true, supportFetchAPI: true } }
+    ]);
+    const { startLocal } = await import("./local-app");
+    await app.whenReady();
+    await startLocal();
   } else {
-    void mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
+    const { startService } = await import("./service-app");
+    await app.whenReady();
+    startService(config.origin);
   }
 }
-
-app.whenReady().then(async () => {
-  app.dock?.setIcon(appIconPath);
-
-  protocol.handle("map-asset", (request) =>
-    fetchMapAsset(request.url, (url, options) => net.fetch(url, options))
-  );
-
-  const mapImageStorage = new ElectronMapImageStorage(() => mainWindow);
-  const sceneFileStorage = new ElectronSceneFileStorage(() => mainWindow);
-  const monsterTemplateRepository = new ElectronMonsterTemplateRepository(getMonsterTemplatesStoragePath());
-  const monsterLibraryRepository = new SqliteMonsterLibraryRepository(getLocalDatabasePath());
-  const entityLibraryRepository = new SqliteEntityLibraryRepository(getLocalDatabasePath());
-  const recentScenes = new RecentScenesStore(getRecentScenesStoragePath());
-  const menuOptions = {
-    storage: sceneFileStorage,
-    recentScenes,
-    getMainWindow: () => mainWindow
-  };
-  await installAppMenu(menuOptions);
-  registerSceneIpc(sceneFileStorage, {
-    onRecentScenePath: async (filePath) => {
-      await registerRecentScene(recentScenes, filePath);
-      await rebuildAppMenu(menuOptions);
-    }
-  });
-  registerSceneNavigationLinksIpc(sceneFileStorage, {
-    getMainWindow: () => mainWindow,
-    onRecentScenePath: async (filePath) => {
-      await registerRecentScene(recentScenes, filePath);
-      await rebuildAppMenu(menuOptions);
-    }
-  });
-  registerMapIpc(mapImageStorage, { getMainWindow: () => mainWindow });
-  registerAsideIpc(mapImageStorage);
-  registerMonsterTemplateIpc(monsterTemplateRepository);
-  registerMonsterLibraryIpc(monsterLibraryRepository);
-  registerEntityLibraryIpc({
-    npcRepository: {
-      search: (query) => entityLibraryRepository.searchNpcs(query),
-      findById: (id) => entityLibraryRepository.findNpcById(id),
-      save: (entry) => entityLibraryRepository.saveNpc(entry)
-    },
-    playerCharacterRepository: {
-      search: (query) => entityLibraryRepository.searchPlayerCharacters(query),
-      findById: (id) => entityLibraryRepository.findPlayerCharacterById(id),
-      save: (entry) => entityLibraryRepository.savePlayerCharacter(entry)
-    }
-  });
-  const playerWindowOptions = {
-    isDevelopment,
-    rendererUrl: process.env.ELECTRON_RENDERER_URL,
-    preloadPath: join(__dirname, "../preload/index.cjs"),
-    iconPath: appIconPath,
-    rendererIndexPath: getPlayerWindowRendererIndexPath()
-  };
-  registerPlayerWindowIpc(playerWindowOptions);
-  createMainWindow();
-  const disposeDice = registerDiceIpc({ getDmWindow: () => mainWindow, getPlayerWindow });
-  app.once("before-quit", disposeDice);
-  preloadPlayerWindow(playerWindowOptions);
-});
-
-app.on("window-all-closed", () => {
+void start().catch(async () => {
+  await app.whenReady();
+  dialog.showErrorBox("No se pudo iniciar TTRPG Effects", "Comprueba TTRPG_ELECTRON_MODE (local o service), TTRPG_SERVICE_URL (origen HTTPS; HTTP solo en loopback) y el acceso al almacenamiento. No se cambió de modo.");
   app.quit();
 });
-
-function getMonsterTemplatesStoragePath(): string {
-  return `${app.getPath("userData")}/monster-templates.json`;
-}
-
-function getLocalDatabasePath(): string {
-  return `${app.getPath("userData")}/ttrpg-effects.sqlite`;
-}
+app.on("window-all-closed", () => app.quit());

@@ -342,7 +342,7 @@ export type SceneDocument = SceneDocumentV2;
 export type AnySceneDocument = SceneDocumentV1 | SceneDocumentV2;
 
 export interface SceneWarning {
-  readonly code: "map-image-missing" | "scene-format-outdated";
+  readonly code: "map-image-missing" | "scene-format-outdated" | "scene-link-unresolved";
   readonly message: string;
   readonly path: string;
 }

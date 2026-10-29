@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { lazy, Suspense, useCallback, useEffect, useState, type JSX } from "react";
 import type { SceneNpc } from "../../../../domain/sessions/scene-aside";
 import { ensureUniqueSlug, slugify } from "../../../../domain/sessions/scene-aside";
@@ -17,6 +18,7 @@ interface NpcModalProps {
 }
 
 export function NpcModal({ initial, existingIds, onSave, onClose }: NpcModalProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [name, setName] = useState(initial?.name ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [imagePath, setImagePath] = useState<string | null>(initial?.imagePath ?? null);
@@ -24,11 +26,11 @@ export function NpcModal({ initial, existingIds, onSave, onClose }: NpcModalProp
 
   useEffect(() => {
     if (initial?.imagePath !== undefined && initial.imagePath !== null) {
-      void window.ttrpg?.resolveAsideUrl(initial.imagePath).then((url) => {
+      void imagesApi?.resolveAsideUrl(initial.imagePath).then((url) => {
         setImageUrl(url ?? null);
       });
     }
-  }, [initial?.imagePath]);
+  }, [initial?.imagePath, imagesApi]);
 
   const handleSave = useCallback(() => {
     const trimmed = name.trim();

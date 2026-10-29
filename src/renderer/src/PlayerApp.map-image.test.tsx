@@ -8,7 +8,11 @@ import type { PlayerWindowSnapshot, ViewportCameraSnapshot } from "../../domain/
 import type { PlayerCameraCommand } from "../../domain/player/player-camera-control";
 import { createDefaultSceneMap, createSceneWithMap } from "../../domain/sessions/scene-maps";
 import type { MapViewport } from "./components/MapViewport";
+import { TableSession } from "../../application/services/table-session";
+import { randomUUID } from "node:crypto";
 import { PlayerApp } from "./PlayerApp";
+import { ClientProvider } from "./client/ClientProvider";
+import { createClient, LOCAL_CAPABILITIES } from "../../shared/api/client";
 
 type ViewportProps = ComponentProps<typeof MapViewport>;
 const viewport = vi.hoisted(() => ({
@@ -127,6 +131,21 @@ describe("PlayerApp map image replacement", () => {
     Reflect.deleteProperty(window, "ttrpg");
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it("reconfirma textura y ready de servicio tras bootstrap sin reiniciar cámara ni viewport", async () => {
+    const client=createClient(window.ttrpg!,LOCAL_CAPABILITIES,"service");
+    await act(async()=>root.render(<ClientProvider client={client}><PlayerApp/></ClientProvider>));
+    await ready();
+    const localCamera={center:{x:800,y:900},zoom:2};await navigate(localCamera);
+    const cameraProp=props().cameraSnapshot;const mounts=viewport.mount.mock.calls.length;
+    reportImage.mockClear();notifyReady.mockClear();
+    await act(async()=>onScene(initial));await flushReports();
+    expect(reportImage).toHaveBeenCalledExactlyOnceWith({imageUrl:initial.mapImageUrl,ok:true});
+    expect(notifyReady).toHaveBeenCalledOnce();
+    expect(reportImage.mock.invocationCallOrder[0]).toBeLessThan(notifyReady.mock.invocationCallOrder[0]);
+    expect(props().cameraSnapshot).toBe(cameraProp);expect(viewport.effectiveCamera).toEqual(localCamera);
+    expect(viewport.mount).toHaveBeenCalledTimes(mounts);
   });
 
   it("waits for the initial map and reports readiness for its exact image revision", async () => {
@@ -317,4 +336,22 @@ describe("PlayerApp map image replacement", () => {
     expect(props().map).toBeNull();
     expect(container.querySelector(".player-loading")).toBeNull();
   });
+  it.each([0,160])("respeta diez reportes por segundo con respuesta de %i ms y entrega el final",async(latency)=>{
+    await ready();const server=new TableSession(Date.now,randomUUID);server.publish(initial);
+    const connection=server.connect("p","player",()=>{});const times:number[]=[],errors:string[]=[];
+    reportCamera.mockImplementation(async report=>{
+      times.push(Date.now());try{server.report("p",connection.id,report);}catch(error){errors.push(String(error));}
+      if(latency)await new Promise(r=>setTimeout(r,latency));return {ok:true};
+    });
+    for(let i=0;i<40;i++){
+      await act(async()=>props().onCameraChange?.({center:{x:i,y:0},zoom:1}));
+      await act(async()=>vi.advanceTimersByTimeAsync(20));
+    }
+    const final={center:{x:1000,y:2000},zoom:2};
+    await act(async()=>props().onCameraInteractionEnd?.(final));await flushReports();
+    expect(errors).toEqual([]);expect(server.presence().report).toMatchObject({camera:final,final:true});
+    for(let i=1;i<times.length-1;i++)expect(times[i]-times[i-1]).toBeGreaterThanOrEqual(100);
+    connection.close();
+  });
+
 });

@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../client/ClientProvider";
 import { useCallback, useEffect, useRef, useState, type RefObject, type SetStateAction } from "react";
 import { prepareMapImageReplacementUseCase } from "../../../application/use-cases/prepare-map-image-replacement";
 import { computeReplacementScale, type MapImageReplacementPolicy } from "../../../domain/map/map-image-replacement";
@@ -44,6 +45,8 @@ function fingerprint(map: SceneMap): string {
 }
 
 export function useMapImageReplacement(options: Options) {
+  const imagesApi = useTtrpgApi("images");
+  const playerApi = useTtrpgApi("player");
   const latest = useRef(options);
   latest.current = options;
   const generation = useRef(0);
@@ -75,6 +78,8 @@ export function useMapImageReplacement(options: Options) {
     }
     setPlayerError(null);
   }, [cancel]);
+
+  useEffect(() => { resetSession(); }, [imagesApi, resetSession]);
 
   const targetForJob = useCallback((pending: ReplacementJob): SceneMapDocument | null => {
     if (job.current !== pending || generation.current !== pending.generation) return null;
@@ -113,7 +118,7 @@ export function useMapImageReplacement(options: Options) {
     }
     let cancelled = false;
     const session = generation.current;
-    void window.ttrpg?.resolveMapUrl(map.imagePath).then((url) => {
+    void imagesApi?.resolveMapUrl(map.imagePath).then((url) => {
       const current = latest.current.sceneRef.current;
       if (cancelled || session !== generation.current || current.activeMapId !== activeMapId
         || current.map.imagePath !== map.imagePath || latest.current.mapImageUrl !== null) return;
@@ -123,7 +128,7 @@ export function useMapImageReplacement(options: Options) {
       }
     }).catch(() => { if (!cancelled) latest.current.onFeedback("No se pudo leer la imagen del mapa."); });
     return () => { cancelled = true; };
-  }, [options.scene.activeMapId, options.scene.map.imagePath, options.mapImageUrl]);
+  }, [options.scene.activeMapId, options.scene.map.imagePath, options.mapImageUrl, imagesApi]);
 
   const onImageLoaded = useCallback((loaded: MapImageDimensions & { imagePath: string; imageUrl: string }) => {
     const { sceneRef, setScene, mapImageUrl } = latest.current;
@@ -140,7 +145,7 @@ export function useMapImageReplacement(options: Options) {
 
   const begin = useCallback(async (mapId: string) => {
     if (job.current !== null) return;
-    const api = window.ttrpg;
+    const api = imagesApi;
     const current = syncActiveMapFromRuntimeFields(latest.current.sceneRef.current);
     const target = current.maps.find((map) => map.id === mapId);
     if (!api || !target) return;
@@ -194,7 +199,7 @@ export function useMapImageReplacement(options: Options) {
       cancel();
       latest.current.onFeedback(caught instanceof Error ? caught.message : "No se pudo preparar la imagen.");
     }
-  }, [cancel, targetForJob]);
+  }, [cancel, targetForJob, imagesApi]);
 
   const confirm = useCallback((policy: MapImageReplacementPolicy) => {
     const pending = job.current;
@@ -227,10 +232,10 @@ export function useMapImageReplacement(options: Options) {
     }
   }, [cancel, targetForJob]);
 
-  useEffect(() => window.ttrpg?.onPlayerMapImageStatus((status) => {
+  useEffect(() => playerApi?.onPlayerMapImageStatus((status) => {
     if (status.imageUrl !== latest.current.mapImageUrl) return;
     setPlayerError(status.ok ? null : status.error ?? "No se pudo actualizar la imagen en Player View.");
-  }), []);
+  }), [playerApi]);
 
   const retryPlayer = useCallback(async () => {
     cancel();
@@ -239,7 +244,7 @@ export function useMapImageReplacement(options: Options) {
     if (current.activeMapId === null || current.map.imagePath === null) return;
     const session = generation.current;
     let url: string | null | undefined;
-    try { url = await window.ttrpg?.resolveMapUrl(current.map.imagePath); }
+    try { url = await imagesApi?.resolveMapUrl(current.map.imagePath); }
     catch { latest.current.onFeedback("No se pudo reintentar la imagen del jugador."); return; }
     if (!url || session !== generation.current || latest.current.mapImageUrl !== mapImageUrl
       || latest.current.sceneRef.current.activeMapId !== current.activeMapId) return;
@@ -247,7 +252,7 @@ export function useMapImageReplacement(options: Options) {
     images.current.set(current.activeMapId, { imagePath: current.map.imagePath, imageUrl: url });
     latest.current.setMapImageUrl(url);
     setPlayerError(null);
-  }, [cancel]);
+  }, [cancel, imagesApi]);
 
   useEffect(() => () => {
     generation.current++;

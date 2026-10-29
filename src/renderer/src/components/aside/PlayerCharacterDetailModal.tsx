@@ -1,3 +1,4 @@
+import { useTtrpgApi } from "../../client/ClientProvider";
 import { useEffect, useState, type JSX } from "react";
 import { formatAbilityScore } from "../../../../domain/entity-library/entity-library";
 import type { ScenePlayerCharacter } from "../../../../domain/sessions/scene-aside";
@@ -19,12 +20,13 @@ export function PlayerCharacterDetailModal({
   onAddToScene,
   onNotesChange
 }: PlayerCharacterDetailModalProps): JSX.Element {
+  const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (character.imagePath === null) { setImageUrl(null); return; }
-    void window.ttrpg?.resolveAsideUrl(character.imagePath).then((url) => setImageUrl(url ?? null));
-  }, [character.imagePath]);
+    void imagesApi?.resolveAsideUrl(character.imagePath).then((url) => setImageUrl(url ?? null));
+  }, [character.imagePath, imagesApi]);
 
   return (
     <ModalBackdrop onClose={onClose} fitContent>
