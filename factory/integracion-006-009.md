@@ -1,41 +1,44 @@
-# Integración 006–009 — verificación previa
+# Integración local 006–009 y corrección 012
 
-Informe inicial: 2026-10-30. Estado histórico de la primera verificación: detenida antes de commit/merge por un fallo reproducible de build API/web en instalación limpia. No hay SHA de integración ni DMG nuevo; main continúa en e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3.
+Fecha de cierre: 2026-10-31. **Integración y DMG completados.** Versión final **3.11.1**. Commit de producto `a64b5e9dcf7ba60be28047f890ab7edfecbb82df`, incorporado a `main` mediante `git merge --ff-only feature/integracion-006-009`. Sin push, instalación ni despliegue. No se integraron010/011.
 
-## Alcance y recuperación exacta
+## Autorización, aislamiento y alcance
 
-Autorización: factory/integracion-006-009-solicitud.md. Integración conjunta del producto acumulado 3.11.0 (prerrequisito 3.7.0 y trabajos 006–009). No se inventan commits de estados intermedios. Las últimas rondas son 006/ronda-2, 007/ronda-1, 008/ronda-4 y 009/ronda-1: 16 informes APROBADO y cuatro decisiones APROBAR comprobados.
+La orden del usuario registrada en [solicitud de integración](integracion-006-009-solicitud.md) autoriza los commits y merge locales006–009; [solicitud012](jobs/012-build-reproducible/solicitud.md) incluye la corrección necesaria de reproducibilidad. El cierre documental también está autorizado. El orquestador mantiene la escritura exclusiva de board/backlog; este integrador no los modificó.
 
-Huellas009 y base010 contienen el mismo conjunto de 616 archivos. La fuente tiene 19 versiones posteriores de010; constructor010 recuperó versiones anteriores en una carpeta externa, sin alterar el checkout. Integración comprobó por separado cada SHA contra ronda-1/huellas.json: 616/616 exactos, 19 recuperados y 597 tomados de fuente. SHA256 del manifiesto009: bc44a98465b5a3a6b3a76366ea254a43a22c15c6d79d16649f776d838af03342. Recuperación: /var/folders/j2/t8vngw011bj2lr2vkwgpnhtr0000gn/T/ttrpg-pre010-recovered-w5czz__w, con verification.json.
+Checkout destino: `/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects`. Rama de preparación `feature/integracion-006-009`, creada desde `main`/HEAD `e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3`, misma base de revisión. main no avanzó durante la preparación, por lo que no hubo reconciliación ni conflictos. Tras el commit se cambió exclusivamente este checkout a main y se realizó el avance rápido. Original `feature/configuracion-env` y fuente010 `feature/factory-006-persistencia-multidb` permanecieron en sus ramas/HEAD originales; no se modificaron sus fuentes, configuración privada, servicios ni datos.
 
-Checkout separado: /Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects. Rama feature/integracion-006-009 creada desde main e1fd3ee, misma base de revisión. Copiados únicamente los 616 archivos aprobados, expedientes006–009, cierre005 heredado y solicitud de integración. El orquestador preparó board/backlog en etapa integración. No se copiaron producto/expedientes010–011, .env privado, datos ni buildoutputs. Dependencias se instalaron de nuevo. No se modificaron los checkouts fuente/original, sus servicios ni configuración.
+Se integra conjuntamente el producto acumulado del prerrequisito3.7 y los trabajos006–009, con corrección012 y versión final3.11.1. No se inventan commits de estados intermedios no conservados. Se incluyen los expedientes aprobados, el cierre005 heredado y los registros preparados por orquestador; se excluyen producto/expedientes010–011, .env privados, node_modules, datos y buildoutputs del historial.
 
-## Checks propios del destino
+## Recuperación e identidad aprobada
 
-Node v24.15.0; pnpm 11.1.2. Logs en /tmp/ttrpg-integration009-*.log.
+Las huellas009 y base010 son idénticas:616archivos.010 había modificado19rutas preexistentes. Constructor010 recuperó sus versiones previas exclusivamente fuera del checkout, en `/var/folders/j2/t8vngw011bj2lr2vkwgpnhtr0000gn/T/ttrpg-pre010-recovered-w5czz__w`, con verification.json. Integración comprobó cada SHA:616/616 exactos,19recuperados y597tomados de fuente. SHA256 del manifiesto009: `bc44a98465b5a3a6b3a76366ea254a43a22c15c6d79d16649f776d838af03342`.
 
-- pnpm install --frozen-lockfile: exit0 (install.log).
-- pnpm typecheck: exit0 (typecheck.log).
-- pnpm lint: exit0 (lint.log).
-- pnpm test: exit0, 129 archivos/1206 pruebas, 22.73 s (test.log). Avisos conocidos canvas/jsdom.
-- pnpm build: exit0, Electron/main/preload/renderer compilados (build.log).
-- pnpm build:api: exit1 tras typecheck, sh: vite: command not found (build-api.log).
-- pnpm build:web: exit1 tras typecheck, sh: vite: command not found (build-web.log).
+Últimas aprobaciones comprobadas:006/ronda2,007/ronda1,008/ronda4 y009/ronda1, con16informes APROBADO y4decisiones APROBAR.012 añadió cuatro revisiones APROBADO y decisión APROBAR en ciclo1/ronda1. Antes del staging,618/618huellas012 coincidían; frente a009 solo difieren package.json,pnpm-lock.yaml yCHANGELOG.md. Todas las fuentes, pruebas, assets y configuraciones funcionales permanecen idénticas. Después del commit y del build se volvió a verificar: la única diferencia con618huellas es este informe de integración, actualizado expresamente como registro de cierre.
 
-No se abrió ni reutilizó PostgreSQL reservado a010. Los gates finales009 del mismo producto se comprobaron en logs y se atribuyen al constructor/revisores: DB32, identidad25, propiedad46 e invitaciones36, en SQLite/PostgreSQL real. No equivalen a nuevas ejecuciones de integración.
+Se prepararon196rutas concretas con git add explícito, sin selección general. `git diff --cached --check` reportó862avisos de espacios en diffs archivados de revision.md; se conservaron intactos como evidencia histórica. El mismo check excluyendo exclusivamente esos revision.md pasó. No hubo errores de formato en producto ni tests funcionales pendientes.
 
-## Impedimento concreto y siguiente acción
+## Verificaciones y corrección del impedimento inicial
 
-El package.json aprobado usa el comando vite en build:api/build:web/dev:web, pero no declara vite como dependencia directa. Lockfile registra vite7.3.3 transitivo/peer de electron-vite y vitest. La instalación limpia no expone node_modules/.bin/vite. La instalación de origen conserva un shim anterior (2026-10-29); allí pnpm exec vite --version responde7.3.3. Ambos .modules.yaml registran pnpm11.1.2, nodeLinker isolated, hoistPattern[*], publicHoistPattern[], sin .npmrc de proyecto ni configuración distinta documentada. El fallo no se resuelve recurriendo al entorno viejo como prueba de reproducibilidad.
+Entorno: Node v24.15.0,pnpm11.1.2,macOS arm64. Checks propios iniciales del integrador en destino: instalación frozen exit0,typecheck exit0,lint exit0,129archivos/1206pruebas exit0 (22.73s),buildElectron exit0. Logs `/tmp/ttrpg-integration009-*.log`.
 
-No se creó shim manual, no se alteró package/lockfile ni se ocultaron los fallos. El orquestador indicó corrección de manifiesto por constructor y revisiones explícitas de integración antes de merge. Se requiere esa evidencia para continuar; no se marca integrado. Rama/destino quedan recuperables, sin staging ni commits. El producto aprobado conserva todavía las616huellas exactas; los cambios010 permanecen intactos en su checkout.
+En ese primer intento build:api y build:web fallaron con `vite: command not found`: package.json usaba Vite sin declararlo directamente; instalación antigua conservaba un shim y la nueva no. No se creó un enlace manual ni se ocultó el fallo. Se detuvo la integración antes de commit y se ejecutó012 con constructor y cuatro revisiones independientes.
 
-## Reanudación aprobada — 2026-10-31
+012 declara Vite7.3.3 directo en devDependencies, añade únicamente tres líneas del importer del lockfile y bump patch/changelog3.11.1. No cambia otras versiones, integridades, snapshots, scripts ni configuración. Su constructor retiró node_modules/out previos, realizó instalación realmente nueva frozen y ejecutó todos los gates. Integración inspeccionó sus registros originales en `/var/folders/j2/t8vngw011bj2lr2vkwgpnhtr0000gn/T/ttrpg-012-wqflzqsu`: instalación, ejecutable local7.3.3,typecheck,lint,129archivos/1206tests y buildsElectron/API/web exit0. Son pruebas del constructor012 verificadas por el integrador, no nuevas ejecuciones propias.
 
-012 corrigió el manifiesto mediante Vite7.3.3 directo, tres líneas del importer y bump patch3.11.1/changelog. Cuatro revisiones APROBADO y decisión APROBAR en ciclo1/ronda1. Integración comprobó de nuevo618/618huellas012 exactas antes de preparar el índice; frente a009 solo difieren los tres archivos autorizados. main sigue en la basee1fd3ee. No existe producto010/011 en el checkout de destino.
+La primera suite012 sufrió4timeouts y2workers fallidos durante suspensión documentada del equipo. El reintento íntegro, sin cambios de producto ni timeouts, pasó1206/1206. Se conserva el fallo original y su explicación en [build012](jobs/012-build-reproducible/build.md). No se suman pasadas ni se presenta la primera como exitosa.
 
-Instalación realmente nueva y seis gates de012 verificados en logs originales del constructor: typecheck/lint, suite129archivos/1206tests y buildsElectron/API/web terminan exit0. La primera ejecución de tests sufrió timeouts/workers durante suspensión del equipo; evidencia y reintento íntegro sin cambios se conservan en build012. No se repiten los gates sin una causa nueva. Los checks propios iniciales de integración y sus fallos deVite permanecen arriba como historial, resueltos por012.
+Contratos DB32,identidad25,propiedad46 e invitaciones36 en SQLite/PostgreSQL son evidencia heredada de009 y sus revisores, corroborada en logs por identidad de fuentes. No se reejecutaron en integración/012 ni se utilizó PostgreSQL reservado a010. Permanecen avisos conocidos de canvas/jsdom,use client y tamaño de chunks; la corrección no los oculta.
 
-Se prepara un único commit del producto acumulado006–009 con prerrequisito3.7 y corrección012, versión final3.11.1, sin inventar estados intermedios.196rutas seleccionadas explícitamente; no git add general. Incluye expedientes aprobados, tablero/cola preparados por orquestador, cierre005 heredado y autorización. La comprobación git diff --cached --check identifica862avisos de espacios en diffs archivados de revision.md, que se preservan como evidencia inmutable; la comprobación sin esos archivos debe pasar antes del commit. Sin fallos funcionales pendientes.
+## DMG y validación final
 
-Siguiente paso autorizado: commit local, avance rápido de main y ./scripts/build-dmg.sh; resultado final aún pendiente en esta sección.
+- Comando posterior al merge: `./scripts/build-dmg.sh`, exit0. Incluye typecheck,compilaciónElectron y electron-builder. Log: `/tmp/ttrpg-3.11.1-dmg.log`.
+- Instalador arm64: `/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg`.
+- Tamaño:152683497bytes.
+- SHA256: `b55b43276e7bd638ae7b3f5ed7054abd24de8d02a56e1b2581a6edddc368e084`.
+- `hdiutil verify`:exit0,checksumVALID. Log: `/tmp/ttrpg-3.11.1-dmg-verify.log`.
+- Info.plist del paquete confirma CFBundleShortVersionString y CFBundleVersion3.11.1.
+
+El empaquetador mantuvo la configuración existente sin firma DeveloperID y emitió avisos de author ausente/dependencias opcionales de otras plataformas; terminó correctamente. No se instaló ni ejecutó el paquete con perfil personal, ni se certifica nueva inspección visual/proyección física. Se entrega el instalable local validado por integridad, conservando los límites funcionales aprobados: moderación/SSE010 y experiencia/corte011 siguen pendientes.
+
+El orquestador actualiza board/backlog a integrado solo después de este éxito. El commit documental de cierre conserva estos resultados sin modificar producto; su SHA puede consultarse en el historial posterior al commit de producto citado arriba.

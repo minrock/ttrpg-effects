@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-10-31T12:51:33.861345+00:00",
+  "actualizado": "2026-10-31T12:54:09.145024+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
@@ -235,7 +235,7 @@
       "titulo": "Persistencia común SQLite y PostgreSQL",
       "rama": "feature/factory-006-persistencia-multidb",
       "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 2,
       "constructor": "/root/aprobador_005",
@@ -262,19 +262,21 @@
         }
       ],
       "dependencias": [],
-      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "motivo": "Integración local autorizada en main, versión3.11.1 con fix012. DMGarm64 generado y hdiutil verify correcto. Sinpush;010excluida.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 13,
         "texto": "- [ ] Persistencia común SQLite y PostgreSQL — `006-persistencia-multidb`"
-      }
+      },
+      "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "007-cuentas-dm",
       "titulo": "Cuentas DM administradas y autenticación segura",
       "rama": "feature/factory-006-persistencia-multidb",
       "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 1,
       "constructor": "/root/constructor_007",
@@ -293,19 +295,21 @@
       "dependencias": [
         "006-persistencia-multidb"
       ],
-      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "motivo": "Integración local autorizada en main, versión3.11.1 con fix012. DMGarm64 generado y hdiutil verify correcto. Sinpush;010excluida.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 14,
         "texto": "- [ ] Cuentas DM administradas y autenticación segura — `007-cuentas-dm`"
-      }
+      },
+      "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "008-partidas-propiedad",
       "titulo": "Partidas y catálogo administrado de sistemas",
       "rama": "feature/factory-006-persistencia-multidb",
       "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 2,
       "ronda": 4,
       "constructor": "/root/constructor_008",
@@ -354,19 +358,21 @@
       "dependencias": [
         "007-cuentas-dm"
       ],
-      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "motivo": "Integración local autorizada en main, versión3.11.1 con fix012. DMGarm64 generado y hdiutil verify correcto. Sinpush;010excluida.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 15,
         "texto": "- [ ] Partidas de cada DM y datos aislados en ambos motores — `008-partidas-propiedad`"
-      }
+      },
+      "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "009-invitaciones-jugadores",
       "titulo": "Enlaces renovables y entrada de jugadores con alias",
       "rama": "feature/factory-006-persistencia-multidb",
       "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 1,
       "constructor": "/root/constructor_009",
@@ -385,19 +391,21 @@
       "dependencias": [
         "008-partidas-propiedad"
       ],
-      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "motivo": "Integración local autorizada en main, versión3.11.1 con fix012. DMGarm64 generado y hdiutil verify correcto. Sinpush;010excluida.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 16,
         "texto": "- [ ] Enlaces renovables y entrada de jugadores con alias — `009-invitaciones-jugadores`"
-      }
+      },
+      "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "012-build-reproducible",
       "titulo": "Construcción reproducible con Vite declarado",
       "rama": "feature/integracion-006-009",
       "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 1,
       "constructor": "/root/constructor_012",
@@ -413,7 +421,9 @@
           }
         }
       ],
-      "motivo": "APROBAR técnico; corrección lista para integración local autorizada con006–009."
+      "motivo": "Integración local autorizada en main, versión3.11.1 con fix012. DMGarm64 generado y hdiutil verify correcto. Sinpush;010excluida.",
+      "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
     }
   ]
 }
