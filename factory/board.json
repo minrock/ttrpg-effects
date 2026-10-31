@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-10-31T18:00:52.118711+00:00",
+  "actualizado": "2026-10-31T18:05:17.671134+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
@@ -507,14 +507,14 @@
       "dependencias": [
         "010-moderacion-tiempo-real"
       ],
-      "motivo": "Integrado localmente en main, versión 3.13.0; cuatro aprobaciones finales y DMG arm64 verificado. Corte del servicio habitual en preparación; sin push.",
+      "motivo": "Integrado en main; servicio 3.13.0 activo en 127.0.0.1:8787, administrador preparado y DMG verificado. Legado respaldado sin adopción automática. Sin push.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 18,
         "texto": "- [ ] Acceso DM, invitaciones y panel de jugadores en web y Electron — `011-experiencia-autenticacion`"
       },
       "integradoEn": "5a074b5209bc8a978f69ad7f5660643ec794ec6c",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.13.0-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/dist/TTRPG Effects-3.13.0-arm64.dmg"
     },
     {
       "id": "012-build-reproducible",
