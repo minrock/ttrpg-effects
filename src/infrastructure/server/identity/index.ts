@@ -34,7 +34,7 @@ function account(user: Record<string, unknown>): AccountDto {
   return { id: String(user.id), email: String(user.email), name: String(user.name), role: user.role as "admin" | "dm", enabled: user.enabled, mustChangePassword: user.mustChangePassword, emailVerified: user.emailVerified === true,
     createdAt: new Date(user.createdAt as string).toISOString(), updatedAt: new Date(user.updatedAt as string).toISOString() };
 }
-export async function openIdentity(database: DatabaseConfig, config: IdentityConfig, clock = { now: () => new Date(), id: randomUUID }, lifecycle: { openingInvalidated?: (game: string) => void; accountDisabled?: (owner: string) => void; sessionRevoked?: (owner: string, session?: string) => void } = {}): Promise<IdentityService> {
+export async function openIdentity(database: DatabaseConfig, config: IdentityConfig, clock = { now: () => new Date(), id: randomUUID }, lifecycle: { openingInvalidated?: (game: string) => void; accountDisabled?: (owner: string) => void; sessionRevoked?: (owner: string, session?: string) => void } = {}, expectedAccount: () => string | undefined = () => undefined): Promise<IdentityService> {
   validateIdentityConfig(config);
   const unit = await identityDatabase(database);
   const secure = config.publicOrigin.startsWith("https:");
@@ -83,7 +83,7 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
     const result = await auth.api.getSession({ headers: new Headers({ cookie: rawCookie }), query: { disableRefresh: true, disableCookieCache: true } });
     if (!result) throw new IdentityError("UNAUTHORIZED");
     const dto = account(result.user);
-    if (!dto.enabled) throw new IdentityError("UNAUTHORIZED");
+    if (!dto.enabled || expectedAccount() !== undefined && dto.id !== expectedAccount()) throw new IdentityError("UNAUTHORIZED");
     if ((permission || functional) && dto.mustChangePassword) throw new IdentityError("PASSWORD_CHANGE_REQUIRED");
     if (permission && dto.role !== permission) throw new IdentityError("FORBIDDEN");
     return { account: dto, sessionId: result.session.id, expiresAt: new Date(result.session.expiresAt).toISOString() };

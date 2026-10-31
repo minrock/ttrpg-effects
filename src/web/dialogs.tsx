@@ -1,5 +1,5 @@
 import { restoreDialogFocus } from "../renderer/src/client/dialog-focus";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { BrowserClient, BrowserDialogs } from "../infrastructure/browser/browser-client";
 import { sceneReference } from "../shared/contracts/service-references";
 import type { SceneSummary } from "../shared/contracts/http-api";
@@ -7,8 +7,10 @@ export type DialogRequest = {kind:"scene"|"name"|"leave"|"discard";initial?:stri
 export class DialogBroker implements BrowserDialogs {
   current:DialogRequest|null=null;
   private notify:()=>void=()=>{};
+  private active=true;
   subscribe(notify:()=>void) {this.notify=notify;return ()=>{this.notify=()=>{};};}
-  private open(kind:DialogRequest["kind"],initial?:string):Promise<string|null>{this.finish(null);return new Promise(resolve=>{this.current={kind,initial,resolve};this.notify();});}
+  private open(kind:DialogRequest["kind"],initial?:string):Promise<string|null>{if(!this.active)return Promise.resolve(null);this.finish(null);return new Promise(resolve=>{this.current={kind,initial,resolve};this.notify();});}
+  setActive(active:boolean){this.active=active;if(!active)this.finish(null);}
   selectScene=()=>this.open("scene");
   sceneName=(initial:string)=>this.open("name",initial);
   leave=()=>this.open("leave");
@@ -17,8 +19,8 @@ export class DialogBroker implements BrowserDialogs {
 }
 export function ServiceDialog({title,onCancel,children}:{title:string;onCancel:()=>void;children:ReactNode}) {
   const ref=useRef<HTMLDialogElement>(null);
-  useEffect(()=>{const trigger=document.querySelector("[data-dialog-return-focus]") ?? document.activeElement;ref.current?.showModal();return()=>{ref.current?.close();restoreDialogFocus(trigger);};},[]);
-  return <dialog className="service-dialog" ref={ref} aria-label={title} onCancel={event=>{event.preventDefault();onCancel();}} onKeyDown={event=>event.stopPropagation()} onKeyUp={event=>event.stopPropagation()}>
+  useLayoutEffect(()=>{const active=document.activeElement;const trigger=active instanceof HTMLElement&&active!==document.body?active:document.querySelector("[data-dialog-return-focus]");const dialog=ref.current;dialog?.showModal();return()=>{dialog?.close();const target=trigger?.isConnected?trigger:document.querySelector("[data-dialog-return-focus]");if(!target?.closest('[hidden],[inert]'))restoreDialogFocus(target);};},[]);
+  return <dialog className="service-dialog" ref={ref} aria-label={title} onCancel={event=>{event.preventDefault();onCancel();}} onKeyDown={event=>{event.stopPropagation();if(event.key!=="Tab")return;const elements=[...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),a[href],[tabindex="0"]')].filter(e=>!e.closest('[hidden],[inert]'));if(!elements.length){event.preventDefault();return;}const index=elements.indexOf(document.activeElement as HTMLElement);if(event.shiftKey&&(index<=0)||!event.shiftKey&&(index===elements.length-1||index<0)){event.preventDefault();elements[event.shiftKey?elements.length-1:0].focus();}}} onKeyUp={event=>event.stopPropagation()}>
     <h2>{title}</h2>{children}
   </dialog>;
 }
@@ -36,9 +38,9 @@ function NameDialog({request,finish}:{request:DialogRequest;finish:(value:string
   const [name,setName]=useState(request.initial??"");
   return <ServiceDialog title="Guardar escena en el servicio" onCancel={()=>finish(null)}><form onSubmit={e=>{e.preventDefault();if(name.trim())finish(name.trim());}}><label>Nombre de escena<input autoFocus value={name} maxLength={200} required onChange={e=>setName(e.target.value)}/></label><footer><button type="button" onClick={()=>finish(null)}>Cancelar</button><button disabled={!name.trim()}>Guardar</button></footer></form></ServiceDialog>;
 }
-export function DialogHost({broker,browser}:{broker:DialogBroker;browser:BrowserClient}) {
+export function DialogHost({broker,browser,active=true}:{broker:DialogBroker;browser:BrowserClient;active?:boolean}) {
   const [,render]=useState(0);useEffect(()=>broker.subscribe(()=>render(n=>n+1)),[broker]);const request=broker.current;
-  if(!request)return null;
+  if(!active||!request)return null;
   if(request.kind==="scene")return <ScenePicker browser={browser} finish={value=>broker.finish(value)}/>;
   if(request.kind==="name")return <NameDialog request={request} finish={value=>broker.finish(value)}/>;
   if(request.kind==="discard")return <ServiceDialog title="Descartar cambios" onCancel={()=>broker.finish(null)}><p>Para guardar, cancela y vuelve a acceder como DM. Descartar retira los cambios que permanecen en memoria.</p><footer><button onClick={()=>broker.finish(null)}>Cancelar</button><button onClick={()=>broker.finish("discard")}>Descartar y cerrar sesión</button></footer></ServiceDialog>;

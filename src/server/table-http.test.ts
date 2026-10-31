@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { request } from "node:http";
 import { randomUUID } from "node:crypto";
-import { createApi } from "./http";
+import { createApi } from "./legacy-http.fixture";
 import { LIMITS, type ServerConfig } from "./config";
 import sharp from "sharp";
 import { privateFixture, refs } from "../application/services/public-table-projection.fixture";

@@ -1,4 +1,4 @@
-import { useTtrpgApi } from "../../client/ClientProvider";
+import { useTtrpgApi, useTtrpgClient } from "../../client/ClientProvider";
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import {
@@ -32,6 +32,7 @@ export function MonsterLibraryModal({
   onAddMonster,
   onClose
 }: MonsterLibraryModalProps): JSX.Element {
+  const client = useTtrpgClient();
   const librariesApi = useTtrpgApi("libraries");
   const imagesApi = useTtrpgApi("images");
   const [query, setQuery] = useState("");
@@ -40,13 +41,13 @@ export function MonsterLibraryModal({
   const [isLoading, setIsLoading] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [draft, setDraft] = useState<NewMonsterDraft>(() => createEmptyDraft(templates));
+  const [draft, setDraft] = useState<NewMonsterDraft>(() => createEmptyDraft(templates,!!client?.presentations));
 
   const libraryGeneration = useRef(0);
   useEffect(() => {
     libraryGeneration.current++;
     setIsCreating(false);
-    setDraft(createEmptyDraft(templates));
+    setDraft(createEmptyDraft(templates,!!client?.presentations));
     return () => { libraryGeneration.current++; };
   }, [librariesApi, imagesApi]);
 
@@ -89,7 +90,10 @@ export function MonsterLibraryModal({
     [templates]
   );
 
-  function addEntryToScene(entry: MonsterLibraryEntry): void {
+  async function addEntryToScene(entry: MonsterLibraryEntry): Promise<void> {
+    const generation = libraryGeneration.current;
+    try { await client?.presentations?.validateLibraryUse(entry.id); } catch(error) { setFeedback({kind:"error",message:error instanceof Error?error.message:"No se puede crear este vínculo."});return; }
+    if(generation !== libraryGeneration.current)return;
     onAddMonster(createSceneMonsterFromLibraryEntry(entry, existingIds));
     onClose();
   }
@@ -135,7 +139,7 @@ export function MonsterLibraryModal({
       return;
     }
 
-    addEntryToScene(result.entry);
+    await addEntryToScene(result.entry);
   }
 
   return (
@@ -181,7 +185,7 @@ export function MonsterLibraryModal({
                   <div className="monster-library-card__body">
                     <strong>{entry.name}</strong>
                     <span>{entry.system}{entry.templateId !== null ? ` · ${templateById.get(entry.templateId)?.name ?? entry.templateId}` : ""}</span>
-                    <button type="button" onClick={() => addEntryToScene(entry)}>
+                    <button type="button" onClick={() => void addEntryToScene(entry)}>
                       Agregar a escena
                     </button>
                   </div>
@@ -212,7 +216,7 @@ export function MonsterLibraryModal({
                     value={draft.templateId ?? ""}
                     onChange={(event) => handleTemplateChange(event.currentTarget.value)}
                   >
-                    <option value="">Sin template</option>
+                    {(!client?.presentations || templates.some(t=>t.id==="generic-markdown"))&&<option value="">Sin template</option>}
                     {templates.map((template) => (
                       <option key={template.id} value={template.id}>
                         {template.name} ({template.system})
@@ -250,13 +254,13 @@ export function MonsterLibraryModal({
   );
 }
 
-function createEmptyDraft(templates: readonly MonsterTemplate[]): NewMonsterDraft {
+function createEmptyDraft(templates: readonly MonsterTemplate[], explicit=false): NewMonsterDraft {
   const defaultTemplate = templates[0] ?? null;
 
   return {
     name: "",
     system: defaultTemplate?.system ?? "Sin sistema",
-    templateId: null,
+    templateId: explicit ? defaultTemplate?.id ?? null : null,
     contentMarkdown: "",
     imagePath: null,
     imageUrl: null

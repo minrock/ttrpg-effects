@@ -1,6 +1,6 @@
 # Partidas y recursos privados (008)
 
-Versión 3.10.0, ciclo 2. Backend preparado para011, sin pantallas nuevas ni invitaciones funcionales. La API global histórica continúa en local+SQLite y conserva su guard contra PostgreSQL/producción. `TTRPG_IDENTITY_ENABLED=true` monta, además de identidad007, las familias `/api/v1/dm` y `/api/v1/admin/systems` contra `control.sqlite`. Cada familia mantiene sus datos y credenciales independientes: las cuentas nuevas nunca autorizan la mesa global. El arnés `pnpm test:owned` monta exactamente los handlers de identidad y DM sobre PostgreSQL real sin construir ServiceStore. Este arnés no es un modo de despliegue productivo.011 realizará el corte integrado.
+El servicio final3.13.0 compone `/api/v1/dm` y `/api/v1/admin/systems` sobre SQLite/local o PostgreSQL/production conTLS, sin almacén global ni claves legadas. Las cuentas siempre se validan y el administrador no obtiene capacidadDM. Las pantallas consumen revisiones/bindings y catálogo exacto.
 
 ## Datos y autorización
 
@@ -10,7 +10,7 @@ La migración3 de `pnpm db:migrate` extiende el catálogo006 y crea tablas funci
 
 Las unidades de trabajo prestadas por `IdentityService.authorized` contienen `games`, `systems`, `links`, recursos, assets, aperturas e idempotencia. Comparten conexión/COMMIT/ROLLBACK con la revalidación de identidad y mantienen el bloqueo007 frente a revocaciones. Se comprueba principal antes del cuerpo y de nuevo dentro de la transacción; el resultado deduplicado también exige sesión vigente. Se registra cada método completo: un rechazo incluso capturado por el callback, una operación sin await o un fallo posterior revierte toda la operación. Una marca irreversible conserva el primer motivo; rechazar sin argumento, con null, false, cero o cadena vacía también aborta y no permite que un rechazo posterior borre el fallo. Se capturan argumentos antes del primer await; la revalidación final comprueba disponibilidad de todos los usos nuevos y coherencia de los enlaces. Los puertos caducan al salir del callback. Los callbacks deben terminar y no realizar red prolongada; PostgreSQL conserva sus timeouts006. La exclusión global007 serializa mutaciones autorizadas entre conexiones: no se promete rendimiento horizontal.
 
-## HTTP para011
+## HTTP de recursos propios
 
 Todas las rutas requieren cookie de cuenta DM activa, contraseña temporal ya cambiada, Host correcto y Origin exacto para mutaciones. No se acepta cookie legada ni rol admin como DM. Se conservan límites de10MiB JSON,20MiB imagen,40millones de píxeles y decodificador acotado de002. Respuestas JSON `{ok:true,...}` o `{ok:false,error:{code,message}}`. Ausencia de principal401; rol incorrecto403; recurso ausente o ajeno404 sin distinguirlos; validación422; revisión/conflicto409; corrupción500; almacenamiento503. Referencias de imagen no resolubles devuelven `url:null` y avisos genéricos, sin comprobar la existencia en otro owner.
 
@@ -24,10 +24,11 @@ Todas las rutas requieren cookie de cuenta DM activa, contraseña temporal ya ca
 | GET `scenes/:id/links/candidates` | Candidatos de marcadores propios, contrato existente. |
 | POST `assets` | Bytes PNG/JPEG/WebP y Content-Type exacto.201 `{asset:{id,reference,url,mimeType,byteLength}}`. UUID servidor; assets inmutables, sin limpieza automática. |
 | GET/HEAD `assets/:id`, POST `assets/resolve` | Bytes privados o404. Resolve `{references}`→`{assets:[{reference,url}]}`. Solo URLs `/api/v1/dm/assets/...` propias. Hash SHA256 y longitud verificados al leer bytes persistidos. |
+| GET `definitions/:kind/:id` | kind=`scenes` o `monsters`; resuelve exclusivamente bindings del recurso propio. `{templates,monsters}` contiene definiciones exactas y mapa monsterId→índice en templates (deduplicadas por referencia completa) para evitar colisiones de IDs privados/compartidos. No es un catálogo de selección nuevo. |
 | GET `monster-templates` | Página personal `limit/offset`→`{builtIn,templates,total}`; builtIn se entrega separado, no consume paginación personal. |
 | GET `monster-templates/:id` | Fachada de lectura histórica. Prioriza la definición privada del owner ante ID coincidente. PUT/DELETE devuelven 409 `IMMUTABLE`, incluso si nadie la referencia. |
 | GET/POST `libraries/:kind`, GET/PUT `libraries/:kind/:id` | kind=`monsters`, `npcs`, `player-characters`. Campos `{entry,bindings?}` y normalizadores/casos de uso anteriores. Respuestas `{entry}` con revisión; listas `{entries,total}`, `text`, `limit`, `offset`. No se añade DELETE. |
-| POST `scene-links/connect`, `disconnect` | Campos anteriores más `expectedRevisions:{[sceneId]:revision}` para todos los extremos modificados, incluida tercera escena de reconexión. Operación atómica completa. |
+| POST `scene-links/connect`, `disconnect` | Campos anteriores más `expectedRevisions:{[sceneId]:revision}` para todos los extremos modificados, incluida tercera escena de reconexión. Operación atómica completa; respuesta `revisions:{[sceneId]:revisionConfirmada}` para actualizar CAS sin releer una revisión posterior. |
 | POST `scene-links/validate`, `navigate` | Contratos anteriores, solo escenas propias; validate conserva diagnóstico genérico de destino ausente. |
 
 Toda mutación persistida lleva `Idempotency-Key: UUID`; GET/HEAD y los POST de solo lectura resolve/validate/navigate no la requieren. Editar/borrar exige `If-Match: "revision"` (se acepta también número sin comillas). La creación de un borrador exige revisión 0. La revisión es entera y aumenta en cada escritura; no vive dentro del documento portable. Las creaciones no aceptan IDs/owner/fechas/revisión del body. Eliminar devuelve200 `{ok:true}`, por lo que DELETE envía JSON `{}` y Content-Type; no hay cuerpo vacío implícito.
@@ -143,7 +144,7 @@ pg_restore --list /ruta/privada/respaldo.dump
 pg_restore --no-password --exit-on-error --no-owner --no-acl --dbname BASE_RESTAURACION /ruta/privada/respaldo.dump
 ```
 
-Configurar PGHOST/PGPORT/PGUSER/PGSSLMODE=verify-full/PGSSLROOTCERT y PGPASSFILE por entorno privado. Una restauración completa PostgreSQL incluye identidad; tratar dump como secreto y revalidar/cerrar sesiones según operación007. No usar `--clean` sobre una base con escrituras. Esta receta es distinta del paquete funcional, que excluye identidad. La evidencia008 prueba restauración temporal SQLite y transferencia a PostgreSQL; el dump/restore integral productivo se verifica durante el corte011.
+Configurar PGHOST/PGPORT/PGUSER/PGSSLMODE=verify-full/PGSSLROOTCERT y PGPASSFILE por entorno privado. Una restauración completa PostgreSQL incluye identidad; tratar dump como secreto y revalidar/cerrar sesiones según operación007. No usar `--clean` sobre una base con escrituras. Esta receta es distinta del paquete funcional, que excluye identidad. La evidencia008 prueba restauración temporal SQLite y transferencia a PostgreSQL; el gate de moderación incluye roundtrip integral real y cookies antiguas rechazadas antes de servir.
 
 ## Verificación reproducible
 
@@ -160,4 +161,8 @@ pnpm test:identity
 pnpm test:owned
 ```
 
-Los gates fallan si PostgreSQL real/TLS no están disponibles; no omiten motor. Crean y retiran basesUUID/directorios/HTTP propios y no tocan perfiles/env personales. `test:owned` incluye principal Better Auth real, CRUD y matriz de aislamiento, carreras entre conexiones, corrupción, rollback tras await, enlaces2/3 escenas, lease con reloj, bytea/BLOB, imágenes huérfanas, Unicode/Markdown, transferencia/adopción/rollback/restauración y CLI inspect/verify/import compilado. La UI011, invitaciones009 y moderación010 siguen pendientes; sin humo visual nuevo por este backend. Electron local conserva abrir/guardar/Player sin cuentas/API/PG.
+Los gates fallan si PostgreSQL real/TLS no están disponibles; no omiten motor. Crean y retiran basesUUID/directorios/HTTP propios y no tocan perfiles/env personales. `test:owned` incluye principal Better Auth real, CRUD y matriz de aislamiento, carreras entre conexiones, corrupción, rollback tras await, enlaces2/3 escenas, lease con reloj, bytea/BLOB, imágenes huérfanas, Unicode/Markdown, transferencia/adopción/rollback/restauración y CLI inspect/verify/import compilado. La UI011 consume estos contratos; su evidencia visual se registra separadamente de los contratos backend. Electron local conserva abrir/guardar/Player sin cuentas/API/PG.
+
+GET `/api/v1/dm/definitions/{scenes,monsters}/:id` devuelve `{ok,templates}` únicamente para los bindings de la instancia propia. Conserva definiciones privadas retenidas y versiones exactas; no resuelve referencias libres, no admite admin ni publica definiciones a invitados.
+
+El cliente011 separa presentaciones habilitadas para crear de la definición exacta retenida de cada instancia. Reutilizar una ficha de biblioteca comprueba su referencia exacta antes de agregarla; persistencia vuelve a validar autoridad/disponibilidad. Una coincidencia de templateId no convierte una privada en compartida ni cambia su binding.

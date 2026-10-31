@@ -1,4 +1,4 @@
-import { useTtrpgApi } from "../../client/ClientProvider";
+import { useTtrpgApi, useTtrpgClient } from "../../client/ClientProvider";
 import { useCallback, useEffect, useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import type { SceneMonster } from "../../../../domain/sessions/scene-aside";
@@ -23,6 +23,8 @@ export function MonsterSection({
   onRemove,
   onToggleVisibility
 }: MonsterSectionProps): JSX.Element {
+  const client = useTtrpgClient();
+  const forMonster = (m: SceneMonster) => client?.presentations?.forMonster(m.id,m.templateId ?? null,templates) ?? templates;
   const [detailMonster, setDetailMonster] = useState<SceneMonster | null>(null);
   const [editingMonster, setEditingMonster] = useState<SceneMonster | null | "new">(null);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
@@ -77,7 +79,7 @@ export function MonsterSection({
       {syncedDetail !== null && (
         <MonsterDetailModal
           monster={syncedDetail}
-          templates={templates}
+          templates={forMonster(syncedDetail)}
           onClose={closeDetail}
           onToggleVisibility={() => onToggleVisibility(syncedDetail.id)}
           onEdit={() => handleEditFromDetail(syncedDetail)}
@@ -89,7 +91,7 @@ export function MonsterSection({
         <MonsterModal
           initial={editingMonster === "new" ? null : editingMonster}
           existingIds={existingIds}
-          templates={templates}
+          templates={editingMonster === "new" ? templates : forMonster(editingMonster)}
           onSave={handleSave}
           onClose={() => setEditingMonster(null)}
         />

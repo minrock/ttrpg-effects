@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { request } from "node:http";
 import { DatabaseSync } from "node:sqlite";
-import { createApi } from "../../server/http";
+import { createApi } from "../../server/legacy-http.fixture";
 import { connectInternalSceneLink, disconnectInternalSceneLink } from "../../domain/annotations/internal-scene-links";
 import { createDefaultSceneMap, createSceneWithMap, syncRuntimeFieldsFromActiveMap } from "../../domain/sessions/scene-maps";
 import { createDefaultScene } from "../../domain/sessions/default-scene";

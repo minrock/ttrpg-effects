@@ -1,23 +1,23 @@
 # Identidad de cuentas (007, versión 3.9.0)
 
-Esta entrega incorpora administrador/DM con Better Auth **1.7.14** y Kysely **0.29.7**, Node **24** y los drivers de 006. No cambia la UI ni concede acceso a la mesa global legada. El VTT completo sigue admitiendo exclusivamente local+SQLite; producción/PostgreSQL permanece bloqueado hasta el corte funcional. La composición HTTP aislada de las pruebas PostgreSQL no es un modo de despliegue.
+Cuentas administrador/DM con Better Auth1.7.14 y Kysely0.29.7, Node24 y driversSQLite/PostgreSQL. El servicio final usa identidad obligatoria y pantallas compartidas con Electron servicio. No existe acceso por claves globales.
 
 ## Preparación y operación local
 
-Conserva `.env` privado, fuera de Git, modo 0600. Usa el driver y TLS descritos en [base de datos](database.md). `TTRPG_IDENTITY_ENABLED=false` es el valor por defecto; ninguna clave global se convierte en cuenta. Añade un `TTRPG_AUTH_SECRET` independiente generado por un gestor de secretos: al menos 32 bytes aleatorios en base64url. No reutilices claves DM/player, no lo publiques en VITE/Electron ni lo imprimas en logs. El ejemplo es un placeholder que se rechaza al activar. El generador existente no activa identidad ni reescribe secretos.
+Conserva `.env` privado0600 y `TTRPG_AUTH_SECRET` aleatorio independiente. Setup genera el secreto solo en una configuración nueva; no modifica secretos existentes. `TTRPG_IDENTITY_ENABLED` ausente/true exige identidad; false aborta con instrucciones de actualización. Nunca publicar secretos en VITE/Electron/logs.
 
 1. Detén el servicio para migrar/provisionar en SQLite y para recuperar al administrador en ambos motores.
 2. Ejecuta `pnpm build:api` y `pnpm db:migrate`. La migración 2 crea identidad en `control.sqlite` o la base PostgreSQL seleccionada, sin tocar las bases legadas. Los comandos de identidad verifican la migración; no la aplican implícitamente ni crean una DB SQLite ausente.
 3. Ejecuta `pnpm identity:bootstrap`. Solicita email, nombre y contraseña con confirmación oculta. Solo puede crear el primer administrador en una base sin cuentas. El control se serializa dentro del motor y hay un índice único de administrador.
 4. Ejecuta `pnpm identity:password` para cambiar la contraseña temporal. Solicita email, contraseña actual y nueva con confirmación. Revoca todas las sesiones. Este comando funciona también para un DM.
 5. Ejecuta `pnpm identity:provision-dm`. Autentica al administrador, solicita datos/contraseña temporal del DM y revoca su sesión de operación incluso ante un error/cancelación. No funciona con contraseña administrativa temporal: completa el paso 4. Entrega la contraseña al destinatario por un canal privado; no se envía ni verifica correo.
-6. Solo después configura `TTRPG_IDENTITY_ENABLED=true` para exponer las rutas optativas en la API local. Habilitar exige secreto válido y esquema migrado antes de crear ServiceStore o escuchar. El frontend legado continúa con sus claves hasta 011.
+6. Arranca `pnpm start:api` tras migrar/provisionar. El listener compone cuentas, datos porDM, invitados y mesas contextuales sin ServiceStore legado.
 
-Los cuatro comandos son interactivos y exigen TTY. No admiten contraseñas por argumentos, pipes ni variables de provisión. Ctrl+C, Ctrl+D o Escape cancelan y restauran la terminal. Nunca se imprime una contraseña ni su hash; el éxito de alta muestra únicamente ID e instrucciones. No pongas contraseñas en curl, URL, historial o scripts. `identity:password` completa el flujo antes de disponer de la UI011.
+Los cuatro comandos son interactivos y exigen TTY. No admiten contraseñas por argumentos, pipes ni variables de provisión. Ctrl+C, Ctrl+D o Escape cancelan y restauran la terminal. Nunca se imprime una contraseña ni su hash; el éxito de alta muestra únicamente ID e instrucciones. No pongas contraseñas en curl, URL, historial o scripts. La UI también ofrece cambio propio con revocación de sesiones.
 
 Para una contraseña administrativa perdida, detén el servicio y ejecuta `pnpm identity:recover-admin`. Selecciona el administrador existente por email, escribe `RECUPERAR`, y define la contraseña temporal dos veces. No crea cuentas, no promueve DMs ni cambia email/rol; revoca todas las sesiones. Después ejecuta `identity:password`. Esta capacidad confía en el operador con acceso local a configuración/DB, equivalente a poder administrar esa base; no existe endpoint HTTP de recuperación.
 
-## HTTP optativo
+## HTTP de identidad
 
 Prefijo `/api/v1/identity`. JSON cerrado, máximo **8192 bytes** incluso con transferencia chunked. Todas las mutaciones requieren `Origin` exacto y el Host configurado; HTTP solo loopback, HTTPS remoto. No se confía en X-Forwarded-* ni se configura CORS. El peer para cuotas es la IP TCP; tras proxy es la IP del proxy y la cuota se comparte, sin prometer identificación del cliente por una cabecera no fiable.
 

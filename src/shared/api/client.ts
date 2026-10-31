@@ -1,3 +1,4 @@
+import type { MonsterTemplate } from "../../domain/monster-templates/monster-template";
 import type { TtrpgApi } from "./ttrpg-api";
 
 /** Availability of operations, never authorization or a security boundary. */
@@ -5,6 +6,7 @@ export interface ClientCapabilities {
   readonly scenes: boolean;
   readonly images: boolean;
   readonly libraries: boolean;
+  readonly templateAdministration?: boolean;
   readonly player: boolean;
   readonly dice: boolean;
   readonly nativeMenus: boolean;
@@ -14,6 +16,10 @@ export interface TtrpgClient {
   readonly api: TtrpgApi;
   readonly assetReferences?: "service";
   readonly capabilities: ClientCapabilities;
+  readonly presentations?: {
+    forMonster(id: string, templateId: string | null, available: readonly MonsterTemplate[]): readonly MonsterTemplate[];
+    validateLibraryUse(id: string): Promise<void>;
+  };
 }
 
 export const LOCAL_CAPABILITIES: ClientCapabilities = Object.freeze({
@@ -21,6 +27,6 @@ export const LOCAL_CAPABILITIES: ClientCapabilities = Object.freeze({
 });
 
 /** The full contract stays required; only tests/labs may provide partial doubles. */
-export function createClient(api: TtrpgApi, capabilities: ClientCapabilities, assetReferences?: "service"): TtrpgClient {
-  return Object.freeze({ api, assetReferences, capabilities: Object.freeze({ ...capabilities }) });
+export function createClient(api: TtrpgApi, capabilities: ClientCapabilities, assetReferences?: "service", presentations?: TtrpgClient["presentations"]): TtrpgClient {
+  return Object.freeze({ api, assetReferences, presentations, capabilities: Object.freeze({ ...capabilities }) });
 }

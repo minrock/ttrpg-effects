@@ -1,6 +1,6 @@
 # Contrato de clientes y paridad del servicio
 
-Estado del cliente: implementado en 3.2.0 (2026-10-28), con transporte Electron local. Desde 3.3.0 existe el [servicio HTTP privado](private-api.md) con autenticación y recursos opacos; el [cliente navegador 3.4.0](browser-client.md) implementa HTTP; la [mesa sincronizada 3.5.0](synchronized-table.md) completa SSE y dados. La matriz siguiente conserva las responsabilidades previstas de adaptación de `factory/migracion-servicio.md`.
+Cliente compartido con transporteElectron local y servicio contextual3.13.0. Desde 3.3.0 existe el [servicio HTTP privado](private-api.md) con autenticación y recursos opacos; el [cliente navegador 3.4.0](browser-client.md) implementa HTTP; la [mesa sincronizada 3.5.0](synchronized-table.md) completa SSE y dados. La matriz siguiente conserva las responsabilidades previstas de adaptación de `factory/migracion-servicio.md`.
 
 ## Fronteras implementadas
 
@@ -20,7 +20,8 @@ Las capacidades describen disponibilidad de grupos de operaciones existentes, **
 | --- | --- |
 | `scenes` | Abrir, guardar, guardar en ruta, importar como mapa y enlaces; hoy incluyen diálogos nativos y archivos locales. |
 | `images` | Selección/importación, reemplazo y resolución de imágenes de mapa, token y contenido lateral; hoy diálogos y protocolos locales. |
-| `libraries` | Plantillas de monstruos y las tres bibliotecas persistentes. |
+| `libraries` | Lectura de presentaciones y tres bibliotecas propias. |
+| `templateAdministration` | Disponibilidad de gestión local de plantillas; false en servicioDM. No es autorización. |
 | `player` | Apertura de ventana, estado, snapshots, cámara, puntero, áreas, readiness y estado de imagen. |
 | `dice` | Contexto, preferencias, tiradas, presentación pública, historial, visibilidad, errores y tamaños. |
 | `nativeMenus` | Acciones de escenas recientes y apertura del administrador de plantillas desde el menú nativo. |
@@ -29,7 +30,7 @@ Las capacidades describen disponibilidad de grupos de operaciones existentes, **
 
 ## Matriz de paridad
 
-Esta tabla enumera todos los métodos del contrato, incluidos los que no tienen consumidor actual. La columna de servicio es propuesta, no una implementación ni endpoints fijados. “DM” y “jugador” describen el rol previsto del servidor futuro. Electron actual conserva sus validaciones IPC y reglas vigentes.
+Esta tabla enumera todos los métodos del contrato, incluidos los que no tienen consumidor actual. La columna de servicio describe adaptación compartida. Las rutas y autoridad vigentes se definen en las guías de cuentas/datos/invitaciones/moderación. Electron actual conserva sus validaciones IPC y reglas vigentes.
 
 | Métodos | Local / capacidad | Equivalencia navegador implementada | Rol y diferencia de transporte |
 | --- | --- | --- | --- |
@@ -40,7 +41,7 @@ Esta tabla enumera todos los métodos del contrato, incluidos los que no tienen 
 | `selectSceneLinkTargetFile`, `listSceneLinkCandidates` | Selector y lectura de candidatos / `scenes` | Selector por ids y HTTP de candidatos autorizados | DM; nunca aceptar lectura arbitraria por ruta. |
 | `connectSceneLink`, `disconnectSceneLink`, `validateSceneLinks`, `loadSceneLinkTarget` | Conexiones recíprocas y navegación / `scenes` | HTTP y transacciones entre recursos opacos | DM; adaptar identidad/rutas y conservar fallos recuperables. |
 | `onRecentSceneOpen` | Evento del menú nativo / `nativeMenus` | Historial/selector propio del navegador; evento de cliente si procede | DM; no existe menú Electron en navegador. |
-| `listMonsterTemplates`, `saveMonsterTemplate`, `deleteMonsterTemplate` | Repositorio local / `libraries` | HTTP de plantillas | DM; aislar biblioteca privada. |
+| `listMonsterTemplates`, `saveMonsterTemplate`, `deleteMonsterTemplate` | Repositorio local / `libraries` | ServicioDM lee presentaciones exactas/retención; escritura/borrado rechazan | Admin administra catálogo aparte; local conserva gestor. |
 | `onOpenMonsterTemplateManager` | Evento del menú nativo / `nativeMenus` | Acción de UI de navegador | DM; conservar apertura sin simular IPC. |
 | `searchMonsterLibrary`, `getMonsterLibraryEntry`, `saveMonsterLibraryEntry` | Biblioteca de monstruos / `libraries` | HTTP de monstruos | DM; imágenes por recursos autorizados. |
 | `searchNpcLibrary`, `getNpcLibraryEntry`, `saveNpcLibraryEntry` | Biblioteca de NPC / `libraries` | HTTP de NPC | DM; no exponer notas privadas. |
@@ -68,10 +69,12 @@ Esta tabla enumera todos los métodos del contrato, incluidos los que no tienen 
 
 ## Seguridad y compatibilidad
 
-No cambia `.ttrpgscene`: formato 2 y carga/migración de legado 1, mapas, enlaces, referencias locales y recuperación de imágenes ausentes permanecen vigentes. `SceneOperationResult.filePath`, rutas de escenas/imágenes y protocolos `map-asset:` se conservan para Electron y requieren traducción en el adaptador futuro. No son una autorización para acceder al filesystem del servidor. La importación/exportación debe ser explícita y los ids del servicio opacos.
+No cambia `.ttrpgscene`: formato 2 y carga/migración de legado 1, mapas, enlaces, referencias locales y recuperación de imágenes ausentes permanecen vigentes. `SceneOperationResult.filePath`, rutas de escenas/imágenes y protocolos `map-asset:` se conservan para Electron y se traducen en el adaptador contextual. No son una autorización para acceder al filesystem del servidor. La importación/exportación debe ser explícita y los ids del servicio opacos.
 
 Las capacidades solo ayudan a presentar disponibilidad. La API autentica y autoriza por rol; la frontera `publicTableProjection` elimina ramas privadas antes de transmitir. Las reglas y límites de assets, presencia, SSE, idempotencia y dados se detallan en [mesa sincronizada](synchronized-table.md). El snapshot local Electron conserva su transporte; nunca se usa sin reconstrucción como frontera pública.
 
 Pruebas de composición: `src/renderer/src/client/ClientProvider.test.tsx`. Compatibilidad/versionado/IPC: `src/preload/index.test.ts`. Las suites existentes siguen cubriendo formato, enlaces, reemplazo de imagen, workspace, privacidad y herramientas Player. El expediente `factory/jobs/001-contrato-clientes/build.md` registra las verificaciones reales y límites de humo.
 
 La matriz de adaptación histórica de este documento se complementa con la [paridad efectiva y evidencias 3.4.0](browser-client.md#matriz-de-paridad-y-evidencia). `createClient` acepta metadato opcional `assetReferences: "service"` para representación de imágenes en notas; no es autorización.
+
+El cliente de recursos conserva CAS, bindings y operaciones inciertas por cuenta/recurso. El cliente de mesa es inmutable por partida/apertura/generación/audiencia. Rotar invitación no cambia su identidadReact. El guard superior contiene canvas y portales;401 suspende operaciones y protege borrador del ID original.

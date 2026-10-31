@@ -1,14 +1,12 @@
-import { useMemo, useState, type JSX } from "react";
+import { MonsterTemplateFields } from "./MonsterTemplateFields";
+import { useState, type JSX } from "react";
 import type { MonsterTemplate } from "../../../../domain/monster-templates/monster-template";
 import {
-  createEmptyMonsterTemplate,
-  getMonsterTemplateRenderClass,
-  scopeMonsterTemplateCss
+  createEmptyMonsterTemplate
 } from "../../../../domain/monster-templates/monster-template";
 import { ensureUniqueSlug, slugify } from "../../../../domain/sessions/scene-aside";
 import { FeedbackAlert, type Feedback } from "./FeedbackAlert";
 import { ModalBackdrop } from "./ModalBackdrop";
-import { renderMarkdown } from "./markdown";
 
 interface MonsterTemplateManagerModalProps {
   readonly templates: readonly MonsterTemplate[];
@@ -26,16 +24,7 @@ export function MonsterTemplateManagerModal({
   const [selectedId, setSelectedId] = useState<string | null>(templates[0]?.id ?? null);
   const selectedTemplate = templates.find((template) => template.id === selectedId) ?? templates[0] ?? null;
   const [draft, setDraft] = useState<MonsterTemplate | null>(selectedTemplate);
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-
-  const html = useMemo(() => renderMarkdown(draft?.markdown ?? ""), [draft?.markdown]);
-  const scopeClass = draft !== null ? `monster-template-manager-${toCssSafeId(draft.id)}` : "";
-  const scopedCss = useMemo(
-    () => draft !== null ? scopeMonsterTemplateCss(draft.css, scopeClass) : "",
-    [draft, scopeClass]
-  );
-  const renderClass = draft !== null ? getMonsterTemplateRenderClass(draft) : "monster-card";
 
   function selectTemplate(template: MonsterTemplate): void {
     setSelectedId(template.id);
@@ -51,7 +40,6 @@ export function MonsterTemplateManagerModal({
     const template = createEmptyMonsterTemplate(id);
     setSelectedId(template.id);
     setDraft(template);
-    setIsPreviewMode(false);
     setFeedback({ message: "Nuevo template sin guardar.", kind: "info" });
   }
 
@@ -68,7 +56,6 @@ export function MonsterTemplateManagerModal({
     };
     setSelectedId(next.id);
     setDraft(next);
-    setIsPreviewMode(false);
     setFeedback({ message: "Copia sin guardar.", kind: "info" });
   }
 
@@ -121,23 +108,6 @@ export function MonsterTemplateManagerModal({
           {draft !== null ? (
             <section className="monster-template-manager__editor">
               <div className="monster-template-manager__toolbar">
-                <label>
-                  Nombre
-                  <input
-                    value={draft.name}
-                    onChange={(event) => setDraft({ ...draft, name: event.currentTarget.value })}
-                  />
-                </label>
-                <label>
-                  Sistema
-                  <input
-                    value={draft.system}
-                    onChange={(event) => setDraft({ ...draft, system: event.currentTarget.value })}
-                  />
-                </label>
-                <button type="button" onClick={() => setIsPreviewMode((value) => !value)}>
-                  {isPreviewMode ? "Editar" : "Previsualizar"}
-                </button>
                 <button type="button" onClick={duplicateTemplate}>
                   Duplicar
                 </button>
@@ -151,38 +121,7 @@ export function MonsterTemplateManagerModal({
 
               {feedback !== null ? <FeedbackAlert feedback={feedback} /> : null}
 
-              {isPreviewMode ? (
-                <div className="monster-template-manager__preview">
-                  {scopedCss !== "" ? <style>{scopedCss}</style> : null}
-                  <div
-                    className={`markdown-content ${scopeClass}`}
-                  >
-                    <div
-                      className={renderClass}
-                      dangerouslySetInnerHTML={{ __html: html }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="monster-template-manager__fields">
-                  <label>
-                    Markdown
-                    <textarea
-                      value={draft.markdown}
-                      onChange={(event) => setDraft({ ...draft, markdown: event.currentTarget.value })}
-                      spellCheck={false}
-                    />
-                  </label>
-                  <label>
-                    CSS scoped
-                    <textarea
-                      value={draft.css}
-                      onChange={(event) => setDraft({ ...draft, css: event.currentTarget.value })}
-                      spellCheck={false}
-                    />
-                  </label>
-                </div>
-              )}
+              <MonsterTemplateFields template={draft} onChange={setDraft}/>
             </section>
           ) : (
             <section className="monster-template-manager__empty">
@@ -193,8 +132,4 @@ export function MonsterTemplateManagerModal({
       </div>
     </ModalBackdrop>
   );
-}
-
-function toCssSafeId(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9_-]/g, "-");
 }

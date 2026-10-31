@@ -70,6 +70,15 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
             throw missing();
           }
           if (permission === "admin") throw missing();
+          if (parts[0] === "definitions" && parts.length === 3 && method === "GET") {
+            query(url, []); const kind=parse(z.enum(["scenes","monsters"]),parts[1]);const item=await tx.resources.get(kind,routeId(parts[2]));if(!item)throw missing();
+            const refs=[...(item.bindings?.root?[item.bindings.root]:[]),...Object.values(item.bindings?.monsters??{})];
+            const unique=[...new Map(refs.map(ref=>[JSON.stringify(ref),ref])).entries()];
+            const templates=await Promise.all(unique.map(([,ref])=>tx.systems.definition(ref)));
+            const indices=new Map(unique.map(([key],index)=>[key,index]));
+            const monsters=Object.fromEntries(Object.entries(item.bindings?.monsters??{}).map(([id,ref])=>[id,indices.get(JSON.stringify(ref))!]));
+            return {value:{ok:true,templates,monsters}};
+          }
           if (parts[0] === "games") {
             if (parts.length === 1 && method === "GET") { query(url, ["limit", "offset"]); return { value: { ok: true, ...await games.list({ limit: numberQuery(url, "limit", 50, 1, 100), offset: numberQuery(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER) }) } }; }
             query(url, []);

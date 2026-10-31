@@ -6,9 +6,9 @@ export function validateIdentityConfig(config: IdentityConfig): void {
   if (origin.origin !== config.publicOrigin || !["http:", "https:"].includes(origin.protocol) || (origin.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname))) throw new Error("TTRPG_PUBLIC_ORIGIN requiere HTTPS fuera de loopback y un origen exacto.");
 }
 export function readIdentityConfig(env: NodeJS.ProcessEnv = process.env, required = false): IdentityConfig | undefined {
-  const enabled = env.TTRPG_IDENTITY_ENABLED ?? "false";
-  if (!["true", "false"].includes(enabled)) throw new Error("TTRPG_IDENTITY_ENABLED debe ser true o false.");
-  if (!required && enabled === "false") return undefined;
+  const enabled = env.TTRPG_IDENTITY_ENABLED ?? "true";
+  if (enabled !== "true") throw new Error("TTRPG_IDENTITY_ENABLED: retira el selector legado o usa true; configura TTRPG_AUTH_SECRET y ejecuta pnpm db:migrate.");
+  void required;
   const config = { secret: env.TTRPG_AUTH_SECRET ?? "", publicOrigin: env.TTRPG_PUBLIC_ORIGIN ?? "" };
   validateIdentityConfig(config);
   if ([env.TTRPG_DM_KEY, env.TTRPG_PLAYER_KEY].includes(config.secret)) throw new Error("TTRPG_AUTH_SECRET debe ser independiente de las claves legadas.");

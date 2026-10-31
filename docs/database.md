@@ -1,12 +1,16 @@
+# Persistencia del servicio final
+
+Desde3.13.0, `start:api` utiliza exclusivamente `control.sqlite` local o PostgreSQL productivo conTLS. La identidad es obligatoria, las rutas globales están retiradas y no hay ServiceStore auxiliar. Las referencias históricas a la transición006 describen esa entrega; la configuración operativa vigente está en [operación](service-operations.md).
+
 # Persistencia SQLite y PostgreSQL — 3.8.0
 
-El catálogo de metadatos de partidas tiene dos adaptadores con el mismo contrato asíncrono. SQLite se usa localmente; PostgreSQL es obligatorio para producción. Es una entrega de infraestructura: **la API global actual todavía solo arranca con local + sqlite**. Seleccionar postgres o production en `pnpm start:api` falla antes de abrir archivos o escuchar. Las escenas, imágenes, bibliotecas y autenticación global siguen en el almacenamiento legado; migrarlas con propiedad real corresponde a las siguientes entregas. No hay todavía UI ni endpoints de partidas o cuentas nuevas.
+El catálogo y los recursos propios tienen adaptadores SQLite/PostgreSQL con contratos asíncronos equivalentes. SQLite es local; producción exige PostgreSQL. El servicio final usa estas fronteras para cuentas, partidas, contenido e invitados, sin almacén global auxiliar.
 
 El catálogo guarda UUID, propietario opaco, nombre, estado ready/archived y fechas UTC. Ready no significa partida abierta ni DM presente. Los repositorios reciben ownerId y restringen consultas/mutaciones a ese propietario; ese parámetro no autentica a nadie. No hay transferencia de propietario ni adopción automática de recursos legados.
 
 ## Configurar
 
-Node 24 y pnpm. La configuración se carga desde `.env` opcional, con prioridad para variables del proceso; no se ejecuta como script ni expande rutas. No compartir credenciales, imprimir objetos de configuración o copiarlos al frontend/.env.electron. `setup:env` conserva sus garantías anteriores: genera local/sqlite al crear archivos, conserva archivos existentes y no crea almacenamiento SQLite si `.env` ya selecciona postgres. Tras conservar una configuración PostgreSQL, el setup dirige a `pnpm build:api` y `pnpm db:migrate` y recuerda que el servicio completo sigue bloqueado; las instrucciones de claves/arranque legado se reservan a SQLite. PostgreSQL requiere preparación manual de un `.env` privado con permisos 0600; el script no genera sus credenciales ni modifica servidores.
+Node24 y pnpm. `.env` se carga como datos y variables del proceso prevalecen; las rutas no se expanden. Setup conserva archivos/secretos y no crea SQLite si se selecciona PostgreSQL. Crea directorios privados internos, sin duplicar assetsPG. PostgreSQL requiere configuraciónURL/TLS privada0600; setup no genera sus credenciales ni modifica servidores. Consulta [operación](service-operations.md).
 
 | Variable | Uso |
 | --- | --- |
@@ -47,7 +51,7 @@ PostgreSQL mantiene el catálogo en tablas `ttrpg_games` y `ttrpg_control_migrat
 
 El registro de migraciones guarda versión, nombre y checksum. Segunda ejecución es idempotente. Un historial más nuevo, cambiado o incompatible se rechaza. DDL y registro se confirman juntos; ante fallo se revierten. La migración PostgreSQL usa un advisory lock transaccional; SQLite, exclusión de archivo y BEGIN IMMEDIATE. Contención falla explícitamente o espera dentro de límites, sin duplicar versiones. No existe comando reset/drop/down destructivo.
 
-Abrir el catálogo sin esquema actualizado produce MIGRATION_REQUIRED y pide ejecutar el comando. El servidor legado no abre el nuevo catálogo por sí mismo ni convierte datos. No se debe quitar el guard productivo para probar el servicio: la infraestructura PostgreSQL disponible aquí no representa paridad funcional de escenas/assets/bibliotecas.
+Abrir sin esquema actualizado produce MIGRATION_REQUIRED y pide `pnpm db:migrate`. Ningún arranque adopta datos legados ni migra perfilElectron. El listener final espera apertura de identidad y exclusión antes de servir.
 
 ## Transacciones y recursos
 
@@ -69,7 +73,7 @@ pnpm build:web
 
 `test:db` es un gate **adicional obligatorio** para persistencia. Necesita `TTRPG_TEST_DATABASE_URL` y `TTRPG_TEST_DB_CA_FILE` en el entorno apuntando a un servidor temporal con SCRAM/TLS y CA de prueba. No carga `.env` real y rechaza el checkout si encuentra uno; usar checkout de pruebas aislado. La credencial de pruebas necesita CREATE DATABASE: cada fixture crea una base `ttrpg_test_<UUID>` y elimina solo esa base después de cerrar pools. SQLite usa directorios temporales separados. No usar una cuenta/base productiva para este arnés.
 
-El certificado de prueba debe cubrir localhost y 127.0.0.1, pero no 127.1, para la prueba negativa de hostname; el servidor debe escuchar loopback. El gate falla si falta configuración, no existe PostgreSQL o no están los artefactos compilados. No simula PostgreSQL ni hace skip verde. La suite general no incluye los archivos `.contract.ts`: el comando test:db los selecciona expresamente. Las mismas pruebas de repositorio/migraciones corren en ambos motores y se añaden TLS, comandos compilados y humo legado.
+El certificado de prueba debe cubrir localhost y 127.0.0.1, pero no 127.1, para la prueba negativa de hostname; el servidor debe escuchar loopback. El gate falla si falta configuración, no existe PostgreSQL o no están los artefactos compilados. No simula PostgreSQL ni hace skip verde. La suite general no incluye los archivos `.contract.ts`: el comando test:db los selecciona expresamente. Las mismas pruebas de repositorio/migraciones corren en ambos motores y se añaden TLS, comandos compilados y humo del listener final.
 
 La evidencia real de construcción y limpieza está en [build 006](../factory/jobs/006-persistencia-multidb/build.md). El gate no certifica despliegue remoto, carga prolongada ni todas las plataformas.
 
@@ -77,8 +81,8 @@ La evidencia real de construcción y limpieza está en [build 006](../factory/jo
 
 `.ttrpgscene` sigue en v2 con carga/migración v1. Catálogo, cuentas futuras e invitaciones no se serializan dentro del documento. Exportar JSON no incorpora imágenes; no se implementa aún traslado de datos SQLite/PostgreSQL ni adopción de recursos con un propietario elegido por defecto.
 
-Para respaldo local detener consumidores y migradores y copiar como unidad todo TTRPG_DATA_DIR, ahora incluyendo control.sqlite y sus sidecars junto a las bases legadas. No copiar solo un archivo en caliente ni borrar WAL/SHM para forzar apertura. Restaurar a un directorio nuevo privado y ejecutar la versión correspondiente. En PostgreSQL el operador usa herramientas consistentes como pg_dump/pg_restore sobre la base dedicada y conserva configuración/CA/credenciales por separado; no copiar archivos físicos del servidor en caliente. Esta entrega verifica persistencia/reapertura y transacciones, no un procedimiento completo nuevo de backup/restore PostgreSQL. La migración funcional y herramientas de importación/exportación se entregarán posteriormente.
+Para respaldo local detén consumidores/migradores y copia como unidad `control.sqlite` y sidecars presentes a destino nuevo privado. Conserva bases legadas aparte. PostgreSQL utiliza pg_dump/pg_restore consistentes conTLS verificado, configuración/CA y credenciales separadas. El gate final verifica roundtrip de ambos motores, datos/cuentas y rechazo de cookies restauradas tras invalidación explícita; consulta [respaldo/retorno](service-operations.md).
 
 ## Backend privado008
 
-Consulta [partidas, recursos por DM y transferencia operativa](owned-data.md) para migraciones 3/4, catálogo administrativo versionado y rutas `/api/v1/dm` y `/api/v1/admin/systems`, revisiones, idempotencia y pruebas reales de ambos motores. Esta superficie no convierte las rutas globales históricas en multiusuario ni retira su guard productivo;011 completa el corte.
+Consulta [partidas, recursos por DM y transferencia operativa](owned-data.md) para migraciones 3/4, catálogo administrativo versionado y rutas `/api/v1/dm` y `/api/v1/admin/systems`, revisiones, idempotencia y pruebas reales de ambos motores. 011 conecta esta superficie al listener final; las rutas globales históricas no existen en el producto y el driver productivo nunca cae al almacén legado.

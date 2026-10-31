@@ -15,7 +15,7 @@ import { openIdentity } from "./index";
 import { passwordCodec } from "./password";
 import type { IdentityService } from "../../../application/services/identity";
 import { createIdentityHttp } from "../../../server/identity-http";
-import { createApi } from "../../../server/http";
+import { createApi } from "../../../server/legacy-http.fixture";
 import { runIdentityCommand } from "../../../server/identity-commands";
 
 if (!process.env.TTRPG_TEST_DATABASE_URL || !process.env.TTRPG_TEST_DB_CA_FILE) throw new Error("test:identity requiere PostgreSQL temporal real y TLS: TTRPG_TEST_DATABASE_URL y TTRPG_TEST_DB_CA_FILE.");
@@ -337,7 +337,7 @@ it("API compilada activa identidad migrada y rechaza configuración inválida an
   });
   expect((await http(port, "/api/v1/health")).status).toBe(200);
   const login = await http(port, "/api/v1/identity/login", "POST", { email: adminInput.email, password: initial }); expect(login.status).toBe(200);
-  expect((await http(port, "/api/v1/scenes", "GET", undefined, token(login.cookie[0]))).status).toBe(401);
+  expect((await http(port, "/api/v1/scenes", "GET", undefined, token(login.cookie[0]))).status).toBe(404);
   child.kill("SIGTERM"); expect(await exited).toBe(0);
   const untouched = join(config.dataDir, "must-not-exist");
   await expect(promisify(execFile)(process.execPath, ["out/api/index.mjs"], { env: { ...baseEnv, TTRPG_DATA_DIR: untouched, TTRPG_AUTH_SECRET: "invalid" }, timeout: 10000 })).rejects.toMatchObject({ code: 1 });

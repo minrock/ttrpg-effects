@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import { readDatabaseConfig } from "./config";
 import { readConfig } from "../../../server/config";
-import { createApi } from "../../../server/http";
+import { createApi } from "../../../server/legacy-http.fixture";
 
 it("defaults explícitos locales y selección independiente de NODE_ENV", () => {
   expect(readDatabaseConfig({ TTRPG_DATA_DIR: "/tmp/example", NODE_ENV: "production" })).toEqual({ driver: "sqlite", deployment: "local", dataDir: "/tmp/example" });
@@ -23,6 +23,6 @@ it.each([
   expect(() => readDatabaseConfig({ TTRPG_DATA_DIR: "/tmp/example", ...fields })).toThrow(/TTRPG_/);
 });
 it("guard antes de claves/rutas legacy y también en composición directa", () => {
-  expect(() => readConfig({ TTRPG_DB_DRIVER: "postgres", TTRPG_DATABASE_URL: "postgres://u:secret@localhost/db" })).toThrow(/Falta migrar/);
+  expect(() => readConfig({ TTRPG_DB_DRIVER: "postgres", TTRPG_DATABASE_URL: "postgres://u:secret@localhost/db" })).toThrow(/TTRPG_AUTH_SECRET/);
   expect(() => createApi({ host: "127.0.0.1", port: 0, dataDir: "/no-crear", publicOrigin: "", dmKey: "", playerKey: "", database: { deployment: "production", driver: "postgres", url: "postgres://u@localhost/db", tls: "verify-full" } }, { version: "test" })).toThrow(/Falta migrar/);
 });

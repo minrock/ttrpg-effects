@@ -89,7 +89,6 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
           await scope.deliver(() => {
             if (transportClosed || res.destroyed || res.writableEnded) return;
             // El cierre puede ser llamado por la reserva antes de crear el transporte.
-            // eslint-disable-next-line prefer-const
             let closed = false, connection: { id: string; close(): void } | undefined, timer: ReturnType<typeof setInterval> | undefined;
             let release = () => {}, pendingBytes = 0, heartbeatPending = false, chain = Promise.resolve(), roster = scope.roster, deliveredSequence = -1;
             const table = registry.runtime(scope.context);

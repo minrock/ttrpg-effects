@@ -40,14 +40,14 @@ export class OwnedSceneLinksService {
     const nextSource=this.replace(updates.get(source.id)?.scene??source.scene,nextA);
     updates.set(source.id,{name:source.name,scene:nextSource});updates.set(target.id,{name:target.name,scene:this.replace(updates.get(target.id)?.scene??target.scene,nextB)});
     for(const [id,item] of updates) await this.scenes.save(item.name,item.scene,id,this.revision(id));
-    return {ok:true as const,mapAnnotations:nextSource.mapAnnotations,warning};
+    return {ok:true as const,mapAnnotations:nextSource.mapAnnotations,warning,revisions:Object.fromEntries([...updates.keys()].map(id=>[id,this.revision(id)+1]))};
   }
   async disconnect(request:z.infer<typeof linkSchema>) {
     const source=await this.read(request.scenePath);const marker=this.marker(source.scene,request.markerId);if(marker.locked)throw invalid("El marcador está bloqueado.");
     const next=this.replace(source.scene,disconnectSceneLinkMarker(marker));let remote:Awaited<ReturnType<OwnedSceneLinksService["read"]>>|undefined;let nextRemote:SceneDocument|undefined;let warning:string|undefined;
     if(marker.connection){try {remote=await this.read(marker.connection.peer.scenePath);const peer=this.marker(remote.scene,marker.connection.peer.markerId);if(validateReciprocalSceneLink(marker,request.scenePath,peer,marker.connection.peer.scenePath))nextRemote=this.replace(remote.scene,disconnectSceneLinkMarker(peer));else warning="Se desligó el marcador local; el destino no tenía una conexión recíproca válida.";}catch(error){if(error instanceof OwnedError)throw error;warning="Se desligó el marcador local. El destino ausente permanece sin resolver.";}}
     await this.scenes.save(source.name,next,source.id,this.revision(source.id));if(remote&&nextRemote)await this.scenes.save(remote.name,nextRemote,remote.id,this.revision(remote.id));
-    return {ok:true as const,mapAnnotations:next.mapAnnotations,warning};
+    return {ok:true as const,mapAnnotations:next.mapAnnotations,warning,revisions:{[source.id]:this.revision(source.id)+1,...(remote&&nextRemote?{[remote.id]:this.revision(remote.id)+1}:{})}};
   }
   async validate(request:z.infer<typeof validateLinksSchema>) {
     const current=await this.read(request.scenePath);const statuses:Record<string,SceneLinkValidationStatus>={};

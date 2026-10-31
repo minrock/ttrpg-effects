@@ -3679,13 +3679,13 @@ body {
 
 .monster-template-manager__toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr) repeat(4, auto);
+  grid-template-columns: repeat(3, max-content);
   align-items: end;
   gap: 8px;
 }
 
 .monster-template-manager__toolbar label,
-.monster-template-manager__fields label {
+.monster-template-fields label {
   display: grid;
   gap: 4px;
   color: #c8d2cc;
@@ -3711,9 +3711,9 @@ body {
   line-height: 1.45;
 }
 
-.monster-template-manager__fields {
+.monster-template-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-height: 0;
 }
@@ -5768,4 +5768,16 @@ body {
 .lightning-properties input[type="number"] {
   min-width: 0;
   width: 100%;
+}
+
+.monster-template-fields { min-width:0; align-content:start; }
+.monster-template-fields label { min-width:0; }
+.monster-template-fields input,.monster-template-fields textarea { box-sizing:border-box; width:100%; min-width:0; }
+.monster-template-fields>button { justify-self:start; }
+.monster-template-fields p { margin:0; overflow-wrap:anywhere; }
+.monster-template-fields .markdown-content { overflow:auto; min-width:0; }
+@media(max-width:900px) {
+  .monster-template-manager__body { grid-template-columns: minmax(0,1fr); }
+  .monster-template-manager__list { max-height:160px; }
+  .monster-template-manager textarea { min-height:160px; }
 }

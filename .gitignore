@@ -63,3 +63,6 @@ tmp/
 # ── Debug artifacts ───────────────────────────────────────────────────────────
 /index.html
 /index.js
+
+# Datos, provisión y respaldos privados del servicio
+/.local/

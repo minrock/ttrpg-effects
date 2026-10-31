@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-10-31T15:34:10.681462+00:00",
+  "actualizado": "2026-10-31T17:57:34.280503+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
@@ -457,16 +457,57 @@
       "id": "011-experiencia-autenticacion",
       "titulo": "Acceso DM, invitaciones y panel de jugadores en web y Electron",
       "rama": "feature/factory-006-persistencia-multidb",
-      "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
-      "etapa": "especificacion",
-      "ciclo": 1,
-      "ronda": 0,
-      "constructor": null,
-      "rondas": [],
+      "base": "73b8e6de21af74912d23399f1b99f3c1112ade91",
+      "etapa": "integracion",
+      "ciclo": 2,
+      "ronda": 4,
+      "constructor": "/root/constructor_011_ciclo2",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "CAMBIOS",
+            "ux": "CAMBIOS",
+            "ui": "CAMBIOS",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "CAMBIOS",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        },
+        {
+          "numero": 3,
+          "ciclo": 2,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "CAMBIOS",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 4,
+          "ciclo": 2,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
       "dependencias": [
         "010-moderacion-tiempo-real"
       ],
-      "motivo": "Especificación reconciliada con cuentas, catálogo administrado y contratos reales. Lista para construir tras APROBAR 010; incluye cierre en main y servicio con datos internos privados.",
+      "motivo": "Aceptación técnica final; preparando integración local exacta y DMG 3.13.0.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 18,

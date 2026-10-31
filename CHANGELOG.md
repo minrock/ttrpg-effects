@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.13.0 — 2026-10-31 — Funcionalidad
+
+- Acceso por cuentas administrador/DM, cambio obligatorio, administración de cuentas y catálogo de sistemas con versiones retenidas; selección explícita de sistema por partida.
+- Catálogo de partidas, apertura/continuidad/reapertura, invitaciones por alias y panel de participantes con expulsión y enlace renovado sin desconectar sobrevivientes.
+- Cliente compartido navegador/Electron servicio con recursos propios, revisiones, bindings, idempotencia, guard de cuenta/borradores y transporte contextual; Electron local conserva operación autónoma.
+- Servicio final SQLite local/PostgreSQL productivo conTLS, retiro de claves/rutas globales y setup privado bajo `.local/service`; respaldo/restauración con invalidación de accesos y guías de retorno.
+- Recuperación de sesión operable con confirmaciones privadas abiertas: cancelación de decisiones pendientes, foco en acceso y borrador conservado para la misma cuenta.
+- Cierre y reapertura propios reconciliados con terminales de la mesa: estado vigente y acción de inicio operable, sin congelar una apertura nueva por avisos anteriores.
+- Conserva formato `.ttrpgscene`v2 y compatibilidad de lectura/migraciónv1.
+
 ## 3.12.0 — 2026-10-31
 
 ### Feature

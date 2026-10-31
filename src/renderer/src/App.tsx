@@ -303,7 +303,7 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
   const nativeMenusApi = useTtrpgApi("nativeMenus");
   const librariesApi = useTtrpgApi("libraries");
   const [scene, setSceneState] = useState<SceneDocument>(() => {
-    if (service) return createEmptyScene();
+    if (service) { const empty=createEmptyScene(); return {...empty,settings:{...empty.settings,diagonalMode:service.defaultDiagonalMode??empty.settings.diagonalMode}}; }
     try {
       const snapshot = sessionStorage.getItem("ttrpg:session-scene");
       if (snapshot !== null) {
@@ -1574,7 +1574,8 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
 
   const resetToNewScene = useCallback((): void => {
     resetMapImageSession();
-    const defaultScene = createEmptyScene();
+    const empty = createEmptyScene();
+    const defaultScene = service ? {...empty,settings:{...empty.settings,diagonalMode:service.defaultDiagonalMode??empty.settings.diagonalMode}} : empty;
     if (!service) sessionStorage.removeItem("ttrpg:session-scene");
     setScene(defaultScene);
     setSceneAside(createDefaultSceneAside());
@@ -1974,6 +1975,7 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
     lastSavedSceneJsonRef.current = JSON.stringify({ ...sceneRef.current, sceneAside });
     return true;
   }
+  useEffect(() => service?.registerLeave?.(allowServiceLeave));
   async function handleServiceAction(action: "import" | "export" | "logout"): Promise<void> {
     if (!service) return;
     try {
@@ -2052,6 +2054,7 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
       setScene(result.scene);
       setMapAnnotationModal(null);
       setSceneLinkModalId(null);
+      if(service) await refreshMonsterTemplates();
       const loadedSceneAside = result.scene.sceneAside ?? createDefaultSceneAside();
       setSceneAside(loadedSceneAside);
       if (actionLabel === "cargada") {
@@ -3432,7 +3435,7 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
     <main className="app-shell vtt-interface" aria-label="TTRPG Effects">
       <WorkspaceHeader
         sceneName={currentFilePath ? service?.browser.name(currentFilePath) ?? getFileBaseName(currentFilePath) : "Escena sin guardar"}
-        serviceActions={service ? { onImport: () => void handleServiceAction("import"), onExport: () => void handleServiceAction("export"), onLogout: () => void handleServiceAction("logout"), onTemplates: () => setIsMonsterTemplateManagerOpen(true) } : undefined}
+        serviceActions={service ? { onImport: () => void handleServiceAction("import"), onExport: () => void handleServiceAction("export"), onLogout: () => void handleServiceAction("logout"), onTemplates: undefined } : undefined}
         mapName={scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa"}
         busy={isBusy}
         canCreate={canCreateNewScene}

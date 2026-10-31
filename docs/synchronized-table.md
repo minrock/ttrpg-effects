@@ -1,12 +1,12 @@
 # Mesa sincronizada privada — 3.5.0
 
-La API administra una proyección efímera por instancia. El mismo VTT React/Pixi y el replay de dados funcionan en DM y Player. Las escenas y assets guardados conservan la persistencia anterior; reiniciar la API cambia la época y vacía mesa, cámaras, conexiones y dados hasta que el DM publique otra vez. Electron local conserva IPC; Electron remoto pertenece a la entrega 005.
+La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. Electron local conservaIPC.
 
 ## Conectar jugadores
 
-El DM abre la proyección desde el control existente y consulta **Mesa compartida** abajo a la izquierda. En Player, Cerrar sesión, brújula y Mesa ocupan filas separadas arriba a la derecha; el indicador de escala permanece abajo a la izquierda. El enlace seleccionable y las acciones copiar/abrir usan el origen público, sin claves ni tokens. El jugador debe acceder desde otro navegador o perfil independiente con su clave. Una pestaña normal comparte cookie DM y conserva ese rol aunque la URL tenga `view=player`; el query solo preselecciona el formulario si no existe sesión.
+Inicia/continúa una partida desde su catálogo. Mesa contiene enlace de invitación, copia/rotación explícita y panel privado de participantes. Cada invitado entra con alias; la cookie de esa partida conserva suID al recargar. CuentaDM y cookies invitadas pueden coexistir. Expulsar confirma alias+discriminador y cambia el enlace conservando los demás.
 
-Dos regiones live persistentes fuera del detalle anuncian cambios relevantes de conexión, publicación, carga y error aun con Mesa cerrada; los reportes de navegación no cambian el anuncio. La cabecera compacta distingue conectado/desconectado; el detalle muestra publicación, cantidad de jugadores, identificador abreviado del principal, carga y error. Sin publicación, Player espera al DM. Con pérdida de red conserva la escena marcada desactualizada y no confirma reportes; reconecta automáticamente. Logout/caducidad oculta y desmonta la vista jugador. Los borradores DM conservan la protección de recuperación de 003.
+Las regioneslive anuncian conexión/publicación/error sin narrar cada heartbeat. Sin escena, Player espera publicación. Corte de red conserva vista desactualizada; terminal retira proyección/efectos y detiene reintentos. [Interfaz y borradores](browser-client.md).
 
 ## Frontera pública y assets
 
@@ -18,7 +18,7 @@ La niebla **no protege los píxeles del mapa**: el jugador recibe la imagen comp
 
 ## Contrato HTTP
 
-Rutas bajo `/api/v1`. Misma cookie HttpOnly/SameSite, Host/Origin y límites de la API base. Todo POST de mesa/dados lleva `{requestId: UUID, context: UUID|null, connectionId?: UUID, revision?: number, payload}`. El rol proviene exclusivamente de la sesión, que se revalida tras recibir cuerpos y decodificar imágenes, antes de actuar. `connectionId` se obtiene del bootstrap SSE y está ligado a esa cookie; no lo elige el cliente. El contexto lo genera el servicio al cambiar escena/mapa/cameraSyncKey.
+Rutas bajo `/api/v1/dm/games/:gameId` paraDM y `/api/v1/games/:gameId` para invitado; autoridades/cookies distintas. TodoPOST contextual lleva `{openingId,generation,command:{requestId,context,connectionId?,revision?,payload},sceneResourceId?}`. Consulta [protocolo2 vigente](moderation.md); las tablas siguientes describen los payloads internos comunes. El rol proviene exclusivamente de la sesión, que se revalida tras recibir cuerpos y decodificar imágenes, antes de actuar. `connectionId` se obtiene del bootstrap SSE y está ligado a esa cookie; no lo elige el cliente. El contexto lo genera el servicio al cambiar escena/mapa/cameraSyncKey.
 
 | Ruta | Rol y payload | Resultado |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ DiceRollSession valida contexto, composición, simulación y resultado. Solo el 
 
 ## SSE, orden y límites
 
-Cada evento `event: table` tiene ID `época:audiencia:secuencia` y JSON `{protocolVersion:1,epoch,context,revision,serverTime,sequence,type,state?,payload?}`. Tipos: bootstrap, scene, camera, camera-command, pointer, highlight, presence, image-status, dice, sizes, render-error. Heartbeat es comentario SSE cada segundo. Secuencias DM/jugador independientes: las acciones privadas no incrementan la secuencia jugador.
+Cada evento contextual tiene ID `gameId:openingId:generation:epoch:audience:sequence` y sobre protocolVersion2 con sistema/ref/hash/modules públicos; bootstrap contiene el estado internoprotocolVersion1. Tipos: bootstrap, scene, camera, camera-command, pointer, highlight, presence, image-status, dice, sizes, render-error. Heartbeat es comentario SSE cada segundo. Secuencias DM/jugador independientes: las acciones privadas no incrementan la secuencia jugador.
 
 Bootstrap se emite en la misma transición síncrona que registra la suscripción. Todo cursor válido (incluido viejo/desconocido) recupera snapshot actual; no hay replay de mapas anteriores. Cursores malformados se rechazan. Cliente descarta duplicados, revisiones antiguas, contexto ajeno y chunks de generaciones anteriores incluso si `read()` resuelve después del abort. Bootstrap no reinicia navegación local ni acciones ya aplicadas. Las publicaciones HTTP se serializan por cliente; no pueden resolverse fuera de orden.
 
@@ -72,4 +72,4 @@ Pruebas ejecutables: `public-table-projection.test.ts`, `table-http.test.ts`, `t
 
 ## Mesas por partida/apertura (010)
 
-La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/dados/proyección, roster privado, revocación en la frontera de envío y callback terminal del adaptador. El camino legado conserva protocolo1. Runtimes y streams tienen cuotas globales además de las de cada mesa; no hay una partida activa global en la composición nueva.
+La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/dados/proyección, roster privado, revocación en la frontera de envío y callback terminal del adaptador. El listener de producto retira el camino legado; protocolo1 solo permanece en el motor interno y fixtures históricos. Runtimes y streams tienen cuotas globales además de las de cada mesa; no hay una partida activa global en la composición nueva.

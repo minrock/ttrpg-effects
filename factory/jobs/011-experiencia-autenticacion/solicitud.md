@@ -61,3 +61,15 @@ Se autoriza actualizar la especificación de 011 en paralelo a la corrección de
 Lectura no modificadora del legado: service.sqlite contiene una escena y ningún asset/plantilla; las bibliotecas de monstruos, PNJ y personajes están vacías. Se preguntó por nombre/correo de la cuenta DM propietaria (distinta de administrador); pendiente respuesta. No se ha adoptado ni modificado contenido.
 
 Respaldo privado preventivo de siete archivos de configuración y cambios locales: `/Users/minrock/Projects/ttrpg-effects/.local/service/backups/pre-integracion-20261031-084641`, directorios 0700 y archivos 0600. Incluye manifiesto de huellas, env privados, tres archivos no rastreados que difieren de main, tablero y cola reflejados. No contiene respaldo de bases: crear el respaldo consistente de datos al corte definitivo. No copiar el contenido de ese respaldo a Git ni informes.
+
+## Inicio de construcción 011 autorizado — 2026-10-31
+
+010 terminó ciclo2/ronda3 con cuatro APROBADO y decisión APROBAR, integrada como producto ae5c654 y cierre documental en main 73b8e6de21af74912d23399f1b99f3c1112ade91. DMG3.12.0 verificado. Spec011 reconciliada y contraste contractual final completados por especificador. Se autoriza ahora construir011, ciclo1, versión objetivo3.13.0. Base de revisión main 73b8e6de21af74912d23399f1b99f3c1112ade91; base-archivos.json contiene 638 huellas verificadas idénticas al checkout fuente.
+
+Se mantiene la excepción autorizada de misma rama acumulativa feature/factory-006-persistencia-multidb en /Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects; HEAD históricoe1fd3ee, sin Git writes del constructor. No revertir/copiar producto viejo; conservar todas las entregas anteriores. Un único constructor011 edita producto/tests/docs/version/changelog y build.md; orquestador tablero/solicitudes/cola. Commit/main y DMG ocurren después de revisión, coordinados por integrador, sin push.
+
+PG temporal17.10/TLS disponible y limpio, reservado a constructor011; wrapper/configuración privada y herramientas de respaldo17.11 en coordinacion.md. No imprimir secretos ni tocar servicio/datos del usuario durante pruebas. Ejecutar suites de CPU y compilaciones en serie para evitar contención observada en010. Pruebas deben acreditar composición final, contratos y UI real; no sustituir CUA por resultados DOM. Los cambios de contraseña/cuentas reales se harán solo en cierre operativo mediante mecanismos privados; durante construcción usar fixtures propias.
+
+## Continuación autorizada de 011
+
+El usuario ordena «inicia ronda 3» tras el cierre de ronda2. Autoriza corregir UX-3 y abrir ciclo2/ronda3 con cuatro revisores. Se mantienen los permisos previos de cierre local en main y preparación del servicio tras aceptación; sin push.

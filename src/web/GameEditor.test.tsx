@@ -1,0 +1,30 @@
+// @vitest-environment jsdom
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { LiveEditor } from "./GameEditor";
+import { HttpTransport, ServiceError } from "../infrastructure/browser/http";
+import { systemSeeds, type SystemVersion } from "../domain/systems/system-catalog";
+const state=vi.hoisted(()=>({revalidate:vi.fn(),start:vi.fn(()=>()=>{}),clear:vi.fn(),status:{phase:"connected",published:false,presence:null,error:null}}));
+vi.mock("../renderer/src/App",()=>({App:()=> <input aria-label="Borrador retenido" defaultValue="estado inicial"/>}));
+vi.mock("./Participants",()=>({Participants:()=>null}));
+vi.mock("../infrastructure/browser/browser-client",()=>({createBrowserClient:()=>({client:{},revalidate:state.revalidate,clear:vi.fn()})}));
+vi.mock("../infrastructure/browser/contextual-table-client",()=>({contextualTableClient:()=>({subscribeStatus:()=>()=>{},getStatus:()=>state.status,start:state.start,clear:state.clear})}));
+let host:HTMLDivElement,root:Root;
+beforeEach(()=>{vi.useFakeTimers();Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});state.revalidate.mockReset().mockResolvedValue(undefined);state.start.mockClear();host=document.createElement("div");document.body.append(host);root=createRoot(host);HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.useRealTimers();});
+for(const status of [503,429])it(`revalidación ${status} reintenta sin desmontar borrador y espera Retry-After`,async()=>{
+ const id="01010101-0101-4101-8101-010101010101",seed=systemSeeds[0],at="2026-10-31T00:00:00.000Z";
+ const configuration={ref:seed.ref,definition:seed.definition,hash:"a".repeat(64),availability:"enabled" as const};
+ const game={id,ownerId:"a",name:"A",systemRef:seed.ref,state:"ready" as const,createdAt:at,updatedAt:at,revision:1};
+ const version:SystemVersion={...seed.ref,state:"published",createdAt:at,publishedAt:at,revision:1,availability:"enabled",definition:seed.definition,hash:configuration.hash,templates:{}};
+ const opening={ok:true as const,opening:{id,gameId:id,generation:1,revision:1,state:"open" as const},invitation:null,systemRef:seed.ref,status:"fresh" as const};
+ const fetcher=vi.fn(async(input:RequestInfo|URL)=>new Response(JSON.stringify(String(input).endsWith("configuration")?{ok:true,configuration}:String(input).endsWith("heartbeat")?opening:{ok:true,game}),{headers:{"content-type":"application/json"}}));
+ const http=new HttpTransport(fetcher);http.bindAccount("a");
+ const render=async(active:boolean)=>{await act(async()=>root.render(<LiveEditor http={http} gameId={id} active={active} frozen={false} expired={()=>{}} onLogout={async()=>{}} opening={opening} loaded={loaded} registerLeave={()=>()=>{}} url="" onInvitation={()=>{}} onRotate={()=>{}} onTerminal={()=>{}}/>));};
+ const loaded={game,configuration,version};await render(true);const node=host.querySelector<HTMLInputElement>('input[aria-label="Borrador retenido"]')!;node.value="cambios privados";await render(false);
+ state.revalidate.mockRejectedValueOnce(new ServiceError(status===429?"RATE_LIMITED":"UNAVAILABLE","Fallo transitorio",status,status===429?12:0));await render(true);
+ expect(host.textContent).toContain("No se pudo comprobar la partida");expect(host.textContent).not.toContain("en conflicto");expect(host.querySelector('input[aria-label="Borrador retenido"]')).toBe(node);
+ const button=host.querySelector<HTMLButtonElement>('dialog button')!;if(status===429){expect(button.disabled).toBe(true);await act(async()=>{button.click();vi.advanceTimersByTime(11000);});expect(state.revalidate).toHaveBeenCalledTimes(2);expect(button.disabled).toBe(true);await act(async()=>vi.advanceTimersByTime(1000));}else await act(async()=>vi.advanceTimersByTime(250));
+ expect(button.disabled).toBe(false);await act(async()=>button.click());expect(host.querySelector("dialog")).toBeNull();expect(host.querySelector('input[aria-label="Borrador retenido"]')).toBe(node);expect(node.value).toBe("cambios privados");expect(node.closest('[hidden]')).toBeNull();expect(state.start).toHaveBeenCalledTimes(2);
+});

@@ -35,6 +35,8 @@ export class BrowserTableClient {
   private applied = new Set<string>();
   constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) {}
   private get reply() { return z.object({ ok, state: this.contextual ? contextualStateSchema.transform(value => { if (value.gameId !== this.contextual!.gameId || value.openingId !== this.contextual!.openingId || value.generation !== this.contextual!.generation || value.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); } return tableStateSchema.parse({ ...value, protocolVersion: 1 }); }) : tableStateSchema, playerUrl: z.string().optional() }); }
+  private sceneResourceId: string | undefined;
+  setSceneResource(id: string | undefined) { this.sceneResourceId = id; }
   private ended = false;
   accessEnded() { this.terminal("access-ended"); }
   private terminal(reason: "access-ended" | "replaced" | "unavailable") { if (this.ended) return; this.ended = true; this.http.invalidate(); this.clear(); this.emit("closed"); this.contextual?.terminal(reason); }
@@ -87,6 +89,7 @@ export class BrowserTableClient {
         }
       } catch (error) {
         if (generation !== this.generation || session.aborted) return;
+        if(this.contextual&&(error instanceof z.ZodError||error instanceof SyntaxError||error instanceof ServiceError&&error.code==="INVALID_RESPONSE")){this.terminal("unavailable");return;}
         this.setStatus({ phase: "disconnected", error: "Mesa desconectada. La vista está desactualizada; reconectando…" });
         if (error instanceof ServiceError && [401, 403, 404].includes(error.status)) { if (this.contextual) this.terminal("access-ended"); return; }
         this.retry = setTimeout(() => { void connect(count + 1); }, Math.min(30000, 500 * 2 ** Math.min(count, 6)));
@@ -174,8 +177,8 @@ export class BrowserTableClient {
     const body = { requestId: crypto.randomUUID(), context: this.current?.context ?? null, connectionId: this.connectionId, revision: this.current?.revision, ...captured, payload };
     const startedAt = Date.now();
     // Un único reintento con el mismo ID, dentro de la ventana de cinco minutos.
-    try { return await this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body } : body); }
-    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body } : body); }
+    try { return await this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
+    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
   }
   private mutation(action: string, payload: unknown) {
     const expectedContext = this.current?.context;
@@ -202,7 +205,7 @@ export class BrowserTableClient {
     notifyPlayerContentReady: () => this.mutation("ready", {}), reportPlayerMapImageStatus: async value => { await this.mutation("map-image-status", value); },
     getPlayerWindowState: async () => {
       try { if (!this.current) this.applyState((await this.http.request("/table/state", this.reply)).state); }
-      catch (error) { this.setStatus({ error: error instanceof Error ? error.message : "No se pudo cargar la mesa." }); }
+      catch (error) { if(this.contextual&&error instanceof ServiceError&&error.code==="INVALID_RESPONSE")this.terminal("unavailable");this.setStatus({ error: error instanceof Error ? error.message : "No se pudo cargar la mesa." }); }
       return { snapshot:this.current?.snapshot ?? null,camera:this.current?.camera ?? null,cameraCommand:this.current?.cameraCommand ?? null,isOpen:(this.status.presence?.count ?? 0)>0 };
     },
     onPlayerScene: h => this.on("scene", h),onPlayerCamera: h => this.on("camera", h),onPlayerCameraCommand: h => this.on("command", h),onPlayerCameraReport: h => this.on("report", h),onPlayerPointer: h => this.on("pointer", h),onPlayerInformationAreaHighlight: h => this.on("highlight", h),onPlayerWindowClosed: h => this.on("closed", h),onPlayerWindowReady: h => this.on("ready", h),onPlayerMapImageStatus: h => this.on("image", h),

@@ -29,7 +29,7 @@ try {
   const driver = api?.TTRPG_DB_DRIVER ?? process.env.TTRPG_DB_DRIVER ?? 'sqlite';
   if (!['sqlite', 'postgres'].includes(driver)) throw new Error('TTRPG_DB_DRIVER inválido.');
   if (driver === 'postgres' && api === null) throw new Error('Prepara manualmente .env para PostgreSQL; consulta la guía de persistencia.');
-  const dataDir = api?.TTRPG_DATA_DIR ?? process.env.TTRPG_DATA_DIR ?? join(homedir(), '.local/share/ttrpg-effects-service');
+  const dataDir = api?.TTRPG_DATA_DIR ?? process.env.TTRPG_DATA_DIR ?? join(process.cwd(), '.local/service/data');
   if (driver === 'sqlite') {
   if (!isAbsolute(dataDir) || [resolve('/'), resolve(homedir())].includes(resolve(dataDir))) {
     throw new Error('TTRPG_DATA_DIR debe ser un directorio absoluto exclusivo del servicio.');
@@ -41,6 +41,11 @@ try {
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   chmodSync(dataDir, 0o700);
   }
+  for (const relative of ['.local', '.local/service', '.local/service/data', '.local/service/backups', '.local/service/logs']) {
+    const directory = join(process.cwd(), relative);
+    if (existsSync(directory) && (lstatSync(directory).isSymbolicLink() || !lstatSync(directory).isDirectory() || realpathSync(directory) !== directory)) throw new Error('Los directorios privados deben ser físicos, sin enlaces simbólicos.');
+    if (!existsSync(directory)) mkdirSync(directory, { mode: 0o700 }); chmodSync(directory, 0o700);
+  }
   if (api === null) {
     const contents = [
       '# Configuración privada de la API. No subir a Git ni compartir las claves.',
@@ -49,24 +54,23 @@ try {
       'TTRPG_PUBLIC_ORIGIN=http://127.0.0.1:8787',
       `TTRPG_WEB_DIR=${JSON.stringify(join(process.cwd(), 'out/web'))}`,
       `TTRPG_DATA_DIR=${JSON.stringify(resolve(dataDir))}`,
-      `TTRPG_DM_KEY=${randomBytes(32).toString('hex')}`,
-      `TTRPG_PLAYER_KEY=${randomBytes(32).toString('hex')}`, ''
+      `TTRPG_AUTH_SECRET=${randomBytes(32).toString('base64url')}`, ''
     ].join('\n');
     writeFileSync('.env', contents, { flag: 'wx', mode: 0o600 });
   }
+  const clientOrigin = api?.TTRPG_PUBLIC_ORIGIN ?? 'http://127.0.0.1:8787';
+  const parsedOrigin = new URL(clientOrigin);
+  if (parsedOrigin.origin !== clientOrigin || !['http:', 'https:'].includes(parsedOrigin.protocol) || parsedOrigin.protocol === 'http:' && !['localhost','127.0.0.1','[::1]'].includes(parsedOrigin.hostname)) throw new Error('TTRPG_PUBLIC_ORIGIN debe ser un origen raíz seguro.');
   if (!existsSync('.env.electron')) {
-    writeFileSync('.env.electron', '# Cliente Electron: service usa la API; local usa archivos locales.\nTTRPG_ELECTRON_MODE=service\nTTRPG_SERVICE_URL=http://127.0.0.1:8787\n', { flag: 'wx', mode: 0o600 });
+    writeFileSync('.env.electron', `# Cliente Electron: service usa la API; local usa archivos locales.\nTTRPG_ELECTRON_MODE=service\nTTRPG_SERVICE_URL=${clientOrigin}\n`, { flag: 'wx', mode: 0o600 });
   }
   chmodSync('.env', 0o600);
   chmodSync('.env.electron', 0o600);
-  console.log(driver === 'sqlite' ? 'Configuración lista: .env y .env.electron (600), directorio de datos (700).' : 'Configuración PostgreSQL conservada; no se creó almacenamiento SQLite.');
-  if (driver === 'postgres') {
-    console.log('Se conservaron los valores existentes. Siguiente paso: pnpm build:api y pnpm db:migrate.');
-    console.log('El servicio completo PostgreSQL permanece bloqueado en esta entrega. Consulta docs/database.md.');
-  } else {
-    console.log('Se conservaron los valores existentes. Consulta las claves de acceso en .env.');
-    console.log('Arranque: pnpm start:api; en otra terminal, pnpm start:service.');
+  console.log('Configuración privada conservada; directorios internos 700 y archivos 600.');
+  if (api && (!api.TTRPG_AUTH_SECRET || api.TTRPG_IDENTITY_ENABLED === 'false')) {
+    throw new Error('Configuración anterior incompleta: conserva una copia y añade un secreto independiente TTRPG_AUTH_SECRET; retira TTRPG_IDENTITY_ENABLED=false. Las claves anteriores ya no autorizan. Consulta docs/service-operations.md.');
   }
+  console.log('Siguiente: pnpm build:api, pnpm db:migrate e identity:bootstrap (TTY). Después: pnpm start:api. No se crearon cuentas.');
 } catch (error) {
   // No volcar contenido de configuración, claves ni detalles de errores del sistema.
   console.error(error.code ? 'No se pudo preparar la configuración. Comprueba rutas y permisos.' : error.message);

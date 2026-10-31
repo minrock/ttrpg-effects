@@ -3,8 +3,7 @@ import { request } from "node:http";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { resolve } from "node:path";
-import { createDefaultScene } from "../../../domain/sessions/default-scene";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync, readFileSync, existsSync, symlinkSync, linkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -220,24 +219,25 @@ for (const kind of ["sqlite", "postgres"] as const) it(`comando pnpm db:migrate 
   expect(second.stdout).toContain("sin migraciones pendientes");
   if (config.driver === "postgres") { expect(env.TTRPG_DATA_DIR).toBeUndefined(); expect(first.stdout + first.stderr).not.toContain(config.url); }
 });
-it("start:api rechaza combinaciones productivas antes de datos/socket y no filtra URL", async () => {
+it("start:api rechaza identidad incompleta antes de datos/socket y no filtra URL", async () => {
   requireBuild(); const config = await fixture("postgres"); if (config.driver !== "postgres") throw new Error();
   const root = realpathSync(mkdtempSync(join(tmpdir(), "ttrpg-guard-"))); cleanups.push(async () => { rmSync(root, { recursive: true, force: true }); });
   for (const deployment of ["local", "production"] as const) {
     try { await exec("pnpm", ["start:api"], { env: { ...commandEnv({ ...config, deployment }), TTRPG_DATA_DIR: join(root, "no-crear") }, timeout: 10000 }); throw new Error("Arranque inesperado"); }
     catch (error) {
       const result = error as { code?: number; stdout?: string; stderr?: string };
-      expect(result.code).not.toBe(0); expect(result.stderr).toContain("Falta migrar"); expect(result.stdout).not.toContain("lista.");
+      expect(result.code).not.toBe(0); expect(result.stderr).toContain("TTRPG_AUTH_SECRET"); expect(result.stdout).not.toContain("lista.");
       expect(result.stderr).not.toContain(config.url); expect(existsSync(join(root, "no-crear"))).toBe(false);
     }
   }
   await expect(exec("pnpm", ["start:api"], { env: { ...commandEnv({ driver: "sqlite", deployment: "local", dataDir: join(root, "no-crear") }), TTRPG_DEPLOYMENT: "production" }, timeout: 10000 })).rejects.toMatchObject({ code: 1 });
   expect(existsSync(join(root, "no-crear"))).toBe(false);
 });
-it("API compilada local conserva login, guardado y reapertura de escena sin migrar catálogo", async () => {
+it("API compilada exige catálogo migrado y retira las claves globales", async () => {
   requireBuild(); const config = await fixture("sqlite"); if (config.driver !== "sqlite") throw new Error();
+  await migrateCatalog(config);
   const key = randomUUID(), playerKey = randomUUID();
-  const env = { ...commandEnv(config), TTRPG_HOST: "127.0.0.1", TTRPG_PORT: "0", TTRPG_PUBLIC_ORIGIN: "http://127.0.0.1:8787", TTRPG_DM_KEY: key, TTRPG_PLAYER_KEY: playerKey };
+  const env = { ...commandEnv(config), TTRPG_HOST: "127.0.0.1", TTRPG_PORT: "0", TTRPG_PUBLIC_ORIGIN: "http://127.0.0.1:8787", TTRPG_DM_KEY: key, TTRPG_PLAYER_KEY: playerKey, TTRPG_AUTH_SECRET: randomBytes(32).toString("base64url") };
   async function start() {
     const child = spawn(process.execPath, [resolve("out/api/index.mjs")], { env, stdio: ["ignore", "pipe", "pipe"] });
     const stopped = new Promise<number | null>(resolve => child.once("exit", resolve));
@@ -265,16 +265,11 @@ it("API compilada local conserva login, guardado y reapertura de escena sin migr
   }
   const first = await start();
   expect((await call(first.port, "/health")).status).toBe(200);
-  const login = await call(first.port, "/auth/login", "POST", { key }); expect(login.status).toBe(200);
-  const cookie = login.headers.get("set-cookie")!.split(";")[0];
-  const saved = await call(first.port, "/scenes", "POST", { name: "Legado intacto", scene: createDefaultScene() }, cookie); expect(saved.status).toBe(201);
-  const resource = (await saved.json()).resource;
-  await first.stop();
-  const second = await start();
-  const login2 = await call(second.port, "/auth/login", "POST", { key }); const cookie2 = login2.headers.get("set-cookie")!.split(";")[0];
-  const loaded = await call(second.port, `/scenes/${resource.id}`, "GET", undefined, cookie2);
-  expect(loaded.status).toBe(200); expect((await loaded.json()).resource.scene).toEqual(resource.scene);
-  await second.stop(); expect(existsSync(join(config.dataDir, "control.sqlite"))).toBe(false);
+  expect((await call(first.port,"/auth/login","POST",{key})).status).toBe(404);
+  expect((await call(first.port,"/dm/games","GET",undefined,"ttrpg_session=old")).status).toBe(401);
+  await first.stop();const second=await start();expect((await call(second.port,"/health")).status).toBe(200);
+  expect((await call(second.port,"/scenes")).status).toBe(404);await second.stop();expect(existsSync(join(config.dataDir,"control.sqlite"))).toBe(true);
+
 });
 
 it("variables PG heredadas no cambian destino, TLS, contraseña ni search_path", async () => {

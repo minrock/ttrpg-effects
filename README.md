@@ -147,30 +147,27 @@ Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en 
 
 ## Servicio privado API
 
-`pnpm build:api` y `pnpm start:api` ejecutan la API independiente en Node.js 24. Requiere configurar claves DM/jugador, origen y directorio exclusivo. Consulta [configuración, rutas, límites y respaldo](docs/private-api.md). La versión 3.6.0 conserva el formato de escena 2 y Electron local, e incluye [cliente navegador](docs/browser-client.md) y [mesa sincronizada HTTP/SSE](docs/synchronized-table.md) con roles DM/jugador.
+`pnpm build:api` y `pnpm start:api` ejecutan la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](docs/private-api.md), [interfaz](docs/browser-client.md) y [operación/respaldo](docs/service-operations.md).
 
-Para ejecutar Electron contra el servicio y operar la instancia, consulta [Electron servicio, HTTPS, claves y backup/restore](docs/service-operations.md).
+## Preparar el servicio
 
-### Configuración local del servicio
+```bash
+pnpm setup:env
+pnpm build:api
+pnpm build:web
+pnpm db:migrate
+pnpm identity:bootstrap
+pnpm identity:password
+pnpm identity:provision-dm
+pnpm start:api
+```
 
-Ejecuta `pnpm setup:env` una vez para crear `.env`, `.env.electron` y el directorio privado de datos. Después usa `pnpm start:api` y, en otra terminal, `pnpm start:service`. Las claves DM/jugador permanecen en `.env`; el modo y la URL del cliente están en `.env.electron`. Consulta la [guía operativa](docs/service-operations.md) para builds y detalles.
+Los comandos de identidad son TTY y nunca aceptan contraseñas en argumentos. No se crean cuentas al arrancar. Setup conserva configuración existente y genera configuración nueva privada en `.env`, `.env.electron` y `.local/service/{data,backups,logs}`; los datos quedan ignorados porGit. Un entorno legado incompleto exige actualización explícita. No hay claves DM/jugador globales ni autorregistro.
 
-### Persistencia multi-DB
+Para Electron servicio, compila con `pnpm build` y ejecuta `pnpm start:service`; `.env.electron` solo contiene modo/origen, sin secretos ni DB. Para local usa `pnpm dev` sin modo service. PostgreSQL conTLS verificado es obligatorio en producción; SQLite sigue disponible localmente. [Persistencia y migraciones](docs/database.md).
 
-La versión 3.8.0 incorpora infraestructura y catálogo de partidas para SQLite local/PostgreSQL producción, con migraciones explícitas y contratos reales. **La API global todavía solo arranca con local + sqlite**; la migración funcional y autenticación por cuentas siguen pendientes. Consulta [drivers, migraciones y gate test:db](docs/database.md).
+## Cuentas, sistemas, partidas e invitaciones (3.13.0)
 
-## Identidad de cuentas optativa (007)
+[Identidad](docs/identity.md): administrador único, provisiónDM, cambio obligatorio, disable/reset/revocación. [Datos privados y catálogo](docs/owned-data.md): dos propietarios aislados, versiones publicadas retenidas, CAS/bindings y transferencia explícita sin tocar el perfilElectron. [Invitaciones](docs/invitations.md): alias, cookie por partida, continuidad/reapertura deliberada. [Moderación](docs/moderation.md): participantes identificados por alias+discriminador, expulsión atómica con nuevo enlace y supervivientes estables.
 
-La versión 3.9.0 incorpora cuentas administrador/DM separadas del acceso legado, activadas explícitamente y sin nueva UI. Consulta [operación de identidad](docs/identity.md) para migraciones, comandos TTY, contraseñas temporales, cookies y límites de transición. No habilita el servicio VTT completo sobre PostgreSQL ni concede acceso a la mesa global.
-
-## Partidas y datos privados (008)
-
-La versión 3.10.0 entrega partidas y recursos privados por DM, catálogo de sistemas administrado por admin y publicaciones retenidas sin borrado. Incluye referencias exactas, transacciones SQLite/PostgreSQL, revisiones/idempotencia, migración 4 y transferencia operativa v3 con lectores v1/v2. [API y operación de datos privados](docs/owned-data.md). El servicio global histórico continúa limitado a local+SQLite; las nuevas cuentas y datos están separados, el arnés PostgreSQL se prueba sin ServiceStore y el corte de producto/UI está pendiente de011.
-
-## Invitaciones backend009 (3.11.0)
-
-La [guía de invitaciones](docs/invitations.md) describe apertura/presencia, enlaces efímeros, alias/cookies, replay, cuotas, migración5 y restauración segura. `pnpm test:invitations` verifica contratos reales SQLite/PostgreSQL y humo API compilada. Proyección/moderación010 y pantallas/corte011 siguen pendientes; no se retira el guard de transición.
-
-## Moderación y transporte contextual010 (3.12.0)
-
-[Moderación por participante y mesas independientes](docs/moderation.md): expulsión atómica con rotación única, roster privado, HTTP/SSE/assets/dados por partida y adaptador con terminación segura. `pnpm test:moderation` verifica ambos motores reales y el backend compilado. La composición optativa no activa el frontend legado; pantallas y corte integrado permanecen en011.
+Los gates de DB/identidad/datos/invitaciones/moderación requieren PostgreSQL temporal real conTLS. El gate de moderación incluye composición final compilada y respaldo/restauración integral de ambos motores. Las pantallas se verifican también con navegador/Electron reales; evidencia y límites en el expediente011. `.ttrpgscene` conserva v2 y lectura/migraciónv1.

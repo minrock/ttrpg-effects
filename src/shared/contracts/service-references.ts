@@ -10,4 +10,4 @@ export function assetUrl(reference: string): string | null {
   const id = reference.startsWith("asset:") ? reference.slice(6) : "";
   return uuid.test(id) ? `/api/v1/assets/${id}` : null;
 }
-export function isServiceAssetUrl(url: string): boolean { return url.startsWith("/api/v1/assets/") && assetUrl(`asset:${url.slice(15)}`) === url; }
+export function isServiceAssetUrl(url: string): boolean { const match=/^\/api\/v1\/(?:dm\/|games\/([0-9a-f-]+)\/)?assets\/([0-9a-f-]+)$/.exec(url); return !!match && (!match[1] || uuid.test(match[1])) && uuid.test(match[2]); }

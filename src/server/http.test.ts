@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { request } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { createApi } from "./http";
+import { createApi } from "./legacy-http.fixture";
 import { LIMITS, readConfig, type ServerConfig } from "./config";
 import { createDefaultScene } from "../domain/sessions/default-scene";
 import { createDefaultSceneMap, createSceneWithMap } from "../domain/sessions/scene-maps";

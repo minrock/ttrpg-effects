@@ -1,6 +1,6 @@
 .service-workspace, .service-player-workspace { height:100%; }
 .service-workspace[hidden] { display:none; }
-.service-access { min-height:100dvh;display:grid;place-items:center;padding:24px;background:#191b1e;color:#ebedef; }
+.service-access { height:100dvh;overflow:auto;box-sizing:border-box;display:grid;place-items:safe center;padding:24px;background:#191b1e;color:#ebedef; }
 .service-access section { width:min(100%,420px);padding:28px;border:1px solid #50565d;border-radius:12px;background:#232528; }
 .service-access h1 { font-size:26px;margin:12px 0 24px; }
 .service-eyebrow { color:#a3e2c5;font-size:13px; }
@@ -41,3 +41,34 @@
 
 /* Reservar filas distintas para sesión, brújula y estado de mesa del servicio. */
 .service-player-workspace .player-workspace-root .compass-overlay.compass-overlay--player { top: 70px; }
+
+.account-guard { height:100%; }
+.account-guard[hidden] { display:none; }
+.account-bar, .game-bar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#202830;color:#ebedef;padding:8px 16px; }
+.account-bar nav { margin-left:auto;display:flex;gap:8px;flex-wrap:wrap; }
+.account-bar button,.game-bar button,.service-page button { padding:8px 12px;border:1px solid #6d817f;border-radius:5px;color:#f1f6f4;background:#283d38;cursor:pointer;font:inherit; }
+.account-bar button:focus-visible,.game-bar button:focus-visible,.service-page :focus-visible { outline:2px solid #99e7c3;outline-offset:3px; }
+.service-page { height:calc(100dvh - 60px);overflow:auto;padding:24px clamp(16px,5vw,70px);background:#191f23;color:#eef2f1;box-sizing:border-box; }
+.service-page h1 { font-size:28px; }
+.service-page input,.service-page select,.service-page textarea,.service-dialog textarea { color:#eef2f1;background:#10181c;border:1px solid #7d8d94;border-radius:4px;padding:10px;font:inherit;width:100%;min-width:0;box-sizing:border-box; }
+.service-form { display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;margin:24px 0; }
+.service-page label { display:grid;gap:8px; }
+.service-cards { list-style:none;padding:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr)); }
+.service-cards>li { border:1px solid #4d5e65;border-radius:8px;padding:20px;overflow-wrap:anywhere; }
+.service-cards button { margin:4px; }
+.service-page nav { display:flex;gap:16px;align-items:center;padding:12px 0; }
+.service-hash { font-family:monospace;overflow-wrap:anywhere; }
+.password-field { display:flex;gap:6px;min-width:0; }
+.password-field input { flex:1;min-width:0; }
+.password-field button { flex:none; }
+.game-shell { height:calc(100% - 54px);display:flex;flex-direction:column; }
+.game-shell>.service-workspace { flex:1;min-height:0;height:auto; }
+.game-shell .service-page { height:auto;flex:1; }
+.participant-list { list-style:none;padding:0; }
+.participant-list li { padding:12px 0;border-bottom:1px solid #526173;display:grid;gap:5px;overflow-wrap:anywhere; }
+.service-floating-error { position:fixed;bottom:16px;right:16px;max-width:440px;background:#4e2227;color:#fff;padding:14px;z-index:50; }
+.service-page button:disabled { opacity:.5;cursor:default; }
+
+.game-bar strong { flex:1 1 240px;min-width:0;overflow-wrap:anywhere; }
+.account-bar>span,.service-page h1 { min-width:0;overflow-wrap:anywhere; }
+.game-bar>button { flex-shrink:0; }

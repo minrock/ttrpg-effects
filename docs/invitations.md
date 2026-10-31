@@ -1,6 +1,6 @@
 # Invitaciones y participantes — backend 009
 
-Disponible desde 3.11.0 en la composición optativa de identidad 007/propiedad 008. Son contratos backend utilizables y probados en SQLite y PostgreSQL; la proyección y moderación pertenecen a 010, las pantallas y el corte del servicio a 011. `/jugar/<id>` es el destino reservado para esa pantalla futura. No se anuncia todavía una experiencia multijugador visual ni se retira el guard que limita el servidor legado a local+SQLite.
+El servicio final integra invitados por partida con cuentas/propiedad y moderación. La pantalla `/jugar/:id` es un shell neutro y usa exclusivamente autoridad invitada; la cuentaDM puede coexistir sin elevar ese namespace. Contratos probados enSQLite/PostgreSQL.
 
 ## Apertura y presencia
 
@@ -37,26 +37,26 @@ Primera ejecución de start/reopen/rotate entrega `secretAvailable:true` e `invi
 
 Cookie `ttrpg_guest`, HttpOnly, SameSite=Strict, Secure en HTTPS, sin Domain, Path `/api/v1/games/<gameId>/`, duración absoluta 28800 s. Cada path permite otra partida; siempre se verifica su contexto durable. Token únicamente en Set-Cookie, nunca JSON ni storage. Cookies duplicadas se rechazan.
 
-Alias: trim/NFC, 1–40 puntos Unicode, 160 bytes UTF-8, sin controles/formato invisible/bidi/surrogates inválidos. `<`, `>` y comillas permanecen texto: la futura UI debe escaparlo. Alias repetidos reciben discriminador estable diferente. No identifican a una persona ni permiten recuperar credenciales. Para otro alias hay que salir e ingresar nuevamente.
+Alias: trim/NFC, 1–40 puntos Unicode, 160 bytes UTF-8, sin controles/formato invisible/bidi/surrogates inválidos. `<`, `>` y comillas permanecen texto: la interfaz los renderiza como texto. Alias repetidos reciben discriminador estable diferente. No identifican a una persona ni permiten recuperar credenciales. Para otro alias hay que salir e ingresar nuevamente.
 
 Idempotencia DM conserva 24 h y presupuesto 008 de 1000 resultados/64 MiB por principal. Contextos incluyen acción, partida y apertura esperada, estables aunque cambie la generación. El resultado durable no guarda secretos. Idempotencia de admisión conserva 24 h, hasta 1000 resultados/1 MiB por apertura, huella del alias normalizado y digest de invitación. Misma clave con contenido diferente:409. Replay con cookie de ese participante devuelve identidad sin emitir otro token ni Set-Cookie, incluso si la invitación ya rotó. Sin cookie y enlace vigente:409 ADMISSION_ALREADY_PROCESSED sin identidad; enlace inválido:401 uniforme. Si se perdió la respuesta antes de instalar la cookie, nueva entrada explícita con clave nueva y enlace vigente crea otro participante y consume cupo; no puede recuperar el anterior por alias o requestId.
 
 Límites: 64 participantes con credencial vigente simultáneamente, 1000 admisiones históricas por apertura; salida/expiración libera cupo activo, nunca el histórico. HTTP cuenta incluso fallos/replay: 10 intentos/minuto/IP y 60/minuto/partida. Mapa máximo 10000 claves; saturación rechaza con 429, no desaloja claves para permitir evasión. Handler acota 64 solicitudes simultáneas; servidor conserva límites globales 100 conexiones y timeout vigente. Se usa IP del socket; no se confía en X-Forwarded-For. 429 incluye Retry-After; presupuestos durables incluyen retryAt. Los parámetros están centralizados en el handler/repositorio; ajustarlos exige medir y mantener autenticación, cuota y reserva transaccional.
 
-## Estados para 011
+## Estados del cliente
 
 - «El enlace no está disponible. Solicita uno vigente al DM»:401 uniforme para secreto incorrecto/rotado/expirado, partida inexistente/no disponible o apertura inválida.
 - «El anfitrión está reconectando. Intenta entrar cuando regrese»:409 únicamente después de verificar invitación.
 - «El acceso expiró o ya no está disponible. Solicita un enlace vigente al DM»:cookie sin autoridad.
 - Salida confirmada:204 y cookie borrada. Un fallo de DB no anuncia salida confirmada.
 
-`src/web/invitation-fragment.ts` captura una sola vez y limpia history sincrónicamente antes de fetch/carga opcional. Solo memoria hasta consumir/cancelar, sin storage/analytics/terceros.011 debe ejecutarlo al entrar, usar no-referrer y permitir pegar alias, Enter, Escape/cancelación, errores anunciados y aislar Delete/Backspace del canvas. Las pruebas instrumentadas no son una inspección visual de esa pantalla futura.
+`src/web/invitation-fragment.ts` captura una sola vez y limpia history sincrónicamente antes de fetch/carga opcional. Solo memoria hasta consumir/cancelar, sin storage/analytics/terceros.El cliente lo ejecuta al entrar y usa no-referrer, pegado de alias, Enter, Escape/cancelación y errores anunciados. La verificación visual se registra separada de las pruebas instrumentadas.
 
 ## Migración, restauración y verificación
 
 Usar Node 24 y pnpm. `pnpm build:api` genera API, módulo backend aislado para pruebas y comandos. `pnpm db:migrate` aplica migración 5 posterior a 1–4 sin cambiar checksums. Una apertura 008 existente queda sin invitación; debe recibir heartbeat válido y rotate con versión esperada0 o una reapertura explícita. No se emite secretamente al leer.
 
-Restart ordinario conserva plazos/revocaciones. Restaurar una copia integral es distinto: puede contener acceso antiguo. Mantener API detenida, configurar únicamente el destino restaurado, ejecutar `pnpm invitations:invalidate`, comprobar éxito, y solo entonces iniciar API. La operación transaccional cierra todas las aperturas y revoca participantes/credenciales del destino. No elimina contenido ni cambia identidades DM. Si falla, mantener API detenida y revisar configuración/migraciones. La guía no certifica backup/restore PostgreSQL productivo:011 lo completará.009 prueba copia integral SQLite y clon temporal PostgreSQL con invalidación explícita. Backups y hashes siguen siendo datos privados.
+Restart ordinario conserva plazos/revocaciones. Restaurar una copia integral es distinto: puede contener acceso antiguo. Mantener API detenida, configurar únicamente el destino restaurado, ejecutar `pnpm invitations:invalidate`, comprobar éxito, y solo entonces iniciar API. La operación transaccional cierra todas las aperturas y revoca participantes/credenciales del destino. No elimina contenido ni cambia identidades DM. Si falla, mantener API detenida y revisar configuración/migraciones. El gate final incluye pg_dump/pg_restore real, invalidación de invitados y rotación deliberada del secreto de identidad;009 conserva sus pruebas de copiaSQLite y clonPG. Backups y hashes siguen siendo datos privados.
 
 La transferencia funcional 008 v3 y lectores v1/v2 excluyen apertura/invitación/credencial; importar contenido empieza sin invitados. No se cambia `.ttrpgscene` v2 ni Electron local.
 

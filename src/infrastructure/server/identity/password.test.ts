@@ -23,7 +23,7 @@ describe("Política de identidad", () => {
     const id = new LoginQuota(); for (let n = 0; n < 5; n++) id.consume("ip" + n, "same"); expect(() => id.consume("other", "same")).toThrow();
     const ip = new LoginQuota(); for (let n = 0; n < 10; n++) ip.consume("same", "id" + n); expect(() => ip.consume("same", "other")).toThrow();
     expect(canonicalEmail("  USER+tag@Example.test  ")).toBe("user+tag@example.test"); expect(() => canonicalEmail("x\n@y.test")).toThrow();
-    expect(readIdentityConfig({})).toBeUndefined(); expect(() => readIdentityConfig({ TTRPG_IDENTITY_ENABLED: "true" })).toThrow();
+    expect(() => readIdentityConfig({})).toThrow(/TTRPG_AUTH_SECRET/); expect(() => readIdentityConfig({TTRPG_IDENTITY_ENABLED:"false"})).toThrow(/retira el selector legado/); expect(() => readIdentityConfig({ TTRPG_IDENTITY_ENABLED: "true" })).toThrow();
     const secret = randomBytes(32).toString("base64url");
     expect(readIdentityConfig({ TTRPG_IDENTITY_ENABLED: "true", TTRPG_AUTH_SECRET: secret, TTRPG_PUBLIC_ORIGIN: "https://example.test" })).toEqual({ secret, publicOrigin: "https://example.test" });
     expect(() => readIdentityConfig({ TTRPG_IDENTITY_ENABLED: "true", TTRPG_AUTH_SECRET: secret, TTRPG_DM_KEY: secret, TTRPG_PUBLIC_ORIGIN: "https://example.test" })).toThrow();

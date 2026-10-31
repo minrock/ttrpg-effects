@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import type { DatabaseConfig } from "../infrastructure/server/database/config";
 import type { IdentityConfig } from "../infrastructure/server/identity/config";
@@ -13,10 +14,12 @@ import { createIdentityHttp } from "./identity-http";
 import { createOwnedHttp } from "./owned-http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 export async function openModerationBackend(database: DatabaseConfig, config: IdentityConfig, now = () => new Date()) {
+  // Aislado por instancia/petición; principal() lo comprueba dentro de cada transacción.
+  const expectedAccount = new AsyncLocalStorage<string | undefined>();
   const lease = await runtimeLease(database);
   const runtimes = new GameRuntimeRegistry(() => now().getTime(), randomUUID); lease.onLost(() => runtimes.clear());
   try {
-    const identity = await openIdentity(database, config, { now, id: randomUUID }, { openingInvalidated: game => runtimes.discardGame(game), accountDisabled: owner => runtimes.discardOwner(owner), sessionRevoked: (owner, session) => runtimes.revokeHost(owner, session) });
+    const identity = await openIdentity(database, config, { now, id: randomUUID }, { openingInvalidated: game => runtimes.discardGame(game), accountDisabled: owner => runtimes.discardOwner(owner), sessionRevoked: (owner, session) => runtimes.revokeHost(owner, session) }, () => expectedAccount.getStore());
     try {
       const invitations = await openInvitations(database, identity, config.publicOrigin, now, (game, participant) => runtimes.leave(game, participant), game => runtimes.discardGame(game), (context, id) => runtimes.allows(context, `asset:${id}`), opening => runtimes.renew(opening));
       const service = moderation(identity, runtimes, { generate: generateSecret, hash: invitationDigest }, config.publicOrigin, () => lease.check(), () => now().getTime());
@@ -27,7 +30,12 @@ export async function openModerationBackend(database: DatabaseConfig, config: Id
         async handler(req: IncomingMessage, res: ServerResponse) {
           try { await lease.check(); } catch { res.writeHead(503, { "Cache-Control": "no-store" }); res.end(); return; }
           const path = (req.url ?? "").split("?")[0];
-          await (isModerationPath(path) ? contextual : isInvitationPath(path) ? invited : path.startsWith("/api/v1/identity/") ? auth : owned)(req, res);
+          const expected = req.headers["x-ttrpg-account"];
+          if (expected !== undefined && (typeof expected !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(expected))) {
+            res.writeHead(400, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+            res.end(JSON.stringify({ ok: false, error: { code: "INVALID_INPUT", message: "Contexto de cuenta inválido." } })); return;
+          }
+          await expectedAccount.run(expected, () => (isModerationPath(path) ? contextual : isInvitationPath(path) ? invited : path.startsWith("/api/v1/identity/") ? auth : owned)(req, res));
         },
         async close() { clearInterval(timer); runtimes.clear(); await invitations.close(); await identity.close(); await lease.close(); }
       };
