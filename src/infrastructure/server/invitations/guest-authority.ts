@@ -1,5 +1,6 @@
+import { readSystem } from "../owned/system-repository";
 import type { CommitEffects } from "../../../application/services/owned-store";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { InvitationError, type GuestAuthority, type GuestTransaction } from "../../../application/services/invitations";
 import type { Presence } from "../../../application/services/host-invitations";
@@ -9,7 +10,7 @@ import { identityDatabase } from "../identity/database";
 import { ACCESS_MS, presenceState } from "../../../domain/invitations/invitation";
 import { admissionSchema, canonicalUuid, guestSchema, type GuestDto } from "../../../shared/contracts/invitations";
 import { alias, digest, gameContext, generateSecret, invitation, invitationDigest, latest, matches, parse, readParticipant, sponsor, tokenDigest, validToken } from "./records";
-export async function guestAuthority(database: DatabaseConfig, presence: Presence, now: () => Date): Promise<GuestAuthority> {
+export async function guestAuthority(database: DatabaseConfig, presence: Presence, now: () => Date, onLeave: (game: string, participant: string) => void = () => {}, allows: (context: import("../../../application/services/game-runtime").GameContext, id: string) => boolean = () => false): Promise<GuestAuthority> {
   const unit = await identityDatabase(database);
   const transaction = <T>(game: string, work: (connection: SqlConnection, effects: CommitEffects) => Promise<T>) => unit.transaction(work, outcome => { if (outcome === "uncertain") presence.forget(game); });
   const validGame = (game: string) => { if (!canonicalUuid.safeParse(game).success) throw new InvitationError("INVALID_INPUT"); };
@@ -79,7 +80,7 @@ export async function guestAuthority(database: DatabaseConfig, presence: Presenc
     },
     async authorized(game, token, work) {
       validGame(game);
-      return transaction(game, async c => {
+      return transaction(game, async (c, effects) => {
         const captured = await principal(c, game, token); let active = true, left = false, rejected = false, failure: unknown;
         const pending: Promise<unknown>[] = [];
         const run = <T>(action: () => Promise<T>): Promise<T> => {
@@ -88,8 +89,29 @@ export async function guestAuthority(database: DatabaseConfig, presence: Presenc
           pending.push(task.catch(() => undefined)); return task;
         };
         const tx: GuestTransaction = {
+          transport: () => run(async () => {
+            const guest = await principal(c, game, token), opening = (await latest(c, game))!;
+            const system = readSystem((await c.query("SELECT * FROM system_versions WHERE system_id=$1 AND version=$2", [guest.systemRef.systemId, guest.systemRef.version])).rows[0]);
+            return { context: { ownerId: opening.hostAccountId, gameId: game, openingId: opening.id, generation: opening.generation, leaseExpiresAt: opening.leaseExpiresAt }, system: { ref: guest.systemRef, definition: system.definition, hash: system.hash, availability: system.availability } };
+          }),
+          asset: id => run(async () => {
+            if (!canonicalUuid.safeParse(id).success) throw new InvitationError("INVALID_INPUT");
+            await principal(c, game, token); const opening = (await latest(c, game))!;
+            const context = { ownerId: opening.hostAccountId, gameId: game, openingId: opening.id, generation: opening.generation };
+            if (!allows(context, id)) return null;
+            effects.beforeCommit(async () => { if (!allows(context, id)) throw new InvitationError("GUEST_UNAUTHORIZED"); });
+            const row = (await c.query("SELECT mime,bytes,sha256,byte_length FROM owned_assets WHERE owner_id=$1 AND id=$2", [opening.hostAccountId, id])).rows[0];
+            if (!row) return null;
+            if (!(row.bytes instanceof Uint8Array) || !["image/png", "image/jpeg", "image/webp"].includes(String(row.mime)) || row.bytes.length !== row.byte_length || createHash("sha256").update(row.bytes).digest("hex") !== row.sha256) throw new InvitationError("UNAVAILABLE");
+            return { mime: String(row.mime), bytes: row.bytes };
+          }),
+          deliver: (effect, uncertain) => run(async () => {
+            await principal(c, game, token);
+            effects.beforeCommit(async () => { await principal(c, game, token); });
+            effects.afterCommit(effect, uncertain);
+          }),
           session: () => run(() => principal(c, game, token)),
-          leave: () => run(async () => { if (left) return; await principal(c, game, token); await revoke(c, captured); left = true; })
+          leave: () => run(async () => { if (left) return; await principal(c, game, token); await revoke(c, captured); left = true; effects.afterCommit(() => onLeave(game, captured.participantId), () => onLeave(game, captured.participantId)); })
         };
         try {
           const result = await work(structuredClone(captured), tx);
@@ -101,7 +123,7 @@ export async function guestAuthority(database: DatabaseConfig, presence: Presenc
         } finally { active = false; await Promise.all(pending); }
       });
     },
-    async leave(game, token) { validGame(game); await transaction(game, async c => { const guest = await optional(c, game, token); if (guest) await revoke(c, guest); }); },
+    async leave(game, token) { validGame(game); await transaction(game, async (c, effects) => { const guest = await optional(c, game, token); if (guest) { await revoke(c, guest); effects.afterCommit(() => onLeave(game, guest.participantId), () => onLeave(game, guest.participantId)); } }); },
     close: () => unit.close()
   };
 }

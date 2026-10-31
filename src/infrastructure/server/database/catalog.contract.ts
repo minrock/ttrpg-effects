@@ -142,7 +142,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Contrato real ${ki
   it("migración explícita e idempotente conserva datos y rechaza historial distinto", async () => {
     const config = await fixture(kind);
     await expect(openCatalog(config)).rejects.toMatchObject({ code: "MIGRATION_REQUIRED" });
-    expect(await migrateCatalog(config)).toEqual([1, 2, 3, 4, 5]); expect(await migrateCatalog(config)).toEqual([]);
+    expect(await migrateCatalog(config)).toEqual([1, 2, 3, 4, 5, 6]); expect(await migrateCatalog(config)).toEqual([]);
     const db = await openCatalog(config); const game = await db.games.create("dm", "preservada"); await db.close();
     await migrateCatalog(config);
     const next = await openCatalog(config); expect(await next.games.find("dm", game.id)).toEqual(game); await next.close();
@@ -162,7 +162,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Contrato real ${ki
   it("un fallo DDL revierte esquema y registro y permite reintentar", async () => {
     const config = await fixture(kind); await migrateCatalog(config);
     const driver = createDriver(config);
-    try { await expect(applyMigrations(driver, [...migrations, { version: 5, name: "fallo-prueba", statements: ["CREATE TABLE rollback_probe(id INTEGER)", "SQL INVALIDO"] }])).rejects.toBeDefined(); }
+    try { await expect(applyMigrations(driver, [...migrations, { version: 7, name: "fallo-prueba", statements: ["CREATE TABLE rollback_probe(id INTEGER)", "SQL INVALIDO"] }])).rejects.toBeDefined(); }
     finally { await driver.close(); }
     expect(await migrateCatalog(config)).toEqual([]);
     const db = await openCatalog(config); cleanups.push(() => db.close()); expect((await db.games.list("dm")).total).toBe(0);
@@ -191,7 +191,7 @@ it("SQLite no toca bases legadas y rechaza symlinks/hardlinks", async () => {
 });
 it("TLS real exige CA y hostname; credencial inválida se sanitiza y no hace fallback", async () => {
   const config = await fixture("postgres"); if (config.driver !== "postgres") throw new Error();
-  expect(await migrateCatalog(config)).toEqual([1, 2, 3, 4, 5]);
+  expect(await migrateCatalog(config)).toEqual([1, 2, 3, 4, 5, 6]);
   await expect(openCatalog({ ...config, caFile: undefined })).rejects.toMatchObject({ code: "UNAVAILABLE" });
   // 127.1 resuelve a loopback, pero no figura en el SAN del certificado de prueba.
   const host = new URL(config.url); host.hostname = "127.1";
@@ -215,7 +215,7 @@ function requireBuild(): void {
 for (const kind of ["sqlite", "postgres"] as const) it(`comando pnpm db:migrate compilado ${kind}, repetición sin pendientes`, async () => {
   requireBuild(); const config = await fixture(kind), env = commandEnv(config);
   const first = await exec("pnpm", ["db:migrate"], { env, timeout: 15000 });
-  expect(first.stdout).toContain(`Catálogo ${kind}: migraciones 1, 2, 3, 4, 5 aplicadas`);
+  expect(first.stdout).toContain(`Catálogo ${kind}: migraciones 1, 2, 3, 4, 5, 6 aplicadas`);
   const second = await exec("pnpm", ["db:migrate"], { env, timeout: 15000 });
   expect(second.stdout).toContain("sin migraciones pendientes");
   if (config.driver === "postgres") { expect(env.TTRPG_DATA_DIR).toBeUndefined(); expect(first.stdout + first.stderr).not.toContain(config.url); }
@@ -283,7 +283,7 @@ it("variables PG heredadas no cambian destino, TLS, contraseña ni search_path",
   const original = Object.fromEntries(Object.keys(overrides).map(key => [key, process.env[key]]));
   try {
     Object.assign(process.env, overrides);
-    expect(await migrateCatalog(config)).toEqual([1, 2, 3, 4, 5]);
+    expect(await migrateCatalog(config)).toEqual([1, 2, 3, 4, 5, 6]);
     await expect(openCatalog({ ...config, caFile: undefined })).rejects.toMatchObject({ code: "UNAVAILABLE" });
     const empty = new URL(config.url); empty.password = "";
     await expect(openCatalog({ ...config, url: empty.href })).rejects.toMatchObject({ code: "UNAVAILABLE" });

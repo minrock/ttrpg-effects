@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.12.0 — 2026-10-31
+
+### Feature
+
+- Moderación por participante y apertura: roster privado, expulsión transaccional/idempotente, revocación de todas sus credenciales y rotación única del enlace; los demás participantes conservan acceso.
+- Mesas, proyección, assets, cámaras y dados independientes por partida; HTTP/SSE contextual con autorización vigente en la entrega y limpieza terminal del adaptador cliente.
+- Migración6 y contratos reales SQLite/PostgreSQL; exclusión de proceso API con bloqueo dedicado en PostgreSQL, cuotas globales y por mesa, reinicio vacío y cierre de transportes en revocación.
+- Composición backend optativa para007–010 sin ServiceStore legado. Panel visual y corte integrado del producto continúan en011; escena v2 y Electron local compatibles.
+
 ## 3.11.1 — 2026-10-30
 
 ### Corregido — bugfix

@@ -318,7 +318,7 @@ for (const kind of ["sqlite", "postgres"] as const) it(`migración006→007 ${ki
   const id = randomUUID(), now = new Date().toISOString();
   await raw(config, c => c.query("INSERT INTO ttrpg_games(id,owner_id,name,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6)", [id, "legacy-owner", "Conservar", "ready", now, now]));
   await expect(openIdentity(config, { secret, publicOrigin: origin })).rejects.toMatchObject({ code: "MIGRATION_REQUIRED" });
-  expect(await migrateCatalog(config)).toEqual([2, 3, 4, 5]); expect(await migrateCatalog(config)).toEqual([]);
+  expect(await migrateCatalog(config)).toEqual([2, 3, 4, 5, 6]); expect(await migrateCatalog(config)).toEqual([]);
   expect((await raw(config, c => c.query("SELECT id FROM ttrpg_games"))).rows).toEqual([{ id }]);
   const service = await open(config); await service.bootstrap(adminInput);
 });

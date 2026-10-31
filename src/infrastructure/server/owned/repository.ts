@@ -35,7 +35,7 @@ export const fingerprint = (value: unknown) => createHash("sha256").update(canon
 const openingSchema = z.object({ id: z.uuid(), gameId: z.uuid(), generation: z.number().int().min(1), state: z.enum(["open", "closed"]), hostAccountId: id, hostSessionId: id, createdAt: z.iso.datetime(), closedAt: z.iso.datetime().nullable(), lastHeartbeatAt: z.iso.datetime(), leaseExpiresAt: z.iso.datetime(), revision: z.number().int().min(1) }).strict();
 const openingColumns = 'id,game_id AS "gameId",generation,state,host_account_id AS "hostAccountId",host_session_id AS "hostSessionId",created_at AS "createdAt",closed_at AS "closedAt",last_heartbeat_at AS "lastHeartbeatAt",lease_expires_at AS "leaseExpiresAt",revision';
 function opening(row: Row): Opening { const result = openingSchema.safeParse(row); if (!result.success) throw new OwnedError("CORRUPT"); return result.data; }
-export function ownedRepositories(run: Execute, identity: IdentitySessionDto, clock: CatalogClock, commitEffects: CommitEffects): OwnedTransaction & { verifyInvariants(): Promise<void> } {
+export function ownedRepositories(run: Execute, identity: IdentitySessionDto, clock: CatalogClock, commitEffects: CommitEffects, onInvalidated: (game: string) => void = () => {}): OwnedTransaction & { verifyInvariants(): Promise<void> } {
   const { role, id: owner } = identity.account, sessionId = identity.sessionId;
   const requireDm = () => { if (role !== "dm") throw new OwnedError("FORBIDDEN"); };
   const execute: Execute = work => run(async c => { requireDm(); return work(c); });
@@ -130,7 +130,8 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
       expected(revision); await ownGame(gameId);
       await execute(async c => { const result = await c.query("UPDATE game_openings SET state='closed',closed_at=$1,revision=revision+1 WHERE game_id=$2 AND id=$3 AND generation=$4 AND revision=$5 AND state='open'", [clock.now().toISOString(), gameId, key, generation, revision]); if (!result.changes) throw new OwnedError("CONFLICT"); });
     },
-    async invalidate(gameId) { await ownGame(gameId); await execute(c => c.query("UPDATE game_openings SET state='closed',closed_at=$1,revision=revision+1 WHERE game_id=$2 AND state='open'", [clock.now().toISOString(), gameId])); }
+    async invalidate(gameId) {
+      effects.afterCommit(() => onInvalidated(gameId), () => onInvalidated(gameId)); await ownGame(gameId); await execute(c => c.query("UPDATE game_openings SET state='closed',closed_at=$1,revision=revision+1 WHERE game_id=$2 AND state='open'", [clock.now().toISOString(), gameId])); }
   };
   let operationUsed = false;
   const validateBudget = async () => {

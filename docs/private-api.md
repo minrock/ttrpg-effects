@@ -137,3 +137,7 @@ La versión 3.9.0 incorpora cuentas administrador/DM separadas del acceso legado
 ## Backend privado008
 
 Consulta [partidas, recursos por DM y transferencia operativa](owned-data.md) para migración3, rutas `/api/v1/dm`, revisiones, idempotencia y pruebas reales de ambos motores. Esta superficie no convierte las rutas globales históricas en multiusuario ni retira su guard productivo;011 completa el corte.
+
+## Familia contextual010
+
+La composición optativa de cuentas007–010 entrega [moderación, HTTP/SSE por partida y assets contextuales](moderation.md). Usa las cookies/autoridades propias de cada namespace y exclusión de proceso; las credenciales nuevas siguen sin autorizar la mesa global. La pantalla y el corte integrado pertenecen a011.

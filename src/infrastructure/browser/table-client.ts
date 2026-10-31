@@ -1,3 +1,4 @@
+import { contextualEventSchema, contextualStateSchema } from "../../shared/contracts/moderation";
 import { z } from "zod";
 import type { TtrpgApi } from "../../shared/api/ttrpg-api";
 import type { DiceContext, DiceEnvelope, DiceSessionState } from "../../domain/dice/dice";
@@ -7,7 +8,7 @@ import { cameraSchema, commandSchema, diceSessionSchema, envelopeSchema, highlig
 import { HttpTransport, ServiceError, result } from "./http";
 
 const ok = z.literal(true);
-const reply = z.object({ ok, state: tableStateSchema, playerUrl: z.string().optional() });
+
 const diceReply = <T>(value: z.ZodType<T>) => z.object({ ok, value });
 type RealtimeKey = "openPlayerWindow" | "getPlayerWindowState" | "publishPlayerScene" | "publishPlayerCamera" | "commandPlayerCamera" | "reportPlayerCamera" | "publishPlayerPointer" | "publishPlayerInformationAreaHighlight" | "notifyPlayerContentReady" | "reportPlayerMapImageStatus" | "onPlayerScene" | "onPlayerCamera" | "onPlayerCameraCommand" | "onPlayerCameraReport" | "onPlayerPointer" | "onPlayerInformationAreaHighlight" | "onPlayerWindowClosed" | "onPlayerWindowReady" | "onPlayerMapImageStatus" | keyof import("../../shared/api/dice-api").DiceApi;
 export interface TableConnectionStatus { phase: "connecting" | "connected" | "disconnected"; published: boolean; error: string; playerUrl: string; presence: TableState["presence"] }
@@ -32,7 +33,12 @@ export class BrowserTableClient {
   private diceContext: DiceContext | null = null;
   private generation = 0;
   private applied = new Set<string>();
-  constructor(private readonly http: HttpTransport) {}
+  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) {}
+  private get reply() { return z.object({ ok, state: this.contextual ? contextualStateSchema.transform(value => { if (value.gameId !== this.contextual!.gameId || value.openingId !== this.contextual!.openingId || value.generation !== this.contextual!.generation || value.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); } return tableStateSchema.parse({ ...value, protocolVersion: 1 }); }) : tableStateSchema, playerUrl: z.string().optional() }); }
+  private ended = false;
+  accessEnded() { this.terminal("access-ended"); }
+  private terminal(reason: "access-ended" | "replaced" | "unavailable") { if (this.ended) return; this.ended = true; this.http.invalidate(); this.clear(); this.emit("closed"); this.contextual?.terminal(reason); }
+
   getStatus = () => this.status;
   subscribeStatus = (handler: () => void) => { this.statusHandlers.add(handler); return () => { this.statusHandlers.delete(handler); }; };
   private setStatus(patch: Partial<TableConnectionStatus>) { this.status = { ...this.status, ...patch }; for (const handler of this.statusHandlers) handler(); }
@@ -43,7 +49,7 @@ export class BrowserTableClient {
     return () => { handlers.delete(wrapped); if (!handlers.size) this.handlers.delete(name); };
   }
   start(role: ServiceRole): () => void {
-    this.stop(); this.role = role;
+    this.stop(); this.ended = false; if (this.contextual) this.http.resume(); this.role = this.contextual?.audience ?? role;
     const generation = this.generation, session = this.http.sessionSignal;
     const connect = async (attempt: number): Promise<void> => {
       if (generation !== this.generation || session.aborted) return;
@@ -65,7 +71,15 @@ export class BrowserTableClient {
             const block = buffer.slice(0, end); buffer = buffer.slice(end + 2);
             const data = block.split("\n").filter(line => line.startsWith("data: ")).map(line => line.slice(6)).join("\n");
             if (!data) continue;
-            const event = tableEventSchema.parse(JSON.parse(data));
+            const raw: unknown = JSON.parse(data);
+            let event: TableEvent;
+            if (this.contextual) {
+              const scoped = contextualEventSchema.parse(raw), context = this.contextual;
+              if (scoped.gameId !== context.gameId || scoped.openingId !== context.openingId || scoped.generation !== context.generation || scoped.audience !== context.audience) { this.terminal("access-ended"); return; }
+              if (scoped.type === "terminal") { this.terminal(scoped.terminal ?? "access-ended"); return; }
+              if (scoped.type === "roster") { context.roster?.(); continue; }
+              event = tableEventSchema.parse({ ...scoped, protocolVersion: 1 });
+            } else event = tableEventSchema.parse(raw);
             if (generation !== this.generation || session.aborted) return;
             this.accept(event); count = 0;
             const cursor = block.split("\n").find(line => line.startsWith("id: "))?.slice(4); if (cursor) this.cursor = cursor;
@@ -74,7 +88,7 @@ export class BrowserTableClient {
       } catch (error) {
         if (generation !== this.generation || session.aborted) return;
         this.setStatus({ phase: "disconnected", error: "Mesa desconectada. La vista está desactualizada; reconectando…" });
-        if (error instanceof ServiceError && [401, 403].includes(error.status)) return;
+        if (error instanceof ServiceError && [401, 403, 404].includes(error.status)) { if (this.contextual) this.terminal("access-ended"); return; }
         this.retry = setTimeout(() => { void connect(count + 1); }, Math.min(30000, 500 * 2 ** Math.min(count, 6)));
       } finally { clearTimeout(this.watchdog); controller.abort(); session.removeEventListener("abort", abort); }
     };
@@ -82,7 +96,7 @@ export class BrowserTableClient {
     return () => this.stop();
   }
   stop() { this.generation++; clearTimeout(this.retry); clearTimeout(this.watchdog); this.controller?.abort(); this.controller = null; this.connectionId = undefined; this.setStatus({ phase: "disconnected" }); }
-  clear() { this.stop(); this.current = null; this.epoch = ""; this.sequence = -1; this.cursor = ""; this.applied.clear(); this.diceContext = null; this.chain = Promise.resolve(); this.setStatus({ phase: "disconnected", published: false, error: "", playerUrl: "", presence: undefined }); }
+  clear() { if (this.contextual) this.http.invalidate(); this.stop(); this.current = null; this.epoch = ""; this.sequence = -1; this.cursor = ""; this.applied.clear(); this.diceContext = null; this.chain = Promise.resolve(); this.setStatus({ phase: "disconnected", published: false, error: "", playerUrl: "", presence: undefined }); }
   private timed(name: "pointer" | "highlight", value: TableState["pointer"] | TableState["highlight"], serverTime: number) {
     if (!value || value.expiresAt <= serverTime || this.applied.has(value.value.id)) return;
     this.applied.add(value.value.id); if (this.applied.size > 1000) this.applied.delete(this.applied.values().next().value!);
@@ -160,8 +174,8 @@ export class BrowserTableClient {
     const body = { requestId: crypto.randomUUID(), context: this.current?.context ?? null, connectionId: this.connectionId, revision: this.current?.revision, ...captured, payload };
     const startedAt = Date.now();
     // Un único reintento con el mismo ID, dentro de la ventana de cinco minutos.
-    try { return await this.http.json(path, schema, "POST", body); }
-    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", body); }
+    try { return await this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body } : body); }
+    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body } : body); }
   }
   private mutation(action: string, payload: unknown) {
     const expectedContext = this.current?.context;
@@ -171,7 +185,7 @@ export class BrowserTableClient {
       const context = this.current?.context;
       let playerUrl: string | undefined;
       if (["open", "scene"].includes(action)) {
-        const response = await this.rpc(`/table/${action}`, payload, reply);
+        const response = await this.rpc(`/table/${action}`, payload, this.reply);
         this.applyState(response.state); playerUrl = response.playerUrl;
         if (playerUrl) this.setStatus({ playerUrl });
         if (context !== response.state.context && this.diceContext) await this.rpc("/dice/context", this.diceContext, diceReply(diceSessionSchema));
@@ -182,12 +196,12 @@ export class BrowserTableClient {
   }
   private diceMutation<T>(action: string, payload: unknown, schema: z.ZodType<T>) { return result(() => this.enqueue(() => this.rpc(`/dice/${action}`, payload, this.responseSchema(schema)))); }
   readonly api: Pick<TtrpgApi, RealtimeKey> = {
-    openPlayerWindow: snapshot => this.mutation("open", snapshot ? { snapshot } : {}),
+    openPlayerWindow: snapshot => this.contextual ? this.mutation("scene", snapshot ?? null) : this.mutation("open", snapshot ? { snapshot } : {}),
     publishPlayerScene: snapshot => this.mutation("scene", snapshot), publishPlayerCamera: camera => this.mutation("camera", camera), commandPlayerCamera: command => this.mutation("camera-command", command),
     reportPlayerCamera: report => this.mutation("camera-report", report), publishPlayerPointer: value => this.mutation("pointer", value), publishPlayerInformationAreaHighlight: value => this.mutation("area-highlight", value),
     notifyPlayerContentReady: () => this.mutation("ready", {}), reportPlayerMapImageStatus: async value => { await this.mutation("map-image-status", value); },
     getPlayerWindowState: async () => {
-      try { if (!this.current) this.applyState((await this.http.request("/table/state", reply)).state); }
+      try { if (!this.current) this.applyState((await this.http.request("/table/state", this.reply)).state); }
       catch (error) { this.setStatus({ error: error instanceof Error ? error.message : "No se pudo cargar la mesa." }); }
       return { snapshot:this.current?.snapshot ?? null,camera:this.current?.camera ?? null,cameraCommand:this.current?.cameraCommand ?? null,isOpen:(this.status.presence?.count ?? 0)>0 };
     },
@@ -196,6 +210,6 @@ export class BrowserTableClient {
     updateDiceContext: value => { this.diceContext=value;return this.diceMutation("context",value,diceSessionSchema); },updateDicePreferences: value=>this.diceMutation("preferences",value,draftSchema),
     beginDiceRoll: value=>this.diceMutation("begin",value,z.object({rollId:z.string()})),completeDiceRoll:(rollId,simulation)=>this.diceMutation("complete",{rollId,simulation},diceSessionSchema),failDiceRoll:rollId=>this.diceMutation("fail",{rollId},diceSessionSchema),
     getDmDiceSession:()=>result(()=>this.http.request("/dice/session",this.responseSchema(diceSessionSchema))),clearDiceHistory:()=>this.diceMutation("clear-history",{},diceSessionSchema),dismissDiceRoll:rollId=>this.diceMutation("dismiss",{rollId},diceSessionSchema),setDiceResultVisibility:(rollId,visible)=>this.diceMutation("visibility",{rollId,visible},diceSessionSchema),
-    getPublicDiceState:()=>result(async()=>{const response=await this.http.request("/table/state",reply);return {ok:true as const,value:this.dice(response.state.dice,response.state.serverTime)};}),reportDiceRenderStatus:(rollId,ok)=>result(()=>this.enqueue(()=>this.rpc("/dice/render-status",{rollId,ok},z.object({ok:z.literal(true)})))),onDicePresentation:h=>this.on("dice",h),onDiceRenderError:h=>this.on("renderError",h)
+    getPublicDiceState:()=>result(async()=>{const response=await this.http.request("/table/state",this.reply);return {ok:true as const,value:this.dice(response.state.dice,response.state.serverTime)};}),reportDiceRenderStatus:(rollId,ok)=>result(()=>this.enqueue(()=>this.rpc("/dice/render-status",{rollId,ok},z.object({ok:z.literal(true)})))),onDicePresentation:h=>this.on("dice",h),onDiceRenderError:h=>this.on("renderError",h)
   };
 }

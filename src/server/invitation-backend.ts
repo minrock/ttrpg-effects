@@ -4,3 +4,4 @@ export { openInvitations } from "../infrastructure/server/invitations";
 export { createInvitationHttp, isInvitationPath } from "./invitation-http";
 export { createOwnedHttp } from "./owned-http";
 export { createIdentityHttp } from "./identity-http";
+export { openModerationBackend } from "./moderation-backend";

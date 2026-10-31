@@ -170,3 +170,7 @@ La versión 3.10.0 entrega partidas y recursos privados por DM, catálogo de sis
 ## Invitaciones backend009 (3.11.0)
 
 La [guía de invitaciones](docs/invitations.md) describe apertura/presencia, enlaces efímeros, alias/cookies, replay, cuotas, migración5 y restauración segura. `pnpm test:invitations` verifica contratos reales SQLite/PostgreSQL y humo API compilada. Proyección/moderación010 y pantallas/corte011 siguen pendientes; no se retira el guard de transición.
+
+## Moderación y transporte contextual010 (3.12.0)
+
+[Moderación por participante y mesas independientes](docs/moderation.md): expulsión atómica con rotación única, roster privado, HTTP/SSE/assets/dados por partida y adaptador con terminación segura. `pnpm test:moderation` verifica ambos motores reales y el backend compilado. La composición optativa no activa el frontend legado; pantallas y corte integrado permanecen en011.

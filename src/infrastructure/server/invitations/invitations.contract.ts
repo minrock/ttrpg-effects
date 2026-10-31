@@ -113,8 +113,11 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Invitaciones reale
     const s = await setup(kind), start = await s.service.start(s.aCookie, s.a1.id, null, 1, randomUUID());
     const g = await s.service.guests.admit(s.a1.id, { secret: invitationSecret(start), alias: "Capacidad" }, randomUUID(), null);
     let escaped!: GuestTransaction;
-    await s.service.guests.authorized(s.a1.id, g.token!, async (dto, tx) => { escaped = tx; dto.gameId = s.b1.id; dto.participantId = randomUUID(); expect(Object.keys(tx).sort()).toEqual(["leave", "session"]); expect((await tx.session()).gameId).toBe(s.a1.id); });
+    await s.service.guests.authorized(s.a1.id, g.token!, async (dto, tx) => { escaped = tx; dto.gameId = s.b1.id; dto.participantId = randomUUID(); expect(Object.keys(tx).sort()).toEqual(["asset", "deliver", "leave", "session", "transport"]); expect((await tx.session()).gameId).toBe(s.a1.id); });
     await expect(escaped.session()).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    await expect(escaped.transport()).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    await expect(escaped.asset(randomUUID())).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    let delivered = false; await expect(escaped.deliver(() => { delivered = true; }, () => {})).rejects.toMatchObject({ code: "UNAVAILABLE" }); expect(delivered).toBe(false);
     for (const mode of ["catch", "settled", "unawaited"]) {
       await expect(s.service.guests.authorized(s.a1.id, g.token!, async (_, tx) => { await tx.leave(); const bad = tx.session(); if (mode === "catch") await bad.catch(() => undefined); else if (mode === "settled") await Promise.allSettled([bad]); else void bad.catch(() => undefined); })).rejects.toMatchObject({ code: "GUEST_UNAUTHORIZED" });
       expect(await s.service.guests.authorized(s.a1.id, g.token!, async dto => dto)).toEqual(g.guest);

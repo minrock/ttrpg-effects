@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "3.11.1",
+  "version": "3.12.0",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -30,7 +30,8 @@
     "data": "node --env-file-if-exists=.env out/api/data-cli.mjs",
     "test:owned": "vitest run --config src/infrastructure/server/owned/vitest.config.ts",
     "test:invitations": "vitest run --config src/infrastructure/server/invitations/vitest.config.ts",
-    "invitations:invalidate": "node --env-file-if-exists=.env out/api/invitation-invalidate.mjs"
+    "invitations:invalidate": "node --env-file-if-exists=.env out/api/invitation-invalidate.mjs",
+    "test:moderation": "vitest run --config src/infrastructure/server/moderation/vitest.config.ts"
   },
   "build": {
     "appId": "com.luismoncaris.ttrpg-effects",

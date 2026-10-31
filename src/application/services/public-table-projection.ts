@@ -6,7 +6,7 @@ import { getPlayerVisibleSceneCounters } from "../../domain/counters/scene-count
 import { assetUrl } from "../../shared/contracts/service-references";
 
 /** Frontera de privacidad de red: los esquemas hoja eliminan propiedades desconocidas; nunca se copian ramas privadas. */
-export function publicTableProjection(input: PlayerWindowSnapshot): { snapshot: PlayerWindowSnapshot; assets: Set<string> } {
+export function publicTableProjection(input: PlayerWindowSnapshot, urlForAsset = assetUrl): { snapshot: PlayerWindowSnapshot; assets: Set<string> } {
   const assets = new Set<string>();
   const reference = (value: string | null): string | null => {
     if (!value || !assetUrl(value)) return null;
@@ -46,8 +46,8 @@ export function publicTableProjection(input: PlayerWindowSnapshot): { snapshot: 
   };
   return { assets, snapshot: {
     scene, camera: { center: { ...input.camera.center }, zoom: input.camera.zoom },
-    mapImageUrl: map.map.imagePath ? assetUrl(map.map.imagePath) : null,
-    tokenImageUrls: Object.fromEntries(map.tokens.flatMap(t => { const url = assetUrl(t.imagePath); return url ? [[t.id, url]] : []; })),
+    mapImageUrl: map.map.imagePath ? urlForAsset(map.map.imagePath) : null,
+    tokenImageUrls: Object.fromEntries(map.tokens.flatMap(t => { const url = urlForAsset(t.imagePath); return url ? [[t.id, url]] : []; })),
     showDmFogOverlay: false, showZoomIndicator: input.showZoomIndicator ?? false,
     cameraSyncKey: input.cameraSyncKey ?? 0, informationAreaHighlightResetKey: input.informationAreaHighlightResetKey ?? 0
   } };

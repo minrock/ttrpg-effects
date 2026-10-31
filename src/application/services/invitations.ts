@@ -9,13 +9,20 @@ const messages: Record<InvitationCode, string> = {
 export class InvitationError extends ApplicationError { constructor(readonly code: InvitationCode, readonly retryAt?: string) { super(messages[code]); } }
 /** Privado del DM y prestado solamente dentro de IdentityService.authorized. */
 export interface InvitationRepository {
+  participants(gameId: string, openingId: string): Promise<{ items: import("../../shared/contracts/moderation").Participant[]; revision: number }>;
+  revoke(gameId: string, openingId: string, participantId: string, invitationVersion: number): Promise<boolean>;
   current(gameId: string, openingId: string): Promise<InvitationMetadata | null>;
   issue(gameId: string, openingId: string, expectedVersion: number, hash: string): Promise<InvitationMetadata>;
   sponsor(gameId: string, openingId: string): Promise<boolean>;
   audit(gameId: string, openingId: string, action: "start" | "reopen" | "rotate" | "close"): Promise<void>;
 }
 /** Capacidad010: no expone repositorios privados ni SQL. DTO no es autoridad. */
-export interface GuestTransaction { session(): Promise<GuestDto>; leave(): Promise<void> }
+export interface GuestTransaction {
+  session(): Promise<GuestDto>; leave(): Promise<void>;
+  transport(): Promise<{ context: import("./game-runtime").GameContext; system: import("../../domain/systems/system-catalog").ResolvedSystem }>;
+  asset(id: string): Promise<{ mime: string; bytes: Uint8Array } | null>;
+  deliver(effect: () => void, uncertain: () => void): Promise<void>;
+}
 export interface GuestAuthority {
   admit(gameId: string, input: { secret: string; alias: string }, requestId: string, token: string | null): Promise<{ guest: GuestDto; token?: string; replayed: boolean }>;
   authorized<T>(gameId: string, token: string | null, work: (guest: GuestDto, tx: GuestTransaction) => Promise<T>): Promise<T>;

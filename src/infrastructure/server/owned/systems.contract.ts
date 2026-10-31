@@ -151,7 +151,7 @@ for (const kind of ["sqlite","postgres"] as const) describe(`Sistemas retenidos 
     await expect(migrateCatalog(config)).rejects.toMatchObject({code:"TEMPLATE_MISSING"});
     expect((await raw(config,c=>c.query("SELECT version FROM ttrpg_control_migrations ORDER BY version"))).rows.map(r=>r.version)).toEqual([1,2,3]);
     await raw(config,c=>c.query("UPDATE owned_resources SET body=$1 WHERE kind='monsters'",[JSON.stringify(m)]));
-    expect(await migrateCatalog(config)).toEqual([4, 5]); expect(await migrateCatalog(config)).toEqual([]);
+    expect(await migrateCatalog(config)).toEqual([4, 5, 6]); expect(await migrateCatalog(config)).toEqual([]);
     await raw(config,async c=>{const row=(await c.query("SELECT bindings FROM owned_resources WHERE kind='monsters'")).rows[0]; expect(JSON.parse(String(row.bindings))).toMatchObject({root:{scope:"private",ownerId:owner,templateId,hash:definitionHash(t)}}); expect((await c.query("SELECT system_id,system_version FROM ttrpg_games")).rows[0]).toEqual({system_id:"generic",system_version:1});});
     const old=await legacyFixture(), root=directory(), backup=join(root,"backup"), bundle=join(root,"v1");backupLegacy(old.source,backup);await exportLegacy(backup,bundle);await inlineVersion2(bundle);const path=join(bundle,"manifest.json"), manifest=JSON.parse(readFileSync(path,"utf8"));delete manifest.catalog;delete manifest.links;manifest.version=1;writeFileSync(path,JSON.stringify(manifest));
     const dest=await fixture(kind), a=await accounts(dest); await importTransfer(dest,bundle,{owner:a.a.id,gameName:"Compatibilidad"}); await verifyTransfer(dest,bundle,{owner:a.a.id});

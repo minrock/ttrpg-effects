@@ -26,7 +26,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Persistencia009 ${
       await c.query("INSERT INTO game_openings(id,game_id,generation,state,host_account_id,host_session_id,created_at,closed_at,last_heartbeat_at,lease_expires_at,revision) VALUES($1,$2,1,'open',$3,'old-session',$4,NULL,$5,$6,1)", [opening, game, owner, at, at, new Date(Date.now() + 150000).toISOString()]);
       const records = []; for (const table of ["ttrpg_control_migrations", "identity_user", "ttrpg_games", "owned_resources", "game_resources", "system_versions", "game_openings"]) records.push((await c.query(`SELECT * FROM ${table}`)).rows); return records;
     });
-    expect(await migrateCatalog(config)).toEqual([5]); expect(await migrateCatalog(config)).toEqual([]);
+    expect(await migrateCatalog(config)).toEqual([5, 6]); expect(await migrateCatalog(config)).toEqual([]);
     await raw(config, async c => {
       const after = []; for (const table of ["ttrpg_control_migrations", "identity_user", "ttrpg_games", "owned_resources", "game_resources", "system_versions", "game_openings"]) after.push((await c.query(`SELECT * FROM ${table}`)).rows);
       after[0] = after[0].slice(0, 4); expect(after).toEqual(before); expect((await c.query("SELECT * FROM game_invitations")).rows).toEqual([]);

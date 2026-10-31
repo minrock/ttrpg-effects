@@ -150,3 +150,7 @@ La versión 3.9.0 incorpora cuentas administrador/DM separadas del acceso legado
 ## Backend privado008
 
 Consulta [partidas, recursos por DM y transferencia operativa](owned-data.md) para migración3, rutas `/api/v1/dm`, revisiones, idempotencia y pruebas reales de ambos motores. Esta superficie no convierte las rutas globales históricas en multiusuario ni retira su guard productivo;011 completa el corte.
+
+## Operación del backend contextual010
+
+Consultar [moderación y exclusión de proceso](moderation.md) antes de componer `openModerationBackend`. La conexión PostgreSQL dedicada conserva el advisory lock783496103; perderla deja el emisor indisponible y termina sus streams. Solo un proceso por base, sin takeover por timeout. Migración6 es explícita; restaurar un backup requiere invalidar acceso009 antes de escuchar. Reinicio crea transporte vacío y nuevo epoch, conserva plazos y exige republicaciónDM. El guard de `start:api` legado se conserva hasta011.

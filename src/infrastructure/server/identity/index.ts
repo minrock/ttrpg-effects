@@ -34,7 +34,7 @@ function account(user: Record<string, unknown>): AccountDto {
   return { id: String(user.id), email: String(user.email), name: String(user.name), role: user.role as "admin" | "dm", enabled: user.enabled, mustChangePassword: user.mustChangePassword, emailVerified: user.emailVerified === true,
     createdAt: new Date(user.createdAt as string).toISOString(), updatedAt: new Date(user.updatedAt as string).toISOString() };
 }
-export async function openIdentity(database: DatabaseConfig, config: IdentityConfig, clock = { now: () => new Date(), id: randomUUID }): Promise<IdentityService> {
+export async function openIdentity(database: DatabaseConfig, config: IdentityConfig, clock = { now: () => new Date(), id: randomUUID }, lifecycle: { openingInvalidated?: (game: string) => void; accountDisabled?: (owner: string) => void; sessionRevoked?: (owner: string, session?: string) => void } = {}): Promise<IdentityService> {
   validateIdentityConfig(config);
   const unit = await identityDatabase(database);
   const secure = config.publicOrigin.startsWith("https:");
@@ -116,12 +116,13 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
     },
     session: rawCookie => transaction(() => principal(rawCookie)),
     async logout(rawCookie, all = false) {
-      await transaction(async c => {
+      await transaction(async (c, effects) => {
         let current: IdentitySessionDto;
         try { current = await principal(rawCookie); } catch (error) { if (!all && error instanceof IdentityError && error.code === "UNAUTHORIZED") return; throw error; }
         if (all) await adapter.deleteUserSessions(current.account.id);
         else await context.adapter.delete({ model: "session", where: [{ field: "id", value: current.sessionId }] });
         await audit(c, current.account.id, current.account.id, all ? "logout-all" : "logout");
+        effects.afterCommit(() => lifecycle.sessionRevoked?.(current.account.id, all ? undefined : current.sessionId), () => lifecycle.sessionRevoked?.(current.account.id));
       });
     },
     async changePassword(rawCookie, currentPassword, newPassword) {
@@ -130,13 +131,14 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
       const snapshot = await transaction(async () => { const identity = await principal(rawCookie); return { identity, ...await credentials(identity.account.email) }; });
       if (!await context.password.verify({ hash: snapshot.hash, password: currentPassword })) throw new IdentityError("UNAUTHORIZED");
       const hash = await context.password.hash(newPassword);
-      await transaction(async c => {
+      await transaction(async (c, effects) => {
         const current = await principal(rawCookie); const old = await credentials(current.account.email);
         if (current.sessionId !== snapshot.identity.sessionId || old.hash !== snapshot.hash) throw new IdentityError("UNAUTHORIZED");
         await adapter.updatePassword(current.account.id, hash);
         await adapter.updateUser(current.account.id, { mustChangePassword: false, authVersion: revision(old.user) + 1, updatedAt: new Date() });
         await adapter.deleteUserSessions(current.account.id);
         await audit(c, current.account.id, current.account.id, "change-password");
+        effects.afterCommit(() => lifecycle.sessionRevoked?.(current.account.id), () => lifecycle.sessionRevoked?.(current.account.id));
       });
     },
     async createDm(rawCookie, data) {
@@ -156,7 +158,7 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
     async administer(rawCookie, id, action, password) {
       await transaction(() => principal(rawCookie, "admin"));
       const hash = action === "password" ? (validatePassword(password), await context.password.hash(password)) : undefined;
-      await transaction(async c => {
+      await transaction(async (c, effects) => {
         const actor = await principal(rawCookie, "admin"); const user = await adapter.findUserById(id);
         if (!user || account(user).role !== "dm") throw new IdentityError("NOT_FOUND");
         if (action === "disable" || action === "enable") await adapter.updateUser(id, { enabled: action === "enable", authVersion: revision(user) + 1, updatedAt: new Date() });
@@ -165,6 +167,7 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
         if (action !== "enable") await adapter.deleteUserSessions(id);
         if (action === "disable") await c.query("UPDATE game_openings SET state='closed',closed_at=$1,revision=revision+1 WHERE host_account_id=$2 AND state='open'", [new Date().toISOString(), id]);
         await audit(c, actor.account.id, id, action);
+        if (action !== "enable") effects.afterCommit(() => { if (action === "disable" || action === "password") lifecycle.accountDisabled?.(id); else lifecycle.sessionRevoked?.(id); }, () => lifecycle.accountDisabled?.(id));
       });
     },
     async bootstrap(data) {
@@ -202,7 +205,7 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
       }, identity, clock, {
         beforeCommit(check) { if (!active) throw new IdentityError("UNAVAILABLE"); checks.push(check); },
         afterCommit(apply, uncertain) { if (!active) throw new IdentityError("UNAVAILABLE"); effects.afterCommit(apply, uncertain); }
-      });
+      }, lifecycle.openingInvalidated);
       try {
         const result = await work(identity, owned);
         // Resolver escrituras ya iniciadas antes de validar el contexto que se publicará.

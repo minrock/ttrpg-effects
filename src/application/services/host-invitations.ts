@@ -6,7 +6,7 @@ import { presenceState } from "../../domain/invitations/invitation";
 import { canonicalUuid, expectedOpeningSchema, openingContextSchema, rotateSchema, type ExpectedOpening, type OpeningContext } from "../../shared/contracts/invitations";
 export interface Presence { has(opening: Opening): boolean; mark(opening: Opening): void; forget(gameId: string): void; clear(): void }
 export interface InvitationSecrets { generate(): string; hash(game: string, opening: string, version: number, secret: string): string }
-export function hostInvitations(identity: IdentityService, guests: GuestAuthority, presence: Presence, secrets: InvitationSecrets, origin: string, now: () => Date): InvitationService {
+export function hostInvitations(identity: IdentityService, guests: GuestAuthority, presence: Presence, secrets: InvitationSecrets, origin: string, now: () => Date, transition: (game: string) => void = () => {}, onContact: (opening: Opening) => void = () => {}): InvitationService {
   const valid = (game: string, revision?: number, request?: string) => { if (!canonicalUuid.safeParse(game).success || revision !== undefined && (!Number.isSafeInteger(revision) || revision < 1) || request !== undefined && !canonicalUuid.safeParse(request).success) throw new InvitationError("INVALID_INPUT"); };
   const inspect = async (tx: OwnedTransaction, game: string): Promise<OpeningStatus> => {
     const opening = await tx.openings.current(game), system = await tx.links.resolve(game);
@@ -21,7 +21,7 @@ export function hostInvitations(identity: IdentityService, guests: GuestAuthorit
   };
   const contact = (tx: OwnedTransaction, opening: Opening) => {
     const captured = structuredClone(opening);
-    tx.effects.afterCommit(() => presence.mark(captured), () => presence.forget(captured.gameId));
+    tx.effects.afterCommit(() => { presence.mark(captured); onContact(captured); }, () => presence.forget(captured.gameId));
   };
   const final = (tx: OwnedTransaction, opening: Opening, fresh: boolean) => {
     const captured = structuredClone(opening);
@@ -47,6 +47,7 @@ export function hostInvitations(identity: IdentityService, guests: GuestAuthorit
           const opening = await tx.openings.start(game, revision);
           secret = secrets.generate(); await tx.invitations.issue(game, opening.id, 0, secrets.hash(game, opening.id, 1, secret));
           await tx.invitations.audit(game, opening.id, reopen ? "reopen" : "start");
+          tx.effects.afterCommit(() => transition(game), () => transition(game));
           contact(tx, opening); final(tx, opening, true);
           return { ...await inspect(tx, game), status: "fresh" as const };
         });
@@ -83,7 +84,7 @@ export function hostInvitations(identity: IdentityService, guests: GuestAuthorit
         if (!await tx.games.find(actor.account.id, game)) throw new OwnedError("NOT_FOUND");
         await tx.operation(request, `close:${game}:${context.openingId}:${context.generation}`, { context, revision }, async () => {
           await tx.openings.close(game, context.openingId, context.generation, revision); await tx.invitations.audit(game, context.openingId, "close");
-          tx.effects.afterCommit(() => presence.forget(game), () => presence.forget(game)); return null;
+          tx.effects.afterCommit(() => { presence.forget(game); transition(game); }, () => { presence.forget(game); transition(game); }); return null;
         });
       });
     },

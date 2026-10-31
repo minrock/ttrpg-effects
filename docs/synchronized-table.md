@@ -69,3 +69,7 @@ Bootstrap se emite en la misma transición síncrona que registra la suscripció
 - JSON máximo **10 MiB**, imágenes **20 MiB**, simulación **1 MiB/24 dados**, highlights **10 000 celdas**. Cámaras finitas y zoom 0,01–100; viewport positivo hasta 32768 px y DPR hasta 16. Errores de contexto/revisión: 409; validación: 400/422; rol:403; sesión:401; cuotas HTTP:429.
 
 Pruebas ejecutables: `public-table-projection.test.ts`, `table-http.test.ts`, `table-client.test.ts`, más regresión HTTP/cliente/Player. Detalles y límites del recorrido visual quedan en el expediente [004/build](../factory/jobs/004-mesa-sincronizada/build.md).
+
+## Mesas por partida/apertura (010)
+
+La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/dados/proyección, roster privado, revocación en la frontera de envío y callback terminal del adaptador. El camino legado conserva protocolo1. Runtimes y streams tienen cuotas globales además de las de cada mesa; no hay una partida activa global en la composición nueva.

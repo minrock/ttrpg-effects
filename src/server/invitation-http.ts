@@ -29,7 +29,7 @@ export class AdmissionQuota {
   get size() { return this.entries.size; }
 }
 const statuses = { INVALID_INPUT: 400, INVITATION_UNAVAILABLE: 401, GUEST_UNAUTHORIZED: 401, HOST_UNAVAILABLE: 409, REVISION_CONFLICT: 409, OPERATION_CONTENT_CONFLICT: 409, ADMISSION_ALREADY_PROCESSED: 409, ALIAS_CONFLICT: 409, RATE_LIMITED: 429, UNAVAILABLE: 503 } as const;
-export function isInvitationPath(path: string) { return /^\/api\/v1\/games\//.test(path) || /^\/api\/v1\/dm\/games\/[^/]+\/(opening|invitation)(\/|$)/.test(path); }
+export function isInvitationPath(path: string) { return /^\/api\/v1\/games\/[^/]+\/(admission|guest\/(session|leave))$/.test(path) || /^\/api\/v1\/dm\/games\/[^/]+\/(opening|invitation)(\/|$)/.test(path); }
 export function createInvitationHttp(service: InvitationService, identity: IdentityService, origin: string, now = Date.now) {
   const quota = new AdmissionQuota(now); let inFlight = 0;
   const send = (res: ServerResponse, status: number, value?: unknown) => { res.statusCode = status; if (value !== undefined) { res.setHeader("Content-Type", "application/json; charset=utf-8"); res.end(JSON.stringify(value)); } else res.end(); };
