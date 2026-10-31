@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-10-31T17:57:34.280503+00:00",
+  "actualizado": "2026-10-31T18:00:52.118711+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
@@ -458,7 +458,7 @@
       "titulo": "Acceso DM, invitaciones y panel de jugadores en web y Electron",
       "rama": "feature/factory-006-persistencia-multidb",
       "base": "73b8e6de21af74912d23399f1b99f3c1112ade91",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 2,
       "ronda": 4,
       "constructor": "/root/constructor_011_ciclo2",
@@ -507,12 +507,14 @@
       "dependencias": [
         "010-moderacion-tiempo-real"
       ],
-      "motivo": "Aceptación técnica final; preparando integración local exacta y DMG 3.13.0.",
+      "motivo": "Integrado localmente en main, versión 3.13.0; cuatro aprobaciones finales y DMG arm64 verificado. Corte del servicio habitual en preparación; sin push.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 18,
         "texto": "- [ ] Acceso DM, invitaciones y panel de jugadores en web y Electron — `011-experiencia-autenticacion`"
-      }
+      },
+      "integradoEn": "5a074b5209bc8a978f69ad7f5660643ec794ec6c",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.13.0-arm64.dmg"
     },
     {
       "id": "012-build-reproducible",

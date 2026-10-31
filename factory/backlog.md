@@ -15,7 +15,7 @@ Serie construida en `feature/fabrica-software` sin commits intermedios; el usuar
 - [x] Partidas de cada DM y datos aislados en ambos motores — `008-partidas-propiedad`
 - [x] Enlaces renovables y entrada de jugadores con alias — `009-invitaciones-jugadores`
 - [x] Expulsión inmediata y mesas sincronizadas independientes — `010-moderacion-tiempo-real`
-- [ ] Acceso DM, invitaciones y panel de jugadores en web y Electron — `011-experiencia-autenticacion`
+- [x] Acceso DM, invitaciones y panel de jugadores en web y Electron — `011-experiencia-autenticacion`
 
 ## Correcciones de integración
 
