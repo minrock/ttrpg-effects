@@ -34,3 +34,15 @@ DMG3.13.0arm64 generado después de merge por ./scripts/build-dmg.sh; hdiutilver
 API sintética8891 y PostgreSQL temporal detenidos limpiamente después de liberar revisores. Todos los Electron/pestañas de QA propios cerrados; perfiles y fixtures privados conservados. Dashboard8765 y servicio habitual8787 permanecen disponibles.
 
 Pendientes del usuario: cambiar contraseña temporal; crear/invitar DMs desde administración; indicar un DM explícito si desea adoptar la escena antigua preservada. Estas acciones no impiden arrancar con pnpm start:api en próximos usos.
+
+## Cierre de worktrees solicitado por el usuario
+
+2026-10-31: orden «cierra todo a main fuera del worktree en el folder que estamos trabajando y prepara para correr el sistema local». Se verificaron655huellas idénticas entre main y la construcción; la única diferencia visible adicional era un informe histórico010, conservado.
+
+Ambos directorios auxiliares se movieron completos en el mismo volumen a .local/service/backups/worktrees-cerrados-20261031-130822, con padre0700. Se preservaron contenido ignorado, cambios sin commit, fixtures, dependencias, outputs y DMGs. Manifiesto privado0600 contiene huellas verificadas antes/después y los metadatos Git se copiaron aparte. No se borraron archivos de trabajo ni se detuvieron aplicaciones del usuario; solo quedaban referencias de procesos al directorio, sin archivos abiertos.
+
+Después del archivo se retiraron únicamente los dos registros huérfanos mediante git worktree prune. git worktree list conserva solo /Users/minrock/Projects/ttrpg-effects sobre main. Ramas históricas y stash de conservación permanecen disponibles; no se hizo push. El tablero apunta al directorio principal y a los artefactos archivados reales.
+
+El listener8787 se comprobó con cwd de la carpeta principal; API3.13.0, salud200 y HTML200. .env y .env.electron0600 conservan rutas internas y URLlocal; buildsAPI/web/desktop presentes. No fue necesario recompilar producto idéntico ni repetir pruebas de la entrega aprobada.
+
+Para próximos arranques desde la carpeta principal: pnpm start:api y abrir http://127.0.0.1:8787. ClienteElectron opcional: pnpm start:service. Para escritorio autónomo en desarrollo: pnpm dev. El servicio ya está iniciado al cerrar esta operación; no arrancar otra instancia sobre el mismo puerto/base.

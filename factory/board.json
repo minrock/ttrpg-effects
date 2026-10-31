@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-10-31T18:05:17.671134+00:00",
+  "actualizado": "2026-10-31T18:09:05.956100+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
@@ -263,13 +263,13 @@
       ],
       "dependencias": [],
       "motivo": "Integrado localmente en main, versión 3.11.1. DMG arm64 generado y verificado. Sin push.",
-      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "directorio": "/Users/minrock/Projects/ttrpg-effects",
       "backlog": {
         "linea": 13,
         "texto": "- [ ] Persistencia común SQLite y PostgreSQL — `006-persistencia-multidb`"
       },
       "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/worktrees-cerrados-20261031-130822/integracion-006-009/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "007-cuentas-dm",
@@ -296,13 +296,13 @@
         "006-persistencia-multidb"
       ],
       "motivo": "Integrado localmente en main, versión 3.11.1. DMG arm64 generado y verificado. Sin push.",
-      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "directorio": "/Users/minrock/Projects/ttrpg-effects",
       "backlog": {
         "linea": 14,
         "texto": "- [ ] Cuentas DM administradas y autenticación segura — `007-cuentas-dm`"
       },
       "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/worktrees-cerrados-20261031-130822/integracion-006-009/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "008-partidas-propiedad",
@@ -359,13 +359,13 @@
         "007-cuentas-dm"
       ],
       "motivo": "Integrado localmente en main, versión 3.11.1. DMG arm64 generado y verificado. Sin push.",
-      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "directorio": "/Users/minrock/Projects/ttrpg-effects",
       "backlog": {
         "linea": 15,
         "texto": "- [ ] Partidas de cada DM y datos aislados en ambos motores — `008-partidas-propiedad`"
       },
       "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/worktrees-cerrados-20261031-130822/integracion-006-009/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "009-invitaciones-jugadores",
@@ -392,13 +392,13 @@
         "008-partidas-propiedad"
       ],
       "motivo": "Integrado localmente en main, versión 3.11.1. DMG arm64 generado y verificado. Sin push.",
-      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "directorio": "/Users/minrock/Projects/ttrpg-effects",
       "backlog": {
         "linea": 16,
         "texto": "- [ ] Enlaces renovables y entrada de jugadores con alias — `009-invitaciones-jugadores`"
       },
       "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/worktrees-cerrados-20261031-130822/integracion-006-009/dist/TTRPG Effects-3.11.1-arm64.dmg"
     },
     {
       "id": "010-moderacion-tiempo-real",
@@ -445,13 +445,13 @@
         "009-invitaciones-jugadores"
       ],
       "motivo": "Integrado localmente en main, versión 3.12.0; DMG arm64 generado y verificado. Tercera ronda con cuatro aprobaciones. Sin push.",
-      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "directorio": "/Users/minrock/Projects/ttrpg-effects",
       "backlog": {
         "linea": 17,
         "texto": "- [ ] Expulsión inmediata y mesas sincronizadas independientes — `010-moderacion-tiempo-real`"
       },
       "integradoEn": "ae5c654f74962b1f6c8de18055d87f9192d1f9ce",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.12.0-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/worktrees-cerrados-20261031-130822/integracion-006-009/dist/TTRPG Effects-3.12.0-arm64.dmg"
     },
     {
       "id": "011-experiencia-autenticacion",
@@ -507,8 +507,8 @@
       "dependencias": [
         "010-moderacion-tiempo-real"
       ],
-      "motivo": "Integrado en main; servicio 3.13.0 activo en 127.0.0.1:8787, administrador preparado y DMG verificado. Legado respaldado sin adopción automática. Sin push.",
-      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "motivo": "Cerrado en main en la carpeta principal; worktrees archivados. Servicio local 3.13.0 activo en 127.0.0.1:8787, configuración privada preparada y DMG verificado. Sin push.",
+      "directorio": "/Users/minrock/Projects/ttrpg-effects",
       "backlog": {
         "linea": 18,
         "texto": "- [ ] Acceso DM, invitaciones y panel de jugadores en web y Electron — `011-experiencia-autenticacion`"
@@ -539,7 +539,7 @@
       ],
       "motivo": "Integrado localmente en main, versión 3.11.1. DMG arm64 generado y verificado. Sin push.",
       "integradoEn": "a64b5e9dcf7ba60be28047f890ab7edfecbb82df",
-      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.11.1-arm64.dmg"
+      "dmg": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/worktrees-cerrados-20261031-130822/integracion-006-009/dist/TTRPG Effects-3.11.1-arm64.dmg"
     }
   ]
 }
