@@ -1,0 +1,15 @@
+{
+  ".gitignore": "7596c0766e7db18034c2b2e02904390b65c58598ed8b1ae131ca3792c7beeb5c",
+  "CHANGELOG.md": "d93a431d3c1afc883d85635949f0a5c2114d7f0e5b32afffe930aa122d555a86",
+  "README.md": "8005eb154ef5c46c5d24211011e924226dd7ec3208c193d7fd05fbd51e5b582c",
+  "docs/service-operations.md": "b8488d1069406d5bba22976af2e3afa9b42e9e11858169536942c35ab689634a",
+  "package.json": "017d407f365101833b8e7011dd91e0ec11ff892ab9138055c53fb209d113cac9",
+  "src/server/index.ts": "f8ee826b9e567ea4650a8ed95628d27392087425aeea34ea8fbb0f13220ab2fc",
+  ".env.example": "f4ffc966d5306723de69ed0cdddd3ccfe76dc0e444615e8716120e75fd516aee",
+  ".env.electron.example": "f12f0aac1a1e0aa5114b970b4626b5b146bb0e56ff67b5300df2e60fa1f560ba",
+  "scripts/setup-env.sh": "a2585e5e7f59e86d6381f26fbace3bcf6dc11ca89bb7e19baa2b6c406baf6a14",
+  "src/server/environment-setup.test.ts": "91767da3b71eed6eb292909ab715784d679b4245a92f942c87d694477c5cb54c",
+  "factory/board.json": "ef6207f1f43066db601ea95e498c2b1f884ad6d91ee62905aa2af5465fb4af8b",
+  "factory/backlog.md": "8e314841b2637d9cf2a3bc0e5906931600190733ca95c403b8340c96e56a2479",
+  "factory/jobs/005-electron-servicio/integracion.md": "20e89c17d4a3d8b37c54e4eae0ab5d9a09e1fcfb68e6b3f1cfc14cd16b249998"
+}

@@ -40,6 +40,7 @@ logs/
 .env
 .env.*
 !.env.example
+!.env.electron.example
 
 # ── Editor / OS ───────────────────────────────────────────────────────────────
 .DS_Store

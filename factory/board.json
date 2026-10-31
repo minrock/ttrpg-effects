@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "actualizado": "2026-10-29T15:36:46.561655+00:00",
+  "actualizado": "2026-10-31T12:51:33.861345+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
       "titulo": "Contrato común para clientes web y Electron",
       "rama": "feature/fabrica-software",
       "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 2,
       "constructor": "/root/constructor_001",
@@ -34,18 +34,20 @@
         }
       ],
       "dependencias": [],
-      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "motivo": "Aprobada por el usuario e integrada en main; DMG 3.6.0 arm64 generado y verificado. Sin push.",
       "backlog": {
         "linea": 5,
         "texto": "- [ ] Contrato común para clientes web y Electron — `001-contrato-clientes`"
-      }
+      },
+      "integradoEn": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "dmg": "dist/TTRPG Effects-3.6.0-arm64.dmg"
     },
     {
       "id": "002-api-privada",
       "titulo": "API privada, escenas, imágenes y bibliotecas",
       "rama": "feature/fabrica-software",
       "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 2,
       "constructor": "/root/constructor_002",
@@ -74,18 +76,20 @@
       "dependencias": [
         "001-contrato-clientes"
       ],
-      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "motivo": "Aprobada por el usuario e integrada en main; DMG 3.6.0 arm64 generado y verificado. Sin push.",
       "backlog": {
         "linea": 6,
         "texto": "- [ ] API privada, escenas, imágenes y bibliotecas — `002-api-privada`"
-      }
+      },
+      "integradoEn": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "dmg": "dist/TTRPG Effects-3.6.0-arm64.dmg"
     },
     {
       "id": "003-cliente-navegador",
       "titulo": "Cliente web con el frontend VTT existente",
       "rama": "feature/fabrica-software",
       "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 2,
       "ronda": 3,
       "constructor": "/root/constructor_003",
@@ -124,18 +128,20 @@
       "dependencias": [
         "002-api-privada"
       ],
-      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "motivo": "Aprobada por el usuario e integrada en main; DMG 3.6.0 arm64 generado y verificado. Sin push.",
       "backlog": {
         "linea": 7,
         "texto": "- [ ] Cliente web con el frontend VTT existente — `003-cliente-navegador`"
-      }
+      },
+      "integradoEn": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "dmg": "dist/TTRPG Effects-3.6.0-arm64.dmg"
     },
     {
       "id": "004-mesa-sincronizada",
       "titulo": "Sincronización privada entre DM y jugadores",
       "rama": "feature/fabrica-software",
       "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 2,
       "ronda": 3,
       "constructor": "/root/constructor_004",
@@ -174,18 +180,20 @@
       "dependencias": [
         "003-cliente-navegador"
       ],
-      "motivo": "Aprobada técnicamente y por el usuario. Integración autorizada; espera cierre técnico de 005 para integrar los cambios acumulados.",
+      "motivo": "Aprobada por el usuario e integrada en main; DMG 3.6.0 arm64 generado y verificado. Sin push.",
       "backlog": {
         "linea": 8,
         "texto": "- [ ] Sincronización privada entre DM y jugadores — `004-mesa-sincronizada`"
-      }
+      },
+      "integradoEn": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "dmg": "dist/TTRPG Effects-3.6.0-arm64.dmg"
     },
     {
       "id": "005-electron-servicio",
       "titulo": "Electron como cliente del servicio y entrega operativa",
       "rama": "feature/fabrica-software",
       "base": "7d66e79a60f5c2f499495aaef68c8878d2dc7070",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 1,
       "ronda": 2,
       "constructor": "/root/constructor_005",
@@ -214,11 +222,198 @@
       "dependencias": [
         "004-mesa-sincronizada"
       ],
-      "motivo": "Aprobada técnicamente y por el usuario. Preparando integración conjunta de001–005 y DMG3.6.0.",
+      "motivo": "Aprobada por el usuario e integrada en main; DMG 3.6.0 arm64 generado y verificado. Sin push.",
       "backlog": {
         "linea": 9,
         "texto": "- [ ] Electron como cliente del servicio y entrega operativa — `005-electron-servicio`"
+      },
+      "integradoEn": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "dmg": "dist/TTRPG Effects-3.6.0-arm64.dmg"
+    },
+    {
+      "id": "006-persistencia-multidb",
+      "titulo": "Persistencia común SQLite y PostgreSQL",
+      "rama": "feature/factory-006-persistencia-multidb",
+      "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 2,
+      "constructor": "/root/aprobador_005",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "CAMBIOS",
+            "ui": "APROBADO",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [],
+      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "backlog": {
+        "linea": 13,
+        "texto": "- [ ] Persistencia común SQLite y PostgreSQL — `006-persistencia-multidb`"
       }
+    },
+    {
+      "id": "007-cuentas-dm",
+      "titulo": "Cuentas DM administradas y autenticación segura",
+      "rama": "feature/factory-006-persistencia-multidb",
+      "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 1,
+      "constructor": "/root/constructor_007",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "006-persistencia-multidb"
+      ],
+      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "backlog": {
+        "linea": 14,
+        "texto": "- [ ] Cuentas DM administradas y autenticación segura — `007-cuentas-dm`"
+      }
+    },
+    {
+      "id": "008-partidas-propiedad",
+      "titulo": "Partidas y catálogo administrado de sistemas",
+      "rama": "feature/factory-006-persistencia-multidb",
+      "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "etapa": "integracion",
+      "ciclo": 2,
+      "ronda": 4,
+      "constructor": "/root/constructor_008",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "CAMBIOS",
+            "ux": "CAMBIOS",
+            "ui": "APROBADO",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 2,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 3,
+          "ciclo": 2,
+          "revisiones": {
+            "seguridad": "CAMBIOS",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "CAMBIOS"
+          }
+        },
+        {
+          "numero": 4,
+          "ciclo": 2,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "007-cuentas-dm"
+      ],
+      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "backlog": {
+        "linea": 15,
+        "texto": "- [ ] Partidas de cada DM y datos aislados en ambos motores — `008-partidas-propiedad`"
+      }
+    },
+    {
+      "id": "009-invitaciones-jugadores",
+      "titulo": "Enlaces renovables y entrada de jugadores con alias",
+      "rama": "feature/factory-006-persistencia-multidb",
+      "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 1,
+      "constructor": "/root/constructor_009",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "dependencias": [
+        "008-partidas-propiedad"
+      ],
+      "motivo": "Integración local autorizada por el usuario; subagente prepara copia exacta aprobada, separada de010.",
+      "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
+      "backlog": {
+        "linea": 16,
+        "texto": "- [ ] Enlaces renovables y entrada de jugadores con alias — `009-invitaciones-jugadores`"
+      }
+    },
+    {
+      "id": "012-build-reproducible",
+      "titulo": "Construcción reproducible con Vite declarado",
+      "rama": "feature/integracion-006-009",
+      "base": "e1fd3eed0a12a2cf2fc7ab8fa2d2c95acc82dba3",
+      "etapa": "integracion",
+      "ciclo": 1,
+      "ronda": 1,
+      "constructor": "/root/constructor_012",
+      "rondas": [
+        {
+          "numero": 1,
+          "ciclo": 1,
+          "revisiones": {
+            "seguridad": "APROBADO",
+            "ux": "APROBADO",
+            "ui": "APROBADO",
+            "codigo": "APROBADO"
+          }
+        }
+      ],
+      "motivo": "APROBAR técnico; corrección lista para integración local autorizada con006–009."
     }
   ]
 }

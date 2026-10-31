@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.11.1 — 2026-10-30
+
+### Corregido — bugfix
+
+- Vite 7.3.3 declarado como dependencia directa de desarrollo para que una instalación limpia con pnpm genere su ejecutable local y permita compilar Electron, API y web de forma reproducible.
+
+## 3.11.0 — 2026-10-30
+
+### Feature
+
+- Invitaciones renovables por apertura, lease del propietario y admisión con alias/discriminador y cookie invitada independiente; rotación conserva participantes admitidos.
+- Migración5 SQLite/PostgreSQL, hashes de secretos, CAS e idempotencia sin recuperar secretos, cuotas, auditoría y capacidad transaccional invitada para010.
+- Contratos HTTP, módulo de fragmento para011, invalidación explícita del acceso restaurado y pruebas reales de ambos motores; se conserva el guard productivo y el formato de escena.
+
 Todas las notas de version de TTRPG Effects se documentan en este archivo.
 
 El proyecto sigue versionado semantico:
@@ -9,6 +23,48 @@ El proyecto sigue versionado semantico:
 - **Major**: cambios incompatibles con `.ttrpgscene` o migraciones obligatorias del formato de escena.
 
 La version oficial vive en `package.json`. Cada cierre de spec, feature o bug debe actualizar `package.json` y agregar una entrada en este changelog antes de generar el DMG.
+
+## [3.10.0] - 2026-10-30
+
+- Catálogo de sistemas compartido administrado por admin: borradores, publicaciones inmutables, disponibilidad separada de versiones y plantillas, sin borrado. Referencias exactas de partida/recursos y configuración tipada de módulos incorporados; conserva edición de instancias deshabilitadas y plantillas históricas privadas.
+- Migración 4 y transferencia operativa v3 con lectores v1/v2, hashes, bindings y enlaces persistidos; validación final transaccional para operaciones concurrentes y rechazos capturados. Sin cambios del formato portable ni del editor local autónomo.
+
+### Agregado — feature
+
+- Catálogo privado de partidas por DM, revisiones optimistas e idempotencia persistida, con archivo/borrado y cierre de apertura atómicos.
+- Escenas, assets y bibliotecas reutilizables por propietario en SQLite/PostgreSQL reales, rutas DM separadas de la API global y apertura/lease preparados para invitaciones posteriores.
+- Herramientas privadas de respaldo, exportación, adopción, verificación y restauración de datos legados, con selección explícita de dueño, hashes y rollback transaccional.
+- Contratos reales de aislamiento, concurrencia, migración y restauración; sin nuevas pantallas ni cambios del formato portable v2. El corte productivo completo continúa reservado a011.
+
+### Corregido en revisión de 008
+
+- Propietario cerrado en los puertos autorizados y publicación visible solo después del commit.
+- Errores recuperables de revisión, presupuesto y plantilla referenciada; diagnósticos sanitizados de migración y estado incierto.
+- Exportación validada por referencias exactas, catálogo segmentado fuera del manifiesto y rollback ante rechazos sin motivo; regresiones de tamaño, cancelación y fallo tardío en ambos motores.
+
+## [3.9.0] - 2026-10-29
+
+### Agregado — feature
+
+- Identidad de administrador/DM con Better Auth 1.7.14, credenciales scrypt de coste explícito y sesiones revocables persistentes en SQLite/PostgreSQL.
+- Alta DM exclusivamente administrativa, contraseñas temporales, cambio obligatorio, recuperación local y comandos interactivos sin eco.
+- Rutas de identidad optativas, cuotas y migración versionada; las cuentas nuevas siguen separadas de la mesa legada. Sin cambios en UI ni formato de escena v2.
+
+## [3.8.0] - 2026-10-29
+
+### Agregado — feature
+
+- Catálogo de partidas con propietario, puertos asíncronos y adaptadores SQLite/PostgreSQL, transacciones con rollback y cierre explícito de recursos.
+- Migraciones versionadas e idempotentes mediante `pnpm db:migrate`, configuración local/producción y TLS PostgreSQL verificado; contratos reales de ambos motores mediante `pnpm test:db`.
+- Guía de drivers y transición: la API legada conserva SQLite local y rechaza producción/PostgreSQL hasta migrar todo el almacenamiento funcional. Sin cambios de autenticación ni del formato de escena v2.
+
+## [3.7.0] - 2026-10-29
+
+### Agregado
+
+- Configuración de API desde `.env` y de Electron desde `.env.electron`, cargada al arrancar sin exports manuales ni dependencias nuevas. Las variables del proceso tienen precedencia.
+- Preparación Bash idempotente con claves privadas persistentes, archivos con permisos 600 y directorio de datos 700; conserva configuraciones existentes y mantiene secretos fuera de Git y del cliente.
+- El arranque de la API muestra el host, el puerto efectivo y el enlace del origen público configurado para abrir la aplicación.
 
 ## [3.6.0] - 2026-10-29
 

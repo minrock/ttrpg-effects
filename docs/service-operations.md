@@ -1,6 +1,8 @@
-# Operar el servicio y conectar Electron — 3.6.0
+# Operar el servicio y conectar Electron — 3.8.0
 
 Electron arranca **local** por defecto. El modo **service** carga exactamente el cliente web y guarda en el servicio indicado por el título de ventana; no abre la biblioteca ni los archivos del perfil local. No inicia un servidor. El formato `.ttrpgscene` continúa en v2, con migración de v1.
+
+La [infraestructura multi-DB y catálogo](database.md) añade `control.sqlite` local y PostgreSQL para migraciones/pruebas. La API descrita aquí sigue usando almacenamiento legado: solo admite `TTRPG_DEPLOYMENT=local` y `TTRPG_DB_DRIVER=sqlite` (defaults). Declarar production/postgres falla antes de arrancar; no hay aún servicio completo PostgreSQL.
 
 ## Instalar, construir y ejecutar
 
@@ -13,31 +15,39 @@ pnpm build:web
 pnpm build
 ```
 
-Las salidas independientes son `out/api/index.mjs`, `out/web`, y `out/main` + `out/preload` + `out/renderer`. Ningún build borra los otros. El empaquetado Electron solo incluye sus tres directorios; no incorpora el build API/web, datos ni configuración. No hace falta empaquetar para ejecutar el main compilado. En un servidor sin escritorio bastan los dos primeros builds, package.json y dependencias de producción instaladas en la arquitectura destino; sharp contiene binarios nativos. No trasladar node_modules entre arquitecturas.
+Las salidas independientes son `out/api` (entry `index.mjs`, comando `db-migrate.mjs` y chunks compartidos), `out/web`, y `out/main` + `out/preload` + `out/renderer`. Ningún build borra los otros. El empaquetado Electron solo incluye sus tres directorios; no incorpora el build API/web, datos ni configuración. No hace falta empaquetar para ejecutar el main compilado. En un servidor sin escritorio bastan los dos primeros builds, package.json y dependencias de producción instaladas en la arquitectura destino; sharp contiene binarios nativos. No trasladar node_modules entre arquitecturas.
 
-Crea un directorio físico privado fuera del repositorio y del perfil Electron. Proporciona las claves por un gestor de secretos o un archivo de entorno privado (chmod 600), nunca en `VITE_*`, argumentos URL, frontend ni logs. Por ejemplo, genera **dos valores distintos** con `pnpm exec node -e 'console.log(require("node:crypto").randomBytes(32).toString("hex"))'`, ejecutándolo dos veces en tu terminal privada. Cada clave debe tener 32–1024 caracteres.
+Prepara una vez la configuración privada con el script Bash:
 
 ```sh
-export TTRPG_HOST=127.0.0.1
-export TTRPG_PORT=8787
-export TTRPG_DATA_DIR=/ruta/fisica/privada/mesa
-export TTRPG_PUBLIC_ORIGIN=http://127.0.0.1:8787
-export TTRPG_WEB_DIR="$PWD/out/web"
-# Proveer TTRPG_DM_KEY y TTRPG_PLAYER_KEY desde la configuración privada.
+pnpm setup:env
+```
+
+Crea `.env` para la API y `.env.electron` para el cliente, ambos con permisos **0600**, y un directorio de datos **0700** bajo `~/.local/share/ttrpg-effects-service`. Guarda rutas absolutas reales y genera dos claves aleatorias diferentes, que permanecen entre arranques. No imprime claves ni sobrescribe archivos existentes; rechaza enlaces simbólicos. Puedes seleccionar otro directorio al prepararlo por primera vez con `TTRPG_DATA_DIR=/ruta/privada/mesa pnpm setup:env`.
+
+Los archivos privados están ignorados por Git y excluidos del empaquetado. Las plantillas `.env.example` y `.env.electron.example` documentan las variables sin secretos. Consulta las claves DM/jugador en tu `.env` privado para iniciar sesión; no las copies a `.env.electron`, `VITE_*` ni URLs.
+
+Después basta arrancar la API desde la raíz del proyecto:
+
+```sh
 pnpm start:api
 ```
 
-Abre el origen en el navegador. Con API activa, en otra terminal:
+Abre `http://127.0.0.1:8787`. En otra terminal, conecta Electron:
 
 ```sh
-TTRPG_SERVICE_URL=http://127.0.0.1:8787 pnpm start:service
+pnpm start:service
 ```
 
-`start:service` ejecuta `electron .` con `TTRPG_ELECTRON_MODE=service`. Carga el build web de la API, no `out/renderer`. La sesión Electron es efímera: recargar conserva la cookie y cerrar la aplicación exige un nuevo acceso. No comparte cookies con Electron local, navegador ni otro proceso Electron servicio. Para proyectar, publica y copia el **Enlace jugador** de Mesa a un navegador/perfil independiente; allí accede con clave Jugador. `Abrir enlace` se bloquea en Electron por la política de ventanas; el campo Enlace jugador permanece visible y seleccionable. La política de permisos puede impedir el botón Copiar: en ese caso aparece «Selecciona el enlace y cópialo manualmente»; selecciona el campo y usa Cmd/Ctrl+C o Editar → Copiar. La URL por sí sola no cambia el rol de una cookie DM.
+Node carga `.env` para la API y únicamente `.env.electron` para el comando Electron. El entorno explícito del proceso tiene precedencia sobre el archivo. Los archivos son opcionales si ya proporcionas variables desde el entorno; no se ejecutan como Bash ni expanden `$HOME`/`$PWD`. Cambiar la configuración requiere reiniciar el proceso.
+
+En `.env.electron`, `TTRPG_ELECTRON_MODE=service` selecciona servicio y `TTRPG_SERVICE_URL=http://127.0.0.1:8787` define el destino. Cambia el modo a `local` para usar almacenamiento local mediante el mismo comando. Sin archivo ni variables, Electron conserva su valor predeterminado local. `pnpm dev` sigue siendo el desarrollo local tradicional y no carga `.env.electron`; `pnpm dev:service` sí lo carga. El DMG instalado no busca estos archivos del repositorio: esta carga pertenece a los comandos pnpm.
+
+En modo servicio, `start:service` ejecuta Electron y carga el build web de la API, no `out/renderer`. La sesión Electron es efímera: recargar conserva la cookie y cerrar la aplicación exige un nuevo acceso. No comparte cookies con Electron local, navegador ni otro proceso Electron servicio. Para proyectar, publica y copia el **Enlace jugador** de Mesa a un navegador/perfil independiente; allí accede con clave Jugador. `Abrir enlace` se bloquea en Electron por la política de ventanas; el campo Enlace jugador permanece visible y seleccionable. La política de permisos puede impedir el botón Copiar: en ese caso aparece «Selecciona el enlace y cópialo manualmente»; selecciona el campo y usa Cmd/Ctrl+C o Editar → Copiar. La URL por sí sola no cambia el rol de una cookie DM.
 
 Si cierras la ventana o sales de Electron con cambios pendientes, aparece una confirmación nativa: **Seguir editando** conserva el borrador para que puedas guardarlo; **Descartar y salir** cierra perdiendo esos cambios. Escape cancela la salida. Sin cambios pendientes, la aplicación cierra normalmente.
 
-Desarrollo API/web: `TTRPG_PUBLIC_ORIGIN=http://127.0.0.1:5175 pnpm dev:api` con las demás variables anteriores; en otra terminal `pnpm dev:web`. Este Vite usa puerto 5175 y proxy hacia API 8787. Para probar Electron sobre ese frontend: `TTRPG_SERVICE_URL=http://127.0.0.1:5175 pnpm dev:service`. Modo servicio tiene precedencia sobre `ELECTRON_RENDERER_URL`. Para desarrollo Electron local, usa `pnpm dev` sin `TTRPG_ELECTRON_MODE`; no necesita servicio ni claves.
+Desarrollo API/web: `TTRPG_PUBLIC_ORIGIN=http://127.0.0.1:5175 pnpm dev:api` con el resto de variables en `.env`; en otra terminal `pnpm dev:web`. Este Vite usa puerto 5175 y proxy hacia API 8787. Para probar Electron sobre ese frontend: `TTRPG_SERVICE_URL=http://127.0.0.1:5175 pnpm dev:service`. Modo servicio tiene precedencia sobre `ELECTRON_RENDERER_URL`. Para desarrollo Electron local, usa `pnpm dev` sin `TTRPG_ELECTRON_MODE`; no necesita servicio ni claves.
 
 ## Variables
 
@@ -84,11 +94,13 @@ Con puerto público no estándar conserva también ese puerto en Host y origen. 
 
 ## Sesiones, claves y almacenamiento
 
+Los párrafos de claves/globales de esta sección describen el acceso legado. Las sesiones de cuentas007 sí persisten tras reinicio y se revocan al rotar TTRPG_AUTH_SECRET; su provisión, recuperación y respaldo completo están en [identidad](identity.md). No aplicar a esas cuentas la afirmación de sesiones exclusivamente en memoria.
+
 Login establece cookie HttpOnly/SameSite=Strict limitada a `/api/v1`, Secure con HTTPS. La sesión vence absolutamente a ocho horas. Logout la revoca; un fallo de red conserva el estado con error, sin afirmar que la revocación ocurrió. Reautenticar DM recupera cambios en memoria tras expiración; cambiar de rol exige descartarlos. Una recarga no recupera trabajo sin guardar.
 
 Para rotar claves, detener limpiamente la API, cambiar ambas en la configuración privada y arrancar. El reinicio invalida **todas** las sesiones, publicación, presencia y dados, que viven en memoria. No existe recarga dinámica de variables ni revocación retroactiva de bytes descargados. Los jugadores deben acceder otra vez y el DM volver a publicar.
 
-`TTRPG_DATA_DIR` contiene `service.sqlite` (escenas, imágenes BLOB, plantillas y metadatos), `monsters.sqlite`, `entities.sqlite` y sus sidecars SQLite mientras existan. No hay carpeta separada de assets: están en service.sqlite. `service.lock` evita otra instancia. Directorio 0700 y configuración 0600; no compartir escritura con otros procesos. El perfil Electron local es independiente y no se migra. Reiniciar conserva recursos guardados, no estado de mesa ni borradores clientes.
+`TTRPG_DATA_DIR` contiene `service.sqlite` (escenas, imágenes BLOB, plantillas y metadatos), `monsters.sqlite`, `entities.sqlite` y sus sidecars SQLite mientras existan. No hay carpeta separada de assets: están en service.sqlite. `service.lock` evita otra instancia. Si se ejecutó `db:migrate` local, el directorio también contiene `control.sqlite` y sus sidecars, con exclusión independiente `control.lock`; incluirlos en el respaldo completo. Directorio 0700 y configuración 0600; no compartir escritura con otros procesos. El perfil Electron local es independiente y no se migra. Reiniciar conserva recursos guardados, no estado de mesa ni borradores clientes.
 
 ## Backup y restauración
 
@@ -130,3 +142,11 @@ Importar `.ttrpgscene` v1 migra en memoria a v2 y conserva mapas, IDs y geometr�
 | Producción API/web | Node 24 sin Electron/dev server; recursos persistentes y mesa efímera | Reinicio y backup/restore temporal con escena/imagen/biblioteca; ver atribución y comandos en build 005. |
 
 El detalle reproducible y los límites concretos están en [build 005](../factory/jobs/005-electron-servicio/build.md). No se certifican distribución firmada, despliegue remoto, proyector físico ni una prueba manual de todas las combinaciones de herramientas.
+
+## Identidad de cuentas optativa (007)
+
+La versión 3.9.0 incorpora cuentas administrador/DM separadas del acceso legado, activadas explícitamente y sin nueva UI. Consulta [operación de identidad](identity.md) para migraciones, comandos TTY, contraseñas temporales, cookies y límites de transición. No habilita el servicio VTT completo sobre PostgreSQL ni concede acceso a la mesa global.
+
+## Backend privado008
+
+Consulta [partidas, recursos por DM y transferencia operativa](owned-data.md) para migración3, rutas `/api/v1/dm`, revisiones, idempotencia y pruebas reales de ambos motores. Esta superficie no convierte las rutas globales históricas en multiusuario ni retira su guard productivo;011 completa el corte.

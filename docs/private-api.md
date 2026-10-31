@@ -1,10 +1,14 @@
 # Servicio privado HTTP (3.6.0)
 
+Este documento describe los contratos legados. Las rutas optativas de cuentas007 tienen cookies, errores y persistencia independientes: [identidad](identity.md). Una cuenta nueva no autoriza las rutas globales de este documento.
+
 El servicio Node.js 24 administra una instancia privada. Electron conserva su modo local y su perfil. Incluye el [cliente navegador](browser-client.md). La [mesa sincronizada](synchronized-table.md) añade SSE, publicación y assets autorizados para jugadores.
+
+La infraestructura de [catálogo multi-DB](database.md) todavía no sustituye este almacenamiento global. Desde 3.8.0, la API rechaza postgres/production antes de abrir datos; sin variables nuevas conserva local + sqlite. No se añaden cuentas ni autorización de partidas a estas rutas.
 
 ## Arranque y configuración
 
-Instalar con `pnpm install`, compilar con `pnpm build:api` y ejecutar con `pnpm start:api`. `pnpm dev:api` compila y ejecuta; reiniciarlo tras editar fuentes. El artefacto es `out/api/index.mjs`, independiente de Electron. Para trasladarlo conservar `node_modules` de producción (Zod, honeycomb-grid y sharp son externos al bundle; sharp requiere los binarios de su plataforma instalados por pnpm). `pnpm dev` continúa ejecutando Electron local.
+Instalar con `pnpm install`, compilar con `pnpm build:api` y ejecutar con `pnpm start:api`. `pnpm dev:api` compila y ejecuta; reiniciarlo tras editar fuentes. El entry es `out/api/index.mjs`; conservar todo `out/api`, incluidos los chunks compartidos y `db-migrate.mjs`,, independiente de Electron. Para trasladarlo conservar `node_modules` de producción (Zod, honeycomb-grid y sharp son externos al bundle; sharp requiere los binarios de su plataforma instalados por pnpm). `pnpm dev` continúa ejecutando Electron local.
 
 | Variable | Regla |
 | --- | --- |
@@ -125,3 +129,11 @@ El endpoint de conexión entre escenas rechaza marcadores que aún tienen un enl
 La [mesa sincronizada](synchronized-table.md) completa `/table/*` y `/dice/*`, SSE, presencia e idempotencia. Assets GET/HEAD y resolve aceptan sesión jugador exclusivamente para referencias del conjunto público vigente; no exponen escenas ni bibliotecas privadas.
 
 Guía operativa completa de producción, Electron servicio, HTTPS y respaldo: [Operar el servicio](service-operations.md).
+
+## Identidad de cuentas optativa (007)
+
+La versión 3.9.0 incorpora cuentas administrador/DM separadas del acceso legado, activadas explícitamente y sin nueva UI. Consulta [operación de identidad](identity.md) para migraciones, comandos TTY, contraseñas temporales, cookies y límites de transición. No habilita el servicio VTT completo sobre PostgreSQL ni concede acceso a la mesa global.
+
+## Backend privado008
+
+Consulta [partidas, recursos por DM y transferencia operativa](owned-data.md) para migración3, rutas `/api/v1/dm`, revisiones, idempotencia y pruebas reales de ambos motores. Esta superficie no convierte las rutas globales históricas en multiusuario ni retira su guard productivo;011 completa el corte.
