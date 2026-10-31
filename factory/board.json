@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "actualizado": "2026-10-31T15:30:31.768492+00:00",
+  "actualizado": "2026-10-31T15:34:10.681462+00:00",
   "trabajos": [
     {
       "id": "001-contrato-clientes",
@@ -405,7 +405,7 @@
       "titulo": "Expulsión inmediata y mesas sincronizadas independientes",
       "rama": "feature/factory-006-persistencia-multidb",
       "base": "feef7120e0a3145ddd345eed714deef3542007d4",
-      "etapa": "integracion",
+      "etapa": "integrado",
       "ciclo": 2,
       "ronda": 3,
       "constructor": "/root/constructor_010",
@@ -444,12 +444,14 @@
       "dependencias": [
         "009-invitaciones-jugadores"
       ],
-      "motivo": "APROBAR técnico en ciclo 2/ronda 3. Integración local autorizada en preparación; pendiente commit/main y DMG 3.12.0.",
+      "motivo": "Integrado localmente en main, versión 3.12.0; DMG arm64 generado y verificado. Tercera ronda con cuatro aprobaciones. Sin push.",
       "directorio": "/Users/minrock/.codex/worktrees/autenticacion-mesas/ttrpg-effects",
       "backlog": {
         "linea": 17,
         "texto": "- [ ] Expulsión inmediata y mesas sincronizadas independientes — `010-moderacion-tiempo-real`"
-      }
+      },
+      "integradoEn": "ae5c654f74962b1f6c8de18055d87f9192d1f9ce",
+      "dmg": "/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.12.0-arm64.dmg"
     },
     {
       "id": "011-experiencia-autenticacion",

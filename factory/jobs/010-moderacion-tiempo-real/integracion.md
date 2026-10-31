@@ -1,6 +1,6 @@
 # Integración local 010 — 3.12.0
 
-Fecha:2026-10-31. Estado:transferencia preparada antes de commit,main/DMG pendientes. Autorización en integracion-solicitud.md; usuario ordenó dejar las entregas aprobadas en main. Orquestador prepara board/backlog y dará continuación antes del commit. Sin push ni despliegue.
+Fecha:2026-10-31. Estado:producto incorporado en main y DMG verificado; cierre del tablero/commit documental a cargo de coordinación. Autorización en integracion-solicitud.md; usuario ordenó dejar las entregas aprobadas en main. Orquestador preparó board/backlog y autorizó la continuación antes del commit. Sin push ni despliegue.
 
 ## Identidad y aislamiento
 
@@ -14,7 +14,7 @@ No se copiaron producto/expedientes011,env privados,datos,logs ni builds. No se 
 
 Se inspeccionaron logs originales finales del constructor: typecheck ylint satisfactorios (lint conserva1warning cosmético de eslint-disable,0errores),suite131archivos/1213tests PASS,buildElectron/API y41contratos010 PASS enSQLite/PostgreSQL reales. Buildweb de ronda2 permanece vigente por identidad de su grafo. Logs /tmp/ttrpg-010-c2-*.log y /tmp/ttrpg-010-r2-build-web.log. Son ejecuciones del constructor inspeccionadas; no se presentan como checks propios del integrador. Los fallos iniciales por contención y correcciones anteriores permanecen documentados en build.md.
 
-Typecheck propio en destino PASS,exit0;log /tmp/ttrpg-010-integration-typecheck.log. No se repiten suitesmultidriver aprobadas sin causa ni se utiliza PostgreSQL reservado. Empaquetado y hdiutil se ejecutarán después del merge autorizado.
+Typecheck propio en destino PASS,exit0;log /tmp/ttrpg-010-integration-typecheck.log. No se repiten suitesmultidriver aprobadas sin causa ni se utiliza PostgreSQL reservado. Empaquetado y hdiutil se ejecutaron después del merge autorizado; resultados al final.
 
 ## Manifiesto de transferencia
 
@@ -79,3 +79,18 @@ SHA256 del manifiesto638: `df5df4ece192166d9d58a1d7c57effea17460b4819af7d96eae97
 ## Preparación del commit
 
 Orquestador copió board/backlog y autorizó continuar. Comprobados de nuevo638/638SHA tanto en fuente como destino,mainbasefeef712 intacta. Índice preparado mediante80rutas explícitas:49producto,29archivos de expediente010 y2registros del orquestador. Ningún011 ni privado. git diff --cached --check identifica1754avisos de espacios exclusivamente dentro de los diffs archivados de ronda1/ronda2/ronda3 revision.md; se conservan como evidencia inmutable. La comprobación excluyendo esos revision.md pasa, sin errores de formato en producto.
+
+## Resultado final de producto y empaquetado
+
+Commit de producto:`ae5c654f74962b1f6c8de18055d87f9192d1f9ce`. Incorporación local mediante `git switch main` y `git merge --ff-only feature/factory-010-moderacion-tiempo-real`, sin conflictos.79archivos cambiados; se seleccionaron80rutas y backlog no tenía diferencia. Main conserva producto exacto aprobado:638/638SHA después del commit y del empaquetado, igual que la fuente al finalizar. Sin producto011,privados ni buildoutputs en el historial. No push.
+
+- `./scripts/build-dmg.sh`:exit0;typecheck,compilaciónElectron y electron-builder correctos. Log:`/tmp/ttrpg-3.12.0-dmg.log`.
+- DMGarm64:`/Users/minrock/.codex/worktrees/integracion-006-009/ttrpg-effects/dist/TTRPG Effects-3.12.0-arm64.dmg`.
+- Tamaño:152632930bytes.
+- SHA256:`a72ad49dd6db8b35bd1adefa117bd6fc36d5ba1a6715c76e25afe58d341d6c23`.
+- `hdiutil verify`:exit0,checksumVALID. Log:`/tmp/ttrpg-3.12.0-dmg-verify.log`.
+- Info.plist confirma CFBundleShortVersionString y CFBundleVersion3.12.0.
+
+Se preservan los warnings existentes del empaquetador (author ausente,dependencias opcionales para otrasplataformas,DEP0190) y configuración sinfirmaDeveloperID; no impidieron construir. No se instaló ni ejecutó el DMG con perfilpersonal,no se afirma QAvisual nuevo ni despliegue. El servicio8787 y checkout habitual no se tocaron.
+
+El orquestador preparó el estado integrado de board/backlog y coordinación010 y autorizó el cierre documental:se incluyen este informe y cuatro documentos preparatorios011 (solicitud,coordinación,spec y propuesta histórica),sin producto011. Se comprobaron exactamente8rutas documentales y638/638huellas de producto intactas antes del commit de cierre. El integrador no modificó board/backlog ni la fuente. No se requiere otro DMG para este cierre documental del mismo producto3.12.0.

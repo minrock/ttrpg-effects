@@ -53,3 +53,7 @@ Usuario autorizó tercera ronda; leer retrabajo-ciclo-2.md. PostgreSQL temporal 
 ## Ronda 3, ciclo 2
 
 Constructor terminó explícitamente, build SHA256 8ab91e21526135bf117ef37cb863f0fb8353348fa316d6b5df8d29b1a5ca349a. Producto congelado en ronda-3/revision.md y huellas.json. Diff efectivo completo sobre base main, incluidos archivos no rastreados; tres archivos de corrección respecto a ronda2. Seguridad tiene PG exclusivo para revisión; restantes roles usan pruebas cliente o SQLite propias. Esperar cuatro informes y agentes terminados antes de decidir.
+
+## Integración terminada
+
+APROBAR ciclo2/ronda3. Producto integrado en main ae5c654f74962b1f6c8de18055d87f9192d1f9ce y DMG3.12.0 arm64 verificado, detalle en integracion.md. Las638 huellas fuente/destino siguen intactas. Tablero/cola actualizados por orquestador. Cierre documental local autorizado, sin push. 011 puede comenzar tras registrar base final; servicio anterior8787 continúa activo hasta corte011.
