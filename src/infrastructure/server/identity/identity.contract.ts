@@ -73,6 +73,17 @@ function http(port: number, path: string, method = "GET", body?: unknown, cookie
   });
 }
 for (const kind of ["sqlite", "postgres"] as const) describe(`Identidad real ${kind}`, () => {
+  it("permite administradores locales adicionales, conserva sesiones y rechaza correos duplicados", async () => {
+    const config = await fixture(kind), service = await open(config), cookie = await activeAdmin(service);
+    const account = await service.createAdminLocal({ email: "extra@example.test", name: "Administración adicional", password: initial });
+    expect(account).toMatchObject({ role: "admin", mustChangePassword: true, enabled: true });
+    expect((await service.login(account.email, initial, "extra")).identity.account.id).toBe(account.id);
+    expect((await service.session(cookie)).account.email).toBe(adminInput.email);
+    await expect(service.createAdminLocal({ ...adminInput, email: " ADMIN@EXAMPLE.TEST " })).rejects.toMatchObject({ code: "CONFLICT" });
+    const dm = await service.createDm(cookie, { email: "not-promoted@example.test", name: "DM", password: dmPassword });
+    await expect(service.createAdminLocal({ email: dm.email, name: "Duplicado", password: initial })).rejects.toMatchObject({ code: "CONFLICT" });
+    expect((await service.login(dm.email, dmPassword, "dm")).identity.account.role).toBe("dm");
+  });
   it("bootstrap, cambio, alta DM, sesiones y recuperación persisten usando Better Auth", async () => {
     const config = await fixture(kind); let service = await open(config);
     const cookie = await activeAdmin(service);
@@ -277,8 +288,8 @@ for (const kind of ["sqlite", "postgres"] as const) it(`CLI compilado ${kind}: P
   const env = { TTRPG_DB_DRIVER: kind, TTRPG_DEPLOYMENT: config.deployment, TTRPG_PUBLIC_ORIGIN: origin, TTRPG_AUTH_SECRET: secret,
     ...(config.driver === "sqlite" ? { TTRPG_DATA_DIR: config.dataDir } : { TTRPG_DATABASE_URL: config.url, TTRPG_DB_CA_FILE: config.caFile!, TTRPG_DB_TLS: "verify-full" }) };
   const operations = [
-    { name: "bootstrap", answers: [["Email del primer administrador:", "cancel@example.test\r"], ["Nombre visible:", "Cancelado\r"], ["Contraseña inicial (15–128 caracteres):", "\u0003"]], expected: 1 },
-    { name: "bootstrap", answers: [["Email del primer administrador:", adminInput.email + "\r"], ["Nombre visible:", adminInput.name + "\r"], ["Contraseña inicial (15–128 caracteres):", initial + "\r"], ["Confirma la contraseña:", initial + "\r"]] },
+    { name: "bootstrap", answers: [["Email del primer administrador:", "cancel@example.test\r"], ["Nombre visible:", "Cancelado\r"], ["Contraseña inicial (10–128 caracteres):", "\u0003"]], expected: 1 },
+    { name: "bootstrap", answers: [["Email del primer administrador:", adminInput.email + "\r"], ["Nombre visible:", adminInput.name + "\r"], ["Contraseña inicial (10–128 caracteres):", initial + "\r"], ["Confirma la contraseña:", initial + "\r"]] },
     { name: "password", answers: [["Email de la cuenta:", adminInput.email + "\r"], ["Contraseña actual:", initial + "\r"], ["Nueva contraseña:", changed + "\r"], ["Confirma la contraseña:", changed + "\r"]] },
     { name: "provision-dm", answers: [["Email de la cuenta administradora:", adminInput.email + "\r"], ["Contraseña actual:", changed + "\r"], ["Email del nuevo DM:", "tty@example.test\r"], ["Nombre visible del DM:", "TTY DM\r"], ["Contraseña temporal del DM:", dmPassword + "\r"], ["Confirma la contraseña:", dmPassword + "\r"]] },
     { name: "recover-admin", answers: [["Email del administrador existente:", adminInput.email + "\r"], ["Escribe RECUPERAR para confirmar:", "RECUPERAR\r"], ["Nueva contraseña temporal:", initial + "\r"], ["Confirma la contraseña:", initial + "\r"]] }
@@ -318,7 +329,7 @@ for (const kind of ["sqlite", "postgres"] as const) it(`migración006→007 ${ki
   const id = randomUUID(), now = new Date().toISOString();
   await raw(config, c => c.query("INSERT INTO ttrpg_games(id,owner_id,name,state,created_at,updated_at) VALUES($1,$2,$3,$4,$5,$6)", [id, "legacy-owner", "Conservar", "ready", now, now]));
   await expect(openIdentity(config, { secret, publicOrigin: origin })).rejects.toMatchObject({ code: "MIGRATION_REQUIRED" });
-  expect(await migrateCatalog(config)).toEqual([2, 3, 4, 5, 6]); expect(await migrateCatalog(config)).toEqual([]);
+  expect(await migrateCatalog(config)).toEqual(migrations.slice(1).map(migration => migration.version)); expect(await migrateCatalog(config)).toEqual([]);
   expect((await raw(config, c => c.query("SELECT id FROM ttrpg_games"))).rows).toEqual([{ id }]);
   const service = await open(config); await service.bootstrap(adminInput);
 });

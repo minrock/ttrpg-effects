@@ -18,6 +18,10 @@ export interface IdentityService {
   createDm(cookie: string, input: NewAccount): Promise<AccountDto>;
   listDms(cookie: string, limit: number, offset: number): Promise<{ accounts: AccountDto[]; total: number }>;
   administer(cookie: string, id: string, action: DmAction, password?: string): Promise<void>;
+  /** Comprobación previa exclusiva del CLI; bootstrap revalida dentro de la transacción. */
+  bootstrapAvailable(): Promise<boolean>;
+  /** Provisión local de administradores adicionales; nunca exponer por HTTP. */
+  createAdminLocal(input: NewAccount, options?: { mustChangePassword: boolean }): Promise<AccountDto>;
   bootstrap(input: NewAccount): Promise<AccountDto>;
   recoverAdmin(email: string, password: string): Promise<void>;
   /** Bloqueo/revalidación y recursos006 en la misma transacción. No usar tx tras el callback. */

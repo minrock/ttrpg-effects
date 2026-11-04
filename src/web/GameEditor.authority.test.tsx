@@ -130,3 +130,21 @@ for(const status of [503,401])it(`sesión de apertura vieja responde ${status} d
   if(status===401)await render(false);
   expect(host.querySelector('[aria-label="Borrador retenido"]')?.closest('[hidden]')!==null).toBe(status===401);
 });
+
+it("los controles en la cabecera compartida conservan confirmaciones y ocultan datos al suspender", async () => {
+  const slot=document.createElement("div");host.append(slot);
+  const renderWithHeader=async(active:boolean)=>{slot.hidden=!active;slot.inert=!active;await act(async()=>root.render(<GameEditor http={http} gameId={id} active={active} expired={state.expired} onExit={()=>{}} onLogout={async()=>{}} registerLeave={()=>()=>{}} headerSlot={slot}/>));};
+  // El destino del portal está fuera del nodo de montaje, como la cabecera del servicio.
+  document.body.append(slot);
+  try {
+    await renderWithHeader(true);await click("Continuar partida");
+    expect(host.querySelector(".game-bar")).toBeNull();expect(slot.textContent).toContain("Campaña");
+    const button=[...slot.querySelectorAll("button")].find(button=>button.textContent==="Cerrar partida")!;
+    await act(async()=>{slot.querySelector("summary")!.click();button.click();});
+    expect(host.querySelector("dialog")?.getAttribute("aria-label")).toBe("Cerrar partida");
+    expect(slot.querySelector("details")!.open).toBe(false);
+    const draft=host.querySelector('[aria-label="Borrador retenido"]');
+    await renderWithHeader(false);expect(slot.hidden).toBe(true);expect(host.querySelector("dialog")).toBeNull();
+    await renderWithHeader(true);expect(host.querySelector('[aria-label="Borrador retenido"]')).toBe(draft);
+  } finally { await act(async()=>root.unmount());slot.remove(); }
+});

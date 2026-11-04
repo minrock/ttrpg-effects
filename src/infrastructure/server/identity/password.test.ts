@@ -5,8 +5,8 @@ import { readIdentityConfig } from "./config";
 import { randomBytes } from "node:crypto";
 describe("Política de identidad", () => {
   it("acepta passphrases Unicode sin trim, normalización ni composición; rechaza límites antes del KDF", async () => {
-    for (const value of ["a".repeat(14), "a".repeat(129), "😸".repeat(129), "x".repeat(14) + "\uD800", null]) expect(() => validatePassword(value)).toThrow();
-    for (const value of [" ".repeat(15), "a".repeat(128), "😸".repeat(128)]) expect(() => validatePassword(value)).not.toThrow();
+    for (const value of ["a".repeat(9), "a".repeat(129), "😸".repeat(129), "x".repeat(14) + "\uD800", null]) expect(() => validatePassword(value)).toThrow();
+    for (const value of [" ".repeat(10), "a".repeat(10), "😸".repeat(10), "a".repeat(128), "😸".repeat(128)]) expect(() => validatePassword(value)).not.toThrow();
     const value = " cafe\u0301 passphrase ", hash = await passwordCodec.hash(value);
     expect(await passwordCodec.verify({ hash, password: value })).toBe(true);
     expect(await passwordCodec.verify({ hash, password: value.normalize("NFKC") })).toBe(false);

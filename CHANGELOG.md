@@ -1,5 +1,39 @@
 # Changelog
 
+## 3.18.1 — 2026-11-04 — Corrección
+
+- Fusiona los controles del editor con la cabecera del servicio: una sola fila para partida, escena, guardar, herramientas, jugador y perfil, sin logo duplicado ni fila vacía.
+- En pantallas estrechas agrupa las herramientas en un desplegable; conserva la cabecera de Electron local y oculta los controles compartidos al suspender el acceso.
+
+## 3.18.0 — 2026-11-04 — Funcionalidad
+
+- Cabecera del servicio de 44 px: navegación, contexto de partida y perfil en una fila; menús desplegables para cuenta y partida, manteniendo confirmaciones y protección de borradores.
+- Distribución adaptable a pantallas estrechas y desplegables con teclado, Escape y cierre al salir; compartida por navegador y Electron en modo servicio.
+
+## 3.17.0 — 2026-11-04 — Funcionalidad
+
+- `createsuperuser` acepta contraseña definitiva elegida y confirmada por el operador, o Enter para generar una temporal aleatoria. Solo la generada exige cambio posterior y se muestra una vez en la terminal tras confirmar el alta.
+- Se mantienen hash, auditoría, unicidad del correo y acceso exclusivo por CLI; no cambia la política temporal de provisión DM ni recuperación.
+
+## 3.16.0 — 2026-11-03 — Funcionalidad
+
+- Contraseñas de 10–128 caracteres Unicode en la provisión local, autenticación y cambio de contraseña; mensajes de CLI y cliente actualizados. Se conserva el hash existente y no se requiere migración de datos.
+
+## 3.15.0 — 2026-11-03 — Funcionalidad
+
+- `pnpm createsuperuser` permite crear varios administradores desde la terminal local, con correo único, contraseña oculta y cambio obligatorio. No se expone ningún endpoint nuevo.
+- Migración 7 para SQLite/PostgreSQL: retira el índice de administrador único y conserva cuentas, credenciales y sesiones. `identity:bootstrap` mantiene su uso exclusivo para el alta inicial.
+
+## 3.14.1 — 2026-10-31 — Corrección
+
+- El alta local identifica errores de correo, nombre y contraseña y permite corregirlos sin reiniciar el comando ni mostrar secretos.
+- Comprueba antes de pedir datos si el alta inicial ya se completó e indica los comandos de recuperación y cambio de contraseña; conserva la validación transaccional final.
+
+## 3.14.0 — 2026-10-31 — Funcionalidad
+
+- Comando local interactivo `pnpm createsuperuser` para crear el primer administrador, sin endpoint HTTP ni credenciales en argumentos.
+- Reutiliza la provisión transaccional existente, carga el `.env` del proyecto y conserva contraseña oculta, confirmación y cambio obligatorio; incluye ayuda y diagnóstico de preparación.
+
 ## 3.13.0 — 2026-10-31 — Funcionalidad
 
 - Acceso por cuentas administrador/DM, cambio obligatorio, administración de cuentas y catálogo de sistemas con versiones retenidas; selección explícita de sistema por partida.

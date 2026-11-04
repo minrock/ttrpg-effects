@@ -145,3 +145,8 @@
 @media (prefers-reduced-motion: reduce) {
   .vtt-interface * { scroll-behavior: auto; transition-duration: 0s; }
 }
+
+/* El cliente local conserva su cabecera; el servicio usa el destino compartido. */
+.workspace-tools-menu { margin-left:auto;position:relative; }
+.vtt-interface .workspace-tools-trigger { display:none; }
+.vtt-interface.app-shell--shared-header { grid-template-rows:0 auto minmax(0,1fr) 28px; }

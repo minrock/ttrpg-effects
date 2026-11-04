@@ -49,6 +49,30 @@ describe("Workspace chrome", () => {
     await click("Cargar escena"); await click("Abrir ventana de jugador");
     expect(props.onLoad).not.toHaveBeenCalled(); expect(props.onPlayer).not.toHaveBeenCalled();
   });
+  it("fusiona los controles en el destino compartido sin duplicar logo y respeta suspensión", async () => {
+    const target=document.createElement("div");document.body.append(target);
+    const props=header({portalTarget:target,enabled:true,serviceActions:{onImport:vi.fn(),onExport:vi.fn(),onLogout:vi.fn()}});
+    try {
+      await act(async()=>root.render(<WorkspaceHeader {...props}/>));
+      expect(host.querySelector(".workspace-header")).toBeNull();
+      expect(target.querySelector(".workspace-brand")).toBeNull();
+      expect(target.querySelector("header")).toBeNull();
+      expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(7);
+      expect(target.textContent).not.toContain("Cerrar sesión");
+      const trigger=target.querySelector<HTMLButtonElement>('[aria-label="Herramientas del editor"]')!;
+      await act(async()=>trigger.click());expect(trigger.getAttribute("aria-expanded")).toBe("true");
+      const dice=target.querySelector<HTMLButtonElement>('[aria-label="Abrir dados"]')!;
+      await act(async()=>dice.click());expect(props.onDice).toHaveBeenCalledOnce();
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");expect(document.activeElement).toBe(trigger);
+      await act(async()=>root.render(<WorkspaceHeader {...props} enabled={false}/>));
+      expect(dice.closest('[hidden][inert]')).not.toBeNull();
+      await act(async()=>root.render(<WorkspaceHeader {...props} enabled={true}/>));
+      expect(target.querySelector('[aria-label="Abrir dados"]')).toBe(dice);
+      expect(dice.closest('[hidden]')).toBeNull();
+      await act(async()=>root.render(<WorkspaceHeader {...header()}/>));
+      expect(target.children).toHaveLength(0);expect(host.querySelector('.workspace-brand')).not.toBeNull();
+    } finally { target.remove(); }
+  });
   it("routes shapes and lights through their original callbacks", async () => {
     const props = tools(); await act(async () => root.render(<WorkspaceTools {...props} />));
     await click("Areas"); await click("Area conica"); expect(props.onShape).toHaveBeenCalledWith("cone");

@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "3.13.0",
+  "version": "3.18.1",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -23,6 +23,7 @@
     "db:migrate": "node --env-file-if-exists=.env out/api/db-migrate.mjs",
     "test:db": "vitest run --config src/infrastructure/server/database/vitest.config.ts",
     "identity:bootstrap": "node --env-file-if-exists=.env out/api/identity-cli.mjs bootstrap",
+    "createsuperuser": "node scripts/createsuperuser.mjs",
     "identity:provision-dm": "node --env-file-if-exists=.env out/api/identity-cli.mjs provision-dm",
     "identity:recover-admin": "node --env-file-if-exists=.env out/api/identity-cli.mjs recover-admin",
     "identity:password": "node --env-file-if-exists=.env out/api/identity-cli.mjs password",

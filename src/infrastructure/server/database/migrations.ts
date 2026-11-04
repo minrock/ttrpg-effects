@@ -62,6 +62,8 @@ export const migrations: readonly Migration[] = [{ version: 1, name: "catalogo-p
 ] }, { version: 6, name: "moderacion-participantes", statements: [
   "CREATE TABLE moderation_audit (id TEXT PRIMARY KEY, actor TEXT NOT NULL, game_id TEXT NOT NULL, opening_id TEXT NOT NULL, participant_id TEXT NOT NULL, invitation_version INTEGER NOT NULL, at TEXT NOT NULL, result TEXT NOT NULL CHECK(result='revoked'))",
   "CREATE INDEX moderation_roster ON moderation_audit(opening_id)"
+] }, { version: 7, name: "multiples-administradores-locales", statements: [
+  "DROP INDEX identity_one_admin"
 ] }];
 function checksum(migration: Migration): string { return createHash("sha256").update(JSON.stringify(migration)).digest("hex"); }
 async function tableNames(connection: SqlConnection, kind: SqlDriver["kind"]): Promise<string[]> {

@@ -1,7 +1,7 @@
 import { randomUUID, createHash } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { makeSignature } from "better-auth/crypto";
-import { z } from "zod";
+import { emailProblem, nameProblem } from "../../../application/services/identity-validation";
 import { IdentityError, type IdentityService, type NewAccount } from "../../../application/services/identity";
 import type { AccountDto, IdentitySessionDto } from "../../../shared/contracts/identity";
 import { ownedRepositories } from "../owned/repository";
@@ -11,17 +11,16 @@ import type { SqlConnection } from "../database/driver";
 import { identityDatabase } from "./database";
 import { validateIdentityConfig, type IdentityConfig } from "./config";
 import { LoginQuota, passwordCodec, validatePassword } from "./password";
-const emailSchema = z.email().max(254);
 export function canonicalEmail(value: unknown): string {
   if (typeof value !== "string") throw new IdentityError("INVALID_INPUT");
   const email = value.trim().toLowerCase();
-  if (!emailSchema.safeParse(email).success) throw new IdentityError("INVALID_INPUT");
+  if (emailProblem(email)) throw new IdentityError("INVALID_INPUT");
   return email;
 }
 function accountInput(input: NewAccount): NewAccount {
   validatePassword(input.password);
   const name = input.name.trim();
-  if (!name || [...name].length > 100 || [...input.name].some(c => c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127)) throw new IdentityError("INVALID_INPUT");
+  if (nameProblem(input.name)) throw new IdentityError("INVALID_INPUT");
   return { email: canonicalEmail(input.email), name, password: input.password };
 }
 function revision(user: object | undefined): number {
@@ -42,7 +41,7 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
   const auth = betterAuth({
     appName: "TTRPG Identity", baseURL: config.publicOrigin, basePath: "/api/v1/identity/internal-unmounted", secret: config.secret,
     database: { db: unit.db, type: database.driver, transaction: false },
-    emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 15, maxPasswordLength: 256, password: { hash: value => passwordCodec.hash(value), verify: input => passwordCodec.verify(input) } },
+    emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 10, maxPasswordLength: 256, password: { hash: value => passwordCodec.hash(value), verify: input => passwordCodec.verify(input) } },
     user: { modelName: "identity_user", additionalFields: {
       authVersion: { type: "number", required: true, input: false, defaultValue: 0 },
       role: { type: "string", required: true, input: false, defaultValue: "dm" },
@@ -93,11 +92,11 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
     const hash = result?.accounts.find(a => a.providerId === "credential" && a.accountId === result.user.id)?.password ?? "";
     return { user: result?.user, hash };
   };
-  async function create(c: SqlConnection, input: NewAccount, hash: string, role: "admin" | "dm", actor: string): Promise<AccountDto> {
+  async function create(c: SqlConnection, input: NewAccount, hash: string, role: "admin" | "dm", actor: string, action = role === "admin" ? "bootstrap" : "create-dm", mustChangePassword = true): Promise<AccountDto> {
     if (await adapter.findUserByEmail(input.email)) throw new IdentityError("CONFLICT");
-    const user = await adapter.createUser({ email: input.email, name: input.name, emailVerified: false, role, enabled: true, mustChangePassword: true, authVersion: 0 }, { method: "admin" });
+    const user = await adapter.createUser({ email: input.email, name: input.name, emailVerified: false, role, enabled: true, mustChangePassword, authVersion: 0 }, { method: "admin" });
     await adapter.createAccount({ userId: user.id, accountId: user.id, providerId: "credential", password: hash });
-    await audit(c, actor, user.id, role === "admin" ? "bootstrap" : "create-dm");
+    await audit(c, actor, user.id, action);
     return account(user);
   }
   return {
@@ -169,6 +168,11 @@ export async function openIdentity(database: DatabaseConfig, config: IdentityCon
         await audit(c, actor.account.id, id, action);
         if (action !== "enable") effects.afterCommit(() => { if (action === "disable" || action === "password") lifecycle.accountDisabled?.(id); else lifecycle.sessionRevoked?.(id); }, () => lifecycle.accountDisabled?.(id));
       });
+    },
+    bootstrapAvailable: () => transaction(async () => (await context.adapter.count({ model: "user" })) === 0),
+    async createAdminLocal(data, options) {
+      const input = accountInput(data), hash = await context.password.hash(input.password);
+      return transaction(c => create(c, input, hash, "admin", "local-operator", "create-admin-local", options?.mustChangePassword !== false));
     },
     async bootstrap(data) {
       const input = accountInput(data), hash = await context.password.hash(input.password);

@@ -42,13 +42,57 @@
 /* Reservar filas distintas para sesión, brújula y estado de mesa del servicio. */
 .service-player-workspace .player-workspace-root .compass-overlay.compass-overlay--player { top: 70px; }
 
-.account-guard { height:100%; }
+.account-guard { height:100%;display:flex;flex-direction:column;min-height:0; }
 .account-guard[hidden] { display:none; }
-.account-bar, .game-bar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#202830;color:#ebedef;padding:8px 16px; }
-.account-bar nav { margin-left:auto;display:flex;gap:8px;flex-wrap:wrap; }
-.account-bar button,.game-bar button,.service-page button { padding:8px 12px;border:1px solid #6d817f;border-radius:5px;color:#f1f6f4;background:#283d38;cursor:pointer;font:inherit; }
-.account-bar button:focus-visible,.game-bar button:focus-visible,.service-page :focus-visible { outline:2px solid #99e7c3;outline-offset:3px; }
-.service-page { height:calc(100dvh - 60px);overflow:auto;padding:24px clamp(16px,5vw,70px);background:#191f23;color:#eef2f1;box-sizing:border-box; }
+.account-bar { height:44px;flex:0 0 44px;display:flex;align-items:center;gap:12px;padding:0 12px;box-sizing:border-box;background:#202428;border-bottom:1px solid #343b40;color:#e7ebed;position:relative;z-index:60; }
+.game-bar { display:flex;align-items:center;padding:4px 12px;background:#202428;color:#e7ebed; }
+.service-page button { padding:8px 12px;border:1px solid #6d817f;border-radius:5px;color:#f1f6f4;background:#283d38;cursor:pointer;font:inherit; }
+.service-page :focus-visible { outline:2px solid #99e7c3;outline-offset:3px; }
+.header-brand { flex-shrink:0;font-size:12px;font-weight:700;letter-spacing:.02em;color:#e6ece9; }
+.header-brand span { font-weight:400;color:#a0aba8; }
+.header-context { flex:1;min-width:0;display:flex;align-items:center;border-left:1px solid #3c4448;padding-left:12px; }
+.header-section { font-size:12px;color:#aebabc; }
+.header-dropdown { position:relative;min-width:0;font-size:12px; }
+.header-dropdown summary { display:flex;align-items:center;gap:8px;min-height:32px;padding:0 8px;box-sizing:border-box;border:1px solid transparent;border-radius:6px;cursor:pointer;list-style:none;user-select:none; }
+.header-dropdown summary::-webkit-details-marker { display:none; }
+.header-dropdown summary:hover,.header-dropdown[open]>summary { background:#30373c;border-color:#414b50; }
+.header-dropdown :focus-visible { outline:2px solid #99e7c3;outline-offset:2px; }
+.header-chevron { flex-shrink:0;color:#8e9c9f;transition:transform .12s; }
+.header-dropdown[open]>summary>.header-chevron { transform:rotate(180deg); }
+.header-dropdown-panel { position:absolute;top:calc(100% + 7px);min-width:220px;max-width:calc(100vw - 24px);width:max-content;padding:6px;background:#252c31;border:1px solid #465159;border-radius:9px;box-shadow:0 12px 36px #0006;color:#edf2f0;z-index:65;box-sizing:border-box; }
+.header-dropdown-panel--left { left:0; }
+.header-dropdown-panel--right { right:0; }
+.header-dropdown:not([open])>.header-dropdown-panel { display:none; }
+.header-dropdown-panel button { display:flex;align-items:center;gap:10px;width:100%;padding:10px;border:0;border-radius:5px;background:transparent;color:inherit;cursor:pointer;font:inherit;text-align:left; }
+.header-dropdown-panel button:hover:not(:disabled) { background:#354249; }
+.header-dropdown-panel button:disabled { opacity:.4;cursor:default; }
+.header-dropdown-panel .header-danger { color:#f1a9a9; }
+.header-dropdown-heading { margin:4px 10px 8px;color:#a4b2b5;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em; }
+.header-dropdown-divider { height:1px;margin:5px;background:#414b50; }
+.header-navigation summary { padding:0 8px; }
+.header-navigation .header-chevron { display:none; }
+.header-account { flex-shrink:0;margin-left:auto; }
+.header-avatar { width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:#c8b984;color:#25241c;font-size:10px;font-weight:700; }
+.header-account-label { display:flex;flex-direction:column;gap:1px;min-width:0;max-width:150px; }
+.header-account-label strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:600; }
+.header-account-label small { color:#9daeb1;font-size:10px; }
+.header-account-info { display:flex;flex-direction:column;gap:4px;margin:4px 8px 6px;padding-bottom:10px;border-bottom:1px solid #414b50;max-width:240px;overflow-wrap:anywhere; }
+.header-account-info small { color:#a4b2b5; }
+.game-heading { display:flex;align-items:center;gap:12px;min-width:0;max-width:100%; }
+.header-game { min-width:0; }
+.game-heading-title { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600; }
+.header-live { display:flex;align-items:center;gap:5px;flex-shrink:0;font-size:10px;color:#9ed7b8; }
+.header-live i { width:5px;height:5px;border-radius:50%;background:#9ed7b8; }
+.header-disabled { font-size:10px;color:#e4bf84; }
+@media (max-width:700px) {
+  .account-bar { gap:6px;padding:0 8px; }
+  .header-account-label,.header-brand,.header-live span,.header-disabled { display:none; }
+  .header-context { padding-left:4px;border-left:0; }
+  .game-heading { gap:6px; }
+  .header-game { position:static; }
+  .header-game .header-dropdown-panel { top:43px;left:8px; }
+}
+.service-page { height:calc(100dvh - 44px);overflow:auto;padding:24px clamp(16px,5vw,70px);background:#191f23;color:#eef2f1;box-sizing:border-box; }
 .service-page h1 { font-size:28px; }
 .service-page input,.service-page select,.service-page textarea,.service-dialog textarea { color:#eef2f1;background:#10181c;border:1px solid #7d8d94;border-radius:4px;padding:10px;font:inherit;width:100%;min-width:0;box-sizing:border-box; }
 .service-form { display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;margin:24px 0; }
@@ -61,7 +105,7 @@
 .password-field { display:flex;gap:6px;min-width:0; }
 .password-field input { flex:1;min-width:0; }
 .password-field button { flex:none; }
-.game-shell { height:calc(100% - 54px);display:flex;flex-direction:column; }
+.game-shell { flex:1;min-height:0;display:flex;flex-direction:column; }
 .game-shell>.service-workspace { flex:1;min-height:0;height:auto; }
 .game-shell .service-page { height:auto;flex:1; }
 .participant-list { list-style:none;padding:0; }
@@ -69,6 +113,37 @@
 .service-floating-error { position:fixed;bottom:16px;right:16px;max-width:440px;background:#4e2227;color:#fff;padding:14px;z-index:50; }
 .service-page button:disabled { opacity:.5;cursor:default; }
 
-.game-bar strong { flex:1 1 240px;min-width:0;overflow-wrap:anywhere; }
-.account-bar>span,.service-page h1 { min-width:0;overflow-wrap:anywhere; }
-.game-bar>button { flex-shrink:0; }
+.service-page h1 { min-width:0;overflow-wrap:anywhere; }
+
+/* Una sola fila para partida, escena, herramientas y cuenta. */
+.service-editor-tools:empty,.service-editor-tools:has(.service-editor-chrome[hidden]) { display:none; }
+.account-bar:has(.service-editor-chrome:not([hidden])) .header-context { flex:0 1 360px;max-width:28%; }
+.service-editor-tools { flex:1;min-width:0; }
+.service-editor-chrome[hidden] { display:none; }
+.service-editor-chrome .workspace-header { height:42px;gap:12px;padding:0;border:0;background:transparent; }
+.service-editor-chrome .workspace-scene-menu { padding-left:12px; }
+.service-editor-chrome .workspace-scene-menu summary { gap:8px;min-height:32px; }
+.service-editor-chrome .workspace-scene-menu summary small,.service-editor-chrome .workspace-scene-menu summary strong { max-width:min(18vw,230px); }
+.service-editor-chrome .workspace-scene-actions { top:38px; }
+.service-editor-chrome .workspace-header-actions { gap:3px; }
+.service-editor-chrome .workspace-tools-menu { flex-shrink:0; }
+@media (max-width:1100px) {
+  .account-bar:has(.service-editor-chrome) .header-brand { display:none; }
+  .account-bar:has(.service-editor-chrome) .header-live { display:none; }
+  .service-editor-chrome .workspace-icon.workspace-tools-trigger { display:inline-flex; }
+  .service-editor-chrome .workspace-header-actions { display:none;position:absolute;right:0;top:40px;padding:8px;background:#252c31;border:1px solid #465159;border-radius:7px;box-shadow:0 10px 26px #0006; }
+  .service-editor-chrome .workspace-header-actions.is-open { display:flex; }
+  .service-editor-chrome .workspace-header-separator { display:none; }
+  .service-editor-chrome .workspace-present span { display:none; }
+  .service-editor-chrome .workspace-present { width:34px;padding:0; }
+  .account-bar:has(.service-editor-chrome) .header-account-label { display:none; }
+}
+@media (max-width:700px) {
+  .account-bar:has(.service-editor-chrome) .header-context { max-width:28%; }
+  .service-editor-chrome .workspace-header { gap:3px; }
+  .service-editor-chrome .workspace-scene-menu { padding-left:6px;position:static; }
+  .service-editor-chrome .workspace-scene-menu summary small,.service-editor-chrome .workspace-scene-menu summary strong { max-width:18vw; }
+  .service-editor-chrome .workspace-scene-actions { top:43px;left:8px; }
+  .service-editor-chrome .workspace-tools-menu { position:static; }
+  .service-editor-chrome .workspace-header-actions { top:43px;right:8px; }
+}

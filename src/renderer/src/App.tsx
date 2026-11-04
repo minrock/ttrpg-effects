@@ -3432,8 +3432,10 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
   }
 
   return (
-    <main className="app-shell vtt-interface" aria-label="TTRPG Effects">
+    <main className={`app-shell vtt-interface${service?.headerTarget ? " app-shell--shared-header" : ""}`} aria-label="TTRPG Effects">
       <WorkspaceHeader
+        portalTarget={service?.headerTarget}
+        enabled={service?.headerEnabled}
         sceneName={currentFilePath ? service?.browser.name(currentFilePath) ?? getFileBaseName(currentFilePath) : "Escena sin guardar"}
         serviceActions={service ? { onImport: () => void handleServiceAction("import"), onExport: () => void handleServiceAction("export"), onLogout: () => void handleServiceAction("logout"), onTemplates: undefined } : undefined}
         mapName={scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa"}

@@ -1,9 +1,12 @@
 import { rememberDialogFocus, restoreDialogFocus } from "../../client/dialog-focus";
-import { useEffect, useRef, type JSX } from "react";
-import { ChevronDown, Dices, FilePlus, FolderOpen, Monitor, PanelLeft, PanelRight, Save, Swords, Timer } from "lucide-react";
+import { useEffect, useRef, useState, type JSX } from "react";
+import { createPortal } from "react-dom";
+import { MoreHorizontal, ChevronDown, Dices, FilePlus, FolderOpen, Monitor, PanelLeft, PanelRight, Save, Swords, Timer } from "lucide-react";
 import logoUrl from "../../../../../assets/logo/ttrpg-effects-icon.png";
 
 interface WorkspaceHeaderProps {
+  readonly portalTarget?: HTMLElement | null;
+  readonly enabled?: boolean;
   readonly serviceActions?: { onImport: () => void; onExport: () => void; onLogout: () => void; onTemplates?: () => void };
   readonly sceneName: string;
   readonly mapName: string;
@@ -25,20 +28,27 @@ interface WorkspaceHeaderProps {
 
 export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
   const menu = useRef<HTMLDetailsElement>(null);
+  const tools = useRef<HTMLDivElement>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
   useEffect(() => {
-    const closeOutside = (event: PointerEvent): void => {
-      if (event.target instanceof Node && !menu.current?.contains(event.target) && menu.current) menu.current.open = false;
+    const closeOutside = (event: Event): void => {
+      if (event.target instanceof Node) {
+        if (!menu.current?.contains(event.target) && menu.current) menu.current.open = false;
+        if (!tools.current?.contains(event.target)) setToolsOpen(false);
+      }
     };
     document.addEventListener("pointerdown", closeOutside);
-    return () => document.removeEventListener("pointerdown", closeOutside);
+    document.addEventListener("focusin", closeOutside);
+    return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("focusin", closeOutside); };
   }, []);
   const run = (action: () => void): void => {
     if (props.serviceActions) rememberDialogFocus(menu.current?.querySelector("summary") ?? null);
     if (menu.current) menu.current.open = false;
     action();
   };
-  return <header className="workspace-header">
-    <div className="workspace-brand"><img src={logoUrl} alt="" /><strong>TTRPG <span>Effects</span></strong></div>
+  const Container = props.portalTarget ? "div" : "header";
+  const content = <Container className="workspace-header">
+    {!props.portalTarget && <div className="workspace-brand"><img src={logoUrl} alt="" /><strong>TTRPG <span>Effects</span></strong></div>}
     <details className="workspace-scene-menu" ref={menu} onKeyDown={event => {
       if (event.key === "Escape") {
         event.preventDefault(); event.stopPropagation();
@@ -57,12 +67,22 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
           <button disabled={props.busy} onClick={() => run(props.serviceActions!.onExport)}>Exportar archivo .ttrpgscene</button>
           {props.serviceActions.onTemplates && <button disabled={props.busy} onClick={() => run(props.serviceActions!.onTemplates!)}>Administrar plantillas</button>}
           <p className="service-menu-note">Servicio privado · DM<br />Proyección y dados compartidos disponibles.</p>
-          <button disabled={props.busy} onClick={() => run(props.serviceActions!.onLogout)}>Cerrar sesión</button>
+          {!props.portalTarget && <button disabled={props.busy} onClick={() => run(props.serviceActions!.onLogout)}>Cerrar sesión</button>}
         </>}
       </div>
     </details>
-    <div className="workspace-header-actions">
-      <button type="button" className="workspace-icon" title="Guardar escena" aria-label="Guardar escena" disabled={props.busy} onClick={event => { const target=event.currentTarget; if (props.serviceActions) rememberDialogFocus(target); void Promise.resolve(props.onSave()).finally(() => { if (props.serviceActions) restoreDialogFocus(target); }); }}><Save size={17} /></button>
+    <div className="workspace-tools-menu" ref={tools} onKeyDown={event => {
+      if (event.key === "Escape" && toolsOpen) {
+        event.preventDefault(); event.stopPropagation(); setToolsOpen(false); tools.current?.querySelector<HTMLButtonElement>(".workspace-tools-trigger")?.focus();
+      }
+    }}>
+      {props.portalTarget && <button type="button" className="workspace-icon workspace-tools-trigger" aria-label="Herramientas del editor" title="Herramientas del editor" aria-expanded={toolsOpen} onClick={() => setToolsOpen(open => !open)}><MoreHorizontal size={18}/></button>}
+      <div className={`workspace-header-actions${toolsOpen ? " is-open" : ""}`} onClickCapture={event => {
+        if (toolsOpen && event.target instanceof Element && event.target.closest("button:not(:disabled)")) {
+          setToolsOpen(false); tools.current?.querySelector<HTMLButtonElement>(".workspace-tools-trigger")?.focus();
+        }
+      }}>
+      <button type="button" className="workspace-icon" title="Guardar escena" aria-label="Guardar escena" disabled={props.busy} onClick={event => { const target=props.portalTarget && toolsOpen ? tools.current?.querySelector<HTMLButtonElement>(".workspace-tools-trigger") ?? event.currentTarget : event.currentTarget; if (props.serviceActions) rememberDialogFocus(target); void Promise.resolve(props.onSave()).finally(() => { if (props.serviceActions) restoreDialogFocus(target); }); }}><Save size={17} /></button>
       <button type="button" className="workspace-icon" title="Batalla" aria-label="Batalla" aria-pressed={props.battleActive} disabled={props.busy} onClick={props.onBattle}><Swords size={17} /></button>
       <button type="button" className="workspace-icon" title="Contadores" aria-label="Contadores" disabled={props.busy} onClick={props.onCounters}><Timer size={17} /></button>
       <button type="button" className="workspace-icon" title="Dados" aria-label="Abrir dados" onClick={props.onDice}><Dices size={17} /></button>
@@ -71,5 +91,7 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
       <button type="button" className="workspace-icon" title="Inspector" aria-label="Alternar inspector" aria-pressed={props.inspectorVisible} onClick={props.onInspector}><PanelRight size={17} /></button>
       <button type="button" className="workspace-present" title={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} aria-label={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} disabled={props.busy} onClick={props.onPlayer}><Monitor size={16} /><span>Jugador</span></button>
     </div>
-  </header>;
+    </div>
+  </Container>;
+  return props.portalTarget ? createPortal(<div className="vtt-interface service-editor-chrome" hidden={props.enabled===false} inert={props.enabled===false} onKeyDown={event=>event.stopPropagation()}>{content}</div>, props.portalTarget) : content;
 }

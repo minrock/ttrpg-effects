@@ -1,7 +1,8 @@
+import { passwordProblem } from "../../../application/services/identity-validation";
 import { randomBytes, scrypt, timingSafeEqual, createHash } from "node:crypto";
 import { IdentityError } from "../../../application/services/identity";
 export function validatePassword(password: unknown): asserts password is string {
-  if (typeof password !== "string" || [...password].length < 15 || [...password].length > 128 || Buffer.byteLength(password, "utf8") > 512 || /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u.test(password)) throw new IdentityError("INVALID_INPUT");
+  if (passwordProblem(password)) throw new IdentityError("INVALID_INPUT");
 }
 const prefix = "scrypt$v1$131072$8$1$";
 function derive(password: string, salt: Buffer): Promise<Buffer> {
