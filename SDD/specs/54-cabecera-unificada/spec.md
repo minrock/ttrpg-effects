@@ -2,7 +2,7 @@
 
 Fecha de consolidación: 2026-11-04.
 
-**Estado:** Implementado en el commit `c4e8831`; incluido en el cierre de integración autorizado.
+**Estado:** Integrado en `main`; producto en el commit `c4e8831`, cierre y validación en [consolidación](../../consolidacion.md).
 
 ## Objetivo
 

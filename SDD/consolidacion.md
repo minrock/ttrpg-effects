@@ -39,4 +39,8 @@ Validaciones nuevas antes de integrar:
 - Enlaces y perfiles revalidados; `quick_validate.py` de factory y `git diff --check` correctos.
 - Contratos PostgreSQL/TLS no ejecutados: faltan `TTRPG_TEST_DATABASE_URL` y `TTRPG_TEST_DB_CA_FILE`. La suite anterior no sustituye esos contratos. No se afirma una nueva validación visual.
 
-El cierre de integración y el resultado del DMG se registran después de ejecutar ambas operaciones.
+Integración completada por avance rápido en `main`: `c4e8831` (producto) y `a9b5825` (SDD/instrucciones). El checkout principal permanece en `main`; no hubo push.
+
+`./scripts/build-dmg.sh` terminó correctamente en `main` después de integrar. Artefacto: `dist/TTRPG Effects-3.18.1-arm64.dmg`, verificado con `hdiutil verify` (checksum válido). SHA-256: `c38754fb5540df85453cf8767019b7b89207181f8efa914e8c96fbb6c9a5d08e`. Empaquetado interno sin firma, según configuración existente. El DMG corresponde al código 3.18.1; este registro posterior solo añade evidencia documental.
+
+Los archivos privados `.env`, `.env.electron` y `.local/service/data/control.sqlite` siguen ignorados y fuera de los commits. Los expedientes de fábrica y tablero no se alteraron.

@@ -48,8 +48,8 @@ Los identificadores de spec SDD y trabajo factory son espacios distintos. Por ej
 | [50-moderacion: Moderación y transporte por apertura](specs/50-moderacion/spec.md) | [010-moderacion-tiempo-real](../factory/jobs/010-moderacion-tiempo-real/spec.md) | Integrado en tablero; ver evolución |
 | [51-experiencia-servicio: Experiencia de cuentas, partidas y operación local](specs/51-experiencia-servicio/spec.md) | [011-experiencia-autenticacion](../factory/jobs/011-experiencia-autenticacion/spec.md) | Integrado en tablero; ver evolución |
 | [52-build-reproducible: Construcción reproducible](specs/52-build-reproducible/spec.md) | [012-build-reproducible](../factory/jobs/012-build-reproducible/spec.md) | Integrado en tablero; ver evolución |
-| [53-administracion-local: Administradores locales y política de contraseñas](specs/53-administracion-local/spec.md) | Cambios locales posteriores | Implementado; commit c4e8831 |
-| [54-cabecera-unificada: Cabecera compacta compartida](specs/54-cabecera-unificada/spec.md) | Cambios locales posteriores | Implementado; commit c4e8831 |
+| [53-administracion-local: Administradores locales y política de contraseñas](specs/53-administracion-local/spec.md) | Cambios locales posteriores | Integrado; commit c4e8831 |
+| [54-cabecera-unificada: Cabecera compacta compartida](specs/54-cabecera-unificada/spec.md) | Cambios locales posteriores | Integrado; commit c4e8831 |
 
 Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan su comportamiento final, incluidas sustituciones posteriores. Las specs 53–54 documentan los cambios posteriores registrados en el commit `c4e8831`, incluidos en el cierre autorizado de esta entrega; no se les atribuye una revisión de fábrica. [Registro de consolidación y límites de validación](consolidacion.md).
 
