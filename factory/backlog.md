@@ -1,5 +1,7 @@
 # Cola de migración a servicio privado
 
+Planificación vigente y correspondencia de estos trabajos: [SDD](../SDD/README.md). Las siguientes entradas son la cola histórica ejecutada; los alcances nuevos se especifican en SDD antes de agregarse aquí.
+
 Serie construida en `feature/fabrica-software` sin commits intermedios; el usuario autorizó después su integración mediante `$factory aprobar`. El detalle y decisiones comunes están en [migracion-servicio.md](migracion-servicio.md). Las cinco specs quedaron integradas en `main` con DMG 3.6.0 generado y verificado; el tablero conserva las rondas y decisiones.
 
 - [x] Contrato común para clientes web y Electron — `001-contrato-clientes`

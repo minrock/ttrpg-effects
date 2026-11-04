@@ -1,5 +1,7 @@
 # Fábrica de software
 
+La fuente de planificación y contratos vigentes es [SDD](../SDD/README.md). El [flujo SDD](../SDD/flujo.md) vincula cada spec/plan con su expediente; los trabajos 001–012 se consolidan en las specs 41–52. Las evidencias históricas permanecen aquí para mantener el dashboard y la trazabilidad.
+
 Una skill, siete roles y un tablero local. Codex orquesta el trabajo; el navegador solo muestra archivos. Las instrucciones del ciclo están en [SKILL.md](../.agents/skills/factory/SKILL.md).
 
 ```text
@@ -60,7 +62,7 @@ factory/
     decision-ciclo-1.md           Decisión archivada al rehacer
 ```
 
-No se crean expedientes ficticios. Los trabajos nacen al invocar la skill. Se reutilizan `specs/`, los comandos de `package.json` y las reglas de `AGENTS.md`: TypeScript estricto, React, Electron, PixiJS, SQLite y separación dominio/aplicación/infraestructura/render. Las pruebas existentes usan Vitest (`pnpm test`); checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`. Tras integrar se ejecuta `./scripts/build-dmg.sh`.
+No se crean expedientes ficticios. Los trabajos nacen al invocar la skill. Se reutilizan `SDD/specs/`, los comandos de `package.json` y las reglas de `AGENTS.md`: TypeScript estricto, React, Electron, PixiJS, SQLite y separación dominio/aplicación/infraestructura/render. Las pruebas existentes usan Vitest (`pnpm test`); checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build`. Tras integrar se ejecuta `./scripts/build-dmg.sh`.
 
 ## Contrato mínimo del tablero
 

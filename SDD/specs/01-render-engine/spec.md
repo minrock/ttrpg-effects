@@ -1,0 +1,124 @@
+# Spec - Motor Visual y Capas de Render
+
+## Integracion con grilla hexagonal
+
+Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.
+
+- La capa grid soporta cuadrados o hexagonos regulares definidos en spec 04; conserva orden de capas y camaras.
+- Hexagonal usa un Graphics con aristas compartidas dibujadas una sola vez, overscan y limite de 8192 celdas de dibujo. El LOD solo afecta la guia visual, nunca snap/mediciones.
+- Incluir layout en firmas de grilla y etiquetas. Alternar solo layout no invalida mascaras de visibilidad, atlas ni texturas de tokens. Pinturas guardadas usan su layout propio.
+- Reutilizar geometria de celdas para rellenos, hit testing, culling y mascaras, sin crear un sprite/Graphics de grilla por hexagono.
+
+
+Este documento describe de forma unificada la funcionalidad de motor visual y capas de render, consolidando el alcance funcional vigente en el proyecto.
+
+## Motor Visual y Capas de Render
+
+### Objetivo
+
+Definir e implementar la base visual donde se renderizaran el mapa, grilla, oscuridad, luces, efectos animados, formas tacticas y UI contextual.
+
+### Alcance
+
+- Crear el lienzo principal de la aplicacion.
+- Definir el sistema de coordenadas del mundo.
+- Definir orden de capas.
+- Integrar el motor visual elegido.
+- Preparar soporte para pan, zoom y render de alta fluidez.
+- El pan/drag del mapa se activa solo mientras la barra espaciadora esta oprimida.
+
+### Tecnologia propuesta
+
+Recomendacion inicial: PixiJS dentro de Electron.
+
+Motivos:
+
+- Buen rendimiento para mapas, sprites, mascaras y efectos.
+- Encaja bien con luces, blend modes y fuego animado.
+- Evita trabajar directamente con WebGL desde cero.
+- Puede convivir con React para UI externa.
+
+Alternativas:
+
+- Canvas 2D: mas simple, pero puede quedarse corto para iluminacion y efectos.
+- Three.js: potente, pero mas orientado a 3D de lo necesario.
+- WebGL directo: flexible, pero demasiado costoso para el MVP.
+
+### Orden de capas
+
+Orden recomendado de abajo hacia arriba:
+
+1. Imagen del mapa como primera capa visual y base mas baja.
+2. Grilla/base de referencia, debajo de ocultamiento visual.
+3. Tokens/minis.
+4. Capa global de oscuridad.
+5. Luces y mascaras de iluminacion.
+6. Efectos animados como fuego/agua, debajo de niebla.
+7. Oscuridad magica.
+8. Fog of war / niebla de guerra.
+9. Obstaculos/guia tactica si aplican.
+10. Herramientas de area: formas tacticas, mediciones, paths y handles.
+11. Indicadores de seleccion y apuntador.
+12. UI contextual no renderizada en el mapa, si aplica.
+
+El fondo tecnico del canvas puede existir como fallback visual, pero no debe considerarse una capa de gameplay por encima del mapa.
+La secuencia de gameplay que no debe romperse es: mapa -> tokens -> oscuridad -> luces -> oscuridad magica -> fog -> herramientas de area; la grilla queda como referencia base bajo oscuridad/fog.
+
+### Sistema de coordenadas
+
+- Debe existir coordenada de pantalla.
+- Debe existir coordenada de mundo/mapa.
+- La conversion pantalla <-> mundo debe ser centralizada.
+- Las herramientas tacticas deben almacenar posiciones en coordenadas de mundo.
+- La camara debe controlar pan y zoom.
+- El pan de camara no debe ser un modo persistente ni un boton de UI.
+- Al mantener `Space`, el cursor cambia a mano y el viewport entra temporalmente en modo drag.
+- Mientras `Space` esta oprimido no se pueden seleccionar ni editar elementos del mapa.
+- Al soltar `Space`, el cursor vuelve al puntero normal y la herramienta activa vuelve a seleccion, incluso si antes estaba en otro modo como pintar fuego o niebla.
+
+### Criterios de aceptacion
+
+- Existe un lienzo principal renderizado dentro de la ventana Electron.
+- El motor visual inicializa sin errores.
+- Hay una camara basica con pan y zoom.
+- El pan funciona solo con `Space` presionado y arrastre del puntero.
+- El cursor cambia a mano mientras `Space` esta presionado.
+- Al soltar `Space`, la interaccion vuelve a seleccion.
+- El orden de capas esta implementado o preparado de forma explicita.
+- Es posible dibujar elementos de prueba en capas distintas.
+- La base permite agregar mapa, grilla y luces sin reescritura mayor.
+
+### Riesgos
+
+- Acoplar demasiado el motor visual a React.
+- No separar coordenadas de mundo y pantalla.
+- No preparar correctamente el orden de capas para iluminacion.
+
+### Notas de implementacion
+
+- React debe controlar paneles, menus e inputs.
+- PixiJS debe controlar render interactivo del mapa.
+- Evitar que cada herramienta implemente su propia conversion de coordenadas.
+
+## Controles de efectos y grilla acotada
+
+- Compartir con herramientas de area `getAreaToolUiScale(zoom)`: minimo visual mediante `max(1, 1/max(zoom, 0.001))`.
+- Aplicar esa escala a grosores, manivelas y tolerancias de hit testing de efectos; no al radio/longitud fisica de la iluminacion.
+- Mantener los controles en seleccion y exclusivamente en DM. Actualizar su geometria cuando cambia zoom, no recrear efectos animados por mover la camara.
+- Dibujar siempre la grilla sobre la ventana visible y overscan cacheados, sin modo limitado al mapa, con el presupuesto de lineas de spec 04; nunca crear una textura del tamano del mundo navegable.
+- El arbol React de spec 06 opera sobre ids, no sobre objetos Pixi ni copias de texturas.
+- La grilla usa ancho de trazo 1 o 3 segun `grid.lineWidth` (spec 04). Incluirlo en el cache de estilo; cambiarlo no invalida capas ajenas ni modifica la camara o las coordenadas de las lineas.
+
+## Cierre 1.9.0
+
+Los cambios de controles de efectos, arbol de objetos y/o grilla descritos en las extensiones de esta especificacion fueron aceptados por el usuario el 2026-09-02 para cierre en main. El plan registra la verificacion realizada; los pendientes historicos ajenos a estas extensiones no se consideran ejecutados por este cierre.
+
+## Integracion con Relampagos (Spec 35)
+
+Relampagos procedurales de spec 35: dos meshes por efecto, ticker existente, presupuesto agregado de vertices y sin filtros/FBO propios. Guia en efectos debajo de niebla; medidas y handles solo en seleccion DM.
+
+Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Integracion de Dados (Spec 37)
+
+Three.js se usa exclusivamente para dados 3D en un canvas transparente sobre el viewport. Pixi sigue renderizando mapa, niebla, oscuridad y efectos. Los dados no cambian coordenadas, camara ni mascaras del mapa; su animacion se detiene en reposo. Contrato: [spec 37](../37-dm-dice-rolls/spec.md).

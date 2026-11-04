@@ -34,6 +34,10 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 - **Nunca ejecutes `git add`, `git commit`, `git push` ni ninguna operacion de escritura en el repositorio sin permiso explicito del usuario en esa sesion. Espera siempre la orden antes de escribir en el historial de git.**
 - Cada vez que se mergee un nuevo spec a main, ejecutar `./scripts/build-dmg.sh` para generar un nuevo DMG instalable. El DMG queda en `dist/`.
 
+## Especificaciones SDD
+
+El punto de entrada de planificación es `SDD/README.md`. Lee `SDD/estado-actual.md` y las specs/planes relacionados antes de proponer un cambio. Las especificaciones y guías vigentes viven en `SDD/specs/` y `SDD/guias/`; las rutas antiguas `specs/` y `docs/` solo redirigen. Usa `SDD/flujo.md` y las plantillas para nuevos alcances. Conserva los expedientes de `factory/jobs/` como evidencia fechada; no confundas implementación local, aprobación técnica e integración.
+
 ## Fábrica de software en Codex
 
 Para ejecutar la fábrica usa `$factory` (o pide `/factory` como alias textual) y lee `.agents/skills/factory/SKILL.md`. Esa skill solicita explícitamente subagentes para especificar, construir, revisar seguridad/UX/UI/código y aprobar. Los perfiles están en `.codex/agents/`; el tablero y la cola, en `factory/`. Solo el orquestador escribe `factory/board.json`.

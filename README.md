@@ -1,6 +1,10 @@
 # TTRPG Effects
 
-Aplicacion desktop para proyectar mapas y efectos visuales en sesiones TTRPG presenciales.
+Herramienta para preparar y proyectar mesas TTRPG: Electron autónomo y servicio privado API + frontend para navegador o Electron conectado.
+
+## Especificaciones SDD
+
+La planificación y documentación vigente se reúnen en [SDD](SDD/README.md): [estado actual](SDD/estado-actual.md), [arquitectura y datos](SDD/arquitectura.md), specs de escritorio/servidor y [flujo para nuevas especificaciones](SDD/flujo.md). Los expedientes de la fábrica conservan la evidencia de cada entrega.
 
 ## Interfaz de mesa
 
@@ -8,17 +12,17 @@ La version 3.0.0 incorpora una cabecera compacta, una barra vertical de herramie
 
 Player View mantiene la escena del DM protegida y agrega mediciones de linea/camino y areas locales (circulo, cuadrado, rectangulo y cono). Estas figuras solo viven en esa ventana, se pueden editar o borrar y se limpian al cambiar de mapa o escena. El boton de herramientas oculta los controles sin borrar las figuras.
 
-El salto mayor es una decision de lanzamiento; las escenas `.ttrpgscene` existentes siguen siendo compatibles. Alcance y verificaciones en [spec 39](specs/39-vtt-interface/spec.md) y su [plan](specs/39-vtt-interface/plan.md).
+El salto mayor es una decision de lanzamiento; las escenas `.ttrpgscene` existentes siguen siendo compatibles. Alcance y verificaciones en [spec 39](SDD/specs/39-vtt-interface/spec.md) y su [plan](SDD/specs/39-vtt-interface/plan.md).
 
 ## Fábrica de software con Codex
 
 Usa `$factory <funcionalidad>` para especificar, construir y revisar un cambio con subagentes. `$factory siguiente` toma un elemento de la cola; `$factory aprobar <id>` autoriza integrar un trabajo preparado y `$factory rehacer <id> <nota>` abre otro ciclo de correcciones. Commits y merge respetan la autorización explícita indicada en `AGENTS.md`.
 
-Para ver el tablero, ejecuta `python3 -m http.server 8765 --bind 127.0.0.1 --directory factory` y abre [el visor local](http://127.0.0.1:8765/dashboard.html). El botón «Ver ejemplo» permite explorar el flujo con datos ficticios. Instrucciones y estructura en [factory/README.md](factory/README.md); alcance en [spec 40](specs/40-fabrica-software/spec.md).
+Para ver el tablero, ejecuta `python3 -m http.server 8765 --bind 127.0.0.1 --directory factory` y abre [el visor local](http://127.0.0.1:8765/dashboard.html). El botón «Ver ejemplo» permite explorar el flujo con datos ficticios. Instrucciones y estructura en [factory/README.md](factory/README.md); alcance en [spec 40](SDD/specs/40-fabrica-software/spec.md).
 
 ## Arquitectura de clientes
 
-El [contrato común y mapa de paridad](docs/client-architecture.md) documenta la composición por raíz React y las capacidades de cada cliente. Electron conserva el modo local y puede conectarse al mismo servicio privado HTTP/SSE que el navegador, con roles DM y jugador. La [guía operativa](docs/service-operations.md) explica cómo ejecutar ambos modos y el servicio.
+El [contrato común y mapa de paridad](SDD/guias/client-architecture.md) documenta la composición por raíz React y las capacidades de cada cliente. Electron conserva el modo local y puede conectarse al mismo servicio privado HTTP/SSE que el navegador, con roles DM y jugador. La [guía operativa](SDD/guias/service-operations.md) explica cómo ejecutar ambos modos y el servicio.
 
 ## Requisitos
 
@@ -139,7 +143,7 @@ La pestana `Dados` del panel derecho permite preparar tiradas 3D sobre el mapa, 
 - Dados y resumen permanecen hasta cerrar con la X del DM; el resumen numerico publico es opcional. Las caras siguen visibles en una tirada abierta aunque se oculte el resumen.
 - Historial privado durante la sesion, sin guardar dados ni logs en `.ttrpgscene`. Cerrar la aplicacion borra el historial.
 
-Detalle funcional y tecnico en [spec 37](specs/37-dm-dice-rolls/spec.md) y su [plan](specs/37-dm-dice-rolls/plan.md). El motor y las texturas se empaquetan localmente, sin CDN. La atribucion de la geometria adaptada se incluye en `Resources/licenses/dice-box-threejs` del instalador.
+Detalle funcional y tecnico en [spec 37](SDD/specs/37-dm-dice-rolls/spec.md) y su [plan](SDD/specs/37-dm-dice-rolls/plan.md). El motor y las texturas se empaquetan localmente, sin CDN. La atribucion de la geometria adaptada se incluye en `Resources/licenses/dice-box-threejs` del instalador.
 
 ## Laboratorios de interfaz
 
@@ -147,7 +151,7 @@ Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en 
 
 ## Servicio privado API
 
-`pnpm build:api` y `pnpm start:api` ejecutan la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](docs/private-api.md), [interfaz](docs/browser-client.md) y [operación/respaldo](docs/service-operations.md).
+`pnpm build:api` y `pnpm start:api` ejecutan la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
 
 ## Preparar el servicio
 
@@ -156,18 +160,22 @@ pnpm setup:env
 pnpm build:api
 pnpm build:web
 pnpm db:migrate
-pnpm identity:bootstrap
-pnpm identity:password
+pnpm createsuperuser
+pnpm identity:password # Solo si generaste una contraseña temporal
 pnpm identity:provision-dm
 pnpm start:api
 ```
 
 Los comandos de identidad son TTY y nunca aceptan contraseñas en argumentos. No se crean cuentas al arrancar. Setup conserva configuración existente y genera configuración nueva privada en `.env`, `.env.electron` y `.local/service/{data,backups,logs}`; los datos quedan ignorados porGit. Un entorno legado incompleto exige actualización explícita. No hay claves DM/jugador globales ni autorregistro.
 
-Para Electron servicio, compila con `pnpm build` y ejecuta `pnpm start:service`; `.env.electron` solo contiene modo/origen, sin secretos ni DB. Para local usa `pnpm dev` sin modo service. PostgreSQL conTLS verificado es obligatorio en producción; SQLite sigue disponible localmente. [Persistencia y migraciones](docs/database.md).
+`pnpm createsuperuser` solicita correo, nombre y contraseña desde una terminal local. Puedes elegir y confirmar una contraseña definitiva o pulsar Enter para generar una temporal que se muestra una vez y requiere cambio posterior. Ejecútalo con la API detenida si usas SQLite. También puedes usar `node scripts/createsuperuser.mjs`; `--help` muestra la preparación necesaria. Permite crear varios administradores con correos distintos. Ejecuta `pnpm db:migrate` antes del primer uso de esta versión. Si una cuenta ya existe y necesitas recuperar su acceso, usa `pnpm identity:recover-admin` con el servicio detenido. El script no abre un puerto ni se sirve al navegador; usa la provisión transaccional de identidad.
+
+Para Electron servicio, compila con `pnpm build` y ejecuta `pnpm start:service`; `.env.electron` solo contiene modo/origen, sin secretos ni DB. Para local usa `pnpm dev` sin modo service. PostgreSQL conTLS verificado es obligatorio en producción; SQLite sigue disponible localmente. [Persistencia y migraciones](SDD/guias/database.md).
+
+La cabecera del servicio reúne navegación (☰), partida, escena, herramientas del editor y perfil en una sola fila compacta. En pantallas estrechas, las herramientas se agrupan bajo el botón de tres puntos. Abre el nombre de la partida para volver al catálogo, cerrar o reabrir; abre el perfil para cambiar contraseña o cerrar sesión. Los desplegables admiten Tab y Escape, y las acciones conservan sus confirmaciones.
 
 ## Cuentas, sistemas, partidas e invitaciones (3.13.0)
 
-[Identidad](docs/identity.md): administrador único, provisiónDM, cambio obligatorio, disable/reset/revocación. [Datos privados y catálogo](docs/owned-data.md): dos propietarios aislados, versiones publicadas retenidas, CAS/bindings y transferencia explícita sin tocar el perfilElectron. [Invitaciones](docs/invitations.md): alias, cookie por partida, continuidad/reapertura deliberada. [Moderación](docs/moderation.md): participantes identificados por alias+discriminador, expulsión atómica con nuevo enlace y supervivientes estables.
+[Identidad](SDD/guias/identity.md): múltiples administradores locales, provisiónDM, cambio de contraseñas temporales, disable/reset/revocación. [Datos privados y catálogo](SDD/guias/owned-data.md): dos propietarios aislados, versiones publicadas retenidas, CAS/bindings y transferencia explícita sin tocar el perfilElectron. [Invitaciones](SDD/guias/invitations.md): alias, cookie por partida, continuidad/reapertura deliberada. [Moderación](SDD/guias/moderation.md): participantes identificados por alias+discriminador, expulsión atómica con nuevo enlace y supervivientes estables.
 
 Los gates de DB/identidad/datos/invitaciones/moderación requieren PostgreSQL temporal real conTLS. El gate de moderación incluye composición final compilada y respaldo/restauración integral de ambos motores. Las pantallas se verifican también con navegador/Electron reales; evidencia y límites en el expediente011. `.ttrpgscene` conserva v2 y lectura/migraciónv1.
