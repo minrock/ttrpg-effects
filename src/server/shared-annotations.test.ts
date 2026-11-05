@@ -31,17 +31,17 @@ async function fixture() {
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); const address = server.address(); if (!address || typeof address === "string") throw new Error(); const port = address.port;
   cleanup.push(() => new Promise<void>(resolve => { server.close(() => resolve()); server.closeAllConnections(); }));
   const path = (dm: boolean, suffix: string) => `/api/v1/${dm ? "dm/" : ""}games/${game.id}/table/${suffix}`;
-  async function http(dm: boolean, cookie: string, suffix: string, payload?: unknown) {
+  async function http(dm: boolean, cookie: string, suffix: string, payload?: unknown, areaTools = false) {
     return new Promise<{ status: number; body: unknown }>((resolve, reject) => {
-      const req = request({ host: "127.0.0.1", port, path: path(dm, suffix), method: payload === undefined ? "GET" : "POST", headers: { host: "localhost:8787", origin, cookie, "content-type": "application/json" } }, res => { let body = ""; res.on("data", b => { body += b; }); res.on("end", () => resolve({ status: res.statusCode!, body: JSON.parse(body) })); }); req.on("error", reject); req.end(payload === undefined ? undefined : JSON.stringify(payload));
+      const req = request({ host: "127.0.0.1", port, path: path(dm, suffix), method: payload === undefined ? "GET" : "POST", headers: { host: "localhost:8787", origin, cookie, "content-type": "application/json", ...(areaTools ? { "x-ttrpg-area-tools": "1" } : {}) } }, res => { let body = ""; res.on("data", b => { body += b; }); res.on("end", () => resolve({ status: res.statusCode!, body: JSON.parse(body) })); }); req.on("error", reject); req.end(payload === undefined ? undefined : JSON.stringify(payload));
     });
   }
   const scene = createDefaultScene(), snap = { scene, camera: { center: { x: 0, y: 0 }, zoom: 1 }, mapImageUrl: null, tokenImageUrls: {}, showDmFogOverlay: false };
   expect((await http(true, dmCookie, "scene", { ...opening, command: { requestId: randomUUID(), context: null, payload: snap } })).status).toBe(200);
   const query = `?openingId=${opening.openingId}&generation=${opening.generation}&annotationsVersion=1`;
-  async function stream(dm: boolean, cookie: string, negotiate = true, focus = false) {
+  async function stream(dm: boolean, cookie: string, negotiate = true, focus = false, areas = false) {
     const events: ContextualEvent[] = []; let ended = false; const listeners = new Set<() => void>();
-    const req = request({ host: "127.0.0.1", port, path: path(dm, "events") + (negotiate ? query + (focus ? "&focusVersion=1" : "") : focus ? `?openingId=${opening.openingId}&generation=${opening.generation}&focusVersion=1` : ""), headers: { host: "localhost:8787", origin, cookie } }, res => { let buffer = ""; res.on("data", b => { buffer += b; let end: number; while ((end = buffer.indexOf("\n\n")) >= 0) { const block = buffer.slice(0, end); buffer = buffer.slice(end + 2); const data = block.split("\n").find(l => l.startsWith("data: ")); if (data) events.push(JSON.parse(data.slice(6))); } for (const fn of listeners) fn(); }); res.on("close", () => { ended = true; for (const fn of listeners) fn(); }); }); req.on("error", () => { ended = true; }); req.end(); cleanup.push(async () => { req.destroy(); });
+    const req = request({ host: "127.0.0.1", port, path: path(dm, "events") + (negotiate ? query + (focus ? "&focusVersion=1" : "") + (areas ? "&areaToolsVersion=1" : "") : focus ? `?openingId=${opening.openingId}&generation=${opening.generation}&focusVersion=1` : ""), headers: { host: "localhost:8787", origin, cookie } }, res => { let buffer = ""; res.on("data", b => { buffer += b; let end: number; while ((end = buffer.indexOf("\n\n")) >= 0) { const block = buffer.slice(0, end); buffer = buffer.slice(end + 2); const data = block.split("\n").find(l => l.startsWith("data: ")); if (data) events.push(JSON.parse(data.slice(6))); } for (const fn of listeners) fn(); }); res.on("close", () => { ended = true; for (const fn of listeners) fn(); }); }); req.on("error", () => { ended = true; }); req.end(); cleanup.push(async () => { req.destroy(); });
     const until = async (predicate: () => boolean) => { if (predicate()) return; await new Promise<void>((resolve, reject) => { const timer = setTimeout(() => { listeners.delete(check); reject(new Error(`Sin evento SSE esperado (${dm ? "DM" : "jugador"}): ${events.map(e => e.type).join(",")}; cerrado=${ended}`)); }, 5000); const check = () => { if (predicate()) { clearTimeout(timer); listeners.delete(check); resolve(); } }; listeners.add(check); }); };
     await until(() => events.some(e => e.type === "bootstrap"));
     return { events, until, close() { req.destroy(); }, get ended() { return ended; }, state: events.find(e => e.type === "bootstrap")!.state! };
@@ -133,4 +133,29 @@ it("foco HTTP/SSE con SQLite: dos jugadores, negociación independiente, permiso
   expect(a.events.filter(e => e.type === "focus")).toHaveLength(1);
   const reconnected = await f.stream(false, f.cookies[1], true, true);
   expect(reconnected.state.cameraCommand).toBeNull(); expect(reconnected.events.some(e => e.type === "focus")).toBe(false);
+}, 30000);
+
+
+it("SDD57 HTTP/SSE: estilo negociado, bloqueo frente a legado y copia idempotente", async () => {
+  const f = await fixture(), a = await f.stream(false, f.cookies[0], true, true, true), b = await f.stream(false, f.cookies[1], true, false, true), legacy = await f.stream(true, f.dmCookie);
+  const id = randomUUID(), copy = randomUUID();
+  const send = (command: AnnotationCommand, requestId = randomUUID(), areaTools = true) => f.http(false, f.cookies[0], "annotations", { ...f.opening, command: { requestId, context: a.state.context, connectionId: a.state.connectionId, payload: command } }, areaTools);
+  const geometry = { type: "circle" as const, points: [{ x: 0, y: 0 }], radius: 100, color: "#ffaa00", emoji: "❄️", areaPattern: "checkerboard" as const };
+  expect(a.state.annotations?.areaToolsVersion).toBe(1); expect(legacy.state.annotations?.areaToolsVersion).toBeUndefined();
+  expect((await send({ action: "create", id, geometry })).status).toBe(200);
+  const last = (stream: typeof a) => annotationStateSchema.parse(stream.events.filter(e => e.type === "annotations").at(-1)?.payload);
+  await b.until(() => b.events.some(e => e.type === "annotations")); await legacy.until(() => legacy.events.some(e => e.type === "annotations"));
+  expect(last(b).items[0].geometry).toMatchObject({ color: geometry.color, areaPattern: "checkerboard" });
+  expect(last(legacy).items[0].geometry).not.toHaveProperty("color");
+  expect((await send({ action: "lock", id, revision: 1, locked: true })).status).toBe(200);
+  expect((await send({ action: "delete", id, revision: 2 }, randomUUID(), false)).status).toBe(409);
+  expect((await send({ action: "update", id, revision: 2, geometry: { ...geometry, locked: false } })).status).toBe(409);
+  expect((await send({ action: "copy", id, revision: 2, newId: copy })).status).toBe(409);
+  expect((await send({ action: "lock", id, revision: 2, locked: false })).status).toBe(200);
+  const requestId = randomUUID(), command = { action: "copy" as const, id, revision: 3, newId: copy };
+  expect((await send(command, requestId)).status).toBe(200); const retried = await send(command, requestId); expect(retried.status).toBe(200);
+  expect((retried.body as { annotations: AnnotationState }).annotations.items.map(i => i.id)).toEqual([id, copy]);
+  const reconnected = await f.stream(false, f.cookies[0], true, false, true);
+  expect(reconnected.state.annotations!.items[0].geometry).toMatchObject({ color: geometry.color, locked: false });
+  expect((await f.state(true, f.dmCookie)).snapshot!.scene.shapes).toEqual([]);
 }, 30000);

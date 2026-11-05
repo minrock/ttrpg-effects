@@ -1,5 +1,7 @@
 # Plan - Figuras y Medicion
 
+> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** Para círculos y conos, [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora barra de selección, color, damero con emojis del catálogo, bloqueo y copia. Sustituye la exclusión de color y el mosaico con jitter solo en esas áreas; las formas heredadas conservan su aspecto hasta cambiar de patrón. Líneas, caminos y rectángulos no cambian. La integración a main permanece pendiente de autorización.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.

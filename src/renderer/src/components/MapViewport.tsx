@@ -44,6 +44,7 @@ import { CompassOverlay } from "./CompassOverlay";
 import type { DaytimeBrushTopology, DaytimeMaskStrokeMode, SceneDaytimeFilter, SceneDaytimeMask } from "../../../domain/environment/daytime-filter";
 
 export interface MapViewportHandle {
+  getAreaContextBounds?: (id: string) => import("./workspace/AreaContextToolbar").AreaContextBounds | null;
   showAttentionFocus?: (point: { x: number; y: number }) => void;
   cancelCameraGesture: () => void;
   selectAttentionPoint: (handler: (point: { x: number; y: number } | null) => void) => void;
@@ -293,6 +294,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   backgroundColorRef.current = backgroundColor;
 
   useImperativeHandle(ref, () => ({
+    getAreaContextBounds: id => viewportRef.current?.getAreaContextBounds(id) ?? null,
     showAttentionFocus: point => viewportRef.current?.showAttentionFocus(point),
     cancelCameraGesture: () => viewportRef.current?.cancelCameraGesture(),
     selectAttentionPoint: handler => viewportRef.current?.selectAttentionPoint(handler),

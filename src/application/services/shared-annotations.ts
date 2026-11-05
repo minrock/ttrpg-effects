@@ -1,3 +1,5 @@
+import { copyArea, isAreaLocked, isContextualArea } from "../../domain/shapes/shapes";
+import { shapeAnnotationGeometry } from "../../shared/contracts/shared-annotations";
 import { measureDistance, measurePathDistance, worldLengthLabel } from "../../domain/measurement/measurement";
 import type { SceneGrid, SceneSettings } from "../../domain/sessions/scene-document";
 import { annotationCommandSchema, type AnnotationCommand, type AnnotationState, type SharedAnnotation } from "../../shared/contracts/shared-annotations";
@@ -56,14 +58,15 @@ export class SharedAnnotations {
   revoke(owner: string) { this.removeOwner(owner); this.notify(); }
   disconnect(connection: string) { for (const [owner, preview] of this.previews) if (preview.connection === connection) { this.previews.delete(owner); this.notify(); } }
   cancelPreviews() { if (this.previews.size) { this.previews.clear(); this.notify(); } }
-  state(participant?: string): AnnotationState {
+  state(participant?: string, areaTools = true): AnnotationState {
     const previews = [...this.previews.values()]; const replaced = new Set(previews.map(p => p.item.id));
-    return { version: 1, serverTime: this.now(), sceneId: this.sceneId, sequence: this.sequence, self: participant ? this.authors.get(participant)?.id ?? null : null,
-      items: structuredClone([...this.items.values()].filter(e => !replaced.has(e.item.id)).map(e => e.item).concat(previews.map(e => e.item)).map(item => this.measured(item))) };
+    return { ...(areaTools ? { areaToolsVersion: 1 as const } : {}), version: 1, serverTime: this.now(), sceneId: this.sceneId, sequence: this.sequence, self: participant ? this.authors.get(participant)?.id ?? null : null,
+      items: structuredClone([...this.items.values()].filter(e => !replaced.has(e.item.id)).map(e => e.item).concat(previews.map(e => e.item)).map(item => { const measured = this.measured(item); if (areaTools) return measured; const strip = (geometry: SharedAnnotation["geometry"]) => { if (geometry.type !== "circle" && geometry.type !== "cone") return geometry; const legacy = { ...geometry }; delete legacy.color; delete legacy.locked; delete legacy.areaPattern; return legacy; }; return { ...measured, geometry: strip(measured.geometry), ...(measured.committedGeometry ? { committedGeometry: strip(measured.committedGeometry) } : {}) }; })) };
   }
   private tombstone(id: string) { this.removed.add(id); /* Acotado junto al presupuesto de creación del contexto. */ }
-  execute(input: AnnotationCommand, actor: Author | null, credential: string, connection: string) {
-    const command = annotationCommandSchema.parse(input); this.expire();
+  execute(input: AnnotationCommand, actor: Author | null, credential: string, connection: string, areaTools = true) {
+    let command = annotationCommandSchema.parse(input); this.expire();
+    if (!areaTools && (["copy", "lock"].includes(command.action) || "geometry" in command && Object.keys(command.geometry).some(k => ["color", "locked", "areaPattern"].includes(k)))) throw new AnnotationError(409, "AREA_TOOLS_UNSUPPORTED", "Actualiza el cliente para utilizar herramientas de área.");
     if (!actor && !["delete", "clear-all"].includes(command.action) || actor && command.action === "clear-all") throw new AnnotationError(403, "FORBIDDEN", "No puedes modificar ese dibujo.");
     const owner = actor?.participant ?? "dm";
     const rate = this.rates.get(owner) ?? { at: this.now(), tokens: 20, previewAt: -Infinity };
@@ -77,23 +80,47 @@ export class SharedAnnotations {
     }
     this.rates.set(owner, rate);
     const publicId = actor ? this.register(actor, credential) : null;
-    const existing = "id" in command ? this.items.get(command.id) : undefined;
+    let existing = "id" in command ? this.items.get(command.id) : undefined;
     const conflict = () => { throw new AnnotationError(409, "ANNOTATION_CONFLICT", "El dibujo cambió. Consulta el estado actual antes de reintentar."); };
     if ("id" in command && this.removed.has(command.id)) conflict();
     if (existing && actor && existing.owner !== owner) throw new AnnotationError(403, "FORBIDDEN", "Solo puedes editar tus dibujos.");
-    if ((command.action === "update" || command.action === "delete") && !existing) conflict();
+    if ((["update", "delete", "lock", "copy"].includes(command.action)) && !existing) conflict();
     if ("revision" in command && command.revision !== (existing?.item.revision ?? 0)) conflict();
     if (command.action === "create" && existing) conflict();
     const active = this.previews.get(owner);
-    if (active && active.connection !== connection && !["clear-own", "delete"].includes(command.action)) conflict();
+    if (active && active.connection !== connection && !["clear-own", "delete", "lock"].includes(command.action)) conflict();
     if (command.action === "cancel-preview") { this.previews.delete(owner); this.notify(); return; }
+    const currentShape = existing ? { ...existing.item.geometry, id: existing.item.id } : null;
+    if (currentShape && isAreaLocked(currentShape) && command.action !== "lock" && !(command.action === "delete" && !actor)) throw new AnnotationError(409, "AREA_LOCKED", "Desbloquea el área antes de modificarla.");
+    if (command.action === "lock") {
+      if (!existing || !currentShape || !isContextualArea(currentShape)) conflict();
+      const geometry = { ...existing!.item.geometry, locked: command.locked };
+      this.items.set(command.id, { ...existing!, item: { ...existing!.item, geometry, revision: existing!.item.revision + 1 } });
+      for (const [key, preview] of this.previews) if (preview.item.id === command.id) this.previews.delete(key);
+      this.notify(); return;
+    }
+    if (command.action === "copy") {
+      if (!currentShape || !this.rules || this.items.has(command.newId) || this.removed.has(command.newId)) conflict();
+      let geometry;
+      try { geometry = shapeAnnotationGeometry(copyArea(currentShape!, command.newId, this.rules!.grid.cellSizeWorld)); }
+      catch (error) { throw new AnnotationError(400, "INVALID_AREA", error instanceof Error ? error.message : "Copia inválida."); }
+      command = { action: "create", id: command.newId, geometry }; existing = undefined;
+    }
+    if ("geometry" in command && existing) {
+      const previous = existing.item.geometry;
+      if ((previous.type === "circle" || previous.type === "cone") && (command.geometry.type === "circle" || command.geometry.type === "cone")) {
+        if (areaTools && command.geometry.locked !== undefined && command.geometry.locked !== (previous.locked ?? false)) throw new AnnotationError(409, "AREA_LOCKED", "Usa la acción de bloqueo o desbloqueo.");
+        command = { ...command, geometry: { ...command.geometry, ...(!areaTools ? { color: previous.color, areaPattern: previous.areaPattern, ...(previous.areaPattern ? { emoji: previous.emoji } : {}) } : {}), locked: previous.locked } };
+      }
+    }
     if (command.action === "delete") {
       this.items.delete(command.id); this.tombstone(command.id);
       for (const [key, preview] of this.previews) if (preview.item.id === command.id) this.previews.delete(key);
     } else if (command.action === "clear-all" || command.action === "clear-own") {
-      for (const [id, entry] of this.items) if (!actor || entry.owner === owner) { this.items.delete(id); this.tombstone(id); }
+      for (const [id, entry] of this.items) if (!actor || entry.owner === owner && !isAreaLocked({ ...entry.item.geometry, id })) { this.items.delete(id); this.tombstone(id); }
       if (actor) this.previews.delete(owner); else this.previews.clear();
     } else {
+      if (!existing && "geometry" in command && (command.geometry.type === "circle" || command.geometry.type === "cone") && command.geometry.locked) throw new AnnotationError(400, "INVALID_AREA", "Crea el área antes de bloquearla.");
       if (!existing && (this.items.size >= 256 || [...this.items.values()].filter(e => e.owner === owner).length >= 32 || this.removed.size + this.items.size >= 20000)) throw new AnnotationError(429, "ANNOTATION_LIMIT", "Límite de dibujos alcanzado. Borra o limpia tus dibujos.");
       if (!existing && [...this.previews.values()].some(p => p.owner !== owner && p.item.id === command.id)) conflict();
       const item: SharedAnnotation = { id: command.id, revision: existing ? existing.item.revision + (command.action === "preview" ? 0 : 1) : command.action === "preview" ? 0 : 1,

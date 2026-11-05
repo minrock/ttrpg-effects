@@ -80,11 +80,13 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
         const result = await service.kick(cookie, game, action.split("/")[0], kickSchema.parse(await json(req, res, 8192, requestAbort.signal)), Number(rawRevision.replaceAll('"', "")), canonicalUuid.parse(req.headers["idempotency-key"]));
         send(res, { ok: true, ...result }); return;
       }
+      const areaTools = query.areaToolsVersion === "1" && family === "table" && ["state", "events"].includes(action) || req.headers["x-ttrpg-area-tools"] === "1" && family === "table" && action === "annotations";
+      if (query.areaToolsVersion && !areaTools) throw new InvitationError("INVALID_INPUT");
       const focus = query.focusVersion === "1" && family === "table" && ["state", "events"].includes(action);
       if (query.focusVersion && !focus) throw new InvitationError("INVALID_INPUT");
       const annotations = query.annotationsVersion === "1" && family === "table" && ["state", "events"].includes(action);
       if (query.annotationsVersion && !annotations) throw new InvitationError("INVALID_INPUT");
-      if (Object.keys(query).length) { const expected = openingContextSchema.extend({ generation: z.coerce.number().int().min(1), annotationsVersion: z.literal("1").optional(), focusVersion: z.literal("1").optional() }).parse(query); if (expected.openingId !== captured!.openingId || expected.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó."); }
+      if (Object.keys(query).length) { const expected = openingContextSchema.extend({ generation: z.coerce.number().int().min(1), annotationsVersion: z.literal("1").optional(), areaToolsVersion: z.literal("1").optional(), focusVersion: z.literal("1").optional() }).parse(query); if (expected.openingId !== captured!.openingId || expected.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó."); }
       if (family === "table" && action === "events" && req.method === "GET") {
         const cursor = req.headers["last-event-id"];
         if (cursor !== undefined && (typeof cursor !== "string" || cursor.length > 200 || !/^[a-f0-9-]{36}:[a-f0-9-]{36}:\d{1,16}:[a-f0-9-]{36}:(dm|player):\d{1,16}$/.test(cursor))) throw new InvitationError("INVALID_INPUT");
@@ -130,7 +132,7 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
                     if (frame.epoch !== table.epoch || frame.context !== table.context || frame.revision < table.revision || frame.sequence <= deliveredSequence) return;
                     if (frame.type === "focus" && (Number((frame.payload as { expiresAt: number }).expiresAt) <= now() || !table.connection(key, connection?.id).ready)) return;
                     deliveredSequence = frame.sequence;
-                    const extension = annotations ? table.annotations.state(current.participant) : undefined;
+                    const extension = annotations ? table.annotations.state(current.participant, areaTools) : undefined;
                     const value = { ...frame, serverTime: now(), protocolVersion: 2, ...metadata(current),
                       ...(frame.type === "bootstrap" && frame.state ? { state: { ...frame.state, ...(extension ? { annotations: extension } : {}) } } : {}),
                       ...(frame.type === "scene" ? { payload: { ...table.state(role, connection?.id), ...(extension ? { annotations: extension } : {}) } } : {}),
@@ -184,7 +186,7 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
         await authorize(async scope => { same(scope.context); await scope.deliver(() => {
           const table = registry.runtime(scope.context);
           if (annotations && scope.participant) table.annotations.register({ participant: scope.participant, alias: scope.alias!, discriminator: scope.discriminator!, expiresAt: Date.parse(scope.annotationExpiresAt ?? scope.expiresAt!) }, key);
-          if (family === "table" && action === "state") send(res, { ok: true, state: { ...table.state(role), protocolVersion: 2, ...metadata(scope), ...(annotations ? { annotations: table.annotations.state(scope.participant) } : {}) } });
+          if (family === "table" && action === "state") send(res, { ok: true, state: { ...table.state(role), protocolVersion: 2, ...metadata(scope), ...(annotations ? { annotations: table.annotations.state(scope.participant, areaTools) } : {}) } });
           else if (family === "dice" && action === "public") send(res, { ok: true, value: table.dice.getPublicState() });
           else if (family === "dice" && action === "sizes") send(res, { ok: true, value: table.sizes(role) });
           else if (family === "dice" && action === "session" && dm) send(res, { ok: true, value: table.dice.getDmState() });
@@ -201,9 +203,9 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
           if (!command.context || table.context !== command.context || !table.state(role).snapshot) throw new AnnotationError(409, "ANNOTATION_CONTEXT", "Espera la publicación vigente antes de dibujar.");
           if (!dm) table.connection(key, command.connectionId);
           const actor = scope.participant ? { participant: scope.participant, alias: scope.alias!, discriminator: scope.discriminator!, expiresAt: Date.parse(scope.annotationExpiresAt ?? scope.expiresAt!) } : null;
-          const execute = () => { table.annotations.execute(payload, actor, key, command.connectionId ?? key); return { ok: true }; };
+          const execute = () => { table.annotations.execute(payload, actor, key, command.connectionId ?? key, areaTools); return { ok: true }; };
           const result = ["preview", "cancel-preview"].includes(payload.action) ? execute() : table.once(scope.participant ?? key, command.requestId, createHash("sha256").update(JSON.stringify(input)).digest("hex"), execute, role);
-          send(res, { ...result as object, annotations: table.annotations.state(scope.participant) });
+          send(res, { ...result as object, annotations: table.annotations.state(scope.participant, areaTools) });
         }); }); return;
       }
       const tableActions = dm ? ["focus", "scene", "camera", "camera-command", "pointer", "area-highlight"] : ["camera-report", "ready", "map-image-status"];

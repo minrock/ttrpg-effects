@@ -1,5 +1,7 @@
 # Plan - Persistencia y Formato de Escena
 
+> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora campos opcionales de color, bloqueo y patrón para círculos/conos, conservados en escenas DM y sus proyecciones. Mantiene lectura de escenas previas y no persiste dibujos efímeros de jugadores. Evidencia y pendientes en el registro de validación de SDD 57. La integración a main permanece pendiente de autorización.
+
 ## Integracion con grilla hexagonal
 
 Extension implementada y aceptada para cierre 1.10.0 el 2026-09-02, desde `feature/hexagonal-grid` hacia main. Ver contrato geometrico y validacion en spec/plan 04. El cierre no declara ejecutados los smokes nativos ni los pendientes historicos ajenos a esta extension.

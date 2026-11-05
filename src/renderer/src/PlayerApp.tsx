@@ -1,3 +1,5 @@
+import { AreaContextToolbar } from "./components/workspace/AreaContextToolbar";
+import { isContextualArea } from "../../domain/shapes/shapes";
 import { attentionFrame, focusCamera, localEntryCamera } from "../../domain/player/attention-focus";
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
@@ -427,6 +429,12 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
   return (
     <main className={`player-shell player-workspace-root${hasTable ? " player-shell--table" : ""}${hasTable && showTable ? " player-shell--table-open" : ""}`} aria-label="TTRPG Effects jugador">
       <div ref={shellRef} className="player-map-workspace">
+      {showTools && tools.selectedShape && isContextualArea(tools.selectedShape) && <AreaContextToolbar key={tools.selectedShape.id} shape={tools.selectedShape}
+        bounds={() => viewportRef.current?.getAreaContextBounds?.(tools.selectedId!) ?? null}
+        disabled={!isViewportReady || !!shared.api && (!shared.bridge?.enabled || !shared.bridge?.areaTools)}
+        unavailable={shared.api && !shared.bridge?.areaTools ? "Actualiza el servicio para editar estas áreas." : undefined}
+        onPatch={tools.patch} onLock={() => { viewportRef.current?.cancelCameraGesture(); void tools.areaAction("lock"); }} onCopy={() => void tools.areaAction("copy")} onDelete={tools.remove} onClose={() => tools.select(null)} />}
+
       {isHydrated ? (
         <MapViewport
           ref={viewportRef}
@@ -481,7 +489,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
           pathPreviewHoverPoint={null}
           waterPreviewPoints={EMPTY_ITEMS}
           waterPreviewHoverPoint={null}
-          onContextMenuRequest={noop}
+          onContextMenuRequest={request => tools.select(request.targetElementId)}
           onElementSelect={tools.select}
           onGridCellSizeChange={noop}
           onMapRenderError={noop}
@@ -519,7 +527,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
       ) : null}
       <span className="sr-only" role="status">{focusNotice}</span>
       {isHydrated && showTools && <PlayerTools
-        notice={focusNotice.includes("Se canceló") ? focusNotice : undefined}
+        notice={tools.error || shared.error || (focusNotice.includes("Se canceló") ? focusNotice : undefined)}
         tool={tools.tool}
         selectedShape={tools.selectedShape}
         count={tools.shapes.length}

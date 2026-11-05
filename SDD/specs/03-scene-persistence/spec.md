@@ -1,5 +1,7 @@
 # Spec - Persistencia y Formato de Escena
 
+> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora campos opcionales de color, bloqueo y patrón para círculos/conos, conservados en escenas DM y sus proyecciones. Mantiene lectura de escenas previas y no persiste dibujos efímeros de jugadores. Evidencia y pendientes en el registro de validación de SDD 57. La integración a main permanece pendiente de autorización.
+
 ## Nuevas zonas de fuego
 
 La ampliacion de [spec 10](../10-fire-effects/spec.md), aceptada para 2.6.0, agrega zonas fire.line (end/width) y fire.cone (radius/direction) al formato 2. Mantener lectura de circle/cells, coordenadas mundiales por mapa y validacion de dimensiones finitas. No persistir borradores, mascaras derivadas ni recursos GPU. Lectores antiguos pueden rechazar variantes nuevas.

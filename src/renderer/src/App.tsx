@@ -1,3 +1,5 @@
+import { AreaContextToolbar } from "./components/workspace/AreaContextToolbar";
+import { copyArea, isAreaLocked, isContextualArea, setAreaLocked } from "../../domain/shapes/shapes";
 import { attentionFrame } from "../../domain/player/attention-focus";
 import { matchesPublishedDrawingFrame } from "../../domain/player/shared-drawing-frame";
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
@@ -550,6 +552,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   }, [scene, service]);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
+    if (sceneRef.current.shapes.some(s => s.id === request.targetElementId && isContextualArea(s))) {
+      setInteraction(current => selectElement(closeContextMenu(current), request.targetElementId)); return;
+    }
     setInteraction((current) => {
       const opened = openContextMenu(current, request);
       return request.targetElementId === null
@@ -600,6 +605,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     handleSelectSceneObject(entry);
   }, [handleSelectSceneObject]);
   const handleDeleteSceneObject = useCallback((entry: SceneObjectEntry) => {
+    if (sceneRef.current.shapes.some(s => s.id === entry.id && isAreaLocked(s))) { setFeedback("Desbloquea el área antes de eliminarla."); return; }
     setScene((current) => removeSceneObject(current, entry));
     setInteraction((current) => current.selectedElementId === entry.id ? deleteSelectedElement(current) : current);
   }, []);
@@ -1292,6 +1298,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const handleDeleteSelectedElement = useCallback(() => {
     const selectedId = selectedElementIdRef.current;
     if (selectedId === null) return;
+    if (sceneRef.current.shapes.some(s => s.id === selectedId && isAreaLocked(s))) { setFeedback("Desbloquea el área antes de eliminarla."); return; }
     if (sceneRef.current.mapAnnotations.areas.some((area) => area.id === selectedId)) {
       handleDeleteInformationArea(selectedId);
       return;
@@ -4076,7 +4083,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 </div>
               ) : null}
               {selectedShape !== undefined ? (
-                <div className="selected-properties-content" aria-label="Propiedades de forma tactica">
+                <fieldset disabled={isAreaLocked(selectedShape)} className="selected-properties-content" aria-label="Propiedades de forma tactica" style={{ border: 0, padding: 0, margin: 0 }}>
                   {selectedPathDistance !== undefined ? <span>Distancia total: {selectedPathDistance.label}</span> : null}
                   {selectedMeasurement !== undefined ? <span>{selectedMeasurement.label}</span> : null}
                   {selectedShape.type !== "path" ? (
@@ -4084,7 +4091,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                       Emoji
                       <select
                         value={getSelectedShapeEmojis(selectedShape.emoji)[0] ?? ""}
-                        onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined })}
+                        onChange={(event) => updateSelectedShape({ emoji: event.currentTarget.value || undefined, ...(isContextualArea(selectedShape) ? { areaPattern: "checkerboard" as const } : {}) })}
                       >
                         <option value="">Sin emoji</option>
                         {ALLOWED_SHAPE_EMOJIS.map(([emoji, element]) => (
@@ -4155,7 +4162,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                       </label>
                     </>
                   ) : null}
-                </div>
+                </fieldset>
               ) : null}
             </SidebarAccordion>
           ) : null}
@@ -4866,6 +4873,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           onClose={() => setSceneLinkModalId(null)}
         />
       ) : null}
+      {selectedShape && isContextualArea(selectedShape) && interaction.contextMenu === null && <AreaContextToolbar key={selectedShape.id} shape={selectedShape}
+        bounds={() => viewportHandleRef.current?.getAreaContextBounds?.(selectedShape.id) ?? null}
+        onPatch={updateSelectedShape} onDelete={handleDeleteSelectedElement} onClose={() => setInteraction(current => selectElement(current, null))}
+        onLock={() => { viewportHandleRef.current?.cancelCameraGesture(); setScene(current => ({ ...current, shapes: current.shapes.map(s => s.id === selectedShape.id ? setAreaLocked(s, !s.locked) : s) })); }}
+        onCopy={() => { try { const copy = copyArea(selectedShape, crypto.randomUUID(), scene.grid.cellSizeWorld); setScene(current => ({ ...current, shapes: [...current.shapes, copy] })); setInteraction(current => selectElement(current, copy.id)); } catch (error) { setFeedback(error instanceof Error ? error.message : "No se pudo copiar el área."); } }} />}
       {interaction.contextMenu !== null ? (
         <div
           className="context-menu-backdrop"

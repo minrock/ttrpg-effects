@@ -96,7 +96,10 @@ const legacyLineShapeSchema = z
   .passthrough()
   .transform(() => null);
 
+const areaStyleSchema = { color: normalizedHexColor.optional(), locked: z.boolean().optional(), areaPattern: z.literal("checkerboard").optional() };
+
 const circleShapeSchema = z.object({
+  ...areaStyleSchema,
   id: z.string().min(1),
   type: z.literal("circle"),
   emoji: emojiSchema,
@@ -105,6 +108,7 @@ const circleShapeSchema = z.object({
 });
 
 const coneShapeSchema = z.object({
+  ...areaStyleSchema,
   id: z.string().min(1),
   type: z.literal("cone"),
   emoji: emojiSchema,
