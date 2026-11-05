@@ -1,3 +1,4 @@
+import { SharedAnnotations } from "./shared-annotations";
 import { DiceRollSession } from "./dice-roll-session";
 import { publicTableProjection } from "./public-table-projection";
 import type { PlayerWindowSnapshot, ViewportCameraSnapshot } from "../../domain/player/player-window";
@@ -11,6 +12,7 @@ interface Connection { id: string; owner: string; role: ServiceRole; participant
 export class TableSession {
   readonly epoch: string;
   readonly dice: DiceRollSession;
+  readonly annotations: SharedAnnotations;
   context: string | null = null;
   revision = 0;
   private snapshot: PlayerWindowSnapshot | null = null;
@@ -26,6 +28,7 @@ export class TableSession {
   private dedupBudgets = { dm: { count: 0, bytes: 0 }, player: { count: 0, bytes: 0 } };
   constructor(readonly now: () => number, private readonly id: () => string, private readonly assetUrl?: (reference: string) => string | null) {
     this.epoch = id();
+    this.annotations = new SharedAnnotations(now, id, () => this.emit("annotations", null));
     this.dice = new DiceRollSession((role, payload) => this.emit("dice", payload, role), now, id);
   }
   get connectionCount() { return this.connections.size; }
@@ -62,6 +65,7 @@ export class TableSession {
     return { id, close: () => {
       const wasPrimary = this.primary?.id === id;
       if (!this.connections.delete(id)) return;
+      this.annotations.disconnect(id);
       const promoted = wasPrimary ? this.primary : null;
       if (promoted) { promoted.report = null; promoted.ready = false; }
       this.emit("presence", this.presence(), "dm");
@@ -75,11 +79,15 @@ export class TableSession {
     const projected = snapshot ? publicTableProjection(snapshot, this.assetUrl) : null;
     const changedImage = this.snapshot?.mapImageUrl !== projected?.snapshot.mapImageUrl;
     if (changed) {
+      this.annotations.reset();
       this.context = this.id(); this.command = null; this.pointer = null; this.highlight = null;
       for (const c of this.connections.values()) { c.report = null; c.ready = false; c.lastReport = -Infinity; }
       // Invalidar la finalización pendiente antes de recibir el contexto de dados nuevo.
       this.dice.setContext({ token: this.context, sceneId: "", mapId: "", sceneName: "", mapName: "" });
     }
+    if (!changed && JSON.stringify([this.snapshot?.scene.grid, this.snapshot?.scene.settings]) !== JSON.stringify([projected?.snapshot.scene.grid, projected?.snapshot.scene.settings])) this.annotations.cancelPreviews();
+    this.annotations.sceneId = snapshot?.scene.id ?? null;
+    if (projected) this.annotations.configure(projected.snapshot.scene.grid, projected.snapshot.scene.settings);
     this.identity = identity; this.snapshot = projected?.snapshot ?? null; this.assets = projected?.assets ?? new Set(); this.camera = snapshot?.camera ?? null; this.revision++;
     if (changed || changedImage) for (const c of this.connections.values()) { c.ready = false; c.imageStatus = this.snapshot ? "loading" : "waiting"; }
     for (const role of ["dm", "player"] as const) this.emit("scene", this.state(role), role);

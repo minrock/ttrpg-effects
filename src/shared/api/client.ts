@@ -14,6 +14,7 @@ export interface ClientCapabilities {
 
 export interface TtrpgClient {
   readonly api: TtrpgApi;
+  readonly annotations?: import("../contracts/shared-annotations").SharedAnnotationsClient;
   readonly assetReferences?: "service";
   readonly capabilities: ClientCapabilities;
   readonly presentations?: {
@@ -27,6 +28,6 @@ export const LOCAL_CAPABILITIES: ClientCapabilities = Object.freeze({
 });
 
 /** The full contract stays required; only tests/labs may provide partial doubles. */
-export function createClient(api: TtrpgApi, capabilities: ClientCapabilities, assetReferences?: "service", presentations?: TtrpgClient["presentations"]): TtrpgClient {
-  return Object.freeze({ api, assetReferences, presentations, capabilities: Object.freeze({ ...capabilities }) });
+export function createClient(api: TtrpgApi, capabilities: ClientCapabilities, assetReferences?: "service", presentations?: TtrpgClient["presentations"], annotations?: TtrpgClient["annotations"]): TtrpgClient {
+  return Object.freeze({ api, assetReferences, presentations, annotations, capabilities: Object.freeze({ ...capabilities }) });
 }

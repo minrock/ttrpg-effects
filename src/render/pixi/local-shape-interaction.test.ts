@@ -363,3 +363,29 @@ describe("read-only local shape tools", () => {
     expect(options.onElementMove).not.toHaveBeenCalled();
   });
 });
+
+describe("autoría de dibujos compartidos", () => {
+  it("etiquetas de todas las geometrías mantienen medida, texto seguro y contrarrotación", () => {
+    const { viewport } = setup([]);
+    const pixi = viewport as unknown as PixiViewport;
+    const layer = new Container(); Object.assign(viewport, { getLayer: () => layer });
+    cleanup.push(() => layer.destroy({ children: true }));
+    const alias = "Ana <img src=x onerror=alert(1)> nombre largo";
+    const geometries: import("../../shared/contracts/shared-annotations").AnnotationGeometry[] = [
+      { type: "measurement", points: [{ x: 0, y: 0 }, { x: 100, y: 50 }] },
+      { type: "path", points: [{ x: 0, y: 0 }, { x: 100, y: 50 }] },
+      { type: "circle", points: [{ x: 0, y: 0 }], radius: 10 },
+      { type: "rectangle", points: [{ x: 0, y: 0 }], width: 20, height: 15 },
+      { type: "cone", points: [{ x: 0, y: 0 }], radius: 100, angle: 60, direction: 90 }
+    ];
+    Object.assign(viewport, { viewRole: "player", compassOrientation: 90, camera: { center: { x: 0, y: 0 }, zoom: 2 } });
+    pixi.setSharedAnnotations(geometries.map(geometry => ({ id: crypto.randomUUID(), revision: 1, author: { publicId: crypto.randomUUID(), alias, discriminator: 7 }, geometry, measurementLabel: "15 ft", preview: true })));
+    const labels = layer.children.flatMap(child => child instanceof Container ? child.children.filter((c): c is Text => c instanceof Text && c.label === "area-tool-size-label") : []);
+    expect(labels).toHaveLength(5);
+    for (const label of labels) { expect(label.text).toContain("… #7\n15 ft"); expect(label.rotation).toBeCloseTo(Math.PI / 2); }
+    for (const container of layer.children) expect(container.alpha).toBe(0.65);
+    expect(Reflect.get(viewport, "shapes")).toEqual([]);
+    expect(document.querySelector("img[src=x]")).toBeNull();
+    pixi.setSharedAnnotations([]); expect(layer.children).toHaveLength(0);
+  });
+});

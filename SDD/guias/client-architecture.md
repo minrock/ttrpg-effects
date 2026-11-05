@@ -78,3 +78,9 @@ Pruebas de composición: `src/renderer/src/client/ClientProvider.test.tsx`. Comp
 La matriz de adaptación histórica de este documento se complementa con la [paridad efectiva y evidencias 3.4.0](browser-client.md#matriz-de-paridad-y-evidencia). `createClient` acepta metadato opcional `assetReferences: "service"` para representación de imágenes en notas; no es autorización.
 
 El cliente de recursos conserva CAS, bindings y operaciones inciertas por cuenta/recurso. El cliente de mesa es inmutable por partida/apertura/generación/audiencia. Rotar invitación no cambia su identidadReact. El guard superior contiene canvas y portales;401 suspende operaciones y protege borrador del ID original.
+
+## Dibujos compartidos — SDD 55 / 3.19.0
+
+El puerto opcional `TtrpgClient.annotations` conecta mediciones/áreas de jugadores a una capa efímera del servicio. El servidor deriva autoría y medidas, limita edición al propietario y permite retirada/limpieza DM; Electron autónomo conserva herramientas locales. El overlay no entra en guardados ni exportaciones.
+
+Negociación, comandos, límites y ciclo de vida se documentan una sola vez en [mesa sincronizada](synchronized-table.md#dibujos-compartidos--sdd-55--3190). Véanse también el [contrato SDD 55](../specs/55-mediciones-compartidas/spec.md) y su [validación y gates pendientes](../specs/55-mediciones-compartidas/validacion.md).

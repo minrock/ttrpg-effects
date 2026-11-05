@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useEffect } from "react";
+import { act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GameEditor } from "./GameEditor";
@@ -10,9 +10,9 @@ import { HttpTransport, ServiceError } from "../infrastructure/browser/http";
 import { systemSeeds } from "../domain/systems/system-catalog";
 
 const state=vi.hoisted(()=>({revalidate:vi.fn(),expired:vi.fn(),guard:undefined as undefined|(()=>Promise<boolean>),broker:undefined as undefined|DialogBroker,terminals:[] as Array<(reason:string)=>void>,status:{phase:"connected",published:false,presence:null,error:null}}));
-vi.mock("../renderer/src/App",()=>({App:({service}:{service:ServiceWorkspace})=>{
+vi.mock("../renderer/src/App",()=>({App:({service,tablePanel}:{service:ServiceWorkspace;tablePanel?:ReactNode})=>{
   useEffect(()=>service.registerLeave?.(state.guard??(async()=>await service.confirmLeave()!==null)),[service]);
-  return <input aria-label="Borrador retenido" defaultValue="inicial"/>;
+  return <><input aria-label="Borrador retenido" defaultValue="inicial"/>{tablePanel}</>;
 }}));
 vi.mock("../infrastructure/browser/browser-client",()=>({createBrowserClient:(_http:HttpTransport,broker:DialogBroker)=>{state.broker=broker;return {client:{},revalidate:state.revalidate,clear:vi.fn()};}}));
 vi.mock("../infrastructure/browser/contextual-table-client",()=>({contextualTableClient:(_context:unknown,onTerminal:(reason:string)=>void)=>{state.terminals.push(onTerminal);return {subscribeStatus:()=>()=>{},getStatus:()=>state.status,start:()=>()=>{},clear:()=>{}};}}));

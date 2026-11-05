@@ -284,6 +284,24 @@ describe("App production workspace", () => {
     expect(viewport.handle.setCameraSnapshot).not.toHaveBeenCalled();
   });
 
+  it("keeps the table menu inside the sidebar and preserves its state across tabs", async () => {
+    await act(async () => root.render(<App tablePanel={<details open><summary>Mesa · 2 jugadores</summary><input aria-label="Enlace de prueba" defaultValue="invitación" /></details>} />));
+    const panel = element("#right-panel-table");
+    const field = element<HTMLInputElement>('[aria-label="Enlace de prueba"]');
+    const canvas = element('[data-testid="workspace-canvas"]');
+    expect(panel.closest(".control-sidebar")).toBeTruthy();
+    expect(panel.hidden).toBe(true);
+    await click(element("#right-tab-table"));
+    expect(panel.hidden).toBe(false);
+    field.value = "conservado";
+    await click(element("#right-tab-dice"));
+    await click(element("#right-tab-table"));
+    expect(element('[aria-label="Enlace de prueba"]')).toBe(field);
+    expect(field.value).toBe("conservado");
+    expect(element('[data-testid="workspace-canvas"]')).toBe(canvas);
+    expect(viewport.unmount).not.toHaveBeenCalled();
+  });
+
   it("keeps the real dice panel and sound preference mounted when changing tabs and hiding the inspector", async () => {
     await render();
     await click(button("Abrir dados"));

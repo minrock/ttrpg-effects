@@ -92,7 +92,8 @@ export async function guestAuthority(database: DatabaseConfig, presence: Presenc
           transport: () => run(async () => {
             const guest = await principal(c, game, token), opening = (await latest(c, game))!;
             const system = readSystem((await c.query("SELECT * FROM system_versions WHERE system_id=$1 AND version=$2", [guest.systemRef.systemId, guest.systemRef.version])).rows[0]);
-            return { context: { ownerId: opening.hostAccountId, gameId: game, openingId: opening.id, generation: opening.generation, leaseExpiresAt: opening.leaseExpiresAt }, system: { ref: guest.systemRef, definition: system.definition, hash: system.hash, availability: system.availability } };
+            const credentials = await c.query("SELECT MAX(expires_at) AS expiry FROM guest_credentials WHERE participant_id=$1 AND revoked_at IS NULL AND expires_at>$2", [guest.participantId, now().toISOString()]);
+            return { participantExpiresAt: String(credentials.rows[0].expiry ?? guest.expiresAt), context: { ownerId: opening.hostAccountId, gameId: game, openingId: opening.id, generation: opening.generation, leaseExpiresAt: opening.leaseExpiresAt }, system: { ref: guest.systemRef, definition: system.definition, hash: system.hash, availability: system.availability } };
           }),
           asset: id => run(async () => {
             if (!canonicalUuid.safeParse(id).success) throw new InvitationError("INVALID_INPUT");

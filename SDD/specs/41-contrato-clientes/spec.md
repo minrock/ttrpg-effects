@@ -1,5 +1,7 @@
 # 41 — Contrato común de clientes
 
+> **Evolución implementada en 3.19.0 (pendiente de integración):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.
+
 Fecha de consolidación: 2026-11-04.
 
 **Estado:** Integrado según expediente histórico; contrato actualizado a la base actual.

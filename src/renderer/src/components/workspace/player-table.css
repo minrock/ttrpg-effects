@@ -1,0 +1,26 @@
+/* El mapa conserva su propio marco para render, herramientas e informes de cámara. */
+.player-map-workspace { position: relative; min-width: 0; min-height: 0; width: 100%; height: 100%; overflow: hidden; }
+.player-shell--table { --player-table-width: 282px; display: grid; grid-template-columns: minmax(0, 1fr); }
+.player-shell--table-open { grid-template-columns: minmax(0, 1fr) var(--player-table-width); }
+.player-table-sidebar { min-width: 0; min-height: 0; overflow-y: auto; color: #e0e5e9; background: #232528; border-left: 1px solid #3a3e43; font: 12px/1.5 Inter, system-ui, sans-serif; scrollbar-width: thin; }
+.player-table-sidebar[hidden] { display: none; }
+.player-table-sidebar__header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #232528; border-bottom: 1px solid #3a3e43; }
+.player-table-sidebar__header h2 { margin: 0; font-size: 14px; }
+.player-table-sidebar__content { padding: 12px; overflow-wrap: anywhere; }
+.player-table-sidebar__content h3 { margin: 0 0 8px; font-size: 12px; color: #adb5be; }
+.player-table-sidebar__content p { margin: 8px 0; }
+.player-table-session { padding-bottom: 14px; margin-bottom: 14px; border-bottom: 1px solid #3a3e43; }
+.player-table-session__alias { font-weight: 600; }
+.player-table-session [role=alert] { color: #ffd0b7; }
+.player-table-sidebar .shared-drawings details { background: transparent; border: 0; border-bottom: 1px solid #3a3e43; border-radius: 0; padding: 10px 0; }
+.player-table-sidebar :focus-visible { outline: 2px solid #9fe5ca; outline-offset: 2px; }
+/* Pestaña de borde con el mismo tamaño y aspecto del inspector DM. */
+.player-table-toggle { position: absolute; top: 12px; right: 0; z-index: 11; display: grid; place-items: center; width: 25px; height: 28px; padding: 0; border: 1px solid #7e8d7355; border-radius: 6px 0 0 6px; color: #c4c8cd; background: #252a27ed; box-shadow: 0 8px 24px #0004; cursor: pointer; }
+.player-shell--table-open .player-table-toggle { right: var(--player-table-width); }
+.player-table-toggle:hover { color: #a3e2c5; border-color: #435063; background: #181f28; }
+.player-table-toggle:focus-visible { outline: 2px solid #8ed5b6; outline-offset: -2px; }
+@media (max-width: 1099px) {
+  .player-shell--table { --player-table-width: min(282px, calc(100% - 68px)); }
+  .player-shell--table-open { grid-template-columns: minmax(0, 1fr); }
+  .player-table-sidebar { position: absolute; top: 0; right: 0; bottom: 64px; width: var(--player-table-width); z-index: 10; }
+}

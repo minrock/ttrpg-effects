@@ -1,0 +1,17 @@
+.shared-drawings { min-width: 0; color: #f0f3f1; font: 12px/1.4 system-ui, sans-serif; pointer-events: auto; }
+.shared-drawings details { background: #20282eed; border: 1px solid #48585e; border-radius: 6px; padding: 6px 9px; overflow-wrap: anywhere; }
+.shared-drawings summary { cursor: pointer; }
+.shared-drawings__item { display: flex; gap: 8px; align-items: center; border-top: 1px solid #48585e; padding: 6px 0; }
+.shared-drawings__item span { overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.shared-drawings button { background: #30483f; color: #e3f1eb; border: 1px solid #57776a; border-radius: 4px; padding: 4px 7px; margin: 2px; cursor: pointer; }
+.shared-drawings button:disabled { opacity: .5; cursor: default; }
+.shared-drawings :focus-visible { outline: 2px solid #9fe5ca; outline-offset: 2px; }
+.shared-drawings [role=alert] { color: #ffd0b7; }
+
+.shared-drawings-preview { font: 14px/1.4 system-ui, sans-serif; width: min(1000px, 94vw); height: 80vh; padding: 0; color: #f0f3f1; background: #20282e; border: 1px solid #57776a; border-radius: 8px; }
+.shared-drawings-preview::backdrop { background: #0009; }
+.shared-drawings-preview header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px; }
+.shared-drawings-preview__map { position: relative; height: calc(100% - 64px); display: grid; overflow: hidden; }
+.shared-drawings-preview__map { grid-template-columns: minmax(0, 1fr); }
+.shared-drawings-preview__map .map-viewport { position: relative; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+.shared-drawings-preview__map canvas { display: block; }

@@ -17,7 +17,6 @@
 .service-dialog footer,.service-dialog nav { display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:12px;margin-top:20px; }
 .service-dialog select option { padding:10px;overflow:hidden;text-overflow:ellipsis; }
 .service-menu-note { padding:0 10px;color:#bac2c8;font-size:11px;line-height:1.5; }
-.service-player-logout { position:fixed;top:16px;right:16px;z-index:1000; }
 .service-table-status .service-player-error { margin:8px 12px;max-height:25vh;overflow:auto;overflow-wrap:anywhere; }
 
 .service-selected-scene { white-space:normal;overflow-wrap:anywhere;padding:12px;border:1px solid #69727b;border-radius:4px; }
@@ -36,7 +35,6 @@
 
 .service-table-status button { color: #ebedef; background: #303438; border: 1px solid #758397; border-radius: 4px; cursor: pointer; }
 .service-table-status button:hover { background: #41484e; }
-.service-table-status--player { top: 166px; right: 16px; bottom: auto; left: auto; }
 .service-live-message { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 
 /* Reservar filas distintas para sesión, brújula y estado de mesa del servicio. */

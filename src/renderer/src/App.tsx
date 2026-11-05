@@ -1,3 +1,6 @@
+import { matchesPublishedDrawingFrame } from "../../domain/player/shared-drawing-frame";
+import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
+import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
 import type { ServiceWorkspace } from "../../web/workspace";
 import { useTtrpgApi } from "./client/ClientProvider";
 import {
@@ -290,7 +293,8 @@ interface NewTokenDraftState {
 const SESSION_AUTOSAVE_DELAY_MS = 1000;
 const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
 
-export function App({ service }: { readonly service?: ServiceWorkspace } = {}): JSX.Element {
+export function App({ service, tablePanel }: { readonly service?: ServiceWorkspace; readonly tablePanel?: ReactNode } = {}): JSX.Element {
+  const shared = useSharedAnnotations();
   const [servicePublished, setServicePublished] = useState(false);
   useEffect(() => {
     if (!service) return;
@@ -324,6 +328,8 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
     sceneRef.current = syncedScene;
     setSceneState(syncedScene);
   }, []);
+  const sharedScene = shared.view.snapshot?.scene;
+  const sharedAligned = !!sharedScene && matchesPublishedDrawingFrame(scene, sharedScene, shared.view.state?.sceneId ?? null);
   const [sceneAside, setSceneAside] = useState<SceneAside>(() =>
     (scene.sceneAside) ?? createDefaultSceneAside()
   );
@@ -342,7 +348,7 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
   const contextMenuRef = useRef<HTMLElement | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<ContextMenuPosition | null>(null);
   const [isSidebarVisible, setIsSidebarVisible] = useState(() => window.innerWidth >= 1100);
-  const [rightTab, setRightTab] = useState<"properties" | "dice">("properties");
+  const [rightTab, setRightTab] = useState<"properties" | "dice" | "table">("properties");
   const [isAsidePanelVisible, setIsAsidePanelVisible] = useState(() => window.innerWidth >= 1100);
   const [isPanToolActive, setIsPanToolActive] = useState(false);
   const [dmZoom, setDmZoom] = useState(1);
@@ -3575,6 +3581,7 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
           {isAsidePanelVisible ? <ChevronLeft aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
         </button>
         <MapViewport
+          sharedAnnotations={sharedAligned ? shared.items : undefined}
           ref={viewportHandleRef}
           map={mapState}
           grid={scene.grid}
@@ -3751,7 +3758,11 @@ export function App({ service }: { readonly service?: ServiceWorkspace } = {}): 
           onToggleDefeated={handleToggleCombatParticipantDefeated}
         />
         <aside className="control-sidebar" aria-label="Controles de escena" hidden={!isSidebarVisible}>
-          <RightSidebarTabs value={rightTab} onChange={setRightTab} />
+          <RightSidebarTabs value={rightTab} onChange={setRightTab} showTable={!!tablePanel || !!shared.api} />
+          {(tablePanel || shared.api) && <div className="right-table-content" id="right-panel-table" role="tabpanel" aria-labelledby="right-tab-table" hidden={rightTab !== "table"}>
+            {tablePanel}
+            {shared.api && <SharedDrawingPanel api={shared.api} view={shared.view} aligned={sharedAligned}/>}
+          </div>}
           <div id="right-panel-dice" role="tabpanel" aria-labelledby="right-tab-dice" hidden={rightTab !== "dice"}>
             <DicePanel controller={diceSession} />
           </div>

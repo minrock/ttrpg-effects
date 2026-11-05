@@ -19,7 +19,7 @@ export interface InvitationRepository {
 /** Capacidad010: no expone repositorios privados ni SQL. DTO no es autoridad. */
 export interface GuestTransaction {
   session(): Promise<GuestDto>; leave(): Promise<void>;
-  transport(): Promise<{ context: import("./game-runtime").GameContext; system: import("../../domain/systems/system-catalog").ResolvedSystem }>;
+  transport(): Promise<{ participantExpiresAt?: string; context: import("./game-runtime").GameContext; system: import("../../domain/systems/system-catalog").ResolvedSystem }>;
   asset(id: string): Promise<{ mime: string; bytes: Uint8Array } | null>;
   deliver(effect: () => void, uncertain: () => void): Promise<void>;
 }

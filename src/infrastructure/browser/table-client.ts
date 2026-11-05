@@ -1,3 +1,4 @@
+import { annotationStateSchema, type AnnotationState, type AnnotationView, type SharedAnnotationsClient } from "../../shared/contracts/shared-annotations";
 import { contextualEventSchema, contextualStateSchema } from "../../shared/contracts/moderation";
 import { z } from "zod";
 import type { TtrpgApi } from "../../shared/api/ttrpg-api";
@@ -33,7 +34,43 @@ export class BrowserTableClient {
   private diceContext: DiceContext | null = null;
   private generation = 0;
   private applied = new Set<string>();
-  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) {}
+  private annotationView: AnnotationView = { supported: false, connected: false, state: null, snapshot: null, context: null, error: "" };
+  private annotationGeneration = 0;
+  private annotationListeners = new Set<() => void>();
+  private refreshAnnotations(error = "") {
+    this.annotationView = { supported: !!this.current?.annotations, connected: this.status.phase === "connected", state: this.current?.annotations ?? null, snapshot: this.current?.snapshot ?? null, context: this.current?.context ?? null, error };
+    for (const listener of this.annotationListeners) listener();
+  }
+  private applyAnnotations(value: AnnotationState) {
+    if (!this.current || value.sequence < (this.current.annotations?.sequence ?? -1)) return;
+    this.current.annotations = value; this.refreshAnnotations();
+  }
+  readonly annotations: SharedAnnotationsClient = {
+    getSnapshot: () => this.annotationView,
+    subscribe: listener => { this.annotationListeners.add(listener); return () => { this.annotationListeners.delete(listener); }; },
+    command: async command => {
+      const generation = this.generation, annotationGeneration = this.annotationGeneration, context = this.current?.context;
+      if (!this.contextual || !this.current?.annotations || this.status.phase !== "connected" || !context) throw new Error("Dibujo compartido no disponible. Espera la conexión y publicación.");
+      const captured = { context, connectionId: this.connectionId, revision: this.current.revision };
+      try {
+        await this.enqueue(async () => {
+          if (generation !== this.generation || annotationGeneration !== this.annotationGeneration || context !== this.current?.context || this.status.phase !== "connected") throw new Error("El contexto del dibujo cambió.");
+          const response = await this.rpc("/table/annotations", command, z.object({ ok, annotations: annotationStateSchema }), captured);
+          if (generation === this.generation && annotationGeneration === this.annotationGeneration && context === this.current?.context) this.applyAnnotations(response.annotations);
+        });
+      } catch (error) {
+        if (generation === this.generation && annotationGeneration === this.annotationGeneration && context === this.current?.context) {
+          this.refreshAnnotations(error instanceof Error ? error.message : "No se pudo actualizar el dibujo.");
+          if (error instanceof ServiceError && error.status === 409) {
+            const response = await this.http.request("/table/state", this.reply);
+            if (generation === this.generation && annotationGeneration === this.annotationGeneration && context === this.current?.context) this.applyState(response.state);
+          }
+        }
+        throw error;
+      }
+    }
+  };
+  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) { if (contextual) http.negotiateAnnotations(true); }
   private get reply() { return z.object({ ok, state: this.contextual ? contextualStateSchema.transform(value => { if (value.gameId !== this.contextual!.gameId || value.openingId !== this.contextual!.openingId || value.generation !== this.contextual!.generation || value.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); } return tableStateSchema.parse({ ...value, protocolVersion: 1 }); }) : tableStateSchema, playerUrl: z.string().optional() }); }
   private sceneResourceId: string | undefined;
   setSceneResource(id: string | undefined) { this.sceneResourceId = id; }
@@ -43,7 +80,7 @@ export class BrowserTableClient {
 
   getStatus = () => this.status;
   subscribeStatus = (handler: () => void) => { this.statusHandlers.add(handler); return () => { this.statusHandlers.delete(handler); }; };
-  private setStatus(patch: Partial<TableConnectionStatus>) { this.status = { ...this.status, ...patch }; for (const handler of this.statusHandlers) handler(); }
+  private setStatus(patch: Partial<TableConnectionStatus>) { if (patch.phase && patch.phase !== "connected" && this.status.phase === "connected") this.annotationGeneration++; this.status = { ...this.status, ...patch }; for (const handler of this.statusHandlers) handler(); this.refreshAnnotations(); }
   private emit(name: string, value?: unknown) { for (const handler of this.handlers.get(name) ?? []) handler(value); }
   private on<T>(name: string, handler: (value: T) => void) {
     const wrapped = (value: unknown) => handler(value as T);
@@ -90,6 +127,7 @@ export class BrowserTableClient {
       } catch (error) {
         if (generation !== this.generation || session.aborted) return;
         if(this.contextual&&(error instanceof z.ZodError||error instanceof SyntaxError||error instanceof ServiceError&&error.code==="INVALID_RESPONSE")){this.terminal("unavailable");return;}
+        if (this.contextual && error instanceof ServiceError && error.status === 400) this.http.negotiateAnnotations(false);
         this.setStatus({ phase: "disconnected", error: "Mesa desconectada. La vista está desactualizada; reconectando…" });
         if (error instanceof ServiceError && [401, 403, 404].includes(error.status)) { if (this.contextual) this.terminal("access-ended"); return; }
         this.retry = setTimeout(() => { void connect(count + 1); }, Math.min(30000, 500 * 2 ** Math.min(count, 6)));
@@ -138,6 +176,7 @@ export class BrowserTableClient {
     if (this.current && state.epoch === this.current.epoch && state.revision < this.current.revision) return;
     const changed = this.current?.context !== state.context || this.current?.epoch !== state.epoch;
     const sceneChanged = changed || !this.current || state.revision > this.current.revision;
+    if (!changed && this.current?.annotations && (!state.annotations || state.annotations.sequence < this.current.annotations.sequence)) state.annotations = this.current.annotations;
     this.current = state;
     if (state.connectionId) this.connectionId = state.connectionId;
     this.setStatus({ phase: "connected", published: !!state.snapshot, error: "" });
@@ -157,6 +196,7 @@ export class BrowserTableClient {
     if (event.type === "scene") { this.applyState(tableStateSchema.parse(event.payload)); return; }
     if (!this.current || event.context !== this.current.context || event.revision < this.current.revision) return;
     switch (event.type) {
+      case "annotations": this.applyAnnotations(annotationStateSchema.parse(event.payload)); break;
       case "camera": { const camera = cameraSchema.parse(event.payload); if (this.current) this.current.camera = camera; this.emit("camera", camera); break; }
       case "camera-command": { const command = commandSchema.parse(event.payload); if (this.current) this.current.cameraCommand = command; this.emit("command", command); break; }
       case "presence": this.presence(presenceSchema.parse(event.payload)); break;
@@ -178,7 +218,7 @@ export class BrowserTableClient {
     const startedAt = Date.now();
     // Un único reintento con el mismo ID, dentro de la ventana de cinco minutos.
     try { return await this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
-    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
+    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || path === "/table/annotations" && this.status.phase !== "connected" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
   }
   private mutation(action: string, payload: unknown) {
     const expectedContext = this.current?.context;

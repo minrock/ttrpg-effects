@@ -28,8 +28,16 @@ export function GuestEntry({gameId,invitation}:{gameId:string;invitation:Capture
 function GuestWorkspace({guest,onTerminal,onLeave,error}:{guest:GuestDto;onTerminal:(reason:string)=>void;onLeave:()=>void;error:string}){
   const callback=useRef(onTerminal);callback.current=onTerminal;
   const table=useMemo(()=>contextualTableClient({gameId:guest.gameId,openingId:guest.openingId,generation:guest.generation,audience:"player"},reason=>callback.current(reason)),[guest.gameId,guest.openingId,guest.generation]);
-  const client=useMemo(()=>{const base=createBrowserClient(new HttpTransport(fetch,()=>{}),new DialogBroker());return createClient({...base.client.api,...table.api},{scenes:false,images:true,libraries:false,templateAdministration:false,player:true,dice:true,nativeMenus:false},"service");},[table]);
+  const client=useMemo(()=>{const base=createBrowserClient(new HttpTransport(fetch,()=>{}),new DialogBroker());return createClient({...base.client.api,...table.api},{scenes:false,images:true,libraries:false,templateAdministration:false,player:true,dice:true,nativeMenus:false},"service",undefined,table.annotations);},[table]);
   const status=useSyncExternalStore(table.subscribeStatus,table.getStatus);
   useEffect(()=>{const stop=table.start("player");return()=>{stop();table.clear();};},[table]);
-  return <div className="service-player-workspace"><ClientProvider client={client}><PlayerApp unavailableMessage={status.phase!=="connected"?"Mesa desconectada. Reconectando…":"Esperando publicación del DM"}/></ClientProvider><button className="service-player-logout" onClick={onLeave}>Salir de la partida</button><aside className="service-table-status service-table-status--player"><p role="status">{guest.alias} #{guest.discriminator} · {status.phase!=="connected"?"Reconectando":status.published?"Conectado":"Esperando publicación"}</p><p role="alert">{error||status.error}</p></aside></div>;
+  const tablePanel = <section className="player-table-session" aria-label="Datos de la mesa">
+    <h3>Tu acceso</h3>
+    <p className="player-table-session__alias">{guest.alias} #{guest.discriminator}</p>
+    <p>Sistema: {guest.systemRef.systemId} · v{guest.systemRef.version}</p>
+    <p role="status">{status.phase!=="connected"?"Mesa desconectada. Reconectando…":status.published?"Conectado · Escena publicada":"Conectado · Esperando publicación del DM"}</p>
+    <p role="alert">{error||status.error}</p>
+    <button className="service-player-logout" onClick={onLeave}>Salir de la partida</button>
+  </section>;
+  return <div className="service-player-workspace"><ClientProvider client={client}><PlayerApp tablePanel={tablePanel} unavailableMessage={status.phase!=="connected"?"Mesa desconectada. Reconectando…":"Esperando publicación del DM"}/></ClientProvider></div>;
 }

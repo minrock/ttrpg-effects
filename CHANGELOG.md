@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.19.1 — 2026-11-04 — Corrección
+
+- Jugador con lateral derecho retráctil mediante chevrón en el borde (como el DM) para alias, sistema, conexión, salida y dibujos compartidos; mapa y cámara conservados al abrir/cerrar.
+- Gestión de mesa, invitaciones, participantes y dibujos de jugadores integrada en la pestaña Mesa del lateral derecho, sin flotantes sobre los menús del DM.
+- Corrige solapamientos de menús y etiquetas; preserva foco, estado y cámara al contraer los laterales. SDD recoge los criterios del ajuste y los límites de validación.
+
+## 3.19.0 — 2026-11-04 — Funcionalidad
+
+- Mediciones, caminos y áreas de jugadores compartidos en tiempo real con el DM y otros jugadores del servicio, con alias y discriminador del autor.
+- Capa efímera separada de la escena: edición propia, previews acotados, reconexión, retirada al salir/ser expulsado y limpieza por contexto. El DM puede retirar figuras o limpiar con confirmación.
+- Extensión HTTP/SSE negociada, validación y permisos en servidor, revisiones e idempotencia; conserva Electron autónomo y clientes sin extensión. Vista del mapa publicado sin sustituir el borrador DM.
+
 ## 3.18.1 — 2026-11-04 — Corrección
 
 - Fusiona los controles del editor con la cabecera del servicio: una sola fila para partida, escena, guardar, herramientas, jugador y perfil, sin logo duplicado ni fila vacía.

@@ -1,5 +1,7 @@
 # Spec 39 - Interfaz VTT integrada
 
+> **Evolución implementada en 3.19.0 (pendiente de integración):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.
+
 ## Estado
 
 2026-10-28. Implementacion DM y extension Player aceptadas por el usuario. Spec cerrada para la version 3.0.0, con commit, integracion en `main` y DMG autorizados. El plan registra la verificacion y el resultado del empaquetado; no se ha solicitado push en este cierre.
@@ -69,3 +71,9 @@ Extension solicitada antes del cierre de la interfaz. Player View adopta el mism
 - `SDD/specs/06-sidebar-and-properties/spec.md`: inspector y navegacion.
 - `SDD/specs/30-map-compass/spec.md`: orientacion y transformacion de Player View.
 - `SDD/specs/37-dm-dice-rolls/spec.md`: dados y privacidad, sin cambio de reglas.
+
+## Mesa en los laterales — 3.19.1
+
+El inspector DM dispone de Propiedades, Dados y Mesa. Mesa reúne invitaciones, participantes y dibujos de jugadores en menús desplegables dentro de su flujo y desplazamiento. Cambiar de pestaña conserva estado y comprobaciones de acceso. El jugador dispone de un lateral derecho con chevrón de borde para datos de su mesa y dibujos; se eliminan los flotantes independientes de estado, salida y dibujos. El chevrón permanece disponible al contraer, y no se duplica como botón inferior.
+
+Contrato y criterios CA-15–18 en [SDD 55](../55-mediciones-compartidas/spec.md); evidencia y límites en su [validación](../55-mediciones-compartidas/validacion.md).

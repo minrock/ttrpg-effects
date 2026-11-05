@@ -103,6 +103,19 @@ describe("dice panel", () => {
     expect(onChange).toHaveBeenCalledWith("dice");
     expect(document.activeElement?.id).toBe("right-tab-dice");
   });
+  it("includes the optional table tab in keyboard navigation", async () => {
+    const onChange = vi.fn();
+    await act(async () => root.render(<RightSidebarTabs value="dice" showTable onChange={onChange} />));
+    const tabs = host.querySelector('[role="tablist"]')!;
+    await act(async () => tabs.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    expect(onChange).toHaveBeenLastCalledWith("table");
+    expect(document.activeElement?.id).toBe("right-tab-table");
+    await act(async () => root.render(<RightSidebarTabs value="table" showTable onChange={onChange} />));
+    await act(async () => tabs.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+    expect(onChange).toHaveBeenLastCalledWith("properties");
+    await act(async () => tabs.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true })));
+    expect(onChange).toHaveBeenLastCalledWith("table");
+  });
   it("shares manual quantities and modifier with formula mode and keeps damage groups separate", async () => {
     await act(async () => root.render(<DicePanel controller={controller} />));
     await selectGroup("fire"); await click('[aria-label="Agregar d6"]');
