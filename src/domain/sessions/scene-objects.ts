@@ -1,3 +1,4 @@
+import { isAreaLocked } from "../shapes/shapes";
 import type { SceneDocument, SceneEffect, SceneLight, SceneShape } from "./scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import { lightningCenter, lightningShapeNames } from "../effects/lightning";
@@ -28,6 +29,7 @@ export function listSceneObjects(lights: readonly SceneLight[], effects: readonl
 }
 
 export function removeSceneObject(scene: SceneDocument, entry: Pick<SceneObjectEntry, "id" | "collection">): SceneDocument {
+  if (entry.collection === "shapes" && scene.shapes.some(s => s.id === entry.id && isAreaLocked(s))) return scene;
   if (!scene[entry.collection].some((item) => item.id === entry.id)) return scene;
   if (entry.collection === "lights") return { ...scene, lights: scene.lights.filter((item) => item.id !== entry.id) };
   if (entry.collection === "effects") return { ...scene, effects: scene.effects.filter((item) => item.id !== entry.id) };

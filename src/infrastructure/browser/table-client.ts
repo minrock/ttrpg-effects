@@ -72,7 +72,7 @@ export class BrowserTableClient {
       }
     }
   };
-  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) { if (contextual) http.negotiateAnnotations(true); http.negotiateFocus(true); }
+  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) { if (contextual) { http.negotiateAnnotations(true); http.negotiateAreas(true); } http.negotiateFocus(true); }
   private get reply() { return z.object({ ok, state: this.contextual ? contextualStateSchema.transform(value => { if (value.gameId !== this.contextual!.gameId || value.openingId !== this.contextual!.openingId || value.generation !== this.contextual!.generation || value.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); } return tableStateSchema.parse({ ...value, protocolVersion: 1 }); }) : tableStateSchema, playerUrl: z.string().optional() }); }
   private sceneResourceId: string | undefined;
   setSceneResource(id: string | undefined) { this.sceneResourceId = id; }

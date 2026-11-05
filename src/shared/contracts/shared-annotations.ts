@@ -1,23 +1,27 @@
+import { getSelectedShapeEmojis } from "../../domain/shapes/shape-emojis";
 import { z } from "zod";
 const point = z.object({ x: z.number().finite().min(-1e7).max(1e7), y: z.number().finite().min(-1e7).max(1e7) }).strict();
 const length = z.number().finite().positive().max(1e6);
 const base = { points: z.array(point).min(1).max(256), emoji: z.string().max(64).optional() };
+const areaStyle = { color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), locked: z.boolean().optional(), areaPattern: z.literal("checkerboard").optional() };
 export const annotationGeometrySchema = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("measurement"), points: z.array(point).length(2) }).strict(),
   z.object({ ...base, type: z.literal("path"), points: z.array(point).min(2).max(256) }).strict(),
-  z.object({ ...base, type: z.literal("circle"), points: z.array(point).length(1), radius: length }).strict(),
-  z.object({ ...base, type: z.literal("cone"), points: z.array(point).length(1), radius: length, angle: z.number().finite().min(1).max(360), direction: z.number().finite().min(-360).max(360) }).strict(),
+  z.object({ ...base, ...areaStyle, type: z.literal("circle"), points: z.array(point).length(1), radius: length }).strict(),
+  z.object({ ...base, ...areaStyle, type: z.literal("cone"), points: z.array(point).length(1), radius: length, angle: z.number().finite().min(1).max(360), direction: z.number().finite().min(-360).max(360) }).strict(),
   z.object({ ...base, type: z.literal("rectangle"), points: z.array(point).length(1), width: length, height: length }).strict()
-]);
+]).refine(value => !("areaPattern" in value && value.areaPattern && value.emoji) || getSelectedShapeEmojis(value.emoji).length === 1 && getSelectedShapeEmojis(value.emoji)[0] === value.emoji, "Selecciona un patrón del catálogo.");
 export type AnnotationGeometry = z.infer<typeof annotationGeometrySchema>;
 const id = z.uuid();
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const annotationAuthorSchema = z.object({ publicId: id, alias: z.string().max(160), discriminator: z.number().int().min(1).max(1000) }).strict();
 export const sharedAnnotationSchema = z.object({ id, revision, author: annotationAuthorSchema, geometry: annotationGeometrySchema, measurementLabel: z.string().max(160).optional(), committedGeometry: annotationGeometrySchema.optional(), preview: z.boolean(), expiresAt: z.number().finite().optional() }).strict();
 export type SharedAnnotation = z.infer<typeof sharedAnnotationSchema>;
-export const annotationStateSchema = z.object({ version: z.literal(1), serverTime: z.number().finite(), sceneId: z.string().nullable(), sequence: revision, self: id.nullable(), items: z.array(sharedAnnotationSchema).max(320) }).strict();
+export const annotationStateSchema = z.object({ areaToolsVersion: z.literal(1).optional(), version: z.literal(1), serverTime: z.number().finite(), sceneId: z.string().nullable(), sequence: revision, self: id.nullable(), items: z.array(sharedAnnotationSchema).max(320) }).strict();
 export type AnnotationState = z.infer<typeof annotationStateSchema>;
 export const annotationCommandSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("lock"), id, revision, locked: z.boolean() }).strict(),
+  z.object({ action: z.literal("copy"), id, revision, newId: id }).strict(),
   z.object({ action: z.literal("create"), id, geometry: annotationGeometrySchema }).strict(),
   z.object({ action: z.literal("update"), id, revision, geometry: annotationGeometrySchema }).strict(),
   z.object({ action: z.literal("delete"), id, revision }).strict(),
@@ -40,7 +44,7 @@ export interface SharedAnnotationsClient {
 
 /** Adapta la figura local sin transportar campos auxiliares del editor. */
 export function shapeAnnotationGeometry(shape: import("../../domain/sessions/scene-document").SceneShape): AnnotationGeometry {
-  const common = { type: shape.type, points: shape.points, ...(shape.emoji === undefined ? {} : { emoji: shape.emoji }) };
+  const common = { ...((shape.type === "circle" || shape.type === "cone") ? { color: shape.color, locked: shape.locked, areaPattern: shape.areaPattern } : {}), type: shape.type, points: shape.points, ...(shape.emoji === undefined ? {} : { emoji: shape.emoji }) };
   return annotationGeometrySchema.parse({ ...common,
     ...(shape.type === "circle" || shape.type === "cone" ? { radius: shape.radius } : {}),
     ...(shape.type === "cone" ? { angle: shape.angle, direction: shape.direction } : {}),

@@ -66,6 +66,7 @@ export function useSharedAnnotations() {
     chain.current = chain.current.catch(() => {}).then(async () => {
       if (generation !== version.current) return;
       const item = current.current.api?.getSnapshot().state?.items.find(i => i.id === id);
+      if (item && (item.geometry.type === "circle" || item.geometry.type === "cone") && item.geometry.locked) throw new Error("Desbloquea el área antes de eliminarla.");
       if (item && item.revision > 0) await run({ action: "delete", id, revision: item.revision });
       else await run({ action: "cancel-preview" });
     }).catch(e => { if (generation === version.current) setError(e instanceof Error ? e.message : "No se pudo borrar el dibujo."); }).finally(() => { if (generation === version.current) setPending(p => { const next = new Map(p); next.delete(id); return next; }); });
@@ -73,7 +74,19 @@ export function useSharedAnnotations() {
   const clear = useCallback(() => {
     preview.current = null; pendingVersions.current.clear();
     const generation = version.current;
+    const count = current.current.view.state?.items.filter(i => i.author.publicId === current.current.view.state?.self && (i.geometry.type === "circle" || i.geometry.type === "cone") && i.geometry.locked).length ?? 0;
+    setError(count ? `Se conservarán ${count} áreas bloqueadas.` : "");
     chain.current = chain.current.catch(() => {}).then(async () => { if (generation === version.current) await run({ action: "clear-own" }); }).catch(e => { if (generation === version.current) setError(e.message); });
+  }, [run]);
+  const areaCommand = useCallback(async (shapeId: string, action: "lock" | "copy", locked = false): Promise<string | null> => {
+    const id = annotationId(shapeId), view = current.current.api?.getSnapshot(), generation = version.current;
+    const item = view?.state?.items.find(i => i.id === id);
+    if (!view?.state?.areaToolsVersion || !view.connected || !item || item.preview || pendingVersions.current.has(id)) { setError("Espera la confirmación del dibujo y un servicio compatible con herramientas de área."); return null; }
+    const newId = crypto.randomUUID(); preview.current = null; setError("");
+    try {
+      await run(action === "lock" ? { action, id, revision: item.revision, locked } : { action, id, revision: item.revision, newId });
+      return generation === version.current ? `shared-${action === "copy" ? newId : id}` : null;
+    } catch (e) { if (generation === version.current) setError(e instanceof Error ? e.message : "No se pudo modificar el área."); return null; }
   }, [run]);
   const [expiryTick, tickExpiry] = useState(0);
   const received = useRef({ state: view.state, at: Date.now() });
@@ -96,7 +109,7 @@ export function useSharedAnnotations() {
     for (const [id, shape] of pending) { if (shape) own.set(id, shape); else own.delete(id); }
     return [...own.values()];
   }, [items, view.state?.self, pending]);
-  const bridge = useMemo(() => api ? { shapes: owned, enabled: view.connected && view.supported, save, remove, clear, cancel } : undefined, [api, owned, view.connected, view.supported, save, remove, clear, cancel]);
+  const bridge = useMemo(() => api ? { areaTools: !!view.state?.areaToolsVersion, areaCommand, shapes: owned, enabled: view.connected && view.supported, save, remove, clear, cancel } : undefined, [api, owned, view.connected, view.supported, view.state?.areaToolsVersion, areaCommand, save, remove, clear, cancel]);
   const presentedView = useMemo(() => view.state ? { ...view, state: { ...view.state, items } } : view, [view, items]);
   return { api, view: presentedView, items, owned, bridge, showPreview, cancel, error: error || view.error };
 }

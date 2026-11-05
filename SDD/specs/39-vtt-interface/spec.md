@@ -1,5 +1,7 @@
 # Spec 39 - Interfaz VTT integrada
 
+> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora una barra compacta al seleccionar círculos/conos, con paletas de color/patrón, bloqueo, eliminación y copia; compartida por DM/jugador según permisos. Se coordina con el menú general y laterales existentes, sin cambiar líneas ni cámaras. La integración a main permanece pendiente de autorización.
+
 > **Sustitución implementada — SDD 56 / 3.20.0 (integrada en main):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
 
 > **Evolución integrada en 3.19.1 (main, 90dc50e):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.

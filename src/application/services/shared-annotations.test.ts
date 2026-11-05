@@ -74,3 +74,28 @@ describe("Capa compartida efímera", () => {
     table.publish({ ...snapshot, cameraSyncKey: 2 }); expect(table.annotations.state().items).toEqual([]);
   });
 });
+
+it("SDD57: bloqueo autoritativo, copia, moderación y conservación ante clientes anteriores", () => {
+  const { store, a, b, advance } = setup(), id = randomUUID(), scene = createDefaultScene(); store.configure(scene.grid, scene.settings);
+  const area = { type: "cone" as const, points: [{ x: 20, y: 40 }], radius: 100, direction: 45, angle: 60, color: "#ffaa00", emoji: "❄️", areaPattern: "checkerboard" as const };
+  store.execute({ action: "create", id, geometry: area }, a, "a", "1");
+  const legacy = store.state(a.participant, false); expect(legacy.areaToolsVersion).toBeUndefined(); expect(legacy.items[0].geometry).not.toHaveProperty("color");
+  store.execute({ action: "update", id, revision: 1, geometry: { type: "cone", points: [{ x: 30, y: 40 }], radius: 100, direction: 45, angle: 60, emoji: "❄️💨" } }, a, "a", "1", false);
+  expect(store.state().items[0].geometry).toMatchObject({ color: area.color, areaPattern: "checkerboard", emoji: "❄️" });
+  store.execute({ action: "preview", id, revision: 2, geometry: area }, a, "a", "1");
+  store.execute({ action: "lock", id, revision: 2, locked: true }, a, "a", "2");
+  expect(store.state().items[0]).toMatchObject({ preview: false, revision: 3, geometry: { locked: true } });
+  expect(() => store.execute({ action: "delete", id, revision: 3 }, a, "a", "1", false)).toThrow("Desbloquea");
+  expect(() => store.execute({ action: "update", id, revision: 3, geometry: { ...area, locked: false } }, a, "a", "1")).toThrow("Desbloquea");
+  expect(() => store.execute({ action: "copy", id, revision: 3, newId: randomUUID() }, a, "a", "1")).toThrow("Desbloquea");
+  expect(() => store.execute({ action: "lock", id, revision: 3, locked: false }, b, "b", "b")).toThrow("Solo puedes");
+  store.execute({ action: "clear-own" }, a, "a", "1"); expect(store.state().items).toHaveLength(1);
+  store.execute({ action: "lock", id, revision: 3, locked: false }, a, "a", "1");
+  const copyId = randomUUID(); store.execute({ action: "copy", id, revision: 4, newId: copyId }, a, "a", "1");
+  expect(store.state().items[1]).toMatchObject({ id: copyId, revision: 1, geometry: { locked: false, points: [{ x: 30 + scene.grid.cellSizeWorld, y: 40 + scene.grid.cellSizeWorld }] } });
+  expect(store.state().items[1].author).toEqual(store.state().items[0].author);
+  expect(() => store.execute({ action: "copy", id, revision: 3, newId: randomUUID() }, a, "a", "1")).toThrow("cambió");
+  store.execute({ action: "lock", id, revision: 4, locked: true }, a, "a", "1");
+  store.execute({ action: "delete", id, revision: 5 }, null, "dm", "dm");
+  advance(200); store.revoke(a.participant); expect(store.state().items).toHaveLength(0);
+});

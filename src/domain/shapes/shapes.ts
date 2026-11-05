@@ -15,7 +15,7 @@ export interface CreateShapeOptions {
 }
 
 export type ShapePatch = Partial<
-  Pick<SceneShape, "points" | "radius" | "width" | "height" | "angle" | "direction" | "emoji">
+  Pick<SceneShape, "points" | "radius" | "width" | "height" | "angle" | "direction" | "emoji" | "color" | "areaPattern">
 >;
 
 export interface CreatePathShapeOptions {
@@ -94,6 +94,7 @@ export function createPathShape({ id, points }: CreatePathShapeOptions): SceneSh
 }
 
 export function moveShape(shape: SceneShape, position: WorldPoint, snapCellSize?: GridGeometryInput): SceneShape {
+  if (isAreaLocked(shape)) return shape;
   const hexagonal = snapCellSize !== undefined && resolveGridGeometry(snapCellSize).layout === "hexagonal";
   const shouldSnap = snapCellSize !== undefined && (shape.type !== "measurement" || hexagonal);
   let nextAnchor: WorldPoint;
@@ -185,6 +186,7 @@ export function rotateLinearShape(shape: SceneShape, direction: number, grid?: G
 }
 
 export function updateShape(shape: SceneShape, patch: ShapePatch): SceneShape {
+  if (isAreaLocked(shape)) return shape;
   const next: SceneShape = {
     ...shape,
     ...patch,
@@ -229,6 +231,8 @@ export function getShapeEndPoint(shape: SceneShape): WorldPoint | null {
 
 export function validateShape(shape: SceneShape): void {
   assertId(shape.id);
+  if (shape.color !== undefined && (!isContextualArea(shape) || !/^#[0-9a-fA-F]{6}$/.test(shape.color))) throw new Error("El color debe tener formato #RRGGBB.");
+  if (shape.areaPattern !== undefined && (!isContextualArea(shape) || shape.areaPattern !== "checkerboard")) throw new Error("Patrón inválido.");
 
   if (!["measurement", "circle", "cone", "rectangle", "path"].includes(shape.type)) {
     throw new Error("Unsupported tactical shape type.");
@@ -350,4 +354,16 @@ function assertFinitePoint(point: WorldPoint): void {
   if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
     throw new Error("Shape point must be a finite world coordinate.");
   }
+}
+
+/** El bloqueo es una acción explícita, nunca parte del patch de geometría. */
+export function isContextualArea(shape: SceneShape): boolean { return shape.type === "circle" || shape.type === "cone"; }
+export function isAreaLocked(shape: SceneShape): boolean { return isContextualArea(shape) && shape.locked === true; }
+export function setAreaLocked(shape: SceneShape, locked: boolean): SceneShape { return isContextualArea(shape) ? { ...shape, locked } : shape; }
+export function copyArea(shape: SceneShape, id: string, cellSize: number): SceneShape {
+  if (!isContextualArea(shape) || isAreaLocked(shape)) throw new Error("Desbloquea el área antes de copiarla.");
+  if (!Number.isFinite(cellSize) || cellSize <= 0 || id === shape.id) throw new Error("No se puede copiar el área.");
+  const points = shape.points.map(p => ({ x: p.x + cellSize, y: p.y + cellSize }));
+  if (points.some(p => Math.abs(p.x) > 1e7 || Math.abs(p.y) > 1e7)) throw new Error("La copia excede los límites del mapa.");
+  const copy = { ...shape, id, points, locked: false }; validateShape(copy); return copy;
 }

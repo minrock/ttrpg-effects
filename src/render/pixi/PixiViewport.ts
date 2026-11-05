@@ -1,3 +1,5 @@
+import { drawAreaPattern } from "./area-pattern";
+import { isAreaLocked, isContextualArea } from "../../domain/shapes/shapes";
 import type { SharedAnnotation } from "../../shared/contracts/shared-annotations";
 import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RendererType, RenderTexture, Sprite, Text, Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
@@ -400,6 +402,7 @@ export class PixiViewport {
       this.selectedElementId !== null && !this.isLocalEditableShapeId(this.selectedElementId)) {
       this.selectedElementId = null;
     }
+    if (this.dragState?.elementId && this.shapes.some(s => s.id === this.dragState?.elementId && isAreaLocked(s))) this.cancelCameraGesture();
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
   }
@@ -1617,7 +1620,7 @@ export class PixiViewport {
     const canNavigateReadOnly = event.button === 0 &&
       ((this.isNavigationEnabled && this.isSpaceNavigationActive) ||
         (this.localEditableShapeIds !== null && this.isGrabMode));
-    const canUseLocalTools = event.button === 0 && this.localEditableShapeIds !== null;
+    const canUseLocalTools = (event.button === 0 || event.button === 2) && this.localEditableShapeIds !== null;
     if (this.isReadOnly && !canNavigateReadOnly && !canUseLocalTools) {
       return;
     }
@@ -1788,7 +1791,7 @@ export class PixiViewport {
           const hitIsPath = this.shapes.some((s) => s.id === hitElementId && s.type === "path");
           const selectedElementPosition = this.findSelectableElement(hitElementId)?.position;
           const annotation = this.findMapAnnotation(hitElementId);
-          mode = hitIsPath || annotation?.locked === true ? "idle" : "element-move";
+          mode = hitIsPath || annotation?.locked === true || this.shapes.some(s => s.id === hitElementId && isAreaLocked(s)) ? "idle" : "element-move";
           elementId = hitElementId;
           moveStartPosition = selectedElementPosition;
           if (selectedElementPosition !== undefined) {
@@ -2503,6 +2506,7 @@ export class PixiViewport {
     this.world.pivot.set(this.camera.center.x, this.camera.center.y);
     this.world.position.set(viewport.width / 2, viewport.height / 2);
     this.drawGrid();
+    this.updateAreaPatternVisibility();
     this.updateMapInformationPinLabelScale();
     this.updatePlayerCameraControlScale();
     if (shouldRefreshAreaToolUi) {
@@ -2534,6 +2538,19 @@ export class PixiViewport {
       x: this.camera.center.x + offset.x / this.camera.zoom,
       y: this.camera.center.y + offset.y / this.camera.zoom
     };
+  }
+
+  getAreaContextBounds(id: string) {
+    if (this.dragState && this.dragState.mode !== "idle") return null;
+    const shape = this.shapes.find(s => s.id === id);
+    if (!shape || !isContextualArea(shape)) return null;
+    const p = shape.points[0], r = shape.radius ?? 0;
+    const corners = [{ x: p.x-r, y: p.y-r }, { x: p.x+r, y: p.y-r }, { x: p.x-r, y: p.y+r }, { x: p.x+r, y: p.y+r }].map(point => this.worldToScreenPoint(point));
+    const rect = this.app.canvas.getBoundingClientRect();
+    const left = Math.min(...corners.map(c => c.x)), right = Math.max(...corners.map(c => c.x));
+    const top = Math.min(...corners.map(c => c.y)), bottom = Math.max(...corners.map(c => c.y));
+    if (right < 0 || bottom < 0 || left > rect.width || top > rect.height) return null;
+    return { left: rect.left + Math.max(0,left), right: rect.left + Math.min(rect.width,right), top: rect.top + Math.max(0,top), bottom: rect.top + Math.min(rect.height,bottom), mapLeft: rect.left, mapTop: rect.top, mapRight: rect.right, mapBottom: Math.max(rect.top + 80, rect.bottom - 112) };
   }
 
   private worldToScreenPoint(worldPoint: WorldPoint): ScreenPoint {
@@ -2627,14 +2644,17 @@ export class PixiViewport {
     if (this.grid !== null && this.settings !== null) {
       const shapes = this.getRenderableShapes();
       const extras = this.sharedAnnotations.filter(item => !shapes.some(s => s.id === `shared-${item.id}`)).map(item => ({ ...item.geometry, id: `shared-${item.id}` }));
-      for (const shape of [...shapes, ...extras]) {
+      const allShapes: SceneShape[] = [...shapes, ...extras];
+      const patternCount = allShapes.filter(s => s.areaPattern === "checkerboard" && s.emoji).length;
+      const patternBudget = Math.min(256, Math.floor(2048 / Math.max(1, patternCount)));
+      for (const shape of allShapes) {
         const shared = this.sharedAnnotations.find(item => `shared-${item.id}` === shape.id);
-        const signature = getShapeRenderSignature(shape, this.grid, this.settings) + JSON.stringify(shared?.author) + String(shared?.preview);
+        const signature = getShapeRenderSignature(shape, this.grid, this.settings) + patternBudget + JSON.stringify(shared?.author) + String(shared?.preview);
         const cached = this.shapeRenderCache.get(shape.id);
         const rendered =
           cached !== undefined && cached.signature === signature
             ? cached
-            : { signature, container: drawTacticalShape(shape, this.grid, this.settings, shared) };
+            : { signature, container: drawTacticalShape(shape, this.grid, this.settings, shared, patternBudget) };
 
         rendered.container.label = shape.id;
         nextCache.set(shape.id, rendered);
@@ -2649,8 +2669,21 @@ export class PixiViewport {
     for (const [id, cached] of nextCache) {
       this.shapeRenderCache.set(id, cached);
     }
+    this.updateAreaPatternVisibility();
     this.updateAreaToolLabelScale();
     if (this.transientMovePreview) { const { elementId, dx, dy } = this.transientMovePreview; this.applyElementMovePreviewToLayers(elementId, dx, dy); }
+  }
+
+  private updateAreaPatternVisibility(): void {
+    const size = this.getViewportSize();
+    for (const [id, cached] of this.shapeRenderCache) {
+      const pattern = cached.container.children.find(c => c.label === "area-checkerboard"); if (!pattern) continue;
+      const shape = this.shapes.find(s => s.id === id) ?? this.sharedAnnotations.find(a => `shared-${a.id}` === id)?.geometry;
+      if (!shape) continue;
+      const p = shape.points[0], r = "radius" in shape ? shape.radius ?? 0 : 0;
+      const center = this.worldToScreenPoint(p), padding = r * this.camera.zoom * Math.SQRT2;
+      pattern.renderable = center.x + padding >= 0 && center.y + padding >= 0 && center.x - padding <= size.width && center.y - padding <= size.height;
+    }
   }
 
   private updateAreaToolLabelScale(): void {
@@ -3077,7 +3110,7 @@ export class PixiViewport {
       }
 
       const selectedCircleShape = this.getRenderableShapes().find(
-        (s) => s.id === this.selectedElementId && s.type === "circle"
+        (s) => s.id === this.selectedElementId && s.type === "circle" && !isAreaLocked(s)
       );
 
       if (selectedCircleShape !== undefined) {
@@ -3085,7 +3118,7 @@ export class PixiViewport {
       }
 
       const selectedConeShape = this.getRenderableShapes().find(
-        (s) => s.id === this.selectedElementId && s.type === "cone"
+        (s) => s.id === this.selectedElementId && s.type === "cone" && !isAreaLocked(s)
       );
 
       if (selectedConeShape !== undefined) {
@@ -3695,6 +3728,13 @@ export class PixiViewport {
     const worldPoint = this.screenToWorldPoint(screenPoint);
 
     for (const element of [...this.getSelectableElements()].reverse()) {
+      if (element.kind === "circle" || element.kind === "cone") {
+        const shape = this.shapes.find(s => s.id === element.id);
+        if (shape) { const origin = shape.points[0], radius = shape.radius ?? 1;
+          if (Math.hypot(worldPoint.x-origin.x, worldPoint.y-origin.y) <= 5 / this.camera.zoom || (shape.type === "circle" ? Math.hypot(worldPoint.x-origin.x, worldPoint.y-origin.y) <= radius : isPointInCone(worldPoint.x, worldPoint.y, origin, radius, shape.angle ?? 60, shape.direction ?? 0))) return element.id;
+          continue;
+        }
+      }
       if (element.kind === "lightning") {
         const lightning = this.effects.find((effect): effect is SceneLightningEffect => effect.id === element.id && effect.kind === "lightning");
         if (lightning?.visible && lightning.opacity > 0 && hitTestLightning(lightning, worldPoint, 14 / this.camera.zoom)) return element.id;
@@ -4224,7 +4264,7 @@ export class PixiViewport {
 
   private hitTestCircleResizeHandle(screenPoint: ScreenPoint): string | null {
     const shape = this.shapes.find(
-      (s) => s.id === this.selectedElementId && s.type === "circle"
+      (s) => s.id === this.selectedElementId && s.type === "circle" && !isAreaLocked(s)
     );
 
     if (shape === undefined) return null;
@@ -4242,7 +4282,7 @@ export class PixiViewport {
 
   private hitTestConeShapeResizeHandle(screenPoint: ScreenPoint): string | null {
     const shape = this.shapes.find(
-      (s) => s.id === this.selectedElementId && s.type === "cone"
+      (s) => s.id === this.selectedElementId && s.type === "cone" && !isAreaLocked(s)
     );
 
     if (shape === undefined) return null;
@@ -4262,7 +4302,7 @@ export class PixiViewport {
 
   private hitTestConeShapeRotationHandle(screenPoint: ScreenPoint): string | null {
     const shape = this.shapes.find(
-      (s) => s.id === this.selectedElementId && s.type === "cone"
+      (s) => s.id === this.selectedElementId && s.type === "cone" && !isAreaLocked(s)
     );
 
     if (shape === undefined) return null;
@@ -5152,7 +5192,7 @@ function getShapeRenderSignature(shape: SceneShape, grid: SceneGrid, settings: S
   return [
     shape.id,
     shape.type,
-    shape.emoji,
+    shape.emoji, shape.color, shape.locked, shape.areaPattern,
     shape.points.length,
     hashPoints(shape.points),
     shape.radius ?? "",
@@ -5657,7 +5697,7 @@ function drawElement(element: TacticalElement): Graphics {
   }
 }
 
-function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSettings, shared?: SharedAnnotation): Container {
+function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSettings, shared?: SharedAnnotation, patternBudget = 256): Container {
   const container = new Container();
   const graphic = new Graphics();
   const anchor = getShapeAnchor(shape);
@@ -5682,7 +5722,7 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
         const label = drawShapeLabel(distance.label);
         label.position.set((anchor.x + endPoint.x) / 2 + 10, (anchor.y + endPoint.y) / 2 - 28);
         container.addChild(label);
-        if (emojis.length > 0) {
+        if (emojis.length > 0 && shape.areaPattern !== "checkerboard") {
           addEmojiTexts(
             container,
             emojis,
@@ -5710,12 +5750,12 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const radius = shape.radius ?? grid.cellSizeWorld;
       graphic
         .circle(anchor.x, anchor.y, radius)
-        .fill({ color: 0x3d8dff, alpha: 0.18 })
-        .stroke({ color: 0x7fb8ff, width: 4, alpha: 0.92 });
+        .fill({ color: shape.color ?? 0x3d8dff, alpha: 0.18 })
+        .stroke({ color: shape.color ?? 0x7fb8ff, width: 4, alpha: 0.92 });
       const label = drawShapeLabel(worldLengthLabel(radius, grid));
       label.position.set(anchor.x + 10, anchor.y - radius - 28);
       container.addChild(label);
-      if (emojis.length > 0) {
+      if (emojis.length > 0 && shape.areaPattern !== "checkerboard") {
         addEmojiTexts(
           container,
           emojis,
@@ -5730,15 +5770,15 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const angle = shape.angle ?? 60;
       const direction = shape.direction ?? 0;
       drawConeShape(graphic, anchor.x, anchor.y, radius, angle, direction)
-        .fill({ color: 0x60c8a6, alpha: 0.2 })
-        .stroke({ color: 0x79e1bf, width: 4, alpha: 0.9 });
+        .fill({ color: shape.color ?? 0x60c8a6, alpha: 0.2 })
+        .stroke({ color: shape.color ?? 0x79e1bf, width: 4, alpha: 0.9 });
       const radians = (direction * Math.PI) / 180;
       const tipX = anchor.x + Math.cos(radians) * radius;
       const tipY = anchor.y + Math.sin(radians) * radius;
       const label = drawShapeLabel(`${Math.round(angle)}° · ${worldLengthLabel(radius, grid)}`);
       label.position.set(tipX + 12, tipY - 10);
       container.addChild(label);
-      if (emojis.length > 0) {
+      if (emojis.length > 0 && shape.areaPattern !== "checkerboard") {
         addEmojiTexts(
           container,
           emojis,
@@ -5758,7 +5798,7 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
       const label = drawShapeLabel(`${worldLengthLabel(width, grid)} × ${worldLengthLabel(height, grid)}`);
       label.position.set(anchor.x + 10, anchor.y + height / 2 + 10);
       container.addChild(label);
-      if (emojis.length > 0) {
+      if (emojis.length > 0 && shape.areaPattern !== "checkerboard") {
         addEmojiTexts(
           container,
           emojis,
@@ -5789,6 +5829,8 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
     if (shared.preview) container.alpha = 0.65;
   }
   container.addChildAt(graphic, 0);
+  if (isContextualArea(shape) && shape.areaPattern === "checkerboard" && emojis.length) container.addChildAt(drawAreaPattern(shape, grid.cellSizeWorld, patternBudget), 1);
+  if (isAreaLocked(shape)) { const lock = drawShapeLabel("🔒"); lock.position.set(anchor.x, anchor.y + 18); container.addChild(lock); }
   return container;
 }
 

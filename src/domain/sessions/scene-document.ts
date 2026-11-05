@@ -240,6 +240,9 @@ export type SceneFireZone =
     };
 
 export interface SceneShape {
+  readonly color?: string;
+  readonly locked?: boolean;
+  readonly areaPattern?: "checkerboard";
   readonly id: string;
   readonly type: "measurement" | "circle" | "cone" | "rectangle" | "path";
   readonly emoji?: string;

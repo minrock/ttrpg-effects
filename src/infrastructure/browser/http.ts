@@ -8,14 +8,17 @@ const unboundIdentity = new Set(["/identity/login", "/identity/logout"]);
 const failure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) });
 export const sessionSchema = z.object({ ok: z.literal(true), role: z.enum(["dm", "player"]), expiresAt: z.string().datetime() });
 export class HttpTransport {
+  private areas = false;
+  negotiateAreas(enabled: boolean) { this.areas = enabled; }
   private focus = false;
   negotiateFocus(enabled: boolean) { this.focus = enabled; }
-  disableNextExtension() { if (this.focus) this.focus = false; else this.annotations = false; }
+  disableNextExtension() { if (this.areas) this.areas = false; else if (this.focus) this.focus = false; else this.annotations = false; }
   private annotations = false;
   negotiateAnnotations(enabled: boolean) { this.annotations = enabled; }
   private query(path: string) {
     const params = new URLSearchParams(this.readQuery);
     if (["/table/state", "/table/events"].includes(path)) {
+      if (this.areas) params.set("areaToolsVersion", "1");
       if (this.annotations) params.set("annotationsVersion", "1");
       if (this.focus) params.set("focusVersion", "1");
     }
@@ -29,7 +32,7 @@ export class HttpTransport {
   get accountId(): string | undefined { return this.principalId; }
   clearAccount(): void { this.invalidate(); this.principalId = undefined; }
   bindAccount(id: string): void { if (this.principalId !== id) { this.invalidate(); this.principalId = id; } this.resume(); }
-  private headers(path: string, supplied?: HeadersInit): Headers { const headers = new Headers(supplied); if (this.principalId && !unboundIdentity.has(path)) headers.set("X-TTRPG-Account", this.principalId); return headers; }
+  private headers(path: string, supplied?: HeadersInit): Headers { const headers = new Headers(supplied); if (this.areas && path === "/table/annotations") headers.set("X-TTRPG-Area-Tools", "1"); if (this.principalId && !unboundIdentity.has(path)) headers.set("X-TTRPG-Account", this.principalId); return headers; }
   private retryNotBefore = 0;
   private checkRetry(){const seconds=Math.ceil((this.retryNotBefore-Date.now())/1000);if(seconds>0)throw new ServiceError("RATE_LIMITED",`Espera ${seconds} segundos antes de reintentar.`,429,seconds);}
   private retryAfter(response:Response){const value=Number(response.headers.get("Retry-After")??0);const seconds=Number.isFinite(value)?Math.max(1,Math.min(3600,value)):1;if(response.status===429)this.retryNotBefore=Date.now()+seconds*1000;return seconds;}

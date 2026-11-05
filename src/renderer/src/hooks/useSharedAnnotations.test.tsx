@@ -76,3 +76,21 @@ it("el DM confirma limpiar y Escape cancela antes de enviar el comando", async (
   await act(async () => button("Confirmar limpieza").click());
   expect(command).toHaveBeenCalledExactlyOnceWith({ action: "clear-all" });
 });
+
+it("SDD57: el jugador cambia estilo, bloquea, conserva al limpiar y copia con selección nueva", async () => {
+  const f = fixture(); f.store.configure(f.scene.grid, f.scene.settings);
+  await act(async () => f.result.tools.createArea("cone", { x: 0, y: 0 }));
+  await act(async () => f.result.tools.patch({ emoji: "❄️", color: "#abcdef", areaPattern: "checkerboard" }));
+  const original = f.result.tools.selectedId!;
+  await act(async () => f.result.tools.areaAction("lock"));
+  expect(f.result.tools.selectedShape?.locked).toBe(true);
+  await act(async () => { f.result.tools.move(original, 300, 300); f.result.tools.remove(); });
+  expect(f.result.tools.selectedShape?.points).toEqual([{ x: 0, y: 0 }]);
+  await act(async () => f.result.tools.clear()); expect(f.result.tools.shapes).toHaveLength(1);
+  act(() => f.result.tools.select(original));
+  await act(async () => f.result.tools.areaAction("lock"));
+  await act(async () => f.result.tools.areaAction("copy"));
+  expect(f.result.tools.shapes).toHaveLength(2); expect(f.result.tools.selectedId).not.toBe(original);
+  expect(f.result.tools.selectedShape).toMatchObject({ color: "#abcdef", areaPattern: "checkerboard", locked: false });
+  expect(f.scene.shapes).toEqual([]);
+});

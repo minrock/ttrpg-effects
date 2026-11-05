@@ -63,7 +63,7 @@ export function PlayerTools(props: PlayerToolsProps): JSX.Element {
     <label className="player-tools__field" key={key}>
       <span>{label} <small>{grid.unit}</small></span>
       <input type="number" min="0.01" step="any" aria-label={`${label} en ${grid.unit}`}
-        value={Number(worldLengthValue(value, grid).toFixed(2))} disabled={disabled}
+        value={Number(worldLengthValue(value, grid).toFixed(2))} disabled={disabled || selectedShape?.locked}
         onChange={(event) => {
           const next = event.currentTarget.valueAsNumber;
           if (Number.isFinite(next) && next > 0) props.onPatch({ [key]: worldLengthFromValue(next, grid) });
@@ -75,7 +75,7 @@ export function PlayerTools(props: PlayerToolsProps): JSX.Element {
     <label className="player-tools__field" key={key}>
       <span>{label} <small>°</small></span>
       <input type="number" min={key === "angle" ? 1 : 0} max="360" step="1"
-        aria-label={`${label} en grados`} value={value} disabled={disabled}
+        aria-label={`${label} en grados`} value={value} disabled={disabled || selectedShape?.locked}
         onChange={(event) => {
           const next = event.currentTarget.valueAsNumber;
           if (Number.isFinite(next) && next >= (key === "angle" ? 1 : 0) && next <= 360) props.onPatch({ [key]: next });
@@ -92,7 +92,7 @@ export function PlayerTools(props: PlayerToolsProps): JSX.Element {
       {button("Medir", <Ruler size={18} />, () => toggleGroup("measure"), group === "measure" || isDrawing)}
       {button("Areas", <Shapes size={18} />, () => toggleGroup("area"), group === "area")}
       <span className="player-tools__divider" aria-hidden="true" />
-      {button("Borrar seleccion", <Trash2 size={17} />, props.onDelete, false, selectedShape === null)}
+      {button("Borrar seleccion", <Trash2 size={17} />, props.onDelete, false, selectedShape === null || selectedShape.locked === true)}
       {button("Borrar todas las formas", <RotateCcw size={17} />, props.onClear, false, count <= 0)}
     </nav>
 

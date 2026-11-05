@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SceneGrid, SceneSettings, SceneShape } from "../../../domain/sessions/scene-document";
 import type { WorldPoint } from "../../../domain/shared/coordinates";
 import {
-  createPathShape, createTacticalShape, movePathPoint, moveShape, normalizePathPoints,
+  copyArea, isAreaLocked, setAreaLocked, createPathShape, createTacticalShape, movePathPoint, moveShape, normalizePathPoints,
   rotateLinearShape, setLinearShapeEnd, setShapeRadius, updateShape, type ShapePatch
 } from "../../../domain/shapes/shapes";
 import type { PlayerAreaKind, PlayerTool } from "../components/workspace/PlayerTools";
@@ -19,8 +19,9 @@ const emptyState = (identity: string | null): LocalToolsState => ({
   identity, shapes: [], selectedId: null, tool: "select", points: []
 });
 
-export interface PlayerToolsBridge { shapes: readonly SceneShape[]; enabled: boolean; save(shape: SceneShape): void; remove(id: string): void; clear(): void; cancel(): void }
+export interface PlayerToolsBridge { areaTools?: boolean; areaCommand?: (id: string, action: "lock" | "copy", locked?: boolean) => Promise<string | null>; shapes: readonly SceneShape[]; enabled: boolean; save(shape: SceneShape): void; remove(id: string): void; clear(): void; cancel(): void }
 export function usePlayerTools(identity: string | null, grid: SceneGrid, settings: SceneSettings, bridge?: PlayerToolsBridge) {
+  const [error, setError] = useState("");
   const [stored, setStored] = useState(() => emptyState(identity));
   const local = stored.identity === identity ? stored : emptyState(identity);
   const state = bridge ? { ...local, shapes: bridge.shapes } : local;
@@ -51,7 +52,7 @@ export function usePlayerTools(identity: string | null, grid: SceneGrid, setting
   }, [mutate]);
   const cancel = useCallback((): void => { bridgeRef.current?.cancel(); const next = { ...stateRef.current, tool: "select" as const, selectedId: null, points: [] }; stateRef.current = next; setStored(next); }, [mutate]);
   const remove = useCallback((): void => mutate(current => ({
-    ...current, shapes: current.shapes.filter(shape => shape.id !== current.selectedId), selectedId: null
+    ...current, shapes: current.shapes.filter(shape => shape.id !== current.selectedId || isAreaLocked(shape)), selectedId: current.shapes.some(s => s.id === current.selectedId && isAreaLocked(s)) ? current.selectedId : null
   })), []);
   const finish = useCallback((): void => mutate(current => {
     if (current.tool !== "path" || current.points.length < 2) return current;
@@ -86,10 +87,22 @@ export function usePlayerTools(identity: string | null, grid: SceneGrid, setting
     return { ...current, points };
   }), [mutate]);
   const undoPoint = useCallback((): void => mutate(current => ({ ...current, points: current.points.slice(0, -1) })), []);
-  const clear = useCallback((): void => { if (bridgeRef.current) { if (!bridgeRef.current.enabled) return; bridgeRef.current.clear(); setStored(emptyState(context.current.identity)); } else setStored(emptyState(context.current.identity)); }, [mutate]);
+  const clear = useCallback((): void => { const count = stateRef.current.shapes.filter(isAreaLocked).length; setError(count ? `Se conservarán ${count} áreas bloqueadas.` : ""); if (bridgeRef.current) { if (!bridgeRef.current.enabled) return; bridgeRef.current.clear(); setStored(emptyState(context.current.identity)); } else { const next = { ...emptyState(context.current.identity), shapes: stateRef.current.shapes.filter(isAreaLocked) }; stateRef.current = next; setStored(next); } }, [mutate]);
   const patch = useCallback((patch: ShapePatch): void => mutate(current => ({
     ...current, shapes: current.shapes.map(shape => shape.id === current.selectedId ? updateShape(shape, patch) : shape)
   })), []);
+  const areaAction = useCallback(async (action: "lock" | "copy") => {
+    setError("");
+    const shape = stateRef.current.shapes.find(s => s.id === stateRef.current.selectedId); if (!shape) return;
+    const remote = bridgeRef.current;
+    if (remote) {
+      if (!remote.enabled || !remote.areaTools || !remote.areaCommand) return;
+      const identity = context.current.identity;
+      const id = await remote.areaCommand(shape.id, action, !shape.locked);
+      if (id && context.current.identity === identity) { const next = { ...stateRef.current, selectedId: id }; stateRef.current = next; setStored(next); }
+    } else if (action === "lock") mutate(current => ({ ...current, shapes: current.shapes.map(s => s.id === shape.id ? setAreaLocked(s, !s.locked) : s) }));
+    else { try { const copy = copyArea(shape, newId(), context.current.grid.cellSizeWorld); mutate(current => ({ ...current, selectedId: copy.id, shapes: [...current.shapes, copy] })); } catch (e) { setError(e instanceof Error ? e.message : "No se pudo copiar el área."); } }
+  }, [mutate, newId]);
   const move = useCallback((id: string, x: number, y: number): void => {
     const { grid, settings } = context.current;
     edit(id, shape => moveShape(shape, { x, y }, settings.snapToGrid ? grid : undefined));
@@ -127,6 +140,6 @@ export function usePlayerTools(identity: string | null, grid: SceneGrid, setting
     tool: state.tool, points: state.points,
     isDrawing: state.tool === "path" || state.tool === "measurement",
     cancel, remove, finish, select, chooseTool, createArea, addPoint, undoPoint, clear,
-    patch, move, movePath, moveEnd, movePoint, direction, radius, resize
+    error, areaAction, patch, move, movePath, moveEnd, movePoint, direction, radius, resize
   };
 }

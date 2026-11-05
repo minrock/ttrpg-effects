@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.21.0 — 2026-11-04 — Funcionalidad
+
+- SDD 57: barra contextual compartida para círculos y conos, con color, paleta de 29 patrones del catálogo, bloqueo/desbloqueo, eliminación y copia independiente.
+- Damero regular anclado al mundo y recortado a la geometría, con presupuesto de render; conserva apariencia de escenas anteriores hasta elegir un patrón.
+- Bloqueo autoritativo de dibujos compartidos, copia con revisión/idempotencia y negociación `areaToolsVersion=1`. Limpiar propios conserva bloqueados; la retirada moderadora del DM permanece disponible con confirmación.
+- Persistencia opcional de estilo/bloqueo en áreas DM, sin migraciones de tablas ni persistencia de dibujos de jugadores. Menú adaptable sin cubrir los controles de cámara.
+
 ## 3.20.0 — 2026-11-04 — Funcionalidad
 
 - SDD 56: cámaras independientes por jugador, zoom desbloqueado al iniciar y conservación de zoom al cambiar de mapa; se retiran controles remotos de cámara y previews principal/virtual.
