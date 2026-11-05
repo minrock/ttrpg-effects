@@ -1,6 +1,6 @@
 # 55 — Mediciones y áreas compartidas con autor visible
 
-**Estado:** Implementada en la rama `feature/sdd-mediciones-compartidas`; pendiente de integración y de completar la validación PostgreSQL/visual indicada en [validacion.md](validacion.md).
+**Estado:** Integrada en `main` mediante `90dc50e` (2026-11-04), versión 3.19.1. Sigue pendiente completar la validación PostgreSQL/visual indicada en [validacion.md](validacion.md).
 **Fecha:** 2026-11-04. **Tipo:** funcionalidad compatible.
 **Dependencias:** [07 Formas](../07-shapes-and-measurement/spec.md), [15 Player View](../15-player-window/spec.md), [39 Interfaz](../39-vtt-interface/spec.md), [41 Clientes](../41-contrato-clientes/spec.md), [44 Mesa](../44-mesa-sincronizada/spec.md), [49 Invitaciones](../49-invitaciones/spec.md), [50 Moderación](../50-moderacion/spec.md), [51 Servicio](../51-experiencia-servicio/spec.md).
 **Trabajo factory:** sin asignar; implementación directa autorizada por el usuario. **Versión de entrega:** 3.19.1 (base funcional 3.19.0 más correcciones de interfaz). Cierre de rama autorizado por el usuario; evidencia de integración en [validacion.md](validacion.md).

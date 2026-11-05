@@ -79,7 +79,7 @@ La matriz de adaptación histórica de este documento se complementa con la [par
 
 El cliente de recursos conserva CAS, bindings y operaciones inciertas por cuenta/recurso. El cliente de mesa es inmutable por partida/apertura/generación/audiencia. Rotar invitación no cambia su identidadReact. El guard superior contiene canvas y portales;401 suspende operaciones y protege borrador del ID original.
 
-## Dibujos compartidos — SDD 55 / 3.19.0
+## Dibujos compartidos — SDD 55 / 3.19.1
 
 El puerto opcional `TtrpgClient.annotations` conecta mediciones/áreas de jugadores a una capa efímera del servicio. El servidor deriva autoría y medidas, limita edición al propietario y permite retirada/limpieza DM; Electron autónomo conserva herramientas locales. El overlay no entra en guardados ni exportaciones.
 

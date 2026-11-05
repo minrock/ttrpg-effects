@@ -57,7 +57,7 @@ Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan s
 
 | Spec | Estado | Plan |
 | --- | --- | --- |
-| [55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) | Implementada en rama; validación PostgreSQL/visual pendiente | [Plan](specs/55-mediciones-compartidas/plan.md) · [Evidencia](specs/55-mediciones-compartidas/validacion.md) |
+| [55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) | Integrada en main, 3.19.1 (`90dc50e`); validación PostgreSQL/visual pendiente | [Plan](specs/55-mediciones-compartidas/plan.md) · [Evidencia](specs/55-mediciones-compartidas/validacion.md) |
 
 ## Guías técnicas y operativas
 

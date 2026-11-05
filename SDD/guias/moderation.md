@@ -55,7 +55,7 @@ Persisten participantes/credenciales/invitación, operaciones y auditoría en mi
 
 Gate `pnpm test:moderation`: SQLite físico y PostgreSQL real/TLS obligatorios, sin skip por entorno ausente; incluye HTTP/SSE, carreras, buffers, exclusión entre procesos, pérdida de canal y humo del backend compilado. ConstruirAPI primero. Los comandos y resultados de cada entrega se registran en build.md; no equivalen a despliegue, prueba visual ni prueba prolongada de carga.
 
-## Dibujos compartidos — SDD 55 / 3.19.0
+## Dibujos compartidos — SDD 55 / 3.19.1
 
 El puerto opcional `TtrpgClient.annotations` conecta mediciones/áreas de jugadores a una capa efímera del servicio. El servidor deriva autoría y medidas, limita edición al propietario y permite retirada/limpieza DM; Electron autónomo conserva herramientas locales. El overlay no entra en guardados ni exportaciones.
 

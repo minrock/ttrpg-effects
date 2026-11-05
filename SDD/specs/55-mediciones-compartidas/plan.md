@@ -1,6 +1,6 @@
 # Plan — Mediciones y áreas compartidas
 
-**Spec fuente:** [spec.md](spec.md). **Estado:** Implementación realizada; evidencia y pendientes en [validacion.md](validacion.md).
+**Spec fuente:** [spec.md](spec.md). **Estado:** Integrada en main (`90dc50e`), versión 3.19.1; evidencia y pendientes en [validacion.md](validacion.md).
 **Base inspeccionada:** `3760968` en main, versión 3.18.1; rama documental `feature/sdd-mediciones-compartidas`, inicialmente limpia.
 
 ## Reutilización y archivos afectados al implementar

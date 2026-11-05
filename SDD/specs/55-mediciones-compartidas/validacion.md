@@ -67,3 +67,15 @@ Ajuste del control de apertura: pestaña con chevrón en el borde superior derec
 Autorización: «Escribe todo lo extra que no esté dentro de los specs y cierra esta rama a master y genera una nueva patch». Se resuelve la rama principal como `main`: no existe `master` local/remota. La versión sube de 3.19.0 a 3.19.1 para los ajustes de interfaz; no cambia el formato de escena ni el esquema de DB.
 
 Validación previa a la integración: suite fuente completa **142 archivos / 1282 pruebas**, lint, typecheck y builds API/web correctos. Se conserva el aviso de tamaño de bundles. Los límites PostgreSQL/TLS y de recorridos autenticados antes descritos permanecen abiertos: no se convierten en aprobados por la orden de cierre. No se modifica el tablero histórico ni se ejecutan migraciones sobre datos del usuario.
+
+## Cierre efectivo
+
+- Implementación y documentación: `df3950d`.
+- Integración autorizada en `main`: `90dc50e`, sin conflictos. Rama de origen: `feature/sdd-mediciones-compartidas`.
+- Patch final: **3.19.1**. Builds API/web actualizados. `./scripts/build-dmg.sh` completado después del merge para arm64, con typecheck y compilación Electron correctos.
+- Artefacto: `dist/TTRPG Effects-3.19.1-arm64.dmg` (aproximadamente 146 MiB). `hdiutil verify` confirma checksum válido; `CFBundleShortVersionString` de la aplicación empaquetada es 3.19.1.
+- SHA-256: `b94bf35cfb7deadde85f733f63a2829fd0c8d75fa769bbb3751472f1f63ffccf`.
+- Paquete interno sin firma/notarización, según la configuración existente. No se afirma instalación ni humo nativo por generar el DMG.
+- Enlaces locales de la documentación de entrega verificados, sin destinos rotos. No hubo push, despliegue, reinicio de la API ni cambios de datos/env. El DMG y los archivos operativos siguen ignorados por Git.
+
+La integración y el artefacto están completos. Continúan pendientes PostgreSQL/TLS, recorridos autenticados completos y las carreras adicionales detalladas arriba; no se certifican como aceptados por este cierre.

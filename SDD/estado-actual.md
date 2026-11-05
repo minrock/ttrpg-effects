@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-04. Base inspeccionada: `package.json` 3.18.1, fuentes del checkout, guías, changelog y expedientes 001–012. Esta es una consolidación documental; no una nueva certificación de ejecución ni un despliegue.
+Corte: 2026-11-04. Versión vigente: `package.json` 3.19.1, integrada en `main` mediante `90dc50e`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -47,9 +47,9 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. Los 
 - La niebla no evita que el jugador inspeccione los píxeles de una imagen de mapa ya descargada. No usarla como control de confidencialidad.
 - Cambios de código requieren evidencia nueva y permiso de integración; una decisión técnica anterior no concede permisos Git.
 
-## Propuesta especificada pendiente de construcción
+## Última entrega integrada — SDD 55
 
-[SDD 55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) implementa una capa efímera compartida entre DM/jugadores **en servicio**, con alias/discriminador del autor, edición propia y retirada por DM. Versión 3.19.0 en `feature/sdd-mediciones-compartidas`, aún sin integrar; Electron autónomo conserva herramientas locales. La consolidación 3.18.1 descrita arriba es la base histórica. [Validación y pendientes](specs/55-mediciones-compartidas/validacion.md); no se inició un trabajo factory ni se simuló aprobación.
+[SDD 55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) implementa una capa efímera compartida entre DM/jugadores **en servicio**, con alias/discriminador del autor, edición propia y retirada por DM. Versión 3.19.1, integrada desde `feature/sdd-mediciones-compartidas` a `main` (`90dc50e`), con laterales de mesa DM/jugador y chevrón de borde; Electron autónomo conserva herramientas locales. La consolidación 3.18.1 descrita arriba es la base histórica. [Validación y pendientes](specs/55-mediciones-compartidas/validacion.md); no se inició un trabajo factory ni se simuló aprobación.
 
 ## Pendiente de especificar
 

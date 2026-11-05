@@ -73,7 +73,7 @@ Pruebas ejecutables: `public-table-projection.test.ts`, `table-http.test.ts`, `t
 
 La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/dados/proyección, roster privado, revocación en la frontera de envío y callback terminal del adaptador. El listener de producto retira el camino legado; protocolo1 solo permanece en el motor interno y fixtures históricos. Runtimes y streams tienen cuotas globales además de las de cada mesa; no hay una partida activa global en la composición nueva.
 
-## Dibujos compartidos — SDD 55 / 3.19.0
+## Dibujos compartidos — SDD 55 / 3.19.1
 
 En servicio, mediciones, caminos, círculos, conos y rectángulos/cuadrados de jugadores se comparten en una capa efímera independiente de la escena. Cada jugador modifica/limpia los propios; el DM puede retirarlos o limpiar la capa con confirmación. Alias y discriminador provienen de la admisión autenticada. En el DM, «Dibujos de jugadores» comparte la pestaña Mesa del lateral derecho con participantes e invitaciones; ambos menús se despliegan dentro del lateral y usan su desplazamiento, sin flotantes independientes. El jugador accede a su alias, sistema, estado de conexión, salida y «Visible para la mesa» desde el lateral derecho retráctil (pestaña con chevrón en el borde derecho, como en el DM). Escape lo cierra; en pantallas estrechas comienza cerrado. El panel muestra nombres completos; las etiquetas del mapa acortan nombres largos. Electron autónomo conserva herramientas locales.
 
