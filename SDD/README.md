@@ -1,6 +1,6 @@
 # SDD — Especificaciones de TTRPG Effects
 
-Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-04**, código de referencia **3.18.1** según `package.json`.
+Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-04**, versión de entrega **3.19.1** según `package.json`.
 
 1. Lee [estado actual y decisiones](estado-actual.md) para conocer qué existe y qué sigue pendiente.
 2. Consulta [arquitectura y datos](arquitectura.md) y la [operación local](guias/service-operations.md) para preparar una propuesta compatible.
@@ -14,7 +14,7 @@ SDD/
   estado-actual.md          Base vigente, decisiones y límites
   arquitectura.md           Clientes, servidor, persistencia y datos
   flujo.md                  Planificación → implementación → evidencia
-  specs/00-… a 54-…/        spec.md + plan.md por alcance
+  specs/00-… a 55-…/        spec.md + plan.md por alcance
   specs/templates/          Plantillas de planificación
   guias/                    Contratos detallados y operación
 factory/
@@ -53,6 +53,12 @@ Los identificadores de spec SDD y trabajo factory son espacios distintos. Por ej
 
 Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan su comportamiento final, incluidas sustituciones posteriores. Las specs 53–54 documentan los cambios posteriores registrados en el commit `c4e8831`, incluidos en el cierre autorizado de esta entrega; no se les atribuye una revisión de fábrica. [Registro de consolidación y límites de validación](consolidacion.md).
 
+## Especificaciones en desarrollo
+
+| Spec | Estado | Plan |
+| --- | --- | --- |
+| [55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) | Implementada en rama; validación PostgreSQL/visual pendiente | [Plan](specs/55-mediciones-compartidas/plan.md) · [Evidencia](specs/55-mediciones-compartidas/validacion.md) |
+
 ## Guías técnicas y operativas
 
 | Tema | Documento |
@@ -71,7 +77,7 @@ Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan s
 
 ## Siguiente planificación
 
-La siguiente numeración disponible es **55** al momento de esta consolidación; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 55: …» y después «ejecuta con `$factory` la spec SDD …».
+La siguiente numeración disponible es **56** tras reservar la spec 55; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 56: …» y después «ejecuta con `$factory` la spec SDD …».
 
 ## Antecedentes de planificación de la fábrica
 

@@ -19,59 +19,75 @@ const emptyState = (identity: string | null): LocalToolsState => ({
   identity, shapes: [], selectedId: null, tool: "select", points: []
 });
 
-export function usePlayerTools(identity: string | null, grid: SceneGrid, settings: SceneSettings) {
+export interface PlayerToolsBridge { shapes: readonly SceneShape[]; enabled: boolean; save(shape: SceneShape): void; remove(id: string): void; clear(): void; cancel(): void }
+export function usePlayerTools(identity: string | null, grid: SceneGrid, settings: SceneSettings, bridge?: PlayerToolsBridge) {
   const [stored, setStored] = useState(() => emptyState(identity));
-  const state = stored.identity === identity ? stored : emptyState(identity);
+  const local = stored.identity === identity ? stored : emptyState(identity);
+  const state = bridge ? { ...local, shapes: bridge.shapes } : local;
   // Never render tools from the previous map while waiting for an effect to reset them.
-  if (stored.identity !== identity) setStored(state);
+  if (stored.identity !== identity) setStored(emptyState(identity));
   const context = useRef({ identity, grid, settings });
   context.current = { identity, grid, settings };
   const stateRef = useRef(state);
   stateRef.current = state;
+  const bridgeRef = useRef(bridge); bridgeRef.current = bridge;
+  const mutate = useCallback((update: (value: LocalToolsState) => LocalToolsState) => {
+    const previous = stateRef.current, remote = bridgeRef.current;
+    if (remote && !remote.enabled) return;
+    const next = update(previous);
+    if (remote && next.shapes !== previous.shapes) {
+      for (const shape of next.shapes) if (shape !== previous.shapes.find(p => p.id === shape.id)) remote.save(shape);
+      for (const shape of previous.shapes) if (!next.shapes.some(p => p.id === shape.id)) remote.remove(shape.id);
+    }
+    stateRef.current = next; setStored(next);
+  }, []);
+  const newId = useCallback(() => bridgeRef.current ? `shared-${crypto.randomUUID()}` : `player-local-${crypto.randomUUID()}`, []);
+
 
   const editableIds = useMemo(() => state.shapes.map(shape => shape.id), [state.shapes]);
   const selectedShape = state.shapes.find(shape => shape.id === state.selectedId) ?? null;
   const edit = useCallback((id: string, transform: (shape: SceneShape) => SceneShape): void => {
-    setStored(current => ({ ...current, shapes: current.shapes.map(shape => shape.id === id ? transform(shape) : shape) }));
-  }, []);
-  const cancel = useCallback((): void => setStored(current => ({ ...current, tool: "select", selectedId: null, points: [] })), []);
-  const remove = useCallback((): void => setStored(current => ({
+    mutate(current => ({ ...current, shapes: current.shapes.map(shape => shape.id === id ? transform(shape) : shape) }));
+  }, [mutate]);
+  const cancel = useCallback((): void => { bridgeRef.current?.cancel(); const next = { ...stateRef.current, tool: "select" as const, selectedId: null, points: [] }; stateRef.current = next; setStored(next); }, [mutate]);
+  const remove = useCallback((): void => mutate(current => ({
     ...current, shapes: current.shapes.filter(shape => shape.id !== current.selectedId), selectedId: null
   })), []);
-  const finish = useCallback((): void => setStored(current => {
+  const finish = useCallback((): void => mutate(current => {
     if (current.tool !== "path" || current.points.length < 2) return current;
-    const shape = createPathShape({ id: `player-local-${crypto.randomUUID()}`, points: current.points });
+    const shape = createPathShape({ id: newId(), points: current.points });
     return { ...current, shapes: [...current.shapes, shape], selectedId: shape.id, points: [], tool: "select" };
-  }), []);
+  }), [mutate]);
 
-  const select = useCallback((id: string | null): void => setStored(current => ({
+  const select = useCallback((id: string | null): void => mutate(current => ({
     ...current, selectedId: current.shapes.some(shape => shape.id === id) ? id : null
   })), []);
-  const chooseTool = useCallback((tool: PlayerTool): void => setStored(current => ({ ...current, tool, selectedId: null, points: [] })), []);
+  const chooseTool = useCallback((tool: PlayerTool): void => mutate(current => ({ ...current, tool, selectedId: null, points: [] })), []);
   const createArea = useCallback((kind: PlayerAreaKind, position: WorldPoint): void => {
     const { grid, settings } = context.current;
     let shape = createTacticalShape({
-      id: `player-local-${crypto.randomUUID()}`, kind: kind === "square" ? "rectangle" : kind,
+      id: newId(), kind: kind === "square" ? "rectangle" : kind,
       position, grid, settings
     });
     if (kind === "square") shape = updateShape(shape, { height: shape.width });
-    setStored(current => ({ ...current, tool: "select", points: [], selectedId: shape.id, shapes: [...current.shapes, shape] }));
-  }, []);
-  const addPoint = useCallback((point: WorldPoint): void => setStored(current => {
+    mutate(current => ({ ...current, tool: "select", points: [], selectedId: shape.id, shapes: [...current.shapes, shape] }));
+  }, [mutate]);
+  const addPoint = useCallback((point: WorldPoint): void => mutate(current => {
     if (current.tool !== "path" && current.tool !== "measurement") return current;
     const { grid, settings } = context.current;
     const points = normalizePathPoints([...current.points, point]);
+    if (bridgeRef.current && points.length > 256) return current;
     if (current.tool === "measurement" && points.length === 2) {
       const shape = setLinearShapeEnd(createTacticalShape({
-        id: `player-local-${crypto.randomUUID()}`, kind: "measurement", position: points[0], grid, settings
+        id: newId(), kind: "measurement", position: points[0], grid, settings
       }), points[1], grid);
       return { ...current, tool: "select", points: [], selectedId: shape.id, shapes: [...current.shapes, shape] };
     }
     return { ...current, points };
-  }), []);
-  const undoPoint = useCallback((): void => setStored(current => ({ ...current, points: current.points.slice(0, -1) })), []);
-  const clear = useCallback((): void => setStored(emptyState(context.current.identity)), []);
-  const patch = useCallback((patch: ShapePatch): void => setStored(current => ({
+  }), [mutate]);
+  const undoPoint = useCallback((): void => mutate(current => ({ ...current, points: current.points.slice(0, -1) })), []);
+  const clear = useCallback((): void => { if (bridgeRef.current) { if (!bridgeRef.current.enabled) return; bridgeRef.current.clear(); setStored(emptyState(context.current.identity)); } else setStored(emptyState(context.current.identity)); }, [mutate]);
+  const patch = useCallback((patch: ShapePatch): void => mutate(current => ({
     ...current, shapes: current.shapes.map(shape => shape.id === current.selectedId ? updateShape(shape, patch) : shape)
   })), []);
   const move = useCallback((id: string, x: number, y: number): void => {

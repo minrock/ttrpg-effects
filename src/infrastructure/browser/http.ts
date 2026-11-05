@@ -8,6 +8,9 @@ const unboundIdentity = new Set(["/identity/login", "/identity/logout"]);
 const failure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) });
 export const sessionSchema = z.object({ ok: z.literal(true), role: z.enum(["dm", "player"]), expiresAt: z.string().datetime() });
 export class HttpTransport {
+  private annotations = false;
+  negotiateAnnotations(enabled: boolean) { this.annotations = enabled; }
+  private query(path: string) { return this.readQuery + (this.annotations && ["/table/state", "/table/events"].includes(path) ? (this.readQuery ? "&" : "?") + "annotationsVersion=1" : ""); }
   private generation = 0;
   private lifecycle = new AbortController();
   get sessionSignal(): AbortSignal { return this.lifecycle.signal; }
@@ -32,7 +35,7 @@ export class HttpTransport {
     const controller = new AbortController(); this.pending.add(controller);
     try {
       const fetchRequest = this.fetcher;
-      const response = await fetchRequest(this.prefix + path + ((init.method ?? "GET") === "GET" ? this.readQuery : ""), { ...init, credentials: "same-origin", headers: this.headers(path, init.headers), signal: controller.signal });
+      const response = await fetchRequest(this.prefix + path + ((init.method ?? "GET") === "GET" ? this.query(path) : ""), { ...init, credentials: "same-origin", headers: this.headers(path, init.headers), signal: controller.signal });
       if (generation !== this.generation) throw new ServiceError("STALE", "La operación pertenece a una sesión anterior.");
       if (response.status === 401 && (!publicIdentity.has(path) || path === "/identity/session" && !!this.principalId)) { this.invalidate(); this.expired(); }
       const bodyGeneration = this.generation;
@@ -40,7 +43,7 @@ export class HttpTransport {
         let details: z.infer<typeof failure> | undefined;
         try { details = failure.parse(await response.json()); } catch { /* El status conserva su semántica aunque el proxy devuelva HTML. */ }
         if(details?.error.code === "PASSWORD_CHANGE_REQUIRED") { this.invalidate(); this.expired(); }
-        if (this.readQuery && ([403, 404].includes(response.status) || response.status === 409 && details?.error.code === "OPENING_CHANGED")) { this.invalidate(); this.expired(); }
+        if (this.readQuery && ([403, 404].includes(response.status) && !(path === "/table/annotations" && response.status === 403) || response.status === 409 && details?.error.code === "OPENING_CHANGED")) { this.invalidate(); this.expired(); }
         if (bodyGeneration !== this.generation) throw new ServiceError("STALE", "La operación pertenece a una sesión anterior.");
         throw new ServiceError(details?.error.code ?? `HTTP_${response.status}`, details?.error.message ?? ({ 401: "La sesión expiró. Vuelve a acceder.", 403: "No tienes permiso para esta operación.", 404: "El recurso ya no existe.", 413: "El archivo supera el límite permitido." }[response.status] ?? "El servicio no pudo completar la operación. Reintenta."), response.status, this.retryAfter(response));
       }
@@ -61,7 +64,7 @@ export class HttpTransport {
     this.checkRetry();
     const generation = this.generation;
     const fetchRequest = this.fetcher;
-    const response = await fetchRequest(this.prefix + path + this.readQuery, { credentials: "same-origin", signal, headers: this.headers(path, cursor ? { "Last-Event-ID": cursor } : {}) });
+    const response = await fetchRequest(this.prefix + path + this.query(path), { credentials: "same-origin", signal, headers: this.headers(path, cursor ? { "Last-Event-ID": cursor } : {}) });
     if (generation !== this.generation) { await response.body?.cancel(); throw new ServiceError("STALE", "La mesa pertenece a una sesión anterior."); }
     if (response.status === 401) { this.invalidate(); this.expired(); }
     if (!response.ok) {

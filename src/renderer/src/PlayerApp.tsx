@@ -1,12 +1,15 @@
+import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
+import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
 import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
-import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
-import { Compass, Lock, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Compass, Lock, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { getTokensForRole, normalizeCameraSnapshot, type ArcanePointerBroadcast, type PlayerWindowSnapshot, type ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { sortTokensByOrder } from "../../domain/tokens/tokens";
 import type { SceneDocument } from "../../domain/sessions/scene-document";
 import type { MapImageState } from "../../domain/map/map-image";
 import { MapViewport, type MapViewportHandle } from "./components/MapViewport";
+import "./components/workspace/player-table.css";
 import { PlayerTools } from "./components/workspace/PlayerTools";
 import { usePlayerTools } from "./hooks/usePlayerTools";
 import { zoomPlayerCamera } from "../../domain/player/player-camera-control";
@@ -28,10 +31,24 @@ const EMPTY_ITEMS = [] as const;
 const EMPTY_MAP_ANNOTATIONS = { pins: EMPTY_ITEMS, areas: EMPTY_ITEMS, sceneLinks: EMPTY_ITEMS };
 const EMPTY_LINK_STATUSES = {};
 
-export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?: string } = {}): JSX.Element {
+export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavailableMessage?: string; readonly tablePanel?: ReactNode } = {}): JSX.Element {
   const playerApi = useTtrpgApi("player");
   const isServiceClient = useTtrpgClient()?.assetReferences === "service";
-  const shellRef = useRef<HTMLElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
+  const tableToggleRef = useRef<HTMLButtonElement | null>(null);
+  const tableSidebarRef = useRef<HTMLElement | null>(null);
+  const [showTable, setShowTable] = useState(() => window.innerWidth >= 1100);
+  const closeTable = useCallback(() => { setShowTable(false); tableToggleRef.current?.focus(); }, []);
+  useEffect(() => {
+    const media = window.matchMedia?.("(max-width: 1099px)");
+    const collapse = () => {
+      if (!media?.matches) return;
+      if (tableSidebarRef.current?.contains(document.activeElement)) tableToggleRef.current?.focus();
+      setShowTable(false);
+    };
+    media?.addEventListener("change", collapse);
+    return () => media?.removeEventListener("change", collapse);
+  }, []);
   const viewportRef = useRef<MapViewportHandle | null>(null);
   const [showTools, setShowTools] = useState(true);
   const [scene, setScene] = useState<SceneDocument>(() => createDefaultScene());
@@ -383,11 +400,22 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
 
   const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
   const { sizes: diceSizes } = useDiceSizes();
-  const tools = usePlayerTools(viewportIdentity, scene.grid, scene.settings);
+  const shared = useSharedAnnotations();
+  const tools = usePlayerTools(viewportIdentity, scene.grid, scene.settings, shared.bridge);
+  const drawingRules = JSON.stringify([scene.grid, scene.settings]);
+  useEffect(() => { if (shared.api) tools.cancel(); }, [shared.api, drawingRules, tools.cancel]);
+  const draftId = useRef(crypto.randomUUID());
+  const draft = useRef({ tool: tools.tool, points: tools.points }); draft.current = { tool: tools.tool, points: tools.points };
+  useEffect(() => { if (!tools.isDrawing || !tools.points.length) { shared.cancel(); draftId.current = crypto.randomUUID(); } }, [tools.isDrawing, tools.points.length, shared.cancel]);
+  useEffect(() => { if (shared.api && !shared.view.connected) tools.cancel(); }, [shared.api, shared.view.connected, tools.cancel]);
   const shapes = useMemo(() => [...scene.shapes, ...tools.shapes], [scene.shapes, tools.shapes]);
   const handlePathHover = useCallback((point: { readonly x: number; readonly y: number } | null): void => {
     viewportRef.current?.setPathHoverPoint(point);
-  }, []);
+    if (point && draft.current.points.length && ["path", "measurement"].includes(draft.current.tool)) {
+      const points = [...draft.current.points, point];
+      shared.showPreview({ id: `shared-${draftId.current}`, type: draft.current.tool === "path" ? "path" : "measurement", points: draft.current.tool === "path" ? points.slice(0, 256) : [points[0], point] });
+    }
+  }, [shared.showPreview]);
   const zoomLocal = (direction: "in" | "out"): void => {
     if (isZoomLocked) return;
     const next = zoomPlayerCamera(latestPlayerCameraRef.current, direction);
@@ -396,8 +424,10 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
     queuePlayerCameraReport(next, "local-navigation", true);
   };
 
+  const hasTable = !!tablePanel || !!shared.api;
   return (
-    <main ref={shellRef} className="player-shell player-workspace-root" aria-label="TTRPG Effects jugador">
+    <main className={`player-shell player-workspace-root${hasTable ? " player-shell--table" : ""}${hasTable && showTable ? " player-shell--table-open" : ""}`} aria-label="TTRPG Effects jugador">
+      <div ref={shellRef} className="player-map-workspace">
       {isHydrated ? (
         <MapViewport
           ref={viewportRef}
@@ -410,7 +440,9 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
           fogOfWar={scene.fogOfWar}
           elements={EMPTY_ITEMS}
           shapes={shapes}
-          localEditableShapeIds={showTools ? tools.editableIds : undefined}
+          sharedAnnotations={shared.items.filter(item => !(item.preview && item.revision === 0 && item.author.publicId === shared.view.state?.self))}
+          onSharedShapePreview={shared.showPreview}
+          localEditableShapeIds={showTools && (!shared.api || shared.bridge?.enabled) ? tools.editableIds : undefined}
           lights={scene.lights}
           effects={scene.effects}
           tokens={renderedTokens}
@@ -436,7 +468,7 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
           cameraSnapshot={camera}
           isFogRevealMode={false}
           isFirePaintMode={false}
-          isPathDrawingMode={tools.isDrawing}
+          isPathDrawingMode={tools.isDrawing && (!shared.api || !!shared.bridge?.enabled)}
           isWaterDrawingMode={false}
           isArcanePointerMode={false}
           isRoomPinMode={false}
@@ -491,7 +523,7 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
         selectedShape={tools.selectedShape}
         count={tools.shapes.length}
         draftCount={tools.points.length}
-        disabled={!isViewportReady}
+        disabled={!isViewportReady || !!shared.api && !shared.bridge?.enabled}
         grid={scene.grid}
         settings={scene.settings}
         onTool={tools.chooseTool}
@@ -529,6 +561,7 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
         </div>
       )}
       <div className="player-controls" aria-label="Controles de vista de jugador">
+
         <button type="button" className={`player-control-button${showTools ? " is-active" : ""}`}
           title={showTools ? "Ocultar herramientas" : "Mostrar herramientas"}
           aria-label={showTools ? "Ocultar herramientas" : "Mostrar herramientas"} aria-pressed={showTools}
@@ -562,6 +595,20 @@ export function PlayerApp({ unavailableMessage }: { readonly unavailableMessage?
           <Compass aria-hidden="true" size={15} />
         </button>
       </div>
+      </div>
+      {hasTable && <aside ref={tableSidebarRef} id="player-table-sidebar" className="player-table-sidebar" aria-label="Mesa del jugador" hidden={!showTable}
+        onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") { event.preventDefault(); closeTable(); } }}>
+        <header className="player-table-sidebar__header"><h2>Mesa</h2></header>
+        <div className="player-table-sidebar__content">
+          {tablePanel}
+          {shared.api && <SharedDrawingPanel api={shared.api} view={{ ...shared.view, error: shared.error }} aligned player/>}
+        </div>
+      </aside>}
+      {hasTable && <button ref={tableToggleRef} type="button" className="player-table-toggle"
+        title={showTable ? "Ocultar mesa" : "Mostrar mesa"} aria-label={showTable ? "Ocultar mesa" : "Mostrar mesa"}
+        aria-expanded={showTable} aria-controls="player-table-sidebar" onClick={() => { if (showTable) closeTable(); else setShowTable(true); }}>
+        {showTable ? <ChevronRight aria-hidden="true" size={15}/> : <ChevronLeft aria-hidden="true" size={15}/>}
+      </button>}
     </main>
   );
 }

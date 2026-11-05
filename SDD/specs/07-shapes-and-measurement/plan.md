@@ -1025,3 +1025,7 @@ export function measurePathDistance(
 Spec 35 reutiliza la medida tactica de linea y la conversion geometrica de radios ft/m. Relampago en cono: apertura fija de 60 grados, direccion editable y medida de largo, nunca de apertura. Circulo: radio; extremos de linea ajustados a centros hexagonales. No cambiar reglas de las figuras existentes.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+## Planificación posterior: colaboración en servicio
+
+La propagación de mediciones/áreas de jugadores y la etiqueta de autor se planifican en [SDD 55](../55-mediciones-compartidas/spec.md) y su [plan técnico](../55-mediciones-compartidas/plan.md). Es una capa efímera compartida separada de las formas persistentes; reutiliza la geometría de esta spec. Estado: implementada en la rama de SDD 55; evidencia y pendientes en su registro de validación.

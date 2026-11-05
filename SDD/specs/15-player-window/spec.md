@@ -1,5 +1,7 @@
 # Spec - Ventana de Jugador
 
+> **Evolución implementada en 3.19.0 (pendiente de integración):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.
+
 ## Interfaz y herramientas locales 3.0.0
 
 Extension aceptada el 2026-10-28. Ver alcance completo en spec/plan 39. Las restricciones historicas de ausencia de toolbar y edicion descritas abajo quedan limitadas a la escena compartida del DM; no impiden las herramientas locales de esta extension.
@@ -314,3 +316,9 @@ Extension de sonido (2026-10-25): el rodado se reproduce solamente desde DM para
 Tamano de dados (2026-10-28): el DM puede ajustar Player entre 100% y 250%, independientemente del tamano privado y del zoom del mapa. La preferencia dura toda la sesion y se recupera al reabrir Player. Reencuadrar dados abiertos asentados sin relanzar ni revelar resultados ocultos. Si no cabe la ampliacion solicitada, mostrar porcentaje efectivo/solicitado en el overlay; Player no agrega herramientas de edicion. Detalles en spec 37.
 
 Un 20 natural conservado en una tirada abierta muestra rayos por encima del dado y a su alrededor, dejando una abertura circular pequena solo para leer el 20, y `Crítico` durante tres segundos desde el reposo compartido, incluso sin resumen numerico. No se envia ninguna celebracion de tiradas ocultas. La reapertura tardia no reinicia el efecto; el cierre DM lo retira junto con su tirada. Con movimiento reducido los rayos son estaticos. No cambia valores ni aplica reglas de dano.
+
+## Lateral de mesa del jugador — 3.19.1
+
+En servicio, identidad invitada, sistema, conexión, salida y dibujos compartidos viven en un lateral derecho retráctil. Se abre/cierra mediante chevrón de borde, como el inspector DM; Escape restaura el foco y Delete dentro del panel no modifica el mapa. El mapa conserva cámara y estado al redimensionar, y reporta su área útil sin incluir el lateral. Pantallas menores de 1100 px comienzan con el panel cerrado y conservan acceso a controles inferiores. Electron autónomo no añade un panel vacío.
+
+Contrato y criterios CA-15–18 en [SDD 55](../55-mediciones-compartidas/spec.md); evidencia y límites en su [validación](../55-mediciones-compartidas/validacion.md).

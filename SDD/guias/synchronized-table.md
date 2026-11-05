@@ -4,7 +4,7 @@ La API administra una proyección efímera por partida/apertura. El VTTReact/Pix
 
 ## Conectar jugadores
 
-Inicia/continúa una partida desde su catálogo. Mesa contiene enlace de invitación, copia/rotación explícita y panel privado de participantes. Cada invitado entra con alias; la cookie de esa partida conserva suID al recargar. CuentaDM y cookies invitadas pueden coexistir. Expulsar confirma alias+discriminador y cambia el enlace conservando los demás.
+Inicia/continúa una partida desde su catálogo. La pestaña **Mesa** del lateral derecho (junto a Propiedades y Dados) contiene enlace de invitación, copia/rotación explícita y panel privado de participantes. Cada invitado entra con alias; la cookie de esa partida conserva suID al recargar. CuentaDM y cookies invitadas pueden coexistir. Expulsar confirma alias+discriminador y cambia el enlace conservando los demás.
 
 Las regioneslive anuncian conexión/publicación/error sin narrar cada heartbeat. Sin escena, Player espera publicación. Corte de red conserva vista desactualizada; terminal retira proyección/efectos y detiene reintentos. [Interfaz y borradores](browser-client.md).
 
@@ -72,3 +72,13 @@ Pruebas ejecutables: `public-table-projection.test.ts`, `table-http.test.ts`, `t
 ## Mesas por partida/apertura (010)
 
 La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/dados/proyección, roster privado, revocación en la frontera de envío y callback terminal del adaptador. El listener de producto retira el camino legado; protocolo1 solo permanece en el motor interno y fixtures históricos. Runtimes y streams tienen cuotas globales además de las de cada mesa; no hay una partida activa global en la composición nueva.
+
+## Dibujos compartidos — SDD 55 / 3.19.0
+
+En servicio, mediciones, caminos, círculos, conos y rectángulos/cuadrados de jugadores se comparten en una capa efímera independiente de la escena. Cada jugador modifica/limpia los propios; el DM puede retirarlos o limpiar la capa con confirmación. Alias y discriminador provienen de la admisión autenticada. En el DM, «Dibujos de jugadores» comparte la pestaña Mesa del lateral derecho con participantes e invitaciones; ambos menús se despliegan dentro del lateral y usan su desplazamiento, sin flotantes independientes. El jugador accede a su alias, sistema, estado de conexión, salida y «Visible para la mesa» desde el lateral derecho retráctil (pestaña con chevrón en el borde derecho, como en el DM). Escape lo cierra; en pantallas estrechas comienza cerrado. El panel muestra nombres completos; las etiquetas del mapa acortan nombres largos. Electron autónomo conserva herramientas locales.
+
+La extensión `annotationsVersion=1` se solicita junto a `openingId`/`generation` en `table/state` y `table/events`. Añade `annotations` (versión, tiempo de servidor, secuencia, escena de origen, autor propio e items) fuera de `snapshot.scene`; clientes antiguos no reciben eventos nuevos. Los comandos usan POST `table/annotations` bajo los namespaces contextual DM/invitado existentes, con contexto/requestId y revisión de figura. El servidor deriva las medidas con las reglas publicadas. El adaptador expone el puerto opcional `TtrpgClient.annotations`, sin ampliar IPC privilegiado.
+
+Reconectar recupera confirmados, sin reenviar borradores offline. Previews: hasta 10/s, renovación sin movimiento una vez/s, vencimiento 3 s. Cuotas: 32 figuras/autor, 256/mesa, 256 vértices, 16 KiB/comando y 512 KiB de capa. Salir o ser expulsado retira dibujos del autor; rotar invitación conserva supervivientes. Cambiar contexto/cerrar/reabrir limpia la capa. No se guarda en DB, JSON, exportación, deshacer ni dirty state.
+
+El DM solo superpone dibujos si coincide el marco publicado; «Ver mapa publicado» abre una vista separada sin sustituir su borrador. Un servidor sin extensión mantiene la mesa base, informa incompatibilidad y deshabilita dibujo compartido. [Contrato completo](../specs/55-mediciones-compartidas/spec.md) y [evidencia de validación](../specs/55-mediciones-compartidas/validacion.md).

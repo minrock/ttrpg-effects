@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "3.18.1",
+  "version": "3.19.1",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -37,7 +37,7 @@
   "build": {
     "appId": "com.luismoncaris.ttrpg-effects",
     "productName": "TTRPG Effects",
-    "copyright": "Copyright © 2026 Luis Moncaris",
+    "copyright": "Copyright \u00a9 2026 Luis Moncaris",
     "directories": {
       "output": "dist"
     },

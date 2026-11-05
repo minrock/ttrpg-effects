@@ -150,3 +150,14 @@
 .workspace-tools-menu { margin-left:auto;position:relative; }
 .vtt-interface .workspace-tools-trigger { display:none; }
 .vtt-interface.app-shell--shared-header { grid-template-rows:0 auto minmax(0,1fr) 28px; }
+
+/* La mesa ocupa el mismo lateral y desplazamiento que el inspector. */
+.vtt-interface .right-sidebar-tabs--table { grid-template-columns: 1.35fr 1fr 1fr; gap: 2px; }
+.vtt-interface .right-sidebar-tabs--table button { gap: 4px; padding-inline: 2px; min-width: 0; }
+.vtt-interface .right-table-content { padding: 12px; overflow-wrap: anywhere; }
+.vtt-interface .right-table-content > * + * { margin-top: 12px; }
+.vtt-interface .service-table-status--sidebar { position: static; width: 100%; max-width: none; border: 0; border-bottom: 1px solid var(--editor-border); border-radius: 0; box-shadow: none; background: transparent; }
+.vtt-interface .service-table-status--sidebar details[open] { max-height: none; overflow: visible; padding: 0 0 12px; }
+.vtt-interface .service-table-status--sidebar summary { padding: 10px 0; }
+.vtt-interface .service-table-status--sidebar button { max-width: 100%; white-space: normal; }
+.vtt-interface .right-table-content .shared-drawings details { background: transparent; border: 0; border-bottom: 1px solid var(--editor-border); border-radius: 0; padding: 10px 0; }

@@ -47,6 +47,10 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. Los 
 - La niebla no evita que el jugador inspeccione los píxeles de una imagen de mapa ya descargada. No usarla como control de confidencialidad.
 - Cambios de código requieren evidencia nueva y permiso de integración; una decisión técnica anterior no concede permisos Git.
 
+## Propuesta especificada pendiente de construcción
+
+[SDD 55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) implementa una capa efímera compartida entre DM/jugadores **en servicio**, con alias/discriminador del autor, edición propia y retirada por DM. Versión 3.19.0 en `feature/sdd-mediciones-compartidas`, aún sin integrar; Electron autónomo conserva herramientas locales. La consolidación 3.18.1 descrita arriba es la base histórica. [Validación y pendientes](specs/55-mediciones-compartidas/validacion.md); no se inició un trabajo factory ni se simuló aprobación.
+
 ## Pendiente de especificar
 
 Estas son direcciones mencionadas o límites explícitos, no una cola aprobada:

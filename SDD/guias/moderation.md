@@ -54,3 +54,9 @@ Un procesoAPI por base. SQLite conserva control.lock físico006 y no elimina loc
 Persisten participantes/credenciales/invitación, operaciones y auditoría en migración6 (`moderation_audit`). Estado visual, cámaras, tiradas/historial, conexiones y presencia son efímeros. Reinicio dentro del lease conserva admisión, da epoch nuevo y runtime vacío: elDM debe contactar antes de nuevas entradas y publicar de nuevo. No concede otra gracia.009 mantiene fresco<30s,gracia<150s,credencial absoluta8h. Expirar, cerrar, archivar, borrar o deshabilitar invalida accesos; habilitar no resucita aperturas cerradas. Restore antiguo exige invalidación009 antes de servir.
 
 Gate `pnpm test:moderation`: SQLite físico y PostgreSQL real/TLS obligatorios, sin skip por entorno ausente; incluye HTTP/SSE, carreras, buffers, exclusión entre procesos, pérdida de canal y humo del backend compilado. ConstruirAPI primero. Los comandos y resultados de cada entrega se registran en build.md; no equivalen a despliegue, prueba visual ni prueba prolongada de carga.
+
+## Dibujos compartidos — SDD 55 / 3.19.0
+
+El puerto opcional `TtrpgClient.annotations` conecta mediciones/áreas de jugadores a una capa efímera del servicio. El servidor deriva autoría y medidas, limita edición al propietario y permite retirada/limpieza DM; Electron autónomo conserva herramientas locales. El overlay no entra en guardados ni exportaciones.
+
+Negociación, comandos, límites y ciclo de vida se documentan una sola vez en [mesa sincronizada](synchronized-table.md#dibujos-compartidos--sdd-55--3190). Véanse también el [contrato SDD 55](../specs/55-mediciones-compartidas/spec.md) y su [validación y gates pendientes](../specs/55-mediciones-compartidas/validacion.md).

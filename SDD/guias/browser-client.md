@@ -67,3 +67,9 @@ Retry-After; un conflicto de revisión confirmado se presenta por separado.
 ## Cabecera compartida (3.18.1)
 
 Servicio y editor comparten una sola fila de 44 px, sin logo duplicado. Bajo 1100 px las herramientas se agrupan en desplegable; Escape devuelve foco y salir con foco/puntero lo cierra. Los controles del editor se ocultan e inhabilitan al suspender autoridad. Electron local conserva su cabecera. Contrato y límites de evidencia en [SDD 54](../specs/54-cabecera-unificada/spec.md).
+
+## Dibujos compartidos — SDD 55 / 3.19.0
+
+El puerto opcional `TtrpgClient.annotations` conecta mediciones/áreas de jugadores a una capa efímera del servicio. El servidor deriva autoría y medidas, limita edición al propietario y permite retirada/limpieza DM; Electron autónomo conserva herramientas locales. El overlay no entra en guardados ni exportaciones.
+
+Negociación, comandos, límites y ciclo de vida se documentan una sola vez en [mesa sincronizada](synchronized-table.md#dibujos-compartidos--sdd-55--3190). Véanse también el [contrato SDD 55](../specs/55-mediciones-compartidas/spec.md) y su [validación y gates pendientes](../specs/55-mediciones-compartidas/validacion.md).

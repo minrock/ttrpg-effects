@@ -1,3 +1,4 @@
+import type { SharedAnnotation } from "../../../shared/contracts/shared-annotations";
 import { forwardRef, useEffect, useImperativeHandle, useRef, type JSX, type ReactNode } from "react";
 import { NavigationLegend } from "./NavigationLegend";
 import {
@@ -57,6 +58,8 @@ export interface MapViewportHandle {
 }
 
 interface MapViewportProps {
+  readonly sharedAnnotations?: readonly SharedAnnotation[];
+  readonly onSharedShapePreview?: (shape: SceneShape | null) => void;
   readonly map: MapImageState | null;
   readonly grid: SceneGrid;
   readonly settings: SceneSettings;
@@ -167,6 +170,8 @@ interface MapViewportProps {
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport({
+  sharedAnnotations,
+  onSharedShapePreview,
   map,
   grid,
   settings,
@@ -327,6 +332,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onShapeEndMove,
       onPathPointAdd,
       onPathPointerMove,
+      onSharedShapePreview,
       onWaterPointAdd,
       onWaterPointerMove,
       onLightningCreate,
@@ -371,6 +377,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setDaytimeFilter(daytimeFilter, daytimeMask);
       createdViewport.setElements(elements);
       createdViewport.setShapes(shapes);
+      createdViewport.setSharedAnnotations?.(sharedAnnotations ?? []);
       createdViewport.setLights(lights);
       createdViewport.setEffects(effects);
       createdViewport.setTokens(tokens);
@@ -419,7 +426,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [onSharedShapePreview, onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setEffectTool(fireTool ? "fire" : "lightning", fireTool ?? lightningTool, lightningResetKey);
@@ -456,6 +463,8 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   useEffect(() => {
     viewportRef.current?.setShapes(shapes);
   }, [shapes]);
+
+  useEffect(() => { viewportRef.current?.setSharedAnnotations?.(sharedAnnotations ?? []); }, [sharedAnnotations]);
 
   useEffect(() => {
     viewportRef.current?.setLocalEditableShapeIds(localEditableShapeIds);

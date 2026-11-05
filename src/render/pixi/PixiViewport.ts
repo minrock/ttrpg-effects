@@ -1,3 +1,4 @@
+import type { SharedAnnotation } from "../../shared/contracts/shared-annotations";
 import { Application, Assets, ColorMatrixFilter, Container, Graphics, Rectangle, RendererType, RenderTexture, Sprite, Text, Texture } from "pixi.js";
 import { GifSprite, type GifSource } from "pixi.js/gif";
 import {
@@ -173,6 +174,7 @@ export interface PixiContextMenuRequest {
 }
 
 export interface PixiViewportOptions {
+  readonly onSharedShapePreview?: (shape: SceneShape | null) => void;
   readonly onContextMenu?: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect?: (elementId: string | null) => void;
   readonly onGridCellSizeChange?: (cellSizeWorld: number) => void;
@@ -260,6 +262,8 @@ export class PixiViewport {
   private effectDraft: EffectDraft | null = null;
   private effectResetKey: string | number = 0;
   private elements: readonly TacticalElement[] = [];
+  private sharedAnnotations: readonly SharedAnnotation[] = [];
+  setSharedAnnotations(items: readonly SharedAnnotation[]): void { this.sharedAnnotations = items; this.drawShapesAndMeasurementsLayer(); }
   private shapes: readonly SceneShape[] = [];
   private lights: readonly SceneLight[] = [];
   private effects: readonly SceneEffect[] = [];
@@ -388,8 +392,8 @@ export class PixiViewport {
   }
 
   setShapes(shapes: readonly SceneShape[]): void {
+    for (const id of this.previewShapes.keys()) if (JSON.stringify(this.shapes.find(s => s.id === id)) !== JSON.stringify(shapes.find(s => s.id === id))) this.previewShapes.delete(id);
     this.shapes = shapes;
-    this.previewShapes.clear();
     if (this.isReadOnly && this.localEditableShapeIds !== null && this.dragState?.elementId !== undefined &&
       !this.isLocalEditableShapeId(this.dragState.elementId)) this.cancelLocalDrag();
     if (this.isReadOnly && this.localEditableShapeIds !== null &&
@@ -1016,6 +1020,7 @@ export class PixiViewport {
       destroyDisplayObject(cached.container);
     }
     this.magicalDarknessRenderCache.clear();
+    this.options.onSharedShapePreview?.(null);
     this.previewShapes.clear();
     this.previewLights.clear();
     this.previewEffects.clear();
@@ -2145,6 +2150,8 @@ export class PixiViewport {
     const dx = targetPosition.x - startPosition.x;
     const dy = targetPosition.y - startPosition.y;
 
+    const sharedShape = this.shapes.find(shape => shape.id === elementId);
+    if (sharedShape) this.options.onSharedShapePreview?.(moveShape(sharedShape, targetPosition, this.settings?.snapToGrid || sharedShape.type === "path" ? this.grid ?? undefined : undefined));
     this.transientMovePreview = { elementId, dx, dy };
     this.applyElementMovePreviewToLayers(elementId, dx, dy);
   }
@@ -2156,6 +2163,7 @@ export class PixiViewport {
 
     this.applyElementMovePreviewToLayers(this.transientMovePreview.elementId, 0, 0);
     this.transientMovePreview = null;
+    this.options.onSharedShapePreview?.(null);
   }
 
   private applyElementMovePreviewToLayers(elementId: string, dx: number, dy: number): void {
@@ -2181,6 +2189,7 @@ export class PixiViewport {
   }
 
   private drawShapePreviewLayers(): void {
+    this.options.onSharedShapePreview?.([...this.previewShapes.values()].at(-1) ?? null);
     this.drawShapesAndMeasurementsLayer();
     this.drawSelectionLayer();
   }
@@ -2302,6 +2311,7 @@ export class PixiViewport {
       return;
     }
 
+    this.options.onSharedShapePreview?.(null);
     this.previewShapes.clear();
     this.previewLights.clear();
     this.previewEffects.clear();
@@ -2573,13 +2583,16 @@ export class PixiViewport {
     }
 
     if (this.grid !== null && this.settings !== null) {
-      for (const shape of this.getRenderableShapes()) {
-        const signature = getShapeRenderSignature(shape, this.grid, this.settings);
+      const shapes = this.getRenderableShapes();
+      const extras = this.sharedAnnotations.filter(item => !shapes.some(s => s.id === `shared-${item.id}`)).map(item => ({ ...item.geometry, id: `shared-${item.id}` }));
+      for (const shape of [...shapes, ...extras]) {
+        const shared = this.sharedAnnotations.find(item => `shared-${item.id}` === shape.id);
+        const signature = getShapeRenderSignature(shape, this.grid, this.settings) + JSON.stringify(shared?.author) + String(shared?.preview);
         const cached = this.shapeRenderCache.get(shape.id);
         const rendered =
           cached !== undefined && cached.signature === signature
             ? cached
-            : { signature, container: drawTacticalShape(shape, this.grid, this.settings) };
+            : { signature, container: drawTacticalShape(shape, this.grid, this.settings, shared) };
 
         rendered.container.label = shape.id;
         nextCache.set(shape.id, rendered);
@@ -2595,6 +2608,7 @@ export class PixiViewport {
       this.shapeRenderCache.set(id, cached);
     }
     this.updateAreaToolLabelScale();
+    if (this.transientMovePreview) { const { elementId, dx, dy } = this.transientMovePreview; this.applyElementMovePreviewToLayers(elementId, dx, dy); }
   }
 
   private updateAreaToolLabelScale(): void {
@@ -2610,6 +2624,20 @@ export class PixiViewport {
           if (nestedChild instanceof Text && nestedChild.label === AREA_TOOL_LABEL) {
             nestedChild.scale.set(uiScale);
             nestedChild.rotation = -this.getPresentationRotationRadians();
+            const annotation = this.sharedAnnotations.find(item => `shared-${item.id}` === child.label);
+            const shape = annotation ? this.getRenderableShapes().find(item => item.id === child.label) ?? annotation.geometry : null;
+            if (shape && (shape.type === "circle" || shape.type === "rectangle" || shape.type === "cone")) {
+              const origin = shape.points[0];
+              const width = shape.type === "rectangle" ? shape.width ?? 0 : (shape.radius ?? 0) * (shape.type === "cone" ? 0.7 : 2);
+              const height = shape.type === "rectangle" ? shape.height ?? 0 : (shape.radius ?? 0) * 2;
+              const textWidth = Math.max(...nestedChild.text.split("\n").map(line => [...line].length)) * 8 * uiScale;
+              if (textWidth > width * 0.85 || 32 * uiScale > height * 0.7) {
+                nestedChild.anchor.set(0.5, 1); nestedChild.position.set(origin.x, origin.y - (shape.type === "cone" ? 0 : height / 2) - 16 * uiScale);
+              } else {
+                const radius = shape.type === "cone" ? (shape.radius ?? 0) * 0.4 : 0, angle = (shape.type === "cone" ? shape.direction ?? 0 : 0) * Math.PI / 180;
+                nestedChild.anchor.set(0.5); nestedChild.position.set(origin.x + Math.cos(angle) * radius, origin.y + Math.sin(angle) * radius);
+              }
+            }
           }
         }
       }
@@ -5587,7 +5615,7 @@ function drawElement(element: TacticalElement): Graphics {
   }
 }
 
-function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSettings): Container {
+function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSettings, shared?: SharedAnnotation): Container {
   const container = new Container();
   const graphic = new Graphics();
   const anchor = getShapeAnchor(shape);
@@ -5700,6 +5728,24 @@ function drawTacticalShape(shape: SceneShape, grid: SceneGrid, settings: SceneSe
     }
   }
 
+  if (shared) {
+    const name = [...shared.author.alias];
+    const tag = `${name.length > 12 ? name.slice(0, 12).join("") + "…" : shared.author.alias} #${shared.author.discriminator}`;
+    for (const child of container.children) if (child instanceof Text && child.label === AREA_TOOL_LABEL) {
+      const canonical = Object.entries(shared.geometry).every(([key, value]) => JSON.stringify(shape[key as keyof SceneShape]) === JSON.stringify(value));
+      child.text = `${tag}\n${canonical && shared.measurementLabel ? shared.measurementLabel : child.text}`;
+      child.style.fontSize = 12; child.style.lineHeight = 16; child.style.align = "center";
+      if (["circle", "rectangle", "cone"].includes(shape.type)) {
+        const radius = shape.type === "cone" ? (shape.radius ?? 0) * 0.4 : 0;
+        const angle = (shape.direction ?? 0) * Math.PI / 180;
+        child.anchor.set(0.5); child.position.set(anchor.x + Math.cos(angle) * radius, anchor.y + Math.sin(angle) * radius);
+      } else {
+        const xs = shape.points.map(p => p.x), ys = shape.points.map(p => p.y);
+        child.anchor.set(0.5, 1); child.position.set((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2 - 14);
+      }
+    }
+    if (shared.preview) container.alpha = 0.65;
+  }
   container.addChildAt(graphic, 0);
   return container;
 }

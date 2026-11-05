@@ -146,6 +146,33 @@ describe("PlayerApp local tools", () => {
     vi.useRealTimers();
   });
 
+  it("keeps table data in a retractable sidebar without resetting drawings or camera", async () => {
+    expect(container.querySelector("#player-table-sidebar")).toBeNull();
+    const local = await createCircle();
+    await act(async () => root.render(<PlayerApp tablePanel={<details open><summary>Datos de la mesa</summary><button aria-label="Salir de la partida">Salir de la partida</button></details>} />));
+    const sidebar = container.querySelector<HTMLElement>("#player-table-sidebar")!;
+    const toggle = container.querySelector<HTMLButtonElement>('[aria-controls="player-table-sidebar"]')!;
+    if (sidebar.hidden) await act(async () => toggle.click());
+    expect(sidebar.hidden).toBe(false);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(button("Salir de la partida").closest("#player-table-sidebar")).toBe(sidebar);
+    const camera = props().cameraSnapshot;
+    const inner = button("Salir de la partida");
+    inner.focus();
+    await act(async () => inner.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true })));
+    expect(localShapes()).toEqual([local]);
+    await act(async () => inner.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    expect(sidebar.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
+    await click("Mostrar mesa");
+    expect(button("Salir de la partida")).toBe(inner);
+    expect(props().cameraSnapshot).toEqual(camera);
+    expect(localShapes()).toEqual([local]);
+    await click("Ocultar mesa");
+    expect(sidebar.hidden).toBe(true);
+    expect(document.activeElement).toBe(toggle);
+  });
+
   it("creates a local shape from PlayerTools at the effective local camera without persisting it", async () => {
     const localCamera = { center: { x: -340, y: 870 }, zoom: 2 };
     await act(async () => props().onCameraChange?.(localCamera));
