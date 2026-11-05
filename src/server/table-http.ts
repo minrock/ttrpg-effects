@@ -32,7 +32,7 @@ export function createTableHttp(auth: Auth, now: () => number, publicOrigin: str
       if (!res.write(bytes)) { const timer = setTimeout(() => { drains.delete(timer); if (res.writableLength > 0) close(); }, 5000); drains.add(timer); timer.unref(); }
     };
     streams.set(key, close); res.on("close", close);
-    const connection = table.connect(key, role, write);
+    const connection = table.connect(key, role, write, undefined, new URL(req.url!, publicOrigin).searchParams.get("focusVersion") === "1");
     const heartbeat = setInterval(() => {
       if (!auth.get(req)) { close(); return; }
       res.write(`: heartbeat ${now()}\n\n`);
@@ -52,6 +52,6 @@ export function createTableHttp(auth: Auth, now: () => number, publicOrigin: str
     },
     revoke(req: IncomingMessage) { streams.get(owner(req))?.(); },
     close() { for (const close of streams.values()) close(); },
-    validateQuery(url: URL) { for (const key of url.searchParams.keys()) if (!["role", "view"].includes(key)) throw invalid("Consulta inválida."); z.string().max(300).parse(url.search); }
+    validateQuery(url: URL) { for (const key of url.searchParams.keys()) if (!["role", "view", "focusVersion"].includes(key)) throw invalid("Consulta inválida."); z.string().max(300).parse(url.search); }
   };
 }

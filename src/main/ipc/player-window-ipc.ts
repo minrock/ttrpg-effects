@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { attentionFrame, attentionFocusRequestSchema } from "../../domain/player/attention-focus";
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { join } from "node:path";
 import { installNavigationPolicy, localRendererPolicy } from "../window-policy";
@@ -5,7 +7,6 @@ import { sanitizeInformationAreaHighlightBroadcast } from "../../domain/annotati
 import { sanitizePlayerWindowSnapshot } from "../../domain/player/player-window-snapshot";
 import { sanitizePlayerMapImageStatus } from "../../domain/player/map-image-report";
 import {
-  sanitizePlayerCameraCommand,
   sanitizePlayerCameraReport,
   type PlayerCameraCommand
 } from "../../domain/player/player-camera-control";
@@ -23,6 +24,14 @@ let latestSnapshot: unknown = null;
 let latestCamera: unknown = null;
 let latestCameraCommand: PlayerCameraCommand | null = null;
 let isPlayerWindowReady = false;
+let contentReady = false;
+let focusTokens = 4, focusAt = 0;
+const focusRequests = new Map<string, { fingerprint: string; until: number }>();
+function acceptSnapshot(snapshot: NonNullable<ReturnType<typeof sanitizePlayerWindowSnapshot>>) {
+  const old = sanitizePlayerWindowSnapshot(latestSnapshot);
+  if (!old || old.scene.id !== snapshot.scene.id || attentionFrame(old) !== attentionFrame(snapshot) || old.mapImageUrl !== snapshot.mapImageUrl) contentReady = false;
+  latestSnapshot = snapshot;
+}
 let shouldShowPlayerWindowWhenReady = false;
 
 export function getPlayerWindow(): BrowserWindow | null { return playerWindow; }
@@ -44,7 +53,7 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
     if (snapshot !== null) {
       const validated = sanitizePlayerWindowSnapshot(snapshot);
       if (validated === null) return { ok: false, error: "La escena de jugador no es valida." };
-      latestSnapshot = validated;
+      acceptSnapshot(validated);
       latestCamera = validated.camera;
     }
 
@@ -69,7 +78,7 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
 
     const validated = sanitizePlayerWindowSnapshot(snapshot);
     if (validated === null) return { ok: false, error: "La escena de jugador no es valida." };
-    latestSnapshot = validated;
+    acceptSnapshot(validated);
     latestCamera = validated.camera;
 
     if (playerWindow === null || playerWindow.isDestroyed()) {
@@ -80,38 +89,25 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
     return { ok: true };
   });
 
-  ipcMain.handle("player-window:publish-camera", (event: IpcMainInvokeEvent, camera: unknown) => {
-    if (!isFromDmWindow(event)) {
-      return { ok: false, error: "Solo la ventana del DM puede publicar camara." };
-    }
-
-    if (playerWindow === null || playerWindow.isDestroyed()) {
-      return { ok: true };
-    }
-
-    latestCamera = camera;
-    sendToPlayerWindow("player-window:camera", camera);
-    return { ok: true };
-  });
-
-  ipcMain.handle("player-window:camera-command", (event: IpcMainInvokeEvent, payload: unknown) => {
-    if (!isFromDmWindow(event)) {
-      return { ok: false, error: "Solo la ventana del DM puede controlar la camara de jugador." };
-    }
-
-    const command = sanitizePlayerCameraCommand(payload);
-    if (command === null) {
-      return { ok: false, error: "El comando de camara no es valido." };
-    }
-
-    if (latestCameraCommand !== null && command.revision <= latestCameraCommand.revision) {
-      return { ok: true };
-    }
-
-    latestCameraCommand = command;
-    latestCamera = command.camera;
-    sendToPlayerWindow("player-window:camera-command", command);
-    return { ok: true };
+  for (const channel of ["player-window:publish-camera", "player-window:camera-command"]) {
+    ipcMain.handle(channel, () => ({ ok: false, error: "El control remoto de cámara se retiró. Usa foco de atención." }));
+  }
+  ipcMain.handle("player-window:focus", (event: IpcMainInvokeEvent, payload: unknown) => {
+    if (!isFromDmWindow(event)) return { ok: false, error: "Solo el DM puede enfocar a los jugadores." };
+    const parsed = attentionFocusRequestSchema.safeParse(payload), snapshot = sanitizePlayerWindowSnapshot(latestSnapshot);
+    if (!parsed.success || !snapshot) return { ok: false, error: "El foco no es válido o no hay mapa publicado." };
+    const request = parsed.data, now = Date.now(), fingerprint = JSON.stringify(request);
+    if (request.sceneId !== snapshot.scene.id || request.frame !== attentionFrame(snapshot)) return { ok: false, error: "Publica el mapa actual antes de enfocar." };
+    for (const [id, entry] of focusRequests) if (entry.until <= now) focusRequests.delete(id);
+    const old = focusRequests.get(request.requestId);
+    if (old) return old.fingerprint === fingerprint ? { ok: true, delivered: 1, incompatible: 0, notReady: 0 } : { ok: false, error: "El identificador ya tiene otro contenido." };
+    if (!contentReady || !playerWindow || playerWindow.isDestroyed() || !playerWindow.isVisible()) return { ok: false, error: "Espera a que la ventana del jugador esté lista." };
+    focusTokens = Math.min(4, focusTokens + Math.max(0, now - focusAt) / 500); focusAt = now;
+    if (focusTokens < 1 || focusRequests.size >= 1000) return { ok: false, error: "Espera antes de enviar otro foco." };
+    focusTokens--;
+    focusRequests.set(request.requestId, { fingerprint, until: now + 300000 });
+    sendToPlayerWindow("player-window:focus", { id: randomUUID(), frame: request.frame, position: request.position, issuedAt: now, expiresAt: now + 5000 });
+    return { ok: true, delivered: 1, incompatible: 0, notReady: 0 };
   });
 
   ipcMain.handle("player-window:camera-report", (event: IpcMainInvokeEvent, payload: unknown) => {
@@ -157,11 +153,14 @@ export function registerPlayerWindowIpc(options: PlayerWindowIpcOptions): void {
     return { ok: true };
   });
 
-  ipcMain.handle("player-window:content-ready", (event: IpcMainInvokeEvent) => {
+  ipcMain.handle("player-window:content-ready", (event: IpcMainInvokeEvent, context?: { frame?: unknown }) => {
     if (!isFromPlayerWindow(event)) {
       return { ok: false, error: "Solo la ventana de jugador puede marcar contenido listo." };
     }
 
+    const snapshot = sanitizePlayerWindowSnapshot(latestSnapshot);
+    if (!snapshot || context?.frame !== attentionFrame(snapshot)) return { ok: false, error: "La publicación cambió." };
+    contentReady = true;
     notifyDmWindows("player-window:ready");
     return { ok: true };
   });
@@ -213,15 +212,11 @@ function ensurePlayerWindow(options: PlayerWindowIpcOptions): void {
     if (latestSnapshot !== null) {
       sendToPlayerWindow("player-window:scene", latestSnapshot);
     }
-    if (latestCamera !== null) {
-      sendToPlayerWindow("player-window:camera", latestCamera);
-    }
-    if (latestCameraCommand !== null) {
-      sendToPlayerWindow("player-window:camera-command", latestCameraCommand);
-    }
+
   });
 
   playerWindow.on("closed", () => {
+    contentReady = false; focusRequests.clear();
     playerWindow = null;
     isPlayerWindowReady = false;
     shouldShowPlayerWindowWhenReady = false;
@@ -277,12 +272,12 @@ function sendToPlayerWindow(channel: string, payload: unknown): void {
 
 function isFromDmWindow(event: IpcMainInvokeEvent): boolean {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
-  return senderWindow !== null && senderWindow !== playerWindow;
+  return event.senderFrame === event.sender.mainFrame && senderWindow !== null && senderWindow !== playerWindow;
 }
 
 function isFromPlayerWindow(event: IpcMainInvokeEvent): boolean {
   const senderWindow = BrowserWindow.fromWebContents(event.sender);
-  return senderWindow !== null && senderWindow === playerWindow;
+  return event.senderFrame === event.sender.mainFrame && senderWindow !== null && senderWindow === playerWindow;
 }
 
 export function getPlayerWindowRendererIndexPath(): string {

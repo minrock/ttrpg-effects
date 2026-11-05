@@ -1,3 +1,4 @@
+import { attentionFocusEventSchema, attentionFrame } from "../../domain/player/attention-focus";
 import { annotationStateSchema, type AnnotationState, type AnnotationView, type SharedAnnotationsClient } from "../../shared/contracts/shared-annotations";
 import { contextualEventSchema, contextualStateSchema } from "../../shared/contracts/moderation";
 import { z } from "zod";
@@ -5,13 +6,13 @@ import type { TtrpgApi } from "../../shared/api/ttrpg-api";
 import type { DiceContext, DiceEnvelope, DiceSessionState } from "../../domain/dice/dice";
 import { draftSchema } from "../../domain/dice/dice";
 import type { ServiceRole } from "../../shared/contracts/http-api";
-import { cameraSchema, commandSchema, diceSessionSchema, envelopeSchema, highlightSchema, pointerSchema, presenceSchema, sizesSchema, tableEventSchema, tableStateSchema, type TableEvent, type TableState } from "../../shared/contracts/table";
+import { diceSessionSchema, envelopeSchema, highlightSchema, pointerSchema, presenceSchema, sizesSchema, tableEventSchema, tableStateSchema, type TableEvent, type TableState } from "../../shared/contracts/table";
 import { HttpTransport, ServiceError, result } from "./http";
 
 const ok = z.literal(true);
 
 const diceReply = <T>(value: z.ZodType<T>) => z.object({ ok, value });
-type RealtimeKey = "openPlayerWindow" | "getPlayerWindowState" | "publishPlayerScene" | "publishPlayerCamera" | "commandPlayerCamera" | "reportPlayerCamera" | "publishPlayerPointer" | "publishPlayerInformationAreaHighlight" | "notifyPlayerContentReady" | "reportPlayerMapImageStatus" | "onPlayerScene" | "onPlayerCamera" | "onPlayerCameraCommand" | "onPlayerCameraReport" | "onPlayerPointer" | "onPlayerInformationAreaHighlight" | "onPlayerWindowClosed" | "onPlayerWindowReady" | "onPlayerMapImageStatus" | keyof import("../../shared/api/dice-api").DiceApi;
+type RealtimeKey = "focusPlayers" | "onAttentionFocus" | "openPlayerWindow" | "getPlayerWindowState" | "publishPlayerScene" | "publishPlayerCamera" | "commandPlayerCamera" | "reportPlayerCamera" | "publishPlayerPointer" | "publishPlayerInformationAreaHighlight" | "notifyPlayerContentReady" | "reportPlayerMapImageStatus" | "onPlayerScene" | "onPlayerCamera" | "onPlayerCameraCommand" | "onPlayerCameraReport" | "onPlayerPointer" | "onPlayerInformationAreaHighlight" | "onPlayerWindowClosed" | "onPlayerWindowReady" | "onPlayerMapImageStatus" | keyof import("../../shared/api/dice-api").DiceApi;
 export interface TableConnectionStatus { phase: "connecting" | "connected" | "disconnected"; published: boolean; error: string; playerUrl: string; presence: TableState["presence"] }
 export class BrowserTableClient {
   private handlers = new Map<string, Set<(value: unknown) => void>>();
@@ -19,6 +20,7 @@ export class BrowserTableClient {
   private status: TableConnectionStatus = { phase: "connecting", published: false, error: "", playerUrl: "", presence: undefined };
   private current: TableState | null = null;
   private connectionId: string | undefined;
+  private serverClock = { time: 0, received: 0 };
   private sequence = -1;
   private epoch = "";
   private diceOffset = 0;
@@ -70,7 +72,7 @@ export class BrowserTableClient {
       }
     }
   };
-  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) { if (contextual) http.negotiateAnnotations(true); }
+  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) { if (contextual) http.negotiateAnnotations(true); http.negotiateFocus(true); }
   private get reply() { return z.object({ ok, state: this.contextual ? contextualStateSchema.transform(value => { if (value.gameId !== this.contextual!.gameId || value.openingId !== this.contextual!.openingId || value.generation !== this.contextual!.generation || value.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); } return tableStateSchema.parse({ ...value, protocolVersion: 1 }); }) : tableStateSchema, playerUrl: z.string().optional() }); }
   private sceneResourceId: string | undefined;
   setSceneResource(id: string | undefined) { this.sceneResourceId = id; }
@@ -127,7 +129,7 @@ export class BrowserTableClient {
       } catch (error) {
         if (generation !== this.generation || session.aborted) return;
         if(this.contextual&&(error instanceof z.ZodError||error instanceof SyntaxError||error instanceof ServiceError&&error.code==="INVALID_RESPONSE")){this.terminal("unavailable");return;}
-        if (this.contextual && error instanceof ServiceError && error.status === 400) this.http.negotiateAnnotations(false);
+        if (error instanceof ServiceError && error.status === 400) this.http.disableNextExtension();
         this.setStatus({ phase: "disconnected", error: "Mesa desconectada. La vista está desactualizada; reconectando…" });
         if (error instanceof ServiceError && [401, 403, 404].includes(error.status)) { if (this.contextual) this.terminal("access-ended"); return; }
         this.retry = setTimeout(() => { void connect(count + 1); }, Math.min(30000, 500 * 2 ** Math.min(count, 6)));
@@ -178,12 +180,12 @@ export class BrowserTableClient {
     const sceneChanged = changed || !this.current || state.revision > this.current.revision;
     if (!changed && this.current?.annotations && (!state.annotations || state.annotations.sequence < this.current.annotations.sequence)) state.annotations = this.current.annotations;
     this.current = state;
+    this.serverClock = { time: state.serverTime, received: performance.now() };
     if (state.connectionId) this.connectionId = state.connectionId;
     this.setStatus({ phase: "connected", published: !!state.snapshot, error: "" });
     if (state.snapshot && (sceneChanged || bootstrap)) this.emit("scene", state.snapshot);
     this.presence(state.presence);
     if (bootstrap || changed) {
-      if (state.cameraCommand) this.emit("command", state.cameraCommand);
       this.emit("dice", this.dice(state.dice, state.serverTime)); this.emit("sizes", this.sizes(state.sizes));
       this.timed("pointer", state.pointer, state.serverTime); this.timed("highlight", state.highlight, state.serverTime);
     }
@@ -197,8 +199,13 @@ export class BrowserTableClient {
     if (!this.current || event.context !== this.current.context || event.revision < this.current.revision) return;
     switch (event.type) {
       case "annotations": this.applyAnnotations(annotationStateSchema.parse(event.payload)); break;
-      case "camera": { const camera = cameraSchema.parse(event.payload); if (this.current) this.current.camera = camera; this.emit("camera", camera); break; }
-      case "camera-command": { const command = commandSchema.parse(event.payload); if (this.current) this.current.cameraCommand = command; this.emit("command", command); break; }
+      case "camera": case "camera-command": break; // Compatibilidad de lectura sin autoridad de navegación.
+      case "focus": {
+        const focus = attentionFocusEventSchema.parse(event.payload);
+        if (!this.current.snapshot || focus.frame !== attentionFrame(this.current.snapshot) || focus.expiresAt <= Math.max(event.serverTime, this.serverClock.time + performance.now() - this.serverClock.received) || this.applied.has(focus.id)) break;
+        this.applied.add(focus.id); if (this.applied.size > 1000) this.applied.delete(this.applied.values().next().value!);
+        this.emit("focus", focus); break;
+      }
       case "presence": this.presence(presenceSchema.parse(event.payload)); break;
       case "image-status": this.emit("image", z.object({ imageUrl:z.string(),ok:z.boolean(),error:z.string().optional() }).parse(event.payload)); break;
       case "dice": this.emit("dice", this.dice(envelopeSchema.parse(event.payload), event.serverTime)); break;
@@ -214,7 +221,7 @@ export class BrowserTableClient {
     this.chain = next.catch(() => {}); return next;
   }
   private async rpc<T>(path: string, payload: unknown, schema: z.ZodType<T>, captured?: { context: string | null; connectionId?: string; revision?: number }): Promise<T> {
-    const body = { requestId: crypto.randomUUID(), context: this.current?.context ?? null, connectionId: this.connectionId, revision: this.current?.revision, ...captured, payload };
+    const body = { requestId: path === "/table/focus" ? (payload as { requestId: string }).requestId : crypto.randomUUID(), context: this.current?.context ?? null, connectionId: this.connectionId, revision: this.current?.revision, ...captured, payload };
     const startedAt = Date.now();
     // Un único reintento con el mismo ID, dentro de la ventana de cinco minutos.
     try { return await this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
@@ -239,6 +246,17 @@ export class BrowserTableClient {
   }
   private diceMutation<T>(action: string, payload: unknown, schema: z.ZodType<T>) { return result(() => this.enqueue(() => this.rpc(`/dice/${action}`, payload, this.responseSchema(schema)))); }
   readonly api: Pick<TtrpgApi, RealtimeKey> = {
+    focusPlayers: request => {
+      const expires = performance.now() + 5000;
+      const captured = { context: this.current?.context ?? null, revision: this.current?.revision };
+      return result(() => this.enqueue(async () => {
+        if (performance.now() >= expires) throw new Error("El foco venció mientras se esperaba la conexión. Selecciona el punto de nuevo.");
+        if (!this.current?.focusVersion) throw new Error("Este servidor no admite foco de atención. Actualiza la API.");
+        if (this.status.phase !== "connected" || captured.context !== this.current.context) throw new Error("Espera la conexión de la mesa.");
+        return this.rpc("/table/focus", request, z.object({ ok, delivered: z.number(), incompatible: z.number(), notReady: z.number() }), captured);
+      }));
+    },
+    onAttentionFocus: handler => this.on("focus", handler),
     openPlayerWindow: snapshot => this.contextual ? this.mutation("scene", snapshot ?? null) : this.mutation("open", snapshot ? { snapshot } : {}),
     publishPlayerScene: snapshot => this.mutation("scene", snapshot), publishPlayerCamera: camera => this.mutation("camera", camera), commandPlayerCamera: command => this.mutation("camera-command", command),
     reportPlayerCamera: report => this.mutation("camera-report", report), publishPlayerPointer: value => this.mutation("pointer", value), publishPlayerInformationAreaHighlight: value => this.mutation("area-highlight", value),

@@ -21,6 +21,7 @@ vi.mock("../components/MapViewport", async () => {
   return { MapViewport: forwardRef<MapViewportHandle, ComponentProps<typeof MapViewport>>(function Canvas(props, ref) {
     viewport.props = props;
     useImperativeHandle(ref, () => ({
+      cancelCameraGesture: vi.fn(), selectAttentionPoint: vi.fn(),
       setCameraSnapshot: vi.fn(), setPathHoverPoint: vi.fn(), setWaterHoverPoint: vi.fn(),
       getRandomVisibleWorldPoint: () => ({ x: 0, y: 0 }), getNearbyVisibleWorldPoint: () => ({ x: 0, y: 0 }),
       centerOnWorldPoint: vi.fn(), setPlayerCameraControlState: vi.fn(), clearPlayerCameraControlState: vi.fn()

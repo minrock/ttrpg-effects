@@ -49,6 +49,8 @@ export function publicTableProjection(input: PlayerWindowSnapshot, urlForAsset =
     mapImageUrl: map.map.imagePath ? urlForAsset(map.map.imagePath) : null,
     tokenImageUrls: Object.fromEntries(map.tokens.flatMap(t => { const url = urlForAsset(t.imagePath); return url ? [[t.id, url]] : []; })),
     showDmFogOverlay: false, showZoomIndicator: input.showZoomIndicator ?? false,
+    ...(input.mapNavigationKey !== undefined ? { mapNavigationKey: input.mapNavigationKey } : {}),
+    ...(input.playerEntryPoint ? { playerEntryPoint: input.playerEntryPoint } : {}),
     cameraSyncKey: input.cameraSyncKey ?? 0, informationAreaHighlightResetKey: input.informationAreaHighlightResetKey ?? 0
   } };
 }

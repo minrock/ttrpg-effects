@@ -80,9 +80,11 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
         const result = await service.kick(cookie, game, action.split("/")[0], kickSchema.parse(await json(req, res, 8192, requestAbort.signal)), Number(rawRevision.replaceAll('"', "")), canonicalUuid.parse(req.headers["idempotency-key"]));
         send(res, { ok: true, ...result }); return;
       }
+      const focus = query.focusVersion === "1" && family === "table" && ["state", "events"].includes(action);
+      if (query.focusVersion && !focus) throw new InvitationError("INVALID_INPUT");
       const annotations = query.annotationsVersion === "1" && family === "table" && ["state", "events"].includes(action);
       if (query.annotationsVersion && !annotations) throw new InvitationError("INVALID_INPUT");
-      if (Object.keys(query).length) { const expected = openingContextSchema.extend({ generation: z.coerce.number().int().min(1), annotationsVersion: z.literal("1").optional() }).parse(query); if (expected.openingId !== captured!.openingId || expected.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó."); }
+      if (Object.keys(query).length) { const expected = openingContextSchema.extend({ generation: z.coerce.number().int().min(1), annotationsVersion: z.literal("1").optional(), focusVersion: z.literal("1").optional() }).parse(query); if (expected.openingId !== captured!.openingId || expected.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó."); }
       if (family === "table" && action === "events" && req.method === "GET") {
         const cursor = req.headers["last-event-id"];
         if (cursor !== undefined && (typeof cursor !== "string" || cursor.length > 200 || !/^[a-f0-9-]{36}:[a-f0-9-]{36}:\d{1,16}:[a-f0-9-]{36}:(dm|player):\d{1,16}$/.test(cursor))) throw new InvitationError("INVALID_INPUT");
@@ -111,6 +113,7 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
             const unusable = () => transportClosed || res.destroyed || res.writableEnded;
             const write = (bytes: string) => { if (closed) return; if (unusable()) { close(); return; } if (res.writableLength + Buffer.byteLength(bytes) > 2 * 1024 * 1024) { close(); return; } if (!res.write(bytes)) { const drain = setTimeout(() => { drains.delete(drain); if (res.writableLength) close(); }, 5000); drains.add(drain); drain.unref(); } };
             const queue = (event?: TableEvent) => {
+              if (event?.type === "focus" && !focus) return;
               if (event?.type === "annotations" && !annotations) return;
               if (closed || !event && heartbeatPending) return;
               if (unusable()) { close(); return; }
@@ -125,9 +128,10 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
                   if (event) {
                     const frame = event.type === "bootstrap" ? { ...event, epoch: table.epoch, context: table.context, revision: table.revision, serverTime: now(), sequence: table.transportSequence(role), state: table.state(role, connection!.id) } : event;
                     if (frame.epoch !== table.epoch || frame.context !== table.context || frame.revision < table.revision || frame.sequence <= deliveredSequence) return;
+                    if (frame.type === "focus" && (Number((frame.payload as { expiresAt: number }).expiresAt) <= now() || !table.connection(key, connection?.id).ready)) return;
                     deliveredSequence = frame.sequence;
                     const extension = annotations ? table.annotations.state(current.participant) : undefined;
-                    const value = { ...frame, protocolVersion: 2, ...metadata(current),
+                    const value = { ...frame, serverTime: now(), protocolVersion: 2, ...metadata(current),
                       ...(frame.type === "bootstrap" && frame.state ? { state: { ...frame.state, ...(extension ? { annotations: extension } : {}) } } : {}),
                       ...(frame.type === "scene" ? { payload: { ...table.state(role, connection?.id), ...(extension ? { annotations: extension } : {}) } } : {}),
                       ...(frame.type === "annotations" ? { payload: extension } : {}) };
@@ -143,7 +147,7 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
               res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive", "X-Accel-Buffering": "no" }); res.flushHeaders();
               if (unusable()) { close(); return; }
               if (annotations && scope.participant) table.annotations.register({ participant: scope.participant, alias: scope.alias!, discriminator: scope.discriminator!, expiresAt: Date.parse(scope.annotationExpiresAt ?? scope.expiresAt!) }, key);
-              connection = table.connect(key, role, queue, scope.participant);
+              connection = table.connect(key, role, queue, scope.participant, focus);
               // connect puede cerrar sincrónicamente si el bootstrap excede la cola.
               if (closed || unusable()) { connection.close(); close(); return; }
               timer = setInterval(() => queue(), 1000); timer.unref();
@@ -202,10 +206,10 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
           send(res, { ...result as object, annotations: table.annotations.state(scope.participant) });
         }); }); return;
       }
-      const tableActions = dm ? ["scene", "camera", "camera-command", "pointer", "area-highlight"] : ["camera-report", "ready", "map-image-status"];
+      const tableActions = dm ? ["focus", "scene", "camera", "camera-command", "pointer", "area-highlight"] : ["camera-report", "ready", "map-image-status"];
       const diceActions = dm ? ["context", "preferences", "begin", "complete", "fail", "dismiss", "visibility", "clear-history", "size", "render-status"] : ["render-status"];
       if (!(family === "table" ? tableActions : diceActions).includes(action)) throw new HttpError(403, "FORBIDDEN", "La operación no está permitida.");
-      const input = contextualMutationSchema.parse(await json(req, res, undefined, requestAbort.signal));
+      const input = contextualMutationSchema.parse(await json(req, res, action === "focus" ? 4096 : undefined, requestAbort.signal));
       if (input.openingId !== captured!.openingId || input.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó.");
       const command = mutationSchema.parse(input.command);
       const scenePayload = family === "table" && action === "scene" ? tablePayloads.scene.parse(command.payload) : null;

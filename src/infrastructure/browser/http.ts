@@ -8,9 +8,19 @@ const unboundIdentity = new Set(["/identity/login", "/identity/logout"]);
 const failure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) });
 export const sessionSchema = z.object({ ok: z.literal(true), role: z.enum(["dm", "player"]), expiresAt: z.string().datetime() });
 export class HttpTransport {
+  private focus = false;
+  negotiateFocus(enabled: boolean) { this.focus = enabled; }
+  disableNextExtension() { if (this.focus) this.focus = false; else this.annotations = false; }
   private annotations = false;
   negotiateAnnotations(enabled: boolean) { this.annotations = enabled; }
-  private query(path: string) { return this.readQuery + (this.annotations && ["/table/state", "/table/events"].includes(path) ? (this.readQuery ? "&" : "?") + "annotationsVersion=1" : ""); }
+  private query(path: string) {
+    const params = new URLSearchParams(this.readQuery);
+    if (["/table/state", "/table/events"].includes(path)) {
+      if (this.annotations) params.set("annotationsVersion", "1");
+      if (this.focus) params.set("focusVersion", "1");
+    }
+    return params.size ? `?${params}` : "";
+  }
   private generation = 0;
   private lifecycle = new AbortController();
   get sessionSignal(): AbortSignal { return this.lifecycle.signal; }

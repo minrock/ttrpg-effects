@@ -1,5 +1,7 @@
 # Spec 39 - Interfaz VTT integrada
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+
 > **Evolución integrada en 3.19.1 (main, 90dc50e):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.
 
 ## Estado
@@ -77,3 +79,7 @@ Extension solicitada antes del cierre de la interfaz. Player View adopta el mism
 El inspector DM dispone de Propiedades, Dados y Mesa. Mesa reúne invitaciones, participantes y dibujos de jugadores en menús desplegables dentro de su flujo y desplazamiento. Cambiar de pestaña conserva estado y comprobaciones de acceso. El jugador dispone de un lateral derecho con chevrón de borde para datos de su mesa y dibujos; se eliminan los flotantes independientes de estado, salida y dibujos. El chevrón permanece disponible al contraer, y no se duplica como botón inferior.
 
 Contrato y criterios CA-15–18 en [SDD 55](../55-mediciones-compartidas/spec.md); evidencia y límites en su [validación](../55-mediciones-compartidas/validacion.md).
+
+## Cambio planificado de controles de cámara — SDD 56
+
+Sustituir el grupo de cámara dirigida de jugador por **Foco de atención** (selección de punto), con tooltip y alternativa de teclado; retirar zoom remoto, recentrado con zoom y estados sincronizado/desincronizado. Conservar cámara del DM, candado local opcional del jugador y laterales. El foco no toca el zoom de ningún jugador ni mueve el foco de teclado al recibirse. [Contrato, interacción y accesibilidad](../56-camaras-libres-foco-atencion/spec.md).

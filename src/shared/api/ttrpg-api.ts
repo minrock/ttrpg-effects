@@ -90,6 +90,8 @@ export interface TtrpgApi extends DiceApi {
   resolveTokenUrl: (imagePath: string) => Promise<string | null>;
   openAsideImage: () => Promise<TokenOpenResult>;
   resolveAsideUrl: (imagePath: string) => Promise<string | null>;
+  focusPlayers?(request: import("../../domain/player/attention-focus").AttentionFocusRequest): Promise<import("../../domain/player/attention-focus").AttentionFocusResult>;
+  onAttentionFocus?(handler: (event: import("../../domain/player/attention-focus").AttentionFocusEvent) => void): () => void;
   openPlayerWindow: (snapshot?: PlayerWindowSnapshot) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   getPlayerWindowState: () => Promise<{
     readonly snapshot: PlayerWindowSnapshot | null;
@@ -103,7 +105,7 @@ export interface TtrpgApi extends DiceApi {
   reportPlayerCamera: (report: PlayerCameraReport) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerPointer: (pointer: ArcanePointerBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   publishPlayerInformationAreaHighlight: (highlight: InformationAreaHighlightBroadcast) => Promise<{ readonly ok: boolean; readonly error?: string }>;
-  notifyPlayerContentReady: () => Promise<{ readonly ok: boolean; readonly error?: string }>;
+  notifyPlayerContentReady: (context?: { frame: string }) => Promise<{ readonly ok: boolean; readonly error?: string }>;
   onPlayerScene: (handler: (snapshot: PlayerWindowSnapshot) => void) => () => void;
   onPlayerCamera: (handler: (camera: ViewportCameraSnapshot) => void) => () => void;
   onPlayerCameraCommand: (handler: (command: PlayerCameraCommand) => void) => () => void;

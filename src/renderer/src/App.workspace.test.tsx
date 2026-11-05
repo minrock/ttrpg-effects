@@ -29,7 +29,8 @@ const viewport = vi.hoisted(() => ({
   mount: vi.fn(),
   unmount: vi.fn(),
   handle: {
-    setCameraSnapshot: vi.fn<MapViewportHandle["setCameraSnapshot"]>(),
+    cancelCameraGesture: vi.fn(), selectAttentionPoint: vi.fn(),
+      setCameraSnapshot: vi.fn<MapViewportHandle["setCameraSnapshot"]>(),
     getRandomVisibleWorldPoint: vi.fn(() => ({ x: 0, y: 0 })),
     getNearbyVisibleWorldPoint: vi.fn(() => ({ x: 0, y: 0 })),
     setPathHoverPoint: vi.fn<MapViewportHandle["setPathHoverPoint"]>(),
@@ -322,6 +323,24 @@ describe("App production workspace", () => {
     expect(viewport.unmount).not.toHaveBeenCalled();
   });
 
+  it("enfoca el centro DM sin zoom remoto y comunica errores recuperables", async () => {
+    const scene = JSON.parse(sessionStorage.getItem("ttrpg:session-scene")!) as ReturnType<typeof createSceneWithMap>;
+    const snapshot = { scene, mapImageUrl: null, tokenImageUrls: {}, camera: { center: { x: 0, y: 0 }, zoom: 1 }, cameraSyncKey: 0, mapNavigationKey: 0, showDmFogOverlay: false };
+    const focus = vi.fn<NonNullable<TtrpgApi["focusPlayers"]>>(async () => ({ ok: true, delivered: 2, incompatible: 1, notReady: 0 }));
+    const api = { focusPlayers: focus, getPlayerWindowState: async () => ({ snapshot, camera: null, cameraCommand: null, isOpen: true }),
+      publishPlayerScene: async () => ({ ok: true }), onPlayerMapImageStatus: () => () => {}, onPlayerWindowReady: () => () => {}, onPlayerWindowClosed: () => () => {} } as unknown as TtrpgApi;
+    const client = createClient(api, { scenes: false, images: false, libraries: false, player: true, dice: false, nativeMenus: false });
+    await act(async () => root.render(<ClientProvider client={client}><App /></ClientProvider>));
+    const center = { x: 345.67, y: -89.12 }; await navigate({ center, zoom: 2 });
+    await click(button("Enfocar el centro de mi vista"));
+    expect(focus).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ position: center, sceneId: scene.id }));
+    expect(focus.mock.calls[0][0]).not.toHaveProperty("zoom");
+    expect(host.textContent).toContain("2 ventana(s). 1 incompatibles");
+    expect(viewport.handle.setCameraSnapshot).not.toHaveBeenCalled();
+    focus.mockRejectedValueOnce(new Error("Conexión interrumpida"));
+    await click(button("Enfocar el centro de mi vista")); expect(host.textContent).toContain("Conexión interrumpida");
+  });
+
   it("routes DM zoom to the viewport handle while Player controls remain unavailable without preload", async () => {
     await render();
     const camera = { center: { x: 200, y: -70 }, zoom: 1.25 };
@@ -342,8 +361,8 @@ describe("App production workspace", () => {
     expect(props().grid).toEqual(grid);
     expect(viewport.handle.setPlayerCameraControlState).toHaveBeenCalledTimes(playerUpdates);
     expect(viewport.handle.clearPlayerCameraControlState).toHaveBeenCalledTimes(playerClears);
-    expect(button("Acercar camara de jugador").disabled).toBe(true);
-    expect(button("Alejar camara de jugador").disabled).toBe(true);
+    expect(host.querySelector('[aria-label="Acercar camara de jugador"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Alejar camara de jugador"]')).toBeNull();
     expect(window.ttrpg).toBeUndefined();
   });
 
@@ -532,8 +551,8 @@ describe("App production workspace", () => {
     expect(server.presence().primaryId).toBe(player.id);expect(server.presence().report?.camera).toEqual(local);
     await act(async()=>renderBoth(1));await flush();
     expect(command).not.toHaveBeenCalled();expect(viewport.playerProps!.cameraSnapshot).toBe(cameraProp);
-    await act(async()=>command({revision:1,camera:{center:{x:30,y:40},zoom:1},reason:"recenter"}));await flush();
-    expect(viewport.playerProps!.cameraSnapshot).toEqual({center:{x:30,y:40},zoom:1}); // Orden explícita funciona aun bloqueado.
+    await expect(command({revision:1,camera:{center:{x:30,y:40},zoom:1},reason:"recenter"})).rejects.toThrow("se retiró");
+    expect(viewport.playerProps!.cameraSnapshot).toBe(cameraProp);
     browser.table.stop();dm.close();player.close();
   });
 

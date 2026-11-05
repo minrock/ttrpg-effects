@@ -1,3 +1,4 @@
+import { attentionFrame, focusCamera, localEntryCamera } from "../../domain/player/attention-focus";
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
 import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
@@ -22,7 +23,6 @@ import { useDiceSizes } from "./hooks/useDiceSizes";
 import { DiceOverlay } from "./components/dice/DiceOverlay";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
-  sanitizePlayerCameraCommand,
   type PlayerViewportReport,
   type PlayerCameraReportOrigin
 } from "../../domain/player/player-camera-control";
@@ -59,14 +59,15 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
   );
   const [activeZoom, setActiveZoom] = useState(1);
   const hasInitializedCameraRef = useRef(false);
-  const cameraSyncKeyRef = useRef<number | null>(null);
+  const pendingInitialFit = useRef<PlayerWindowSnapshot | null>(null);
+  const cameraMapRef = useRef<string | null>(null);
   const mapLoadKeyRef = useRef<string | null>(null);
   const [viewportIdentity, setViewportIdentity] = useState<string | null>(null);
   const viewportIdentityRef = useRef<string | null>(null);
   const requestedImageUrlRef = useRef<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isViewportReady, setIsViewportReady] = useState(false);
-  const [isZoomLocked, setIsZoomLocked] = useState(true);
+  const [isZoomLocked, setIsZoomLocked] = useState(false);
   const [showCompass, setShowCompass] = useState(false);
   const [showZoomIndicator, setShowZoomIndicator] = useState(false);
   const [arcanePointerEvent, setArcanePointerEvent] = useState<ArcanePointerBroadcast | null>(null);
@@ -76,8 +77,6 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
   const latestPlayerCameraRef = useRef(camera);
   const latestPlayerViewportRef = useRef<PlayerViewportReport | null>(null);
   const activeMapIdRef = useRef(scene.activeMapId);
-  const lastCameraCommandRevisionRef = useRef(-1);
-  const acknowledgedCameraCommandRevisionRef = useRef<number | null>(null);
   const cameraReportRevisionRef = useRef(0);
   const cameraReportTimerRef = useRef<number | null>(null);
   const isCameraReportInFlightRef = useRef(false);
@@ -119,7 +118,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     cameraReportRevisionRef.current = reportRevision;
     void playerApi.reportPlayerCamera({
       reportRevision,
-      acknowledgedCommandRevision: acknowledgedCameraCommandRevisionRef.current,
+      acknowledgedCommandRevision: null,
       camera: pending.camera,
       origin: pending.origin,
       final: pending.final,
@@ -187,24 +186,9 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     }
   }, [queuePlayerCameraReport]);
 
-  const applyPlayerCameraCommand = useCallback(
-    (value: unknown): void => {
-      const command = sanitizePlayerCameraCommand(value);
-      if (command === null || command.revision <= lastCameraCommandRevisionRef.current) {
-        return;
-      }
-
-      lastCameraCommandRevisionRef.current = command.revision;
-      acknowledgedCameraCommandRevisionRef.current = command.revision;
-      const normalized = normalizeCameraSnapshot(command.camera);
-      latestPlayerCameraRef.current = normalized;
-      setCamera(normalized);
-      setActiveZoom(normalized.zoom);
-      queuePlayerCameraReport(normalized, "remote-command", true);
-    },
-    [queuePlayerCameraReport]
-  );
-
+  const focusFrameRef = useRef("");
+  const [focusNotice, setFocusNotice] = useState("");
+  useEffect(() => { if (!focusNotice) return; const timer = setTimeout(() => setFocusNotice(""), 5000); return () => clearTimeout(timer); }, [focusNotice]);
   const loadedImageUrlRef = useRef<string | null>(null);
   const [publicationRevision, setPublicationRevision] = useState(0);
   const applySnapshot = useCallback((snapshot: PlayerWindowSnapshot | null): void => {
@@ -212,8 +196,9 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
       return;
     }
 
+    focusFrameRef.current = attentionFrame(snapshot);
     setScene(snapshot.scene);
-    if (isServiceClient) setPublicationRevision(value => value + 1);
+    setPublicationRevision(value => value + 1);
     setMapImageUrl(snapshot.mapImageUrl);
     requestedImageUrlRef.current = snapshot.mapImageUrl;
     setTokenImageUrls(snapshot.tokenImageUrls);
@@ -238,21 +223,25 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
       loadedImageUrlRef.current = null;
     }
     mapLoadKeyRef.current = nextMapLoadKey;
-    if (!hasInitializedCameraRef.current || cameraSyncKeyRef.current !== nextCameraSyncKey) {
-      const normalized = normalizeCameraSnapshot(snapshot.camera);
+    const cameraMap = JSON.stringify([snapshot.scene.id, snapshot.scene.activeMapId, snapshot.mapNavigationKey ?? null]);
+    if (!hasInitializedCameraRef.current || cameraMap !== cameraMapRef.current) {
+      if (!hasInitializedCameraRef.current && snapshot.mapImageUrl && !snapshot.scene.map.imageSize) pendingInitialFit.current = snapshot;
+      else pendingInitialFit.current = null;
+      cameraMapRef.current = cameraMap;
+      const bounds = shellRef.current?.getBoundingClientRect();
+      const normalized = localEntryCamera(snapshot, { width: bounds?.width || window.innerWidth, height: bounds?.height || window.innerHeight }, hasInitializedCameraRef.current ? latestPlayerCameraRef.current : undefined);
       latestPlayerCameraRef.current = normalized;
       setCamera(normalized);
       setActiveZoom(normalized.zoom);
       hasInitializedCameraRef.current = true;
-      cameraSyncKeyRef.current = nextCameraSyncKey;
+    } else if (changesViewport) {
+      setCamera(latestPlayerCameraRef.current);
     }
   }, [isServiceClient]);
 
   useEffect(() => {
     let mounted = true;
     isCameraReporterActiveRef.current = true;
-    lastCameraCommandRevisionRef.current = -1;
-    acknowledgedCameraCommandRevisionRef.current = null;
     hasInitializedCameraRef.current = false;
     setIsHydrated(false);
     const offScene = playerApi?.onPlayerScene((snapshot) => {
@@ -270,28 +259,12 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
         setInformationAreaHighlightEvent(highlight);
       }
     });
-    const offCameraCommand = playerApi?.onPlayerCameraCommand((command) => {
-      if (mounted) {
-        applyPlayerCameraCommand(command);
-      }
-    });
-
     void playerApi?.getPlayerWindowState().then((state) => {
       if (!mounted) {
         return;
       }
 
       applySnapshot(state.snapshot);
-      if (!hasInitializedCameraRef.current && state.camera !== null) {
-        const normalized = normalizeCameraSnapshot(state.camera);
-        latestPlayerCameraRef.current = normalized;
-        setCamera(normalized);
-        setActiveZoom(normalized.zoom);
-        hasInitializedCameraRef.current = true;
-      }
-      if (state.cameraCommand !== null) {
-        applyPlayerCameraCommand(state.cameraCommand);
-      }
     });
 
     return () => {
@@ -303,13 +276,12 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
       offScene?.();
       offPointer?.();
       offInformationAreaHighlight?.();
-      offCameraCommand?.();
       if (cameraReportTimerRef.current !== null) {
         window.clearTimeout(cameraReportTimerRef.current);
         cameraReportTimerRef.current = null;
       }
     };
-  }, [applyPlayerCameraCommand, applySnapshot, playerApi]);
+  }, [applySnapshot, playerApi]);
 
   useEffect(() => {
     updatePlayerViewportReport();
@@ -356,6 +328,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
   const noop = useCallback((): void => undefined, []);
   const handlePlayerCameraChange = useCallback(
     (nextCamera: ViewportCameraSnapshot): void => {
+      pendingInitialFit.current = null;
       const normalized = normalizeCameraSnapshot(nextCamera);
       setActiveZoom(normalized.zoom);
       queuePlayerCameraReport(normalized, "local-navigation", false);
@@ -370,38 +343,64 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     },
     [queuePlayerCameraReport]
   );
-  const handlePlayerMapReady = useCallback(({ imageUrl }: { imageUrl: string }): void => {
+  const handlePlayerMapReady = useCallback(({ imageUrl, width, height }: { imageUrl: string; width: number; height: number }): void => {
     if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
       imageUrl !== requestedImageUrlRef.current) return;
+    const pending = pendingInitialFit.current;
+    pendingInitialFit.current = null;
+    if (pending && pending.mapImageUrl === imageUrl) {
+      const bounds = shellRef.current?.getBoundingClientRect();
+      const next = localEntryCamera({ ...pending, scene: { ...pending.scene, map: { ...pending.scene.map, imageSize: { width, height } } } }, { width: bounds?.width || window.innerWidth, height: bounds?.height || window.innerHeight });
+      latestPlayerCameraRef.current = next; setCamera(next); setActiveZoom(next.zoom);
+    }
     loadedImageUrlRef.current = imageUrl;
     setIsViewportReady(true);
+    if (!isServiceClient) setPublicationRevision(value => value + 1);
     void playerApi?.reportPlayerMapImageStatus({ imageUrl, ok: true });
-  }, [viewportIdentity, playerApi]);
+  }, [viewportIdentity, playerApi, isServiceClient]);
   const handlePlayerMapError = useCallback(({ imageUrl, error }: { imageUrl: string; error: string }): void => {
     if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
       imageUrl !== requestedImageUrlRef.current) return;
     loadedImageUrlRef.current = null;
     setIsViewportReady(true);
     void playerApi?.reportPlayerMapImageStatus({ imageUrl, ok: false, error: error.slice(0, 500) });
-  }, [viewportIdentity, playerApi]);
+  }, [viewportIdentity, playerApi, isServiceClient]);
 
   const serviceReadyImageUrl = isServiceClient ? mapImageUrl : null;
   useEffect(() => {
     if (isHydrated && isViewportReady) {
+      if (mapImageUrl && loadedImageUrlRef.current !== mapImageUrl) return;
       if (serviceReadyImageUrl) {
         if (loadedImageUrlRef.current !== serviceReadyImageUrl) return;
         // Un bootstrap nuevo necesita confirmar la textura ya cargada en esta conexión.
         void playerApi?.reportPlayerMapImageStatus({ imageUrl: serviceReadyImageUrl, ok: true });
       }
-      void playerApi?.notifyPlayerContentReady();
+      void playerApi?.notifyPlayerContentReady({ frame: focusFrameRef.current });
       queuePlayerCameraReport(latestPlayerCameraRef.current, "initialization", true);
     }
-  }, [isHydrated, isViewportReady, queuePlayerCameraReport, playerApi, publicationRevision, serviceReadyImageUrl]);
+  }, [isHydrated, isViewportReady, queuePlayerCameraReport, playerApi, publicationRevision, serviceReadyImageUrl, mapImageUrl]);
 
   const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
   const { sizes: diceSizes } = useDiceSizes();
   const shared = useSharedAnnotations();
   const tools = usePlayerTools(viewportIdentity, scene.grid, scene.settings, shared.bridge);
+  const focusHandler = useRef<(event: import("../../domain/player/attention-focus").AttentionFocusEvent) => void>(() => {});
+  focusHandler.current = event => {
+    if ((!isServiceClient && event.expiresAt <= Date.now()) || !isHydrated || !isViewportReady || event.frame !== focusFrameRef.current) return;
+    if (mapImageUrl && loadedImageUrlRef.current !== mapImageUrl) return;
+    const interrupted = tools.points.length > 0;
+    if (tools.isDrawing) tools.cancel();
+    shared.cancel();
+    viewportRef.current?.cancelCameraGesture();
+    const next = focusCamera(latestPlayerCameraRef.current, event.position);
+    latestPlayerCameraRef.current = next;
+    viewportRef.current?.setCameraSnapshot(next); setCamera(next);
+    viewportRef.current?.showAttentionFocus?.(event.position);
+    queuePlayerCameraReport(next, "local-navigation", true);
+    setFocusNotice(interrupted ? "El DM enfocó esta zona. Se canceló el dibujo sin terminar." : "El DM enfocó esta zona. Puedes seguir navegando.");
+  };
+  useEffect(() => playerApi?.onAttentionFocus?.(event => focusHandler.current(event)), [playerApi]);
+
   const drawingRules = JSON.stringify([scene.grid, scene.settings]);
   useEffect(() => { if (shared.api) tools.cancel(); }, [shared.api, drawingRules, tools.cancel]);
   const draftId = useRef(crypto.randomUUID());
@@ -518,7 +517,9 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
           onMapAnnotationPreview={noop}
         />
       ) : null}
+      <span className="sr-only" role="status">{focusNotice}</span>
       {isHydrated && showTools && <PlayerTools
+        notice={focusNotice.includes("Se canceló") ? focusNotice : undefined}
         tool={tools.tool}
         selectedShape={tools.selectedShape}
         count={tools.shapes.length}

@@ -47,11 +47,13 @@ it("negocia extensión; ACK perdido conserva requestId y secuencias viejas no re
 });
 it("servidor antiguo rechaza query; recupera mesa base y explica capacidad ausente", async () => {
   vi.useFakeTimers(); const f = fixture(false, true); f.client.start("player"); await flush();
-  await vi.advanceTimersByTimeAsync(500); await flush(); f.event("bootstrap"); await flush();
+  await vi.advanceTimersByTimeAsync(500); await flush(); await vi.advanceTimersByTimeAsync(1000); await flush(); f.event("bootstrap"); await flush();
   expect(f.client.getStatus()).toMatchObject({ phase: "connected", published: true });
   expect(f.client.annotations.getSnapshot().supported).toBe(false); expect(f.terminal).not.toHaveBeenCalled();
   await expect(f.client.annotations.command({ action: "clear-own" })).rejects.toThrow("no disponible");
-  expect(String(f.fetcher.mock.calls[1][0])).not.toContain("annotationsVersion");
+  expect(String(f.fetcher.mock.calls[1][0])).not.toContain("focusVersion");
+  expect(String(f.fetcher.mock.calls[1][0])).toContain("annotationsVersion");
+  expect(String(f.fetcher.mock.calls[2][0])).not.toContain("annotationsVersion");
 });
 it("un 403 de propiedad no expulsa al jugador ni borra la mesa", async () => {
   const f = fixture(); f.client.start("player"); await flush(); f.event("bootstrap"); await flush();

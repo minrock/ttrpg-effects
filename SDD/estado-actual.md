@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-04. Versión vigente: `package.json` 3.19.1, integrada en `main` mediante `90dc50e`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-04. Versión en esta rama: `package.json` 3.20.0, SDD 56 pendiente de integrar. Última entrega integrada: 3.19.1, integrada en `main` mediante `90dc50e`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -50,6 +50,10 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. Los 
 ## Última entrega integrada — SDD 55
 
 [SDD 55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) implementa una capa efímera compartida entre DM/jugadores **en servicio**, con alias/discriminador del autor, edición propia y retirada por DM. Versión 3.19.1, integrada desde `feature/sdd-mediciones-compartidas` a `main` (`90dc50e`), con laterales de mesa DM/jugador y chevrón de borde; Electron autónomo conserva herramientas locales. La consolidación 3.18.1 descrita arriba es la base histórica. [Validación y pendientes](specs/55-mediciones-compartidas/validacion.md); no se inició un trabajo factory ni se simuló aprobación.
+
+## Implementación pendiente de integrar — SDD 56
+
+[Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) implementa navegación propia y un foco puntual que centra el área útil conservando el zoom actual. Retira controles remotos, cámara principal/virtual y previews de la interfaz. Incluye API/SSE negociado e IPC específico. Trabajo en `feature/sdd-foco-atencion`, versión 3.20.0; no integrado ni publicado. [Plan técnico](specs/56-camaras-libres-foco-atencion/plan.md) y [evidencia/límites](specs/56-camaras-libres-foco-atencion/validacion.md).
 
 ## Pendiente de especificar
 

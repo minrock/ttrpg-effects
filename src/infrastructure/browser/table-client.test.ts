@@ -10,7 +10,7 @@ afterEach(()=>{clients.splice(0).forEach(c=>c.clear());vi.useRealTimers();});
 function fixture(now=1000){
   const server=new TableSession(()=>now,randomUUID);const events:TableEvent[]=[];server.connect("player","player",e=>events.push(e));
   const controllers:ReadableStreamDefaultController<Uint8Array>[]=[];
-  const fetcher=vi.fn(async()=>new Response(new ReadableStream<Uint8Array>({start(c){controllers.push(c);}}),{headers:{"content-type":"text/event-stream"}}));
+  const fetcher=vi.fn(async(path: RequestInfo | URL)=>{ void path; return new Response(new ReadableStream<Uint8Array>({start(c){controllers.push(c);}}),{headers:{"content-type":"text/event-stream"}}); });
   const http=new HttpTransport(fetcher),client=new BrowserTableClient(http);clients.push(client);
   const send=(event:TableEvent,index=controllers.length-1)=>controllers[index].enqueue(new TextEncoder().encode(`id: ${event.epoch}:player:${event.sequence}\nevent: table\ndata: ${JSON.stringify(event)}\n\n`));
   return {server,events,controllers,fetcher,http,client,send};
@@ -46,4 +46,25 @@ describe("adaptador SSE y ciclo de vida",()=>{
     const state=f.events[0];f.send(state,0);await flush();expect(f.client.getStatus().phase).toBe("connecting");f.send(state,1);await flush();expect(f.client.getStatus().phase).toBe("connected");
     const unsub=f.client.api.onPlayerPointer(vi.fn());unsub();f.client.stop();expect((await f.client.api.notifyPlayerContentReady()).ok).toBe(false);
   });
+});
+
+it("foco negociado: no replay, contexto, caducidad, duplicados y reloj local desplazado", async () => {
+  const { attentionFrame } = await import("../../domain/player/attention-focus");
+  const f = fixture(1000), focus = vi.fn(), legacy = vi.fn();
+  f.client.api.onAttentionFocus!(focus); f.client.api.onPlayerCameraCommand(legacy);
+  f.server.publish({ scene: createDefaultScene(), camera: { center: { x: 0, y: 0 }, zoom: 1 }, mapImageUrl: null, tokenImageUrls: {}, showDmFogOverlay: false });
+  f.client.start("player"); await flush();
+  expect(String(f.fetcher.mock.calls[0]?.[0])).toContain("focusVersion=1");
+  const state = f.server.state("player");
+  f.send({ ...f.events[0], sequence: 10, context: state.context, revision: state.revision, state: { ...state, cameraCommand: { revision: 1, reason: "open", camera: { center: { x: 3, y: 4 }, zoom: 3 } } } }); await flush();
+  expect(legacy).not.toHaveBeenCalled();
+  vi.spyOn(Date, "now").mockReturnValue(999_999_999);
+  const payload = { id: randomUUID(), frame: attentionFrame(state.snapshot!), position: { x: 4, y: -5 }, issuedAt: 1000, expiresAt: 6000 };
+  const event: TableEvent = { ...f.events[0], context: state.context, revision: state.revision, state: undefined, type: "focus", sequence: 11, payload };
+  f.send(event); f.send({ ...event, sequence: 12 }); await flush(); expect(focus).toHaveBeenCalledExactlyOnceWith(payload);
+  f.send({ ...event, sequence: 13, payload: { ...payload, id: randomUUID(), expiresAt: 1000, issuedAt: 0 } });
+  f.send({ ...event, sequence: 14, context: randomUUID(), payload: { ...payload, id: randomUUID() } });
+  f.send({ ...event, sequence: 15, payload: { ...payload, id: randomUUID(), frame: "old" } });
+  f.send({ ...event, sequence: 16, type: "camera-command", payload: { revision: 2, reason: "zoom", camera: { center: { x: 3, y: 4 }, zoom: 4 } } });
+  await flush(); expect(focus).toHaveBeenCalledOnce(); expect(legacy).not.toHaveBeenCalled(); vi.restoreAllMocks();
 });

@@ -1,5 +1,7 @@
 # Mesa sincronizada privada — contrato vigente
 
+> **SDD 56 / 3.20.0, pendiente de integrar:** cámaras independientes. El DM usa foco efímero para cambiar el centro sin tocar el zoom. `camera` y `camera-command` se rechazan; el foco nunca forma parte del bootstrap. [Contrato y validación](../specs/56-camaras-libres-foco-atencion/plan.md).
+
 La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. Electron local conservaIPC.
 
 ## Conectar jugadores
@@ -25,17 +27,18 @@ Rutas bajo `/api/v1/dm/games/:gameId` paraDM y `/api/v1/games/:gameId` para invi
 | GET `/table/state` | DM/jugador | `{ok,state,serverTime}` autorizado |
 | GET `/table/events` | DM/jugador | SSE del rol autenticado |
 | POST `/table/scene` | DM, snapshot o null para retirar | `{ok,state,serverTime}` |
-| POST `/table/camera` | DM, `{center:{x,y},zoom}` | cámara principal; no mueve la navegación local |
-| POST `/table/camera-command` | DM, `{revision,camera,reason}` | orden explícita con revisión creciente |
+| POST `/table/camera` | Ruta heredada | Rechazada desde 3.20.0 |
+| POST `/table/camera-command` | Ruta heredada | Rechazada desde 3.20.0 |
+| POST `/table/focus` | DM, `{requestId,sceneId,frame,position}` | Entrega efímera sin zoom; cantidades de destinatarios/excluidos |
 | POST `/table/camera-report` | Jugador, `PlayerCameraReport` | requiere contexto/conexión, ack actual y reporte creciente |
 | POST `/table/pointer` | DM, `{id,position,creatureSize,durationMs}` | temporal 100–10000 ms |
 | POST `/table/area-highlight` | DM, `{id,areaId,areaType,cells,durationMs:5000}` | geometría temporal, sin texto |
 | POST `/table/ready` | Jugador, `{}` | exige revisión actual y carga confirmada |
 | POST `/table/map-image-status` | Jugador, `{imageUrl,ok,error?}` | imagen actual; descarta texto arbitrario del error y emite mensaje seguro |
 
-Salvo open y scene, los POST de mesa devuelven un ACK compacto `{ok:true,serverTime}`; no duplican la proyección en cada reporte.
+Salvo open, scene y focus, los POST de mesa devuelven un ACK compacto `{ok:true,serverTime}`; no duplican la proyección en cada reporte.
 
-El primer jugador conectado es el principal. Solo sus reportes llegan al preview DM; los demás observan y navegan independientemente. Al salir se promueve el más antiguo restante, se limpia la confirmación y se envía bootstrap al promovido para recuperar su cámara local actual. La presencia, reconexión y montaje DM no generan órdenes de cámara; únicamente las acciones explícitas del DM lo hacen. Una sesión admite un stream; reconectar reemplaza el anterior. `isOpen` significa presencia, separado de publicación y ready. `onPlayerWindowReady`/Closed representan disponibilidad del principal, no creación de una ventana remota.
+La selección interna de una conexión principal se conserva para diagnóstico de presencia/imagen, sin preview ni autoridad de cámara. Al salir se promueve otra conexión y su bootstrap no contiene órdenes de navegación. `focusReady` y `focusIncompatible` resumen todas las ventanas de jugador, no solo esa conexión. Una sesión admite un stream; reconectar reemplaza el anterior. `isOpen` significa presencia, separado de publicación y ready. El foco se entrega a todas las conexiones compatibles y listas en el instante de envío; nunca a quienes se conectan o terminan de cargar después.
 
 | Ruta de dados | Rol/payload | Valor del resultado `{ok,value,serverTime}` |
 | --- | --- | --- |
@@ -57,7 +60,7 @@ DiceRollSession valida contexto, composición, simulación y resultado. Solo el 
 
 ## SSE, orden y límites
 
-Cada evento contextual tiene ID `gameId:openingId:generation:epoch:audience:sequence` y sobre protocolVersion2 con sistema/ref/hash/modules públicos; bootstrap contiene el estado internoprotocolVersion1. Tipos: bootstrap, scene, camera, camera-command, pointer, highlight, presence, image-status, dice, sizes, render-error. Heartbeat es comentario SSE cada segundo. Secuencias DM/jugador independientes: las acciones privadas no incrementan la secuencia jugador.
+Cada evento contextual tiene ID `gameId:openingId:generation:epoch:audience:sequence` y sobre protocolVersion2 con sistema/ref/hash/modules públicos; bootstrap contiene el estado internoprotocolVersion1. Tipos activos: bootstrap, scene, focus (negociado), annotations (negociado), pointer, highlight, presence, image-status, dice, sizes, render-error. Los tipos camera/camera-command son únicamente compatibilidad de lectura, sin navegación. Heartbeat es comentario SSE cada segundo. Secuencias DM/jugador independientes: las acciones privadas no incrementan la secuencia jugador.
 
 Bootstrap se emite en la misma transición síncrona que registra la suscripción. Todo cursor válido (incluido viejo/desconocido) recupera snapshot actual; no hay replay de mapas anteriores. Cursores malformados se rechazan. Cliente descarta duplicados, revisiones antiguas, contexto ajeno y chunks de generaciones anteriores incluso si `read()` resuelve después del abort. Bootstrap no reinicia navegación local ni acciones ya aplicadas. Las publicaciones HTTP se serializan por cliente; no pueden resolverse fuera de orden.
 
@@ -82,3 +85,12 @@ La extensión `annotationsVersion=1` se solicita junto a `openingId`/`generation
 Reconectar recupera confirmados, sin reenviar borradores offline. Previews: hasta 10/s, renovación sin movimiento una vez/s, vencimiento 3 s. Cuotas: 32 figuras/autor, 256/mesa, 256 vértices, 16 KiB/comando y 512 KiB de capa. Salir o ser expulsado retira dibujos del autor; rotar invitación conserva supervivientes. Cambiar contexto/cerrar/reabrir limpia la capa. No se guarda en DB, JSON, exportación, deshacer ni dirty state.
 
 El DM solo superpone dibujos si coincide el marco publicado; «Ver mapa publicado» abre una vista separada sin sustituir su borrador. Un servidor sin extensión mantiene la mesa base, informa incompatibilidad y deshabilita dibujo compartido. [Contrato completo](../specs/55-mediciones-compartidas/spec.md) y [evidencia de validación](../specs/55-mediciones-compartidas/validacion.md).
+
+
+## Cámaras y foco de atención (SDD 56)
+
+El jugador empieza con zoom local desbloqueado. Publicar, reconectar o promover una conexión no reemplaza su cámara. Al navegar a otro mapa se mantiene el zoom numérico; el centro usa la entrada pública de un enlace o el centro del mapa. `mapNavigationKey` distingue navegación explícita de los campos heredados de cámara; no se guarda en `.ttrpgscene`.
+
+En el DM, **Foco** permite elegir un punto; Escape o clic derecho cancela. **Centro** enfoca el centro de su propia vista, también accesible por teclado. El menú contextual ofrece **Enfocar aquí a los jugadores**. El servidor exige coincidencia con la publicación y jugadores compatibles/listos; informa las ventanas excluidas. Cada jugador conserva su zoom y puede navegar inmediatamente después. Un aro de 1,5 segundos señala el punto.
+
+Negociar `focusVersion=1` en estado/SSE, separado de `annotationsVersion=1`. Enviar `POST /api/v1/dm/games/:gameId/table/focus` con el sobre contextual vigente y request `{requestId, sceneId, frame, position}`. No acepta zoom ni destinatarios. El evento `focus` lleva ID del servidor y caducidad máxima de cinco segundos. Límite de body 4 KiB, dos focos/segundo con ráfaga de cuatro. Se conserva idempotencia cinco minutos sin retener un último foco reproducible.

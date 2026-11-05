@@ -10,7 +10,7 @@ vi.hoisted(() => { vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockRetur
 
 interface Harness extends Pick<PixiViewport,
   "setReadOnly" | "setLocalEditableShapeIds" | "setPathDrawingMode" | "setSelectedElementId" |
-  "setNavigationEnabled" | "setGrabMode" | "setZoomLocked"> {
+  "setNavigationEnabled" | "setGrabMode" | "setZoomLocked" | "cancelCameraGesture" | "setCameraSnapshot" | "selectAttentionPoint"> {
   handlePointerDown(event: PointerEvent): void;
   handlePointerMove(event: PointerEvent): void;
   handlePointerUp(event: PointerEvent): void;
@@ -35,6 +35,7 @@ function setup(shapes: readonly SceneShape[], ids?: readonly string[]) {
   const host = document.createElement("div");
   const canvas = document.createElement("canvas");
   canvas.setPointerCapture = vi.fn();
+  canvas.hasPointerCapture = vi.fn(() => true); canvas.releasePointerCapture = vi.fn();
   const options: PixiViewportOptions = {
     onElementSelect: vi.fn(), onElementMove: vi.fn(), onShapeEndMove: vi.fn(),
     onPathPointAdd: vi.fn(), onPathPointerMove: vi.fn(), onPathPointMove: vi.fn(), onPathMove: vi.fn(),
@@ -387,5 +388,32 @@ describe("autoría de dibujos compartidos", () => {
     expect(Reflect.get(viewport, "shapes")).toEqual([]);
     expect(document.querySelector("img[src=x]")).toBeNull();
     pixi.setSharedAnnotations([]); expect(layer.children).toHaveLength(0);
+  });
+});
+
+
+describe("foco de atención en el canvas", () => {
+  it.each([0, 90, 180, 270] as const)("centra exactamente sin cambiar zoom con norte %i", orientation => {
+    const { viewport, event, options, canvas } = setup([localCircle], [localCircle.id]);
+    presentAsPlayer(viewport, orientation); viewport.setGrabMode(true);
+    viewport.handlePointerDown(event(500, 400, "pointerdown"));
+    viewport.handlePointerMove(event(620, 470, "pointermove"));
+    const point = { x: -123.45, y: 789.25 }, zoom = viewport.camera.zoom;
+    viewport.cancelCameraGesture(); viewport.setCameraSnapshot({ center: point, zoom });
+    viewport.handlePointerUp(event(700, 500)); viewport.flushPendingViewportUpdates();
+    const center = viewport.worldToScreenPoint(point);
+    expect(center.x).toBeCloseTo(500, 8); expect(center.y).toBeCloseTo(400, 8);
+    expect(viewport.camera.zoom).toBe(zoom); expect(viewport.dragState).toBeNull();
+    expect(canvas.releasePointerCapture).toHaveBeenCalled(); expect(options.onElementMove).not.toHaveBeenCalled();
+  });
+  it("selecciona coordenadas sin snap y Escape/clic derecho no dibujan", () => {
+    const { viewport, event, options } = setup([], []), handler = vi.fn();
+    viewport.setReadOnly(false); viewport.setPathDrawingMode(true);
+    const expected = viewport.screenToWorldPoint({ x: 523.25, y: 415.75 });
+    viewport.selectAttentionPoint(handler); viewport.handlePointerDown(event(523.25, 415.75, "pointerdown")); viewport.handlePointerUp(event(523.25, 415.75));
+    expect(handler).toHaveBeenCalledExactlyOnceWith(expected); expect(options.onPathPointAdd).not.toHaveBeenCalled();
+    handler.mockClear(); viewport.selectAttentionPoint(handler); viewport.handleKeyDown(new KeyboardEvent("keydown", { key: "Escape" })); expect(handler).toHaveBeenCalledExactlyOnceWith(null);
+    handler.mockClear(); viewport.selectAttentionPoint(handler); viewport.handlePointerDown(Object.assign(new MouseEvent("pointerdown", { button: 2 }), { pointerId: 2 }) as PointerEvent); expect(handler).toHaveBeenCalledExactlyOnceWith(null);
+    expect(options.onPathPointAdd).not.toHaveBeenCalled();
   });
 });
