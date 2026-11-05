@@ -1,3 +1,4 @@
+import { attentionFrame, attentionFocusRequestSchema, type AttentionFocusRequest } from "../../domain/player/attention-focus";
 import { SharedAnnotations } from "./shared-annotations";
 import { DiceRollSession } from "./dice-roll-session";
 import { publicTableProjection } from "./public-table-projection";
@@ -7,7 +8,7 @@ import type { TableEvent, TableState } from "../../shared/contracts/table";
 import type { ServiceRole } from "../../shared/contracts/http-api";
 
 export class TableConflict extends Error {}
-interface Connection { id: string; owner: string; role: ServiceRole; participant?: string; emit: (event: TableEvent) => void; report: PlayerCameraReport | null; ready: boolean; imageStatus: "waiting" | "loading" | "ready" | "error"; lastReport: number }
+interface Connection { focus: boolean; id: string; owner: string; role: ServiceRole; participant?: string; emit: (event: TableEvent) => void; report: PlayerCameraReport | null; ready: boolean; imageStatus: "waiting" | "loading" | "ready" | "error"; lastReport: number }
 /** Transiciones síncronas: snapshot y permisos se actualizan juntos. */
 export class TableSession {
   readonly epoch: string;
@@ -15,6 +16,8 @@ export class TableSession {
   readonly annotations: SharedAnnotations;
   context: string | null = null;
   revision = 0;
+  private focusTokens = 4;
+  private focusAt = 0;
   private snapshot: PlayerWindowSnapshot | null = null;
   private assets = new Set<string>();
   private identity = "";
@@ -36,10 +39,10 @@ export class TableSession {
   allows(reference: string): boolean { return this.assets.has(reference); }
   presence(): NonNullable<TableState["presence"]> {
     const p = this.primary;
-    return { count: new Set([...this.connections.values()].filter(c => c.role === "player").map(c => c.participant ?? c.owner)).size, primaryId: p?.id ?? null, ready: p?.ready ?? false, imageStatus: p?.imageStatus ?? "waiting", report: p?.report ?? null };
+    return { focusReady: [...this.connections.values()].filter(c => c.role === "player" && c.focus && c.ready).length, focusIncompatible: [...this.connections.values()].filter(c => c.role === "player" && !c.focus).length, count: new Set([...this.connections.values()].filter(c => c.role === "player").map(c => c.participant ?? c.owner)).size, primaryId: p?.id ?? null, ready: p?.ready ?? false, imageStatus: p?.imageStatus ?? "waiting", report: p?.report ?? null };
   }
   state(role: ServiceRole, connectionId?: string): TableState {
-    return { protocolVersion: 1, epoch: this.epoch, context: this.context, revision: this.revision, serverTime: this.now(), snapshot: this.snapshot, camera: this.camera, cameraCommand: this.command,
+    return { focusVersion: 1, protocolVersion: 1, epoch: this.epoch, context: this.context, revision: this.revision, serverTime: this.now(), snapshot: this.snapshot, camera: this.camera, cameraCommand: this.command,
       dice: role === "dm" ? this.dice.getDmState().envelope : this.dice.getPublicState(), sizes: this.sizes(role),
       ...(role === "dm" ? { presence: this.presence() } : {}), ...(connectionId ? { connectionId } : {}),
       pointer: this.pointer && this.pointer.expiresAt > this.now() ? this.pointer : null,
@@ -56,10 +59,10 @@ export class TableSession {
       for (const c of this.connections.values()) if (c.role === audience) c.emit(event);
     }
   }
-  connect(owner: string, role: ServiceRole, emit: Connection["emit"], participant?: string): { id: string; close: () => void } {
+  connect(owner: string, role: ServiceRole, emit: Connection["emit"], participant?: string, focus = false): { id: string; close: () => void } {
     // HTTP reemplaza el stream anterior de esta sesión antes de conectar.
     const id = this.id();
-    this.connections.set(id, { id, owner, role, participant, emit, report: null, ready: false, imageStatus: this.snapshot ? "loading" : "waiting", lastReport: -Infinity });
+    this.connections.set(id, { id, owner, role, participant, focus, emit, report: null, ready: false, imageStatus: this.snapshot ? "loading" : "waiting", lastReport: -Infinity });
     emit({ ...this.event("bootstrap", role), state: this.state(role, id) });
     this.emit("presence", this.presence(), "dm");
     return { id, close: () => {
@@ -74,7 +77,7 @@ export class TableSession {
     } };
   }
   publish(snapshot: PlayerWindowSnapshot | null): void {
-    const identity = snapshot ? JSON.stringify([snapshot.scene.id, snapshot.scene.activeMapId, snapshot.cameraSyncKey ?? 0]) : "";
+    const identity = snapshot ? JSON.stringify([snapshot.scene.id, snapshot.scene.activeMapId, snapshot.cameraSyncKey ?? 0, snapshot.mapNavigationKey ?? null]) : "";
     const changed = this.context === null || identity !== this.identity;
     const projected = snapshot ? publicTableProjection(snapshot, this.assetUrl) : null;
     const changedImage = this.snapshot?.mapImageUrl !== projected?.snapshot.mapImageUrl;
@@ -98,10 +101,22 @@ export class TableSession {
     if (!c || c.owner !== owner || c.role !== "player") throw new TableConflict("La conexión ya no está activa.");
     return c;
   }
-  setCamera(camera: ViewportCameraSnapshot) { this.camera = camera; this.emit("camera", camera); }
-  setCommand(command: PlayerCameraCommand) {
-    if (this.command && command.revision <= this.command.revision) throw new TableConflict("Orden de cámara obsoleta.");
-    this.command = command; this.camera = command.camera; this.emit("camera-command", command);
+  setCamera(camera: ViewportCameraSnapshot) { void camera; throw new TableConflict("El control remoto de zoom se retiró. Usa foco de atención."); }
+  setCommand(command: PlayerCameraCommand) { void command; throw new TableConflict("El control remoto de cámara se retiró. Usa foco de atención."); }
+  focus(request: AttentionFocusRequest, revision: number | undefined) {
+    const value = attentionFocusRequestSchema.parse(request);
+    if (!this.snapshot || revision !== this.revision || value.sceneId !== this.annotations.sceneId || value.frame !== attentionFrame(this.snapshot)) throw new TableConflict("Publica el mapa actual antes de enfocar a los jugadores.");
+    const now = this.now();
+    this.focusTokens = Math.min(4, this.focusTokens + Math.max(0, now - this.focusAt) / 500); this.focusAt = now;
+    if (this.focusTokens < 1) throw new TableConflict("Espera antes de enviar otro foco de atención.");
+    const players = [...this.connections.values()].filter(c => c.role === "player");
+    const recipients = players.filter(c => c.focus && c.ready);
+    if (!recipients.length) throw new TableConflict("No hay jugadores compatibles listos para recibir el foco.");
+    this.focusTokens--;
+    const payload = { id: this.id(), frame: value.frame, position: value.position, issuedAt: now, expiresAt: now + 5000 };
+    const event = this.event("focus", "player", payload);
+    for (const c of recipients) c.emit(event);
+    return { ok: true as const, delivered: recipients.length, incompatible: players.filter(c => !c.focus).length, notReady: players.filter(c => c.focus && !c.ready).length };
   }
   report(owner: string, id: string | undefined, value: PlayerCameraReport) {
     const c = this.connection(owner, id);
@@ -120,7 +135,8 @@ export class TableSession {
     const c = this.connection(owner, id);
     if (revision !== this.revision || report.imageUrl !== this.snapshot?.mapImageUrl) throw new TableConflict("La imagen ya no pertenece a la proyección.");
     c.imageStatus = report.ok ? "ready" : "error"; c.ready = false;
-    if (c.id === this.primary?.id) { this.emit("image-status", { imageUrl: report.imageUrl, ok: report.ok, ...(report.ok ? {} : { error: "El jugador no pudo cargar la imagen. Reemplázala o reintenta." }) }, "dm"); this.emit("presence", this.presence(), "dm"); }
+    if (c.id === this.primary?.id) { this.emit("image-status", { imageUrl: report.imageUrl, ok: report.ok, ...(report.ok ? {} : { error: "El jugador no pudo cargar la imagen. Reemplázala o reintenta." }) }, "dm"); }
+    this.emit("presence", this.presence(), "dm");
   }
   setPointer(value: NonNullable<TableState["pointer"]>["value"]) { this.pointer = { value, startedAt: this.now(), expiresAt: this.now() + value.durationMs }; this.emit("pointer", this.pointer); }
   setHighlight(value: NonNullable<TableState["highlight"]>["value"]) { this.highlight = { value, startedAt: this.now(), expiresAt: this.now() + 5000 }; this.emit("highlight", this.highlight); }

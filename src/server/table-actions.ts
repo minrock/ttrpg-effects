@@ -11,6 +11,7 @@ export function executeTableCommand(table: TableSession, key: string, family: st
     if (family === "table" && (playerActions.includes(action) ? role !== "player" : role !== "dm")) throw dmOnly();
     if (family === "dice" && action !== "render-status" && role !== "dm") throw dmOnly();
     const command = parse(mutationSchema, raw);
+    if (family === "table" && action === "focus" && (command.payload as { requestId?: string } | null)?.requestId !== command.requestId) throw invalid("El identificador del foco no coincide.");
     const fingerprint = createHash("sha256").update(JSON.stringify([family, action, command])).digest("hex");
     try {
       return table.once(key, command.requestId, fingerprint, () => {
@@ -19,6 +20,7 @@ export function executeTableCommand(table: TableSession, key: string, family: st
           switch (action) {
             case "open": { const p = parse(tablePayloads.open, command.payload); if (p.snapshot) table.publish(p.snapshot); return { ok: true, state: table.state(role), playerUrl: publicOrigin + "/?view=player" }; }
             case "scene": table.publish(parse(tablePayloads.scene, command.payload)); break;
+            case "focus": return table.focus(command.payload as import("../domain/player/attention-focus").AttentionFocusRequest, command.revision);
             case "camera": table.setCamera(parse(tablePayloads.camera, command.payload)); break;
             case "camera-command": table.setCommand(parse(tablePayloads["camera-command"], command.payload)); break;
             case "camera-report": table.report(key, command.connectionId, parse(tablePayloads["camera-report"], command.payload)); break;

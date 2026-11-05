@@ -80,6 +80,12 @@ contextBridge.exposeInMainWorld("ttrpg", {
   resolveTokenUrl: (imagePath: string) => ipcRenderer.invoke("token:resolve-url", imagePath),
   openAsideImage: () => ipcRenderer.invoke("aside:open-image"),
   resolveAsideUrl: (imagePath: string) => ipcRenderer.invoke("aside:resolve-url", imagePath),
+  focusPlayers: (request: unknown) => ipcRenderer.invoke("player-window:focus", request),
+  onAttentionFocus: (handler: (event: unknown) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, value: unknown) => handler(value);
+    ipcRenderer.on("player-window:focus", listener);
+    return () => { ipcRenderer.removeListener("player-window:focus", listener); };
+  },
   openPlayerWindow: (snapshot?: unknown) => ipcRenderer.invoke("player-window:open", snapshot ?? null),
   getPlayerWindowState: () => ipcRenderer.invoke("player-window:get-state"),
   publishPlayerScene: (snapshot: unknown) => ipcRenderer.invoke("player-window:publish-scene", snapshot),
@@ -96,7 +102,7 @@ contextBridge.exposeInMainWorld("ttrpg", {
   publishPlayerPointer: (pointer: unknown) => ipcRenderer.invoke("player-window:publish-pointer", pointer),
   publishPlayerInformationAreaHighlight: (highlight: unknown) =>
     ipcRenderer.invoke("player-window:publish-information-area-highlight", highlight),
-  notifyPlayerContentReady: () => ipcRenderer.invoke("player-window:content-ready"),
+  notifyPlayerContentReady: (context?: { frame: string }) => ipcRenderer.invoke("player-window:content-ready", context),
   onPlayerScene: (handler: (snapshot: unknown) => void) => {
     const listener = (_event: IpcRendererEvent, snapshot: unknown): void => handler(snapshot);
     ipcRenderer.on("player-window:scene", listener);

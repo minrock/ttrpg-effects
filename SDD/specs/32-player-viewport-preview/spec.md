@@ -1,5 +1,8 @@
 # Spec 32 - Preview del viewport de Player View en DM
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+> Los previews principal/auxiliar de esta spec se retiran con el nuevo modelo. No se añade seguimiento de cámaras por jugador en este alcance.
+
 ## Estado
 
 Implementada para revision.

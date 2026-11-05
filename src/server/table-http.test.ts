@@ -62,9 +62,9 @@ describe("mesa HTTP/SSE real",()=>{
   it("idempotencia, reconexión actual y reportes ligados a conexión/contexto",async()=>{
     const p1=await stream();const state=await publish();const id=p1.events[0].state!.connectionId!;
     const cmd=mutation({revision:1,camera:{center:{x:40,y:40},zoom:1},reason:"recenter"},state.context);
-    expect((await call("/table/camera-command","POST",cmd)).status).toBe(200);expect((await call("/table/camera-command","POST",cmd)).status).toBe(200);
+    expect((await call("/table/camera-command","POST",cmd)).status).toBe(409);expect((await call("/table/camera-command","POST",cmd)).status).toBe(409);
     expect((await call("/table/camera-command","POST",{...cmd,payload:{...cmd.payload as object,revision:2}})).status).toBe(409);
-    const report={reportRevision:1,acknowledgedCommandRevision:1,camera:{center:{x:40,y:40},zoom:1},origin:"remote-command",final:true};
+    const report={reportRevision:1,acknowledgedCommandRevision:null,camera:{center:{x:40,y:40},zoom:1},origin:"local-navigation",final:true};
     expect((await call("/table/camera-report","POST",mutation(report,state.context,{connectionId:id}),player)).status).toBe(200);
     expect((await call("/table/camera-report","POST",mutation({...report,reportRevision:2,acknowledgedCommandRevision:99},state.context,{connectionId:id}),player)).status).toBe(409);
     expect((await call("/table/camera-report","POST",mutation(report,state.context,{connectionId:randomUUID()}),player)).status).toBe(409);

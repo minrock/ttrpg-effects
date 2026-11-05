@@ -1,5 +1,7 @@
 # Plan consolidado — Proyección y sincronización de la mesa
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+
 **Spec:** [contrato vigente](spec.md). **Tipo:** documentación retrospectiva del diseño implementado, no una nueva orden de ejecución.
 
 ## Módulos que se reutilizan

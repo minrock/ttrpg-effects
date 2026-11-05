@@ -1,5 +1,7 @@
 # Spec - Ventana de Jugador
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+
 > **Evolución integrada en 3.19.1 (main, 90dc50e):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.
 
 ## Interfaz y herramientas locales 3.0.0
@@ -322,3 +324,9 @@ Un 20 natural conservado en una tirada abierta muestra rayos por encima del dado
 En servicio, identidad invitada, sistema, conexión, salida y dibujos compartidos viven en un lateral derecho retráctil. Se abre/cierra mediante chevrón de borde, como el inspector DM; Escape restaura el foco y Delete dentro del panel no modifica el mapa. El mapa conserva cámara y estado al redimensionar, y reporta su área útil sin incluir el lateral. Pantallas menores de 1100 px comienzan con el panel cerrado y conservan acceso a controles inferiores. Electron autónomo no añade un panel vacío.
 
 Contrato y criterios CA-15–18 en [SDD 55](../55-mediciones-compartidas/spec.md); evidencia y límites en su [validación](../55-mediciones-compartidas/validacion.md).
+
+## Contrato próximo de Player View — SDD 56 (propuesto)
+
+Sustituye, al implementarse, la herencia de cámara DM al abrir/cambiar viewport, el bloqueo inicial de zoom y las órdenes de centro+zoom de los apartados anteriores. Cada jugador navega por su cuenta, con zoom inicialmente libre y candado exclusivamente local. Publicar o reconectar no cambia su cámara. El nuevo foco del DM modifica solo el centro exacto del canvas útil, conservando el zoom local en el instante de recepción y sin impedir navegación posterior.
+
+El cambio de mapa conserva zoom numérico propio y utiliza el centro de entrada público o centro del mapa destino; no compensa a partir de la cámara principal. Escena, visibilidad y permisos de edición siguen sujetos al DM. El contrato completo, inicialización, gestos activos y criterios CA-01–14 están en [SDD 56](../56-camaras-libres-foco-atencion/spec.md).

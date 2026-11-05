@@ -688,6 +688,34 @@ export class PixiViewport {
     this.drawSelectionLayer();
   }
 
+  private attentionMarker: Graphics | null = null;
+  private attentionTimer: ReturnType<typeof setTimeout> | undefined;
+  showAttentionFocus(point: WorldPoint): void {
+    this.clearAttentionFocus();
+    const marker = new Graphics().circle(point.x, point.y, 20 / this.camera.zoom).stroke({ color: 0xffd36a, width: 3 / this.camera.zoom });
+    this.attentionMarker = marker;
+    this.getLayer("informationAreaHighlights").addChild(marker);
+    this.attentionTimer = setTimeout(() => this.clearAttentionFocus(), 1500);
+  }
+  private clearAttentionFocus(): void {
+    clearTimeout(this.attentionTimer); this.attentionTimer = undefined;
+    this.attentionMarker?.destroy(); this.attentionMarker = null;
+  }
+  private attentionPointHandler: ((point: WorldPoint | null) => void) | null = null;
+  selectAttentionPoint(handler: (point: WorldPoint | null) => void): void {
+    this.cancelCameraGesture(); this.attentionPointHandler = handler;
+    this.app.canvas.style.cursor = "crosshair";
+  }
+  cancelCameraGesture(): void {
+    const drag = this.dragState;
+    this.cancelPendingViewportUpdates();
+    this.dragState = null;
+    if (drag && this.app.canvas.hasPointerCapture(drag.pointerId)) this.app.canvas.releasePointerCapture(drag.pointerId);
+    this.clearElementMovePreview(); this.clearDragPreviews(); this.cancelEffectEdit();
+    this.setPathPreview([], null); this.options.onSharedShapePreview?.(null);
+    this.updateCursor();
+  }
+
   setCameraSnapshot(camera: ViewportCameraSnapshot): void {
     this.camera = normalizeCameraSnapshot(camera);
     this.applyCamera(false);
@@ -867,6 +895,7 @@ export class PixiViewport {
 
     if (!sameMap || map?.imageUrl !== previous?.imageUrl) {
       if (!sameMap) {
+        this.clearAttentionFocus();
         this.clearMapImage();
         this.map = map;
       }
@@ -942,6 +971,7 @@ export class PixiViewport {
   }
 
   destroy(): void {
+    this.clearAttentionFocus();
     if (this.disposed) {
       return;
     }
@@ -1576,6 +1606,13 @@ export class PixiViewport {
 
   private readonly handlePointerDown = (event: PointerEvent): void => {
     event.preventDefault();
+    if (this.attentionPointHandler) {
+      if (event.button === 0 || event.button === 2) {
+        const handler = this.attentionPointHandler; this.attentionPointHandler = null; this.updateCursor();
+        handler(event.button === 0 ? this.screenToWorldPoint(this.eventToScreenPoint(event)) : null);
+      }
+      return;
+    }
     this.app.canvas.focus();
     const canNavigateReadOnly = event.button === 0 &&
       ((this.isNavigationEnabled && this.isSpaceNavigationActive) ||
@@ -2322,6 +2359,7 @@ export class PixiViewport {
   }
 
   private updateCursor(): void {
+    if (this.attentionPointHandler) { this.app.canvas.style.cursor = "crosshair"; return; }
     if (this.isGrabMode || (this.isNavigationEnabled && this.isSpaceNavigationActive)) {
       this.app.canvas.style.cursor = "grab";
     } else if (this.isReadOnly) {
@@ -2382,6 +2420,10 @@ export class PixiViewport {
   };
 
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === "Escape" && this.attentionPointHandler) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      const handler = this.attentionPointHandler; this.attentionPointHandler = null; this.updateCursor(); handler(null); return;
+    }
     if (event.key === "Escape" && !isEditableKeyboardTarget(event.target)) this.cancelEffectEdit();
     if (!this.isNavigationEnabled || !isSpaceKeyEvent(event) || isEditableKeyboardTarget(event.target)) {
       return;

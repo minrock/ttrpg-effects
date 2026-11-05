@@ -1,5 +1,7 @@
 # Plan - Ventana de Jugador
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+
 ## Interfaz y herramientas locales 3.0.0
 
 Extension implementada y aceptada el 2026-10-28; secuencia, pruebas y cierre en plan 39. Este contrato amplia los controles locales del plan historico sin conceder permisos sobre la escena DM.

@@ -1,5 +1,7 @@
 # Plan 39 - Integracion de interfaz VTT
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+
 ## Estado y restricciones
 
 2026-10-28. Implementacion y extension Player aceptadas. El usuario autoriza cierre, commit, integracion de `feature/vtt-interface-lab` en `main` y generacion del DMG. Version objetivo 3.0.0 por solicitud expresa de siguiente version mayor, en lugar del minor previsto inicialmente; no cambia el formato ni la compatibilidad de escenas. No se solicita push.

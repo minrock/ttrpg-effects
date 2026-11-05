@@ -109,6 +109,7 @@ describe("PlayerApp map image replacement", () => {
     reportCamera.mockResolvedValue({ ok: true });
     reportImage.mockResolvedValue(undefined);
     notifyReady.mockResolvedValue({ ok: true });
+    onCameraCommand = () => {};
     const api = {
       getPlayerWindowState: async () => ({ snapshot: initial, camera: null, cameraCommand: null, isOpen: true }),
       onPlayerScene: (handler) => { onScene = handler; return offScene; },
@@ -163,7 +164,7 @@ describe("PlayerApp map image replacement", () => {
     await ready();
     const cameraProp = props().cameraSnapshot;
     const localCamera = { center: { x: -340, y: 870 }, zoom: 2.5 };
-    act(() => container.querySelector<HTMLButtonElement>('[title="Desbloquear zoom local"]')!.click());
+    expect(props().isZoomLocked).toBe(false);
     await navigate(localCamera);
     const cameraApplications = viewport.applyCamera.mock.calls.length;
     const replacement = snapshot({
@@ -184,21 +185,22 @@ describe("PlayerApp map image replacement", () => {
     expect(viewport.unmount).not.toHaveBeenCalled();
     expect(viewport.visibleImageUrl).toBe(initial.mapImageUrl);
     await ready();
-    expect(notifyReady).toHaveBeenCalledOnce();
+    expect(notifyReady).toHaveBeenCalledTimes(2);
     expect(reportImage).toHaveBeenLastCalledWith({ imageUrl: replacement.mapImageUrl, ok: true });
     expect(reportCamera).toHaveBeenLastCalledWith(expect.objectContaining({ camera: localCamera }));
   });
 
-  it("retains a remotely commanded effective camera on later same-key image snapshots", async () => {
+  it("ignores legacy camera commands and retains local navigation across publication", async () => {
     await ready();
     const commanded = { center: { x: 700, y: -800 }, zoom: 3 };
+    await navigate(commanded);
     await act(async () => onCameraCommand({ revision: 1, reason: "move", camera: commanded }));
     await flushReports();
     const cameraProp = props().cameraSnapshot;
     await act(async () => onScene(snapshot({ mapImageUrl: "map-asset:///maps/a.png?revision=commanded" })));
     expect(props().cameraSnapshot).toBe(cameraProp);
     expect(viewport.effectiveCamera).toEqual(commanded);
-    expect(reportCamera).toHaveBeenLastCalledWith(expect.objectContaining({ camera: commanded, origin: "remote-command" }));
+    expect(reportCamera).toHaveBeenLastCalledWith(expect.objectContaining({ camera: commanded }));
   });
 
   it("applies camera and waits for rendering when navigating to a different map and sync key", async () => {
@@ -210,23 +212,30 @@ describe("PlayerApp map image replacement", () => {
     } }));
     await act(async () => onScene(snapshot({ scene: nextScene, cameraSyncKey: 11, camera: nextCamera, mapImageUrl: "map-asset:///maps/b.png?revision=1" })));
     expect(props().map?.mapId).toBe("b");
-    expect(viewport.effectiveCamera).toEqual(nextCamera);
+    expect(viewport.effectiveCamera).toEqual({ center: { x: 0, y: 0 }, zoom: 2 });
     expect(container.querySelector(".player-loading")).not.toBeNull();
     await ready();
     expect(container.querySelector(".player-loading")).toBeNull();
     expect(notifyReady).toHaveBeenCalledTimes(2);
-    expect(reportCamera).toHaveBeenLastCalledWith(expect.objectContaining({ camera: nextCamera, viewport: expect.objectContaining({ mapId: "b" }) }));
+    expect(reportCamera).toHaveBeenLastCalledWith(expect.objectContaining({ camera: { center: { x: 0, y: 0 }, zoom: 2 }, viewport: expect.objectContaining({ mapId: "b" }) }));
   });
 
-  it("honors an explicit camera sync key change even when the map ID is unchanged", async () => {
+  it("ignores the legacy camera sync key when the map ID is unchanged", async () => {
     await ready();
     await navigate({ center: { x: 800, y: 900 }, zoom: 2 });
     const camera = { center: { x: 120, y: -50 }, zoom: 1.5 };
     await act(async () => onScene(snapshot({ cameraSyncKey: 12, camera })));
-    expect(viewport.effectiveCamera).toEqual(camera);
+    expect(viewport.effectiveCamera).toEqual({ center: { x: 800, y: 900 }, zoom: 2 });
     expect(container.querySelector(".player-loading")).not.toBeNull();
     await ready();
     expect(container.querySelector(".player-loading")).toBeNull();
+  });
+
+  it("una navegación explícita centra en la entrada pública aunque los mapas reutilicen ID", async () => {
+    await ready(); await navigate({ center: { x: 800, y: 900 }, zoom: 2 });
+    const entry = { x: -24.5, y: 90.25 };
+    await act(async () => onScene(snapshot({ mapNavigationKey: 2, playerEntryPoint: entry })));
+    expect(viewport.effectiveCamera).toEqual({ center: entry, zoom: 2 });
   });
 
   it("reports replacement failures for the current revision without resetting local navigation or readiness", async () => {
@@ -253,7 +262,7 @@ describe("PlayerApp map image replacement", () => {
     await fail("Imagen no disponible");
     await flushReports();
     expect(container.querySelector(".player-loading")).toBeNull();
-    expect(notifyReady).toHaveBeenCalledOnce();
+    expect(notifyReady).not.toHaveBeenCalled();
     expect(reportImage).toHaveBeenCalledExactlyOnceWith({ imageUrl: initial.mapImageUrl, ok: false, error: "Imagen no disponible" });
   });
 

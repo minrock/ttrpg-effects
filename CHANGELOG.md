@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.20.0 — 2026-11-04 — Funcionalidad
+
+- SDD 56: cámaras independientes por jugador, zoom desbloqueado al iniciar y conservación de zoom al cambiar de mapa; se retiran controles remotos de cámara y previews principal/virtual.
+- Foco de atención por punto, menú contextual o centro de la vista del DM: centra a los jugadores listos sin cambiar su zoom, con aro breve y cancelación segura de gestos en curso.
+- Evento efímero negociado `focusVersion=1` para API/SSE y canales específicos de Electron, con validación de contexto, deduplicación, caducidad y límites. Sin replay al conectar ni migraciones de datos.
+- Plan técnico, contrato y registro de validación en `SDD/specs/56-camaras-libres-foco-atencion/`.
+
 ## 3.19.1 — 2026-11-04 — Corrección
 
 - Jugador con lateral derecho retráctil mediante chevrón en el borde (como el DM) para alias, sistema, conexión, salida y dibujos compartidos; mapa y cámara conservados al abrir/cerrar.

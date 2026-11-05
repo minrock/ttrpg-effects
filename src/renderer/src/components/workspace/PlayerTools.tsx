@@ -12,6 +12,7 @@ export type PlayerTool = "select" | "pan" | "measurement" | "path";
 export type PlayerAreaKind = "circle" | "square" | "rectangle" | "cone";
 
 export interface PlayerToolsProps {
+  readonly notice?: string;
   readonly tool: PlayerTool;
   readonly selectedShape: SceneShape | null;
   readonly count: number;
@@ -83,6 +84,7 @@ export function PlayerTools(props: PlayerToolsProps): JSX.Element {
   );
 
   return <div className="player-tools">
+    {props.notice && <p className="player-tools__notice">{props.notice}</p>}
     <nav className="player-tools__rail" aria-label="Herramientas del jugador">
       {button("Seleccionar", <MousePointer2 size={18} />, () => { setGroup(null); props.onTool("select"); }, tool === "select" && group === null)}
       {button("Desplazar mapa", <Hand size={18} />, () => { setGroup(null); props.onTool("pan"); }, tool === "pan")}

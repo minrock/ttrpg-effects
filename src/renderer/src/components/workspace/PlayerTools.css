@@ -113,3 +113,5 @@
   .player-workspace-root .player-zoom-indicator { bottom: 62px; left: 16px; max-width: calc(100% - 32px); }
   .player-shell.player-workspace-root .combat-turn-bar { bottom: 70px; max-width: calc(100% - 80px); }
 }
+
+.player-workspace-root .player-tools__notice { margin: 0; padding: 8px 10px; max-width: 260px; font-size: 12px; color: #ffdf9b; border-bottom: 1px solid var(--player-tools-border); }

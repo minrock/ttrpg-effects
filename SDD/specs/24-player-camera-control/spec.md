@@ -1,5 +1,7 @@
 # Spec - Control de Camara de Jugador
 
+> **Sustitución implementada — SDD 56 / 3.20.0 (pendiente de integrar):** [Cámaras libres y foco de atención](../56-camaras-libres-foco-atencion/spec.md) sustituye la cámara dirigida por DM, el zoom remoto y la sincronización principal/virtual por navegación propia y un foco puntual que cambia solo el centro. Las referencias a cámara dirigida de este documento son históricas de 3.19.1 y quedan sustituidas por SDD 56. [Plan de sustitución](../56-camaras-libres-foco-atencion/plan.md).
+
 ## Estado
 
 Aceptada.
@@ -283,3 +285,11 @@ Al aceptar e implementar esta spec, deben actualizarse el spec y plan de `15-pla
 - `SDD/specs/15-player-window/spec.md`.
 - `SDD/specs/15-player-window/plan.md`.
 - El plan tecnico de esta spec, una vez aprobado el alcance funcional.
+
+## Sustitución propuesta de DM View — SDD 56
+
+El control de cámara principal/virtual y sus estados sincronizado/desincronizado dejan de formar parte de la interfaz objetivo. Se retiran el icono de cámara arrastrable, zoom remoto, recentrado con zoom, previews asociados y reproducción de órdenes al abrir. Se conservan los controles del viewport propio del DM.
+
+La acción **Foco de atención** permite elegir un punto del mapa publicado mediante clic, menú contextual o centro de la vista DM desde teclado. Envía únicamente la coordenada a todos los jugadores compatibles y listos de esa apertura. Cada uno centra ese punto manteniendo su zoom actual; la cámara DM queda intacta. Escape cancela la selección y el marcador temporal no es un objeto de escena. No hay seguimiento continuo ni un estado de desincronización que corregir.
+
+[SDD 56](../56-camaras-libres-foco-atencion/spec.md) define el contrato sustituto y sus límites. Esta sección es planificación; la implementación de 3.19.1 permanece sin cambios hasta ejecutar el plan.

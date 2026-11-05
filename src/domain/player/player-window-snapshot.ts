@@ -7,6 +7,8 @@ const snapshotSchema = z.object({
   mapImageUrl: z.string().nullable(),
   tokenImageUrls: z.record(z.string(), z.string()),
   camera: z.object({ center: z.object({ x: z.number().finite(), y: z.number().finite() }), zoom: z.number().finite().positive() }).transform(normalizeCameraSnapshot),
+  playerEntryPoint: z.object({ x: z.number().finite().min(-1e8).max(1e8), y: z.number().finite().min(-1e8).max(1e8) }).strict().optional(),
+  mapNavigationKey: z.number().int().nonnegative().optional(),
   cameraSyncKey: z.number().int().nonnegative().optional(),
   showDmFogOverlay: z.boolean(),
   showZoomIndicator: z.boolean().optional(),

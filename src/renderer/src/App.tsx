@@ -1,3 +1,4 @@
+import { attentionFrame } from "../../domain/player/attention-focus";
 import { matchesPublishedDrawingFrame } from "../../domain/player/shared-drawing-frame";
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
@@ -181,15 +182,7 @@ import {
   type PlayerWindowSnapshot,
   type ViewportCameraSnapshot
 } from "../../domain/player/player-window";
-import {
-  derivePlayerCameraSyncStatus,
-  movePlayerCameraToMap,
-  shouldApplyPlayerCameraReport,
-  zoomPlayerCamera,
-  type PlayerCameraCommandReason,
-  type PlayerCameraSyncStatus,
-  type PlayerViewportReport
-} from "../../domain/player/player-camera-control";
+import { zoomPlayerCamera } from "../../domain/player/player-camera-control";
 import {
   ALLOWED_SHAPE_EMOJIS,
   getSelectedShapeEmojis
@@ -295,10 +288,11 @@ const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
 
 export function App({ service, tablePanel }: { readonly service?: ServiceWorkspace; readonly tablePanel?: ReactNode } = {}): JSX.Element {
   const shared = useSharedAnnotations();
+  const [serviceFocusReady, setServiceFocusReady] = useState(0);
   const [servicePublished, setServicePublished] = useState(false);
   useEffect(() => {
     if (!service) return;
-    const update = () => { if (!service.browser.table.getStatus().published) setServicePublished(false); };
+    const update = () => { const state = service.browser.table.getStatus(); if (!state.published) setServicePublished(false); setServiceFocusReady(state.phase === "connected" ? state.presence?.focusReady ?? 0 : 0); };
     update(); return service.browser.table.subscribeStatus(update);
   }, [service]);
   const scenesApi = useTtrpgApi("scenes");
@@ -389,14 +383,8 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     normalizeCameraSnapshot({ center: { x: scene.camera.x, y: scene.camera.y }, zoom: scene.camera.zoom })
   );
   const dmCameraRef = useRef<ViewportCameraSnapshot>(playerCameraRef.current);
-  const effectivePlayerCameraRef = useRef<ViewportCameraSnapshot | null>(null);
-  const effectivePlayerViewportRef = useRef<PlayerViewportReport | null>(null);
-  const playerCameraCommandRevisionRef = useRef(0);
-  const pendingPlayerCameraCommandRevisionRef = useRef<number | null>(null);
-  const acknowledgedPlayerCameraCommandRevisionRef = useRef<number | null>(null);
-  const lastPlayerCameraReportRevisionRef = useRef(-1);
-  const [playerCameraSyncStatus, setPlayerCameraSyncStatus] =
-    useState<PlayerCameraSyncStatus>("closed");
+  const playerEntryPointRef = useRef<WorldPoint | undefined>(undefined);
+  const [isSelectingFocus, setIsSelectingFocus] = useState(false);
   const [playerCameraSyncKey, setPlayerCameraSyncKey] = useState(0);
   const playerCameraSyncKeyRef = useRef(playerCameraSyncKey);
   playerCameraSyncKeyRef.current = playerCameraSyncKey;
@@ -616,74 +604,35 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     setInteraction((current) => current.selectedElementId === entry.id ? deleteSelectedElement(current) : current);
   }, []);
 
-  const refreshPlayerCameraControl = useCallback((statusOverride?: PlayerCameraSyncStatus): void => {
-    const status =
-      statusOverride ??
-      derivePlayerCameraSyncStatus({
-        isPlayerWindowOpen: isPlayerWindowOpenRef.current,
-        primaryCamera: playerCameraRef.current,
-        effectiveCamera: effectivePlayerCameraRef.current,
-        pendingCommandRevision: pendingPlayerCameraCommandRevisionRef.current,
-        acknowledgedCommandRevision: acknowledgedPlayerCameraCommandRevisionRef.current
-      });
-    setPlayerCameraSyncStatus((current) => (current === status ? current : status));
-    viewportHandleRef.current?.setPlayerCameraControlState({
-      primaryCamera: playerCameraRef.current,
-      effectiveCamera: effectivePlayerCameraRef.current,
-      status,
-      viewport: effectivePlayerViewportRef.current ?? undefined
+  const handleAttentionFocus = useCallback(async (position: WorldPoint) => {
+    setIsSelectingFocus(false);
+    const api = playerApi;
+    if (!api?.focusPlayers) { setFeedback("Este cliente no admite foco de atención. Actualiza el cliente y la API."); return; }
+    const local = { scene: sceneRef.current, cameraSyncKey: playerCameraSyncKeyRef.current, mapNavigationKey: playerCameraSyncKeyRef.current };
+    const frame = attentionFrame(local), sceneId = sceneRef.current.id;
+    try {
+      const state = await api.getPlayerWindowState();
+      if (!state.snapshot || attentionFrame(state.snapshot) !== frame) { setFeedback("Publica el mapa y sus ajustes actuales antes de enfocar a los jugadores."); return; }
+      const result = await api.focusPlayers({ requestId: crypto.randomUUID(), sceneId, frame, position });
+      setFeedback(result.ok ? `Foco enviado a ${result.delivered} ventana(s). ${result.incompatible} incompatibles; ${result.notReady} aún cargando.` : result.error);
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "No se pudo enviar el foco. Comprueba la conexión y reintenta.");
+    }
+  }, [playerApi]);
+  const beginAttentionFocus = useCallback(() => {
+    setIsSelectingFocus(true);
+    setFeedback("Selecciona un punto del mapa para enfocar a los jugadores. Escape o clic derecho cancela.");
+    viewportHandleRef.current?.selectAttentionPoint(point => {
+      setIsSelectingFocus(false);
+      if (point) void handleAttentionFocus(point);
+      else setFeedback("Foco cancelado.");
     });
-  }, []);
-
-  const sendPlayerCameraCommand = useCallback(
-    (reason: PlayerCameraCommandReason): void => {
-      if (!isPlayerWindowOpenRef.current || playerApi === undefined) {
-        refreshPlayerCameraControl("closed");
-        return;
-      }
-
-      const revision = playerCameraCommandRevisionRef.current + 1;
-      playerCameraCommandRevisionRef.current = revision;
-      pendingPlayerCameraCommandRevisionRef.current = revision;
-      refreshPlayerCameraControl("pending");
-      void playerApi.commandPlayerCamera({
-        revision,
-        camera: playerCameraRef.current,
-        reason
-      });
-    },
-    [refreshPlayerCameraControl, playerApi]
-  );
+  }, [handleAttentionFocus]);
 
   const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
     dmCameraRef.current = normalizeCameraSnapshot(camera);
     setDmZoom(current => current === camera.zoom ? current : camera.zoom);
   }, []);
-
-  const handlePlayerCameraControlMove = useCallback(
-    (position: WorldPoint): void => {
-      playerCameraRef.current = normalizeCameraSnapshot({
-        ...playerCameraRef.current,
-        center: position
-      });
-      refreshPlayerCameraControl();
-      sendPlayerCameraCommand("move");
-    },
-    [refreshPlayerCameraControl, sendPlayerCameraCommand]
-  );
-
-  const handlePlayerCameraZoom = useCallback(
-    (direction: "in" | "out"): void => {
-      playerCameraRef.current = zoomPlayerCamera(playerCameraRef.current, direction);
-      refreshPlayerCameraControl();
-      sendPlayerCameraCommand("zoom");
-    },
-    [refreshPlayerCameraControl, sendPlayerCameraCommand]
-  );
-
-  const handleRecenterPlayerCamera = useCallback((): void => {
-    sendPlayerCameraCommand("recenter");
-  }, [sendPlayerCameraCommand]);
 
   const handleArcanePointerTrigger = useCallback((pointer: ArcanePointerBroadcast): void => {
     if (isPlayerWindowOpenRef.current) {
@@ -1169,17 +1118,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       }
 
       const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
-      const targetMap = sceneRef.current.maps.find((map) => map.id === internalTarget.mapId);
-      playerCameraRef.current = movePlayerCameraToMap(
-        playerCameraRef.current,
-        internalTarget.camera,
-        sceneRef.current.grid.cellSizeWorld,
-        targetMap?.grid.cellSizeWorld ?? sceneRef.current.grid.cellSizeWorld
-      );
+      playerEntryPointRef.current = internalTarget.marker.position;
       dmCameraRef.current = internalTarget.camera;
-      effectivePlayerCameraRef.current = null;
-      effectivePlayerViewportRef.current = null;
-      acknowledgedPlayerCameraCommandRevisionRef.current = null;
+
       playerCameraSyncKeyRef.current = nextCameraSyncKey;
       setPlayerCameraSyncKey(nextCameraSyncKey);
       setMapImageUrl(null);
@@ -1189,7 +1130,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       window.requestAnimationFrame(() => {
         viewportHandleRef.current?.centerOnWorldPoint(internalTarget.marker.position);
       });
-      sendPlayerCameraCommand("scene-change");
+
       setFeedback(`Mapa "${internalTarget.mapName}" cargado desde conexion interna.`);
       return;
     }
@@ -1435,7 +1376,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       mapImageUrl,
       tokenImageUrls,
       camera: playerCameraRef.current,
+      playerEntryPoint: playerEntryPointRef.current,
       cameraSyncKey: playerCameraSyncKey,
+      mapNavigationKey: playerCameraSyncKey,
       showDmFogOverlay,
       showZoomIndicator: showPlayerZoomIndicator,
       informationAreaHighlightResetKey
@@ -1457,79 +1400,12 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
   useEffect(() => {
     let cancelled = false;
-    isPlayerWindowOpenRef.current = false;
-    setIsPlayerWindowOpen(false);
-    lastPlayerCameraReportRevisionRef.current = -1;
-    const unsubscribeClosed = playerApi?.onPlayerWindowClosed(() => {
-      isPlayerWindowOpenRef.current = false;
-      setIsPlayerWindowOpen(false);
-      effectivePlayerCameraRef.current = null;
-      effectivePlayerViewportRef.current = null;
-      pendingPlayerCameraCommandRevisionRef.current = null;
-      acknowledgedPlayerCameraCommandRevisionRef.current = null;
-      refreshPlayerCameraControl("closed");
-    });
-    const unsubscribeCameraReport = playerApi?.onPlayerCameraReport((report) => {
-      if (!shouldApplyPlayerCameraReport(lastPlayerCameraReportRevisionRef.current, report)) {
-        return;
-      }
-
-      lastPlayerCameraReportRevisionRef.current = report.reportRevision;
-      effectivePlayerCameraRef.current = normalizeCameraSnapshot(report.camera);
-      effectivePlayerViewportRef.current =
-        report.viewport?.mapId === undefined || report.viewport.mapId === sceneRef.current.activeMapId
-          ? report.viewport ?? null
-          : null;
-      if (report.acknowledgedCommandRevision !== null) {
-        acknowledgedPlayerCameraCommandRevisionRef.current = Math.max(
-          acknowledgedPlayerCameraCommandRevisionRef.current ?? -1,
-          report.acknowledgedCommandRevision
-        );
-      }
-      refreshPlayerCameraControl();
-    });
-    const unsubscribePlayerReady = playerApi?.onPlayerWindowReady(() => {
-      isPlayerWindowOpenRef.current = true;
-      setIsPlayerWindowOpen(true);
-      lastPlayerCameraReportRevisionRef.current = -1;
-      effectivePlayerCameraRef.current = null;
-      effectivePlayerViewportRef.current = null;
-      acknowledgedPlayerCameraCommandRevisionRef.current = null;
-      if (!service) {
-        sendPlayerCameraCommand("open");
-      } else {
-        refreshPlayerCameraControl();
-      }
-    });
-
-    void playerApi?.getPlayerWindowState().then((state) => {
-      if (cancelled) return;
-      if (state.cameraCommand !== null) {
-        playerCameraCommandRevisionRef.current = Math.max(
-          playerCameraCommandRevisionRef.current,
-          state.cameraCommand.revision
-        );
-        playerCameraRef.current = normalizeCameraSnapshot(state.cameraCommand.camera);
-      }
-      if (state.isOpen) {
-        isPlayerWindowOpenRef.current = true;
-        setIsPlayerWindowOpen(true);
-        if (!service) sendPlayerCameraCommand("open");
-        else refreshPlayerCameraControl();
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      unsubscribeClosed?.();
-      unsubscribeCameraReport?.();
-      unsubscribePlayerReady?.();
-    };
-  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, playerApi, service]);
-
-  useEffect(() => {
-    refreshPlayerCameraControl();
-  }, [refreshPlayerCameraControl]);
+    isPlayerWindowOpenRef.current = false; setIsPlayerWindowOpen(false);
+    const closed = playerApi?.onPlayerWindowClosed(() => { isPlayerWindowOpenRef.current = false; setIsPlayerWindowOpen(false); });
+    const ready = playerApi?.onPlayerWindowReady(() => { isPlayerWindowOpenRef.current = true; setIsPlayerWindowOpen(true); });
+    void playerApi?.getPlayerWindowState().then(state => { if (!cancelled) { isPlayerWindowOpenRef.current = state.isOpen; setIsPlayerWindowOpen(state.isOpen); } });
+    return () => { cancelled = true; closed?.(); ready?.(); };
+  }, [playerApi]);
 
   useEffect(() => {
     void refreshMonsterTemplates();
@@ -1585,14 +1461,13 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     if (!service) sessionStorage.removeItem("ttrpg:session-scene");
     setScene(defaultScene);
     setSceneAside(createDefaultSceneAside());
+    playerEntryPointRef.current = undefined;
     playerCameraRef.current = normalizeCameraSnapshot({
       center: { x: defaultScene.camera.x, y: defaultScene.camera.y },
       zoom: defaultScene.camera.zoom
     });
     dmCameraRef.current = playerCameraRef.current;
-    effectivePlayerCameraRef.current = null;
-    effectivePlayerViewportRef.current = null;
-    acknowledgedPlayerCameraCommandRevisionRef.current = null;
+
     setPlayerCameraSyncKey((current) => current + 1);
     setMapImageUrl(null);
     setTokenImageUrls({});
@@ -1620,9 +1495,8 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     nextSceneLinkId.current = 1;
     nextSceneCounterId.current = 1;
     lastSavedSceneJsonRef.current = null;
-    refreshPlayerCameraControl();
-    sendPlayerCameraCommand("scene-change");
-  }, [refreshPlayerCameraControl, sendPlayerCameraCommand, setGridAdjustMode, resetMapImageSession, service]);
+
+  }, [setGridAdjustMode, resetMapImageSession, service]);
 
   const handleRequestNewScene = useCallback((): void => {
     if (!canCreateNewScene) {
@@ -2033,7 +1907,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       mapImageUrl: loadedMapImageUrl,
       tokenImageUrls: loadedTokenImageUrls,
       camera,
+      playerEntryPoint: playerEntryPointRef.current,
       cameraSyncKey,
+      mapNavigationKey: cameraSyncKey,
       showDmFogOverlay,
       showZoomIndicator: showPlayerZoomIndicator
     });
@@ -2046,7 +1922,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   ): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
-
 
     try {
       const result = await operation();
@@ -2073,10 +1948,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           : normalizeCameraSnapshot({ center: options.playerEntryPoint, zoom: loadedCamera.zoom });
         const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
         playerCameraRef.current = playerCamera;
+        playerEntryPointRef.current = options?.playerEntryPoint;
         dmCameraRef.current = loadedCamera;
-        effectivePlayerCameraRef.current = null;
-        effectivePlayerViewportRef.current = null;
-        acknowledgedPlayerCameraCommandRevisionRef.current = null;
+
         playerCameraSyncKeyRef.current = nextCameraSyncKey;
         setPlayerCameraSyncKey(nextCameraSyncKey);
         setMapImageUrl(result.mapImageUrl ?? null);
@@ -2093,8 +1967,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           camera: playerCamera,
           cameraSyncKey: nextCameraSyncKey
         });
-        refreshPlayerCameraControl();
-        sendPlayerCameraCommand("scene-change");
+
       }
       setCurrentFilePath(result.filePath);
       lastSavedSceneJsonRef.current = JSON.stringify({ ...result.scene, sceneAside: loadedSceneAside });
@@ -2202,18 +2075,10 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
       if (sceneRef.current.activeMapId !== mapId) {
         const nextCameraSyncKey = playerCameraSyncKeyRef.current + 1;
-        playerCameraRef.current = movePlayerCameraToMap(playerCameraRef.current, {
-          center: { x: targetMap.camera.x, y: targetMap.camera.y },
-          zoom: targetMap.camera.zoom
-        }, sceneRef.current.grid.cellSizeWorld, targetMap.grid.cellSizeWorld);
-        effectivePlayerCameraRef.current = null;
-        effectivePlayerViewportRef.current = null;
-        pendingPlayerCameraCommandRevisionRef.current = null;
-        acknowledgedPlayerCameraCommandRevisionRef.current = null;
+        playerEntryPointRef.current = undefined;
         playerCameraSyncKeyRef.current = nextCameraSyncKey;
         setPlayerCameraSyncKey(nextCameraSyncKey);
-        refreshPlayerCameraControl();
-        sendPlayerCameraCommand("scene-change");
+
       }
 
       setMapImageUrl(null);
@@ -2797,7 +2662,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       isPlayerWindowOpenRef.current = true; setIsPlayerWindowOpen(true);
       setFeedback("Ventana de jugador lista.");
     }
-    sendPlayerCameraCommand("open");
+
   }
 
   const handleSetCombatTracker = useCallback((combatTracker: CombatTracker): void => {
@@ -3437,6 +3302,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     });
   }
 
+  const canFocusPlayers = !!playerApi?.focusPlayers && !isBusy && (service ? serviceFocusReady > 0 : isPlayerWindowOpen);
   return (
     <main className={`app-shell vtt-interface${service?.headerTarget ? " app-shell--shared-header" : ""}`} aria-label="TTRPG Effects">
       <WorkspaceHeader
@@ -3669,7 +3535,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           onWaterLineRotationChange={handleWaterLineRotationChange}
           onWaterPatternRotationChange={handleWaterPatternRotationChange}
           onCameraChange={handleCameraChange}
-          onPlayerCameraControlMove={handlePlayerCameraControlMove}
           onArcanePointerTrigger={handleArcanePointerTrigger}
           onRoomPinPlace={handleRoomPinPlace}
           onSceneLinkPlace={handleSceneLinkPlace}
@@ -3689,54 +3554,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                   <button type="button" title="Acercar mapa DM" aria-label="Acercar mapa DM" disabled={interaction.isZoomLocked} onClick={() => changeDmZoom("in")}><ZoomIn size={15} /></button>
                   <button type="button" title="Centrar mapa DM" aria-label="Centrar mapa DM" disabled={mapState === null} onClick={centerDmMap}><LocateFixed size={15} /></button>
                 </div>
-            <div
-              className={`player-camera-toolbar is-${playerCameraSyncStatus}`}
-              aria-label={`Camara de jugador: ${getPlayerCameraStatusLabel(playerCameraSyncStatus)}`}
-            >
-              <Camera size={15} aria-hidden="true" />
-              <span>{getPlayerCameraStatusLabel(playerCameraSyncStatus)}</span>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
-                title={showPlayerZoomIndicator ? "Ocultar indicador de escala en Player View" : "Mostrar indicador de escala en Player View"}
-                aria-pressed={showPlayerZoomIndicator}
-                disabled={isBusy}
-                onClick={() => setShowPlayerZoomIndicator((current) => !current)}
-              >
-                <Ruler size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label="Alejar camara de jugador"
-                title="Alejar camara de jugador"
-                disabled={!isPlayerWindowOpen || isBusy}
-                onClick={() => handlePlayerCameraZoom("out")}
-              >
-                <ZoomOut size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label="Acercar camara de jugador"
-                title="Acercar camara de jugador"
-                disabled={!isPlayerWindowOpen || isBusy}
-                onClick={() => handlePlayerCameraZoom("in")}
-              >
-                <ZoomIn size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="player-camera-toolbar__icon"
-                aria-label="Recentrar vista de jugador"
-                title="Recentrar vista de jugador"
-                disabled={playerCameraSyncStatus !== "desynchronized" || isBusy}
-                onClick={handleRecenterPlayerCamera}
-              >
-                <LocateFixed size={14} aria-hidden="true" />
-              </button>
-            </div>
+                <div className="workspace-dm-camera workspace-focus-controls" aria-label="Foco de atención" title={canFocusPlayers ? "El foco conserva el zoom de cada jugador" : "El foco requiere jugadores conectados, listos y con una versión compatible"}>
+                  <button type="button" aria-label="Elegir foco de atención" title="Elegir un punto para enfocar a los jugadores" aria-pressed={isSelectingFocus} disabled={!canFocusPlayers} onClick={beginAttentionFocus}><LocateFixed size={16} /><span>Foco</span></button>
+                  <button type="button" aria-label="Enfocar el centro de mi vista" title="Enfocar el centro de mi vista" disabled={!canFocusPlayers} onClick={() => void handleAttentionFocus(dmCameraRef.current.center)}>Centro</button>
+                  <button type="button" aria-label="Mostrar indicador de escala en Player View" title="Indicador de escala en Player View" aria-pressed={showPlayerZoomIndicator} onClick={() => setShowPlayerZoomIndicator(value => !value)}><Ruler size={14} /></button>
+                </div>
               </div>
               <DmDarknessStatusBadge darkness={scene.darkness} />
               <SceneCountersOverlay
@@ -5075,6 +4897,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
             >
               {interaction.activeTool === "fog-reveal" ? "Salir de Modo niebla" : "Cambiar a Modo niebla"}
             </button>
+            <button type="button" disabled={!canFocusPlayers} onClick={() => { const point = interaction.contextMenu?.world; handleCloseContextMenu(); if (point) void handleAttentionFocus(point); }}>Enfocar aquí a los jugadores</button>
             <button type="button" onClick={handleToggleContextMenuZoomLock}>
               {interaction.isZoomLocked ? "Desbloquear zoom" : "Bloquear zoom"}
             </button>
@@ -5320,19 +5143,6 @@ function getSceneLinkStatusText(
   if (status?.state === "broken") return status.message;
   if (status?.state === "valid") return "Conexion valida";
   return connected ? "Validando" : "Sin enlazar";
-}
-
-function getPlayerCameraStatusLabel(status: PlayerCameraSyncStatus): string {
-  switch (status) {
-    case "pending":
-      return "Sincronizando";
-    case "synchronized":
-      return "Sincronizada";
-    case "desynchronized":
-      return "Vista libre";
-    case "closed":
-      return "Cerrada";
-  }
 }
 
 interface SidebarAccordionProps {

@@ -39,9 +39,9 @@ async function fixture() {
   const scene = createDefaultScene(), snap = { scene, camera: { center: { x: 0, y: 0 }, zoom: 1 }, mapImageUrl: null, tokenImageUrls: {}, showDmFogOverlay: false };
   expect((await http(true, dmCookie, "scene", { ...opening, command: { requestId: randomUUID(), context: null, payload: snap } })).status).toBe(200);
   const query = `?openingId=${opening.openingId}&generation=${opening.generation}&annotationsVersion=1`;
-  async function stream(dm: boolean, cookie: string, negotiate = true) {
+  async function stream(dm: boolean, cookie: string, negotiate = true, focus = false) {
     const events: ContextualEvent[] = []; let ended = false; const listeners = new Set<() => void>();
-    const req = request({ host: "127.0.0.1", port, path: path(dm, "events") + (negotiate ? query : ""), headers: { host: "localhost:8787", origin, cookie } }, res => { let buffer = ""; res.on("data", b => { buffer += b; let end: number; while ((end = buffer.indexOf("\n\n")) >= 0) { const block = buffer.slice(0, end); buffer = buffer.slice(end + 2); const data = block.split("\n").find(l => l.startsWith("data: ")); if (data) events.push(JSON.parse(data.slice(6))); } for (const fn of listeners) fn(); }); res.on("close", () => { ended = true; for (const fn of listeners) fn(); }); }); req.on("error", () => { ended = true; }); req.end(); cleanup.push(async () => { req.destroy(); });
+    const req = request({ host: "127.0.0.1", port, path: path(dm, "events") + (negotiate ? query + (focus ? "&focusVersion=1" : "") : focus ? `?openingId=${opening.openingId}&generation=${opening.generation}&focusVersion=1` : ""), headers: { host: "localhost:8787", origin, cookie } }, res => { let buffer = ""; res.on("data", b => { buffer += b; let end: number; while ((end = buffer.indexOf("\n\n")) >= 0) { const block = buffer.slice(0, end); buffer = buffer.slice(end + 2); const data = block.split("\n").find(l => l.startsWith("data: ")); if (data) events.push(JSON.parse(data.slice(6))); } for (const fn of listeners) fn(); }); res.on("close", () => { ended = true; for (const fn of listeners) fn(); }); }); req.on("error", () => { ended = true; }); req.end(); cleanup.push(async () => { req.destroy(); });
     const until = async (predicate: () => boolean) => { if (predicate()) return; await new Promise<void>((resolve, reject) => { const timer = setTimeout(() => { listeners.delete(check); reject(new Error(`Sin evento SSE esperado (${dm ? "DM" : "jugador"}): ${events.map(e => e.type).join(",")}; cerrado=${ended}`)); }, 5000); const check = () => { if (predicate()) { clearTimeout(timer); listeners.delete(check); resolve(); } }; listeners.add(check); }); };
     await until(() => events.some(e => e.type === "bootstrap"));
     return { events, until, close() { req.destroy(); }, get ended() { return ended; }, state: events.find(e => e.type === "bootstrap")!.state! };
@@ -107,4 +107,30 @@ it("expulsión con comando en vuelo no confirma ni difunde el dibujo después de
   expect((await pending).status).not.toBe(200);
   expect((await f.state(false, f.cookies[1])).annotations!.items).toEqual([]);
   expect(b.events.filter(e => e.type === "annotations").every(e => annotationStateSchema.parse(e.payload).items.length === 0)).toBe(true);
+}, 30000);
+
+it("foco HTTP/SSE con SQLite: dos jugadores, negociación independiente, permisos, deduplicación y expulsión", async () => {
+  const { attentionFrame } = await import("../domain/player/attention-focus");
+  const f = await fixture(), a = await f.stream(false, f.cookies[0], true, true), b = await f.stream(false, f.cookies[1], false, true);
+  expect(a.state.annotations).toBeDefined(); expect(b.state.annotations).toBeUndefined();
+  const ready = async (index: number, stream: typeof a) => expect((await f.http(false, f.cookies[index], "ready", { ...f.opening, command: { requestId: randomUUID(), context: stream.state.context, revision: stream.state.revision, connectionId: stream.state.connectionId, payload: {} } })).status).toBe(200);
+  await ready(0, a); await ready(1, b);
+  const requestId = randomUUID(), input = { ...f.opening, command: { requestId, context: a.state.context, revision: a.state.revision, payload: { requestId, sceneId: f.scene.id, frame: attentionFrame(a.state.snapshot!), position: { x: 123.45, y: -678.9 } } } };
+  expect((await f.http(false, f.cookies[0], "focus", input)).status).toBe(403);
+  expect((await f.http(true, f.dmCookie, "focus", input)).body).toEqual({ ok: true, delivered: 2, incompatible: 0, notReady: 0 });
+  await Promise.all([a, b].map(st => st.until(() => st.events.some(e => e.type === "focus"))));
+  expect((await f.http(true, f.dmCookie, "focus", input)).status).toBe(200);
+  expect(a.events.filter(e => e.type === "focus")).toHaveLength(1); expect(b.events.filter(e => e.type === "focus")).toHaveLength(1);
+  expect((await f.http(true, f.dmCookie, "focus", { ...input, command: { ...input.command, payload: { ...input.command.payload, position: { x: 0, y: 0 } } } })).status).toBe(409);
+  expect((await f.http(true, f.dmCookie, "focus", { ...input, padding: "x".repeat(5000) })).status).toBe(413);
+  expect((await f.http(true, f.dmCookie, "camera-command", { ...input, command: { ...input.command, requestId: randomUUID(), payload: { revision: 1, camera: { center: { x: 1, y: 2 }, zoom: 4 }, reason: "zoom" } } })).status).toBe(409);
+  await f.service.kick(f.dmCookie, f.game.id, f.guests[0].guest.participantId, { ...f.opening, expectedInvitationVersion: 1 }, 1, randomUUID());
+  const state = await f.state(false, f.cookies[1]);
+  await ready(1, { ...b, state: { ...state, protocolVersion: 1, connectionId: b.state.connectionId } });
+  const next = randomUUID();
+  expect((await f.http(true, f.dmCookie, "focus", { ...input, command: { ...input.command, requestId: next, payload: { ...input.command.payload, requestId: next } } })).body).toEqual({ ok: true, delivered: 1, incompatible: 0, notReady: 0 });
+  await b.until(() => b.events.filter(e => e.type === "focus").length === 2);
+  expect(a.events.filter(e => e.type === "focus")).toHaveLength(1);
+  const reconnected = await f.stream(false, f.cookies[1], true, true);
+  expect(reconnected.state.cameraCommand).toBeNull(); expect(reconnected.events.some(e => e.type === "focus")).toBe(false);
 }, 30000);

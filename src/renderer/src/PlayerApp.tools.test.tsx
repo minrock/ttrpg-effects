@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { attentionFrame, type AttentionFocusEvent } from "../../domain/player/attention-focus";
 
 import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -24,7 +25,8 @@ vi.mock("./components/MapViewport", async () => {
     MapViewport: forwardRef<import("./components/MapViewport").MapViewportHandle, ViewportProps>(function MockViewport(props, ref) {
       viewport.props = props;
       useImperativeHandle(ref, () => ({
-        setCameraSnapshot: (camera) => { viewport.effectiveCamera = camera; viewport.setCameraSnapshot(camera); },
+        cancelCameraGesture: vi.fn(), selectAttentionPoint: vi.fn(),
+      setCameraSnapshot: (camera) => { viewport.effectiveCamera = camera; viewport.setCameraSnapshot(camera); },
         setPathHoverPoint: viewport.setPathHoverPoint,
         getRandomVisibleWorldPoint: () => ({ x: 0, y: 0 }),
         getNearbyVisibleWorldPoint: (origin) => origin,
@@ -49,6 +51,7 @@ describe("PlayerApp local tools", () => {
   let root: Root;
   let onScene: (snapshot: PlayerWindowSnapshot) => void;
   let initial: PlayerWindowSnapshot;
+  let onFocus: (event: AttentionFocusEvent) => void;
   const saveScene = vi.fn<TtrpgApi["saveScene"]>();
   const publishPlayerScene = vi.fn<TtrpgApi["publishPlayerScene"]>();
 
@@ -121,6 +124,7 @@ describe("PlayerApp local tools", () => {
     };
     const api = {
       getPlayerWindowState: async () => ({ snapshot: initial, camera: null, cameraCommand: null, isOpen: true }),
+      onAttentionFocus: handler => { onFocus = handler; return () => {}; },
       onPlayerScene: (handler) => { onScene = handler; return () => undefined; },
       onPlayerCameraCommand: () => () => undefined,
       onPlayerPointer: () => () => undefined,
@@ -173,10 +177,28 @@ describe("PlayerApp local tools", () => {
     expect(document.activeElement).toBe(toggle);
   });
 
+  it("el foco conserva el zoom más reciente, cancela un borrador y permite seguir navegando", async () => {
+    const shape = await createCircle();
+    await click("Medir");
+    await click("Medir distancia");
+    await act(async () => props().onPathPointAdd({ x: 10, y: 20 }));
+    await act(async () => props().onCameraChange?.({ center: { x: 400, y: 500 }, zoom: 2.5 }));
+    const event = { id: crypto.randomUUID(), frame: attentionFrame(initial), position: { x: 123.5, y: -45.2 }, issuedAt: Date.now(), expiresAt: Date.now() + 5000 };
+    await act(async () => onFocus(event));
+    expect(viewport.effectiveCamera).toEqual({ center: event.position, zoom: 2.5 });
+    expect(localShapes()).toEqual([shape]); expect(props().isPathDrawingMode).toBe(false);
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Se canceló");
+    await act(async () => props().onCameraChange?.({ center: { x: 0, y: 0 }, zoom: .5 }));
+    await act(async () => onFocus({ ...event, id: crypto.randomUUID() }));
+    expect(viewport.effectiveCamera).toEqual({ center: event.position, zoom: .5 });
+    await act(async () => onFocus({ ...event, position: { x: 999, y: 999 }, frame: "otra mesa" }));
+    expect(viewport.effectiveCamera?.center).toEqual(event.position);
+  });
+
   it("creates a local shape from PlayerTools at the effective local camera without persisting it", async () => {
     const localCamera = { center: { x: -340, y: 870 }, zoom: 2 };
     await act(async () => props().onCameraChange?.(localCamera));
-    expect(viewport.effectiveCamera).toEqual(initial.camera);
+    expect(viewport.effectiveCamera).toEqual({ center: { x: 0, y: 0 }, zoom: 1 });
     const local = await createCircle();
     expect(local.id).toMatch(/^player-local-/);
     expect(local.points[0]).toEqual({ x: -300, y: 900 });
@@ -235,16 +257,19 @@ describe("PlayerApp local tools", () => {
     expect(props().isGrabMode).toBe(true);
     await act(async () => button("Desplazar mapa").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
     expect(props().isGrabMode).toBe(false);
+    expect(button("Acercar vista local").disabled).toBe(false);
+    await click("Bloquear zoom local");
     expect(button("Acercar vista local").disabled).toBe(true);
     await click("Acercar vista local");
     expect(viewport.setCameraSnapshot).not.toHaveBeenCalled();
     await click("Desbloquear zoom local");
+    expect(props().isZoomLocked).toBe(false);
     const effective = { center: { x: 350, y: -150 }, zoom: 2 };
     await act(async () => props().onCameraChange?.(effective));
     await click("Acercar vista local");
     expect(viewport.setCameraSnapshot).toHaveBeenCalledWith({ center: effective.center, zoom: expect.any(Number) });
     expect(viewport.effectiveCamera!.zoom).toBeGreaterThan(effective.zoom);
-    expect(props().cameraSnapshot).toEqual(initial.camera);
+    expect(props().cameraSnapshot).toEqual({ center: { x: 0, y: 0 }, zoom: 1 });
   });
 
   it("keeps viewport tool callback references stable through local changes and grid snapshots", async () => {
