@@ -1,6 +1,6 @@
 # Plan — 57 Áreas contextuales
 
-**Spec fuente:** [spec.md](spec.md). **Estado:** Implementada en rama por orden del usuario; sin integración. **Base:** `0c8d245`, main 3.20.0 limpio al iniciar; rama `feature/sdd-areas-contextuales`.
+**Spec fuente:** [spec.md](spec.md). **Estado:** Integrada en main (`62c351a`), versión 3.21.0, por orden del usuario. **Base:** `0c8d245`, main 3.20.0 limpio al iniciar; rama `feature/sdd-areas-contextuales`.
 
 ## Base inspeccionada
 
@@ -50,7 +50,7 @@ Los lectores antiguos no pueden garantizar conservar estilo/bloqueo nuevo al vol
 
 Comandos según cambios: `pnpm typecheck`, `pnpm lint`, `pnpm test --exclude '.local/**' --exclude 'tmp/**'`, `pnpm build:api`, `pnpm build:web`, `pnpm build`. Para persistencia/moderación afectadas: `pnpm test:owned` y `pnpm test:moderation` con sus entornos reales preparados; ausencia de PostgreSQL no cuenta como éxito.
 
-La planificación se autorizó después para implementación. Se conserva la tabla anterior como estrategia prevista; resultados y limitaciones por criterio en [validacion.md](validacion.md). Versión/changelog 3.21.0 preparados; commit e integración requieren una orden nueva y DMG después de merge según AGENTS.md.
+La planificación se autorizó después para implementación. Se conserva la tabla anterior como estrategia prevista; resultados y limitaciones por criterio en [validacion.md](validacion.md). La orden «ok, cierra a main y construye» autorizó el cierre de 3.21.0: implementación `a09ea69`, integración `62c351a` y construcción mediante `scripts/build-dmg.sh`. El registro de validación conserva la evidencia final y los recorridos pendientes.
 
 
 ## Contrato concretado y decisiones de implementación

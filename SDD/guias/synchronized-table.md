@@ -1,6 +1,6 @@
 # Mesa sincronizada privada — contrato vigente
 
-> **SDD 57 / 3.21.0, implementada en rama (sin integrar):** las herramientas de círculo/cono negocian `areaToolsVersion=1` en GET y usan `X-TTRPG-Area-Tools: 1` al modificar anotaciones. Incluye estilo, bloqueo y copia, sin persistir dibujos de invitados. Los clientes v1 reciben geometría compatible y el servidor conserva los metadatos canónicos y protege bloqueados. [Contrato](../specs/57-areas-contextuales/spec.md) · [Validación](../specs/57-areas-contextuales/validacion.md).
+> **SDD 57 / 3.21.0, integrada en main (`62c351a`):** las herramientas de círculo/cono negocian `areaToolsVersion=1` en GET y usan `X-TTRPG-Area-Tools: 1` al modificar anotaciones. Incluye estilo, bloqueo y copia, sin persistir dibujos de invitados. Los clientes v1 reciben geometría compatible y el servidor conserva los metadatos canónicos y protege bloqueados. [Contrato](../specs/57-areas-contextuales/spec.md) · [Validación](../specs/57-areas-contextuales/validacion.md).
 
 > **SDD 56 / 3.20.0, integrada en main:** cámaras independientes. El DM usa foco efímero para cambiar el centro sin tocar el zoom. `camera` y `camera-command` se rechazan; el foco nunca forma parte del bootstrap. [Contrato y validación](../specs/56-camaras-libres-foco-atencion/plan.md).
 

@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-04. Versión en rama: `package.json` 3.21.0, SDD 57 pendiente de integrar. Última entrega: 3.20.0, SDD 56 integrada en `main` mediante `3d35876`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–56. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-04. Versión: `package.json` 3.21.0, SDD 57 integrada en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -51,13 +51,13 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. Los 
 
 [SDD 55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) implementa una capa efímera compartida entre DM/jugadores **en servicio**, con alias/discriminador del autor, edición propia y retirada por DM. Versión 3.19.1, integrada desde `feature/sdd-mediciones-compartidas` a `main` (`90dc50e`), con laterales de mesa DM/jugador y chevrón de borde; Electron autónomo conserva herramientas locales. La consolidación 3.18.1 descrita arriba es la base histórica. [Validación y pendientes](specs/55-mediciones-compartidas/validacion.md); no se inició un trabajo factory ni se simuló aprobación.
 
-## Última entrega integrada — SDD 56
+## Entrega anterior — SDD 56
 
 [Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) implementa navegación propia y un foco puntual que centra el área útil conservando el zoom actual. Retira controles remotos, cámara principal/virtual y previews de la interfaz. Incluye API/SSE negociado e IPC específico. Implementada en `feature/sdd-foco-atencion` (`34d938c`) e integrada en `main` (`3d35876`), versión 3.20.0, con autorización explícita del usuario. [Plan técnico](specs/56-camaras-libres-foco-atencion/plan.md) y [evidencia/límites](specs/56-camaras-libres-foco-atencion/validacion.md).
 
-## Implementación pendiente de integración — SDD 57
+## Última entrega integrada — SDD 57
 
-[Áreas contextuales](specs/57-areas-contextuales/spec.md) implementa para círculos/conos una barra de selección con color, patrones cuadriculados de emojis existentes, bloqueo y copia. Conserva propiedad/moderación y separación entre figuras DM persistentes y dibujos efímeros de jugadores. [Plan técnico](specs/57-areas-contextuales/plan.md). Implementación autorizada y preparada en `feature/sdd-areas-contextuales`, 3.21.0; sin commit/merge ni trabajo factory iniciado. [Validación y pendientes](specs/57-areas-contextuales/validacion.md).
+[Áreas contextuales](specs/57-areas-contextuales/spec.md) implementa para círculos/conos una barra de selección con color, patrones cuadriculados de emojis existentes, bloqueo y copia. Conserva propiedad/moderación y separación entre figuras DM persistentes y dibujos efímeros de jugadores. [Plan técnico](specs/57-areas-contextuales/plan.md). Implementada en `feature/sdd-areas-contextuales` (`a09ea69`) e integrada en `main` (`62c351a`), 3.21.0, por orden explícita del usuario. No se inició un trabajo factory. [Validación y pendientes](specs/57-areas-contextuales/validacion.md).
 
 ## Pendiente de especificar
 

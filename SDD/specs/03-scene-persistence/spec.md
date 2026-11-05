@@ -1,6 +1,6 @@
 # Spec - Persistencia y Formato de Escena
 
-> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora campos opcionales de color, bloqueo y patrón para círculos/conos, conservados en escenas DM y sus proyecciones. Mantiene lectura de escenas previas y no persiste dibujos efímeros de jugadores. Evidencia y pendientes en el registro de validación de SDD 57. La integración a main permanece pendiente de autorización.
+> **Evolución integrada en main — SDD 57 / 3.21.0 (`62c351a`):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora campos opcionales de color, bloqueo y patrón para círculos/conos, conservados en escenas DM y sus proyecciones. Mantiene lectura de escenas previas y no persiste dibujos efímeros de jugadores. Evidencia y pendientes en el registro de validación de SDD 57. Integración autorizada; evidencia y límites en SDD 57.
 
 ## Nuevas zonas de fuego
 

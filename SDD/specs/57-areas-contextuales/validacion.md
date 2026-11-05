@@ -1,12 +1,12 @@
 # Validación — SDD 57
 
-Fecha: 2026-11-04. Producto 3.21.0. Rama `feature/sdd-areas-contextuales`, base `0c8d245`. Implementación autorizada por la orden «implementa», sin commit, merge ni push. No se inició fábrica ni se simularon rondas de revisión.
+Fecha: 2026-11-04. Producto 3.21.0. Rama `feature/sdd-areas-contextuales`, base `0c8d245`. Implementación autorizada por la orden «implementa»; commit, integración y DMG autorizados después mediante «ok, cierra a main y construye». No se inició fábrica ni se simularon rondas de revisión.
 
 ## Evidencia ejecutada
 
 - `pnpm typecheck` y `pnpm lint`: sin errores.
 - Suite completa: **148 archivos / 1317 pruebas aprobadas**, con `pnpm test --exclude '.local/**' --exclude 'tmp/**' --maxWorkers=2`.
-- Builds de API, web y Electron correctos. No se genera DMG porque no se ha autorizado integrar a main.
+- Builds de API, web y Electron correctos. El empaquetado posterior a la integración se registra en el cierre de esta validación.
 - Dominio: bloqueo de movimiento/edición/borrado/copia; desbloqueo explícito; copia independiente, desplazamiento, límites y validación de color. Round-trip de escena y sanitización de snapshot conservan los campos; las figuras heredadas conservan sus emojis y ausencia de estilo nuevo.
 - Runtime: bloqueo cancela preview de otra pestaña; revisiones obsoletas fallan; limpiar propios conserva bloqueados; DM puede retirarlos; revocación limpia. Cliente antiguo no elimina el estilo canónico al actualizar geometría, ni puede borrar un bloqueado.
 - HTTP/SSE real sobre SQLite temporal: dos jugadores y conexión DM antigua; negociación, propagación de estilo, bloqueo, rechazo de comandos antiguos/modificados, copia reintentada con mismo requestId sin duplicación y reconexión. Los dibujos no contaminan la escena pública persistible.
@@ -45,7 +45,7 @@ Este recorrido verifica UI/render local. No equivale a una sesión de navegador 
 
 No se ejecutaron `pnpm test:owned` ni `pnpm test:moderation`: faltan `TTRPG_TEST_DATABASE_URL` y `TTRPG_TEST_DB_CA_FILE`, y no se encontraron binarios PostgreSQL locales en PATH ni en las rutas habituales inspeccionadas. No se sustituyó PostgreSQL por SQLite ni se relajó TLS. No se añadieron tablas, migraciones, dependencias ni configuración privada nueva.
 
-Advertencias conocidas: algunos tests jsdom no implementan canvas (el render se inspeccionó en navegador); Vite informa chunks grandes y directivas `use client` de dependencias ignoradas. No se atribuye firma/notarización ni empaquetado a esta compilación.
+Advertencias conocidas: algunos tests jsdom no implementan canvas (el render se inspeccionó en navegador); Vite informa chunks grandes y directivas `use client` de dependencias ignoradas. El DMG de uso interno no tiene firma ni notarización; su construcción no sustituye los recorridos nativos pendientes.
 
 ## Reproducción
 
@@ -59,3 +59,15 @@ pnpm build
 ```
 
 En una mesa de pruebas: crear círculo y cono, cambiar color/patrón, bloquear, intentar mover/borrar/copiar, limpiar propios, desbloquear/copiar y comprobar independencia. Repetir como jugador con DM y otro jugador observando; retirar un bloqueado como DM con confirmación, reconectar y cambiar de mapa. Abrir una escena anterior y guardar/cargar una nueva. Mantener separada esta aceptación pendiente de la evidencia automática ya ejecutada.
+
+
+## Cierre autorizado en main y DMG
+
+La orden «ok, cierra a main y construye» autorizó el cierre el 2026-11-04. Implementación registrada en `a09ea69`; integración desde `feature/sdd-areas-contextuales` a `main` mediante merge `62c351a`.
+
+- `./scripts/build-dmg.sh` finalizó con código 0 después del merge: typecheck, compilación Electron y empaquetado macOS arm64 correctos.
+- Artefacto local: `dist/TTRPG Effects-3.21.0-arm64.dmg` (146 MB aproximadamente).
+- `hdiutil verify` confirmó checksum válido; SHA-256: `099f00047217ac49f7473b3529847168e75ec8794d8c204021062335d778c0f8`.
+- Log local de construcción: `/tmp/sdd57-build-dmg.log`. Sin firma ni notarización; no se instaló ni ejecutó el binario generado.
+- La suite de 1317 pruebas y los builds API/web registrados arriba corresponden al mismo código de producto integrado. El cierre posterior modifica únicamente documentación.
+- No se hizo push ni se alteraron `.env`, DB o datos locales. Se mantienen los límites de aceptación manual y PostgreSQL/TLS de este documento.

@@ -1,6 +1,6 @@
 # 55 — Mediciones y áreas compartidas con autor visible
 
-> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora estilo, bloqueo y copia para círculos/conos compartidos con negociación de capacidad. El propietario solo modifica sus dibujos desbloqueados; limpiar propios preserva bloqueados. El DM conserva retirada moderadora, con confirmación para bloqueados, sin permiso nuevo de edición/copia ajena. La capa sigue siendo efímera. La integración a main permanece pendiente de autorización.
+> **Evolución integrada en main — SDD 57 / 3.21.0 (`62c351a`):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora estilo, bloqueo y copia para círculos/conos compartidos con negociación de capacidad. El propietario solo modifica sus dibujos desbloqueados; limpiar propios preserva bloqueados. El DM conserva retirada moderadora, con confirmación para bloqueados, sin permiso nuevo de edición/copia ajena. La capa sigue siendo efímera. Integración autorizada; evidencia y límites en SDD 57.
 
 **Estado:** Integrada en `main` mediante `90dc50e` (2026-11-04), versión 3.19.1. Sigue pendiente completar la validación PostgreSQL/visual indicada en [validacion.md](validacion.md).
 **Fecha:** 2026-11-04. **Tipo:** funcionalidad compatible.

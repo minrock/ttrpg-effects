@@ -1,6 +1,6 @@
 # SDD — Especificaciones de TTRPG Effects
 
-Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-04**, versión en rama **3.21.0** según `package.json` (SDD 57 pendiente de integración; main en 3.20.0).
+Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-04**, versión **3.21.0** según `package.json` (SDD 57 integrada en main, `62c351a`).
 
 1. Lee [estado actual y decisiones](estado-actual.md) para conocer qué existe y qué sigue pendiente.
 2. Consulta [arquitectura y datos](arquitectura.md) y la [operación local](guias/service-operations.md) para preparar una propuesta compatible.
@@ -59,7 +59,7 @@ Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan s
 | --- | --- | --- |
 | [55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) | Integrada en main, 3.19.1 (`90dc50e`); validación PostgreSQL/visual pendiente | [Plan](specs/55-mediciones-compartidas/plan.md) · [Evidencia](specs/55-mediciones-compartidas/validacion.md) |
 | [56 — Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) | Integrada en main, 3.20.0 (`3d35876`); cámaras libres y foco puntual | [Plan](specs/56-camaras-libres-foco-atencion/plan.md) |
-| [57 — Áreas contextuales: color, patrones, bloqueo y copia](specs/57-areas-contextuales/spec.md) | Implementada en rama (3.21.0), sin integrar; ver validación | [Plan](specs/57-areas-contextuales/plan.md) · [Evidencia](specs/57-areas-contextuales/validacion.md) |
+| [57 — Áreas contextuales: color, patrones, bloqueo y copia](specs/57-areas-contextuales/spec.md) | Integrada en main, 3.21.0 (`62c351a`); ver validación | [Plan](specs/57-areas-contextuales/plan.md) · [Evidencia](specs/57-areas-contextuales/validacion.md) |
 
 ## Guías técnicas y operativas
 

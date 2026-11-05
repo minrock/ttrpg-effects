@@ -1,6 +1,6 @@
 # 57 — Áreas con menú contextual, color, patrón, bloqueo y copia
 
-**Estado:** Implementada en rama; pendiente de integración y de los recorridos de aceptación registrados en [validacion.md](validacion.md). **Fecha:** 2026-11-04. **Tipo:** funcionalidad.
+**Estado:** Integrada en main (`62c351a`), versión 3.21.0; pendientes los recorridos de aceptación registrados en [validacion.md](validacion.md). **Fecha:** 2026-11-04. **Tipo:** funcionalidad.
 **Base:** `0c8d245`, producto 3.20.0. **Rama:** `feature/sdd-areas-contextuales`.
 **Dependencias:** [07 Formas](../07-shapes-and-measurement/spec.md), [03 Persistencia](../03-scene-persistence/spec.md), [39 Interfaz](../39-vtt-interface/spec.md), [44 Mesa](../44-mesa-sincronizada/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md), [56 Cámaras libres](../56-camaras-libres-foco-atencion/spec.md).
 **Trabajo factory:** sin asignar. **Versión de entrega:** 3.21.0; fuente oficial en package.json.
@@ -20,7 +20,7 @@ Las dos capturas aportadas por el usuario son referencias de interacción: una b
 
 No incluye líneas/mediciones, caminos, rectángulos/cuadrados, luces, fuego animado, agua, relámpagos, zonas informativas, tokens, selección múltiple, portapapeles del sistema ni copia entre partidas. No cambia medidas, reglas de cobertura, snap, forma geométrica del cono ni cámaras. «Ocultar» no se añade: no fue solicitado y requeriría definir visibilidad pública/privada.
 
-Para círculos/conos, esta entrega sustituye en SDD 07 la exclusión de color, el selector de emoji como único acceso y el mosaico con jitter. Los contratos de líneas y rectángulos permanecen vigentes. SDD 55 conserva autoría, duración y moderación, con las precisiones de bloqueo descritas aquí. La sustitución está implementada en la rama de 3.21.0; main permanece en 3.20.0 hasta autorizar integración.
+Para círculos/conos, esta entrega sustituye en SDD 07 la exclusión de color, el selector de emoji como único acceso y el mosaico con jitter. Los contratos de líneas y rectángulos permanecen vigentes. SDD 55 conserva autoría, duración y moderación, con las precisiones de bloqueo descritas aquí. La sustitución está integrada en main desde 3.21.0 (`62c351a`).
 
 ## Interacción y presentación
 
@@ -104,4 +104,4 @@ Las escenas antiguas sin `areaPattern` conservan su apariencia existente y sus e
 
 Solicitado: círculos/conos, menú contextual, color, patrones con emojis existentes, bloqueo y copia. La orden «implementa» autorizó construir este alcance, incluidas las reglas de bloqueo de estilo/copia, excepción de moderación, desplazamiento de copia y conservación visual de escenas heredadas.
 
-Las capturas no cambian los permisos del servicio ni autorizan ocultar dibujos a otros jugadores. No se añade un catálogo de plugins nuevo. [Plan técnico](plan.md). La evidencia ejecutada y sus límites están en [validacion.md](validacion.md). No se inició un ciclo factory ni se autorizaron commit, merge o push de esta entrega.
+Las capturas no cambian los permisos del servicio ni autorizan ocultar dibujos a otros jugadores. No se añade un catálogo de plugins nuevo. [Plan técnico](plan.md). La evidencia ejecutada y sus límites están en [validacion.md](validacion.md). La orden «ok, cierra a main y construye» autorizó commit, integración y construcción del DMG. Implementación `a09ea69`, merge `62c351a`. No se inició un ciclo factory ni se solicitó push en este cierre.

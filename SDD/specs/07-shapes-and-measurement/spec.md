@@ -1,6 +1,6 @@
 # Spec - Figuras y Medicion
 
-> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** Para círculos y conos, [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora barra de selección, color, damero con emojis del catálogo, bloqueo y copia. Sustituye la exclusión de color y el mosaico con jitter solo en esas áreas; las formas heredadas conservan su aspecto hasta cambiar de patrón. Líneas, caminos y rectángulos no cambian. La integración a main permanece pendiente de autorización.
+> **Evolución integrada en main — SDD 57 / 3.21.0 (`62c351a`):** Para círculos y conos, [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora barra de selección, color, damero con emojis del catálogo, bloqueo y copia. Sustituye la exclusión de color y el mosaico con jitter solo en esas áreas; las formas heredadas conservan su aspecto hasta cambiar de patrón. Líneas, caminos y rectángulos no cambian. Integración autorizada; evidencia y límites en SDD 57.
 
 > **Evolución integrada en 3.19.1 (main, 90dc50e):** [SDD 55 — Mediciones y áreas compartidas](../55-mediciones-compartidas/spec.md) extiende las herramientas del jugador en el servicio: difusión entre DM/jugadores y etiqueta de autor. En servicio se aplica la capa compartida descrita en esa spec; Electron autónomo mantiene las herramientas locales. Consultar su registro de validación para gates pendientes.
 

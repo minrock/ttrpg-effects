@@ -1,6 +1,6 @@
 # Plan — Mediciones y áreas compartidas
 
-> **Evolución implementada en rama — SDD 57 / 3.21.0 (sin integrar):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora estilo, bloqueo y copia para círculos/conos compartidos con negociación de capacidad. El propietario solo modifica sus dibujos desbloqueados; limpiar propios preserva bloqueados. El DM conserva retirada moderadora, con confirmación para bloqueados, sin permiso nuevo de edición/copia ajena. La capa sigue siendo efímera. La integración a main permanece pendiente de autorización.
+> **Evolución integrada en main — SDD 57 / 3.21.0 (`62c351a`):** [SDD 57 — Áreas contextuales](../57-areas-contextuales/spec.md) incorpora estilo, bloqueo y copia para círculos/conos compartidos con negociación de capacidad. El propietario solo modifica sus dibujos desbloqueados; limpiar propios preserva bloqueados. El DM conserva retirada moderadora, con confirmación para bloqueados, sin permiso nuevo de edición/copia ajena. La capa sigue siendo efímera. Integración autorizada; evidencia y límites en SDD 57.
 
 **Spec fuente:** [spec.md](spec.md). **Estado:** Integrada en main (`90dc50e`), versión 3.19.1; evidencia y pendientes en [validacion.md](validacion.md).
 **Base inspeccionada:** `3760968` en main, versión 3.18.1; rama documental `feature/sdd-mediciones-compartidas`, inicialmente limpia.
