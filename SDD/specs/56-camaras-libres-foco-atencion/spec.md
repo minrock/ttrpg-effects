@@ -1,10 +1,10 @@
 # 56 — Cámaras libres y foco de atención
 
-**Estado:** Implementada en rama; pendiente de integración y de los recorridos de aceptación indicados en [validacion.md](validacion.md).
+**Estado:** Integrada en `main` (`3d35876`), versión 3.20.0; pendientes los recorridos de aceptación indicados en [validacion.md](validacion.md).
 **Fecha:** 2026-11-04. **Tipo:** cambio funcional compatible con escenas existentes.
 **Base:** `fc57cda`, producto 3.19.1. **Rama:** `feature/sdd-foco-atencion`.
 **Dependencias:** [15 Player View](../15-player-window/spec.md), [24 Control de cámara](../24-player-camera-control/spec.md), [32 Preview de viewport](../32-player-viewport-preview/spec.md), [39 Interfaz VTT](../39-vtt-interface/spec.md), [41 Clientes](../41-contrato-clientes/spec.md), [44 Mesa](../44-mesa-sincronizada/spec.md), [50 Moderación](../50-moderacion/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md).
-**Trabajo factory:** sin asignar. **Versión de entrega prevista:** 3.20.0.
+**Trabajo factory:** sin asignar. **Versión de entrega:** 3.20.0.
 
 ## Problema y objetivo
 
@@ -119,4 +119,4 @@ Sin nuevas dependencias ni migraciones SQL; dominio puro para aplicar foco conse
 
 La petición define cámaras independientes y foco a centro exacto con zoom propio. Se concreta un foco puntual a todos los jugadores actuales del mapa publicado; no quedan decisiones bloqueantes para especificar. La eventual inspección pasiva de cámaras por jugador es otro alcance, no se reintroduce como requisito de este cambio.
 
-La implementación 3.20.0 sustituye los apartados de cámara dirigida en 15, 24, 32, 39 y 44. Sus contratos anteriores quedan como historia, con aviso explícito. El plan técnico y [registro de validación](validacion.md) distinguen pruebas realizadas y pendientes; no se inició fábrica ni se autorizaron commit/merge/push para esta entrega.
+La implementación 3.20.0 sustituye los apartados de cámara dirigida en 15, 24, 32, 39 y 44. Sus contratos anteriores quedan como historia, con aviso explícito. El plan técnico y [registro de validación](validacion.md) distinguen pruebas realizadas y pendientes; no se inició fábrica. El usuario autorizó explícitamente el cierre en main y push; implementación en `34d938c` e integración en `3d35876`.

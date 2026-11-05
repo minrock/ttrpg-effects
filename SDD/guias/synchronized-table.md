@@ -1,6 +1,6 @@
 # Mesa sincronizada privada — contrato vigente
 
-> **SDD 56 / 3.20.0, pendiente de integrar:** cámaras independientes. El DM usa foco efímero para cambiar el centro sin tocar el zoom. `camera` y `camera-command` se rechazan; el foco nunca forma parte del bootstrap. [Contrato y validación](../specs/56-camaras-libres-foco-atencion/plan.md).
+> **SDD 56 / 3.20.0, integrada en main:** cámaras independientes. El DM usa foco efímero para cambiar el centro sin tocar el zoom. `camera` y `camera-command` se rechazan; el foco nunca forma parte del bootstrap. [Contrato y validación](../specs/56-camaras-libres-foco-atencion/plan.md).
 
 La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. Electron local conservaIPC.
 

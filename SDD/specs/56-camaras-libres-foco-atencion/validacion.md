@@ -1,6 +1,6 @@
 # Validación — SDD 56
 
-Fecha: 2026-11-04. Rama: `feature/sdd-foco-atencion`. Producto: 3.20.0. Implementación preparada; pendiente de integración. Este registro no simula una revisión factory ni declara un despliegue.
+Fecha: 2026-11-04. Rama: `feature/sdd-foco-atencion`. Producto: 3.20.0. Implementación `34d938c`, integrada en main mediante `3d35876` con autorización explícita del usuario. Este registro no simula una revisión factory ni declara un despliegue.
 
 ## Evidencia ejecutada
 
@@ -8,7 +8,7 @@ Fecha: 2026-11-04. Rama: `feature/sdd-foco-atencion`. Producto: 3.20.0. Implemen
 - Suite general de Vitest: **145 archivos, 1307 pruebas aprobadas**. Pruebas nuevas de dominio, runtime, HTTP/SSE, adaptador web, IPC, React y Pixi. Incluye ausencia de zoom en el contrato; posiciones finitas/acotadas; cuatro orientaciones; captura de puntero y callbacks pendientes; dibujos confirmados conservados; navegación explícita con IDs de mapa reutilizados; error de transporte comunicado en el DM.
 - HTTP/SSE **real con SQLite temporal**, DM y dos invitados: negociación independiente de foco/anotaciones, entrega múltiple, permiso DM, idempotencia, rechazo de cuerpo >4 KiB y de órdenes antiguas; expulsión deja de recibir eventos; reconexión sin replay. Cada fixture crea y elimina su base temporal, sin utilizar `.env` ni la base local del usuario.
 - IPC con dobles de Electron: emisor jugador/subframe rechazado, readiness del marco vigente, payload sin zoom, deduplicación y ausencia de replay al abrir. Esto verifica el módulo IPC, no sustituye un recorrido del binario Electron.
-- Compilación de API, frontend web y Electron. Sin DMG: esta rama no está integrada.
+- Compilación de API, frontend web y Electron.
 - Revisión visual con **App, PlayerApp y Pixi reales**, en tres pestañas y un transporte sintético BroadcastChannel aislado: Ana al 49 %, Bruno al 151 %, DM al 100 %. Foco elegido en el mapa produjo centro `(229.50, -139.50)` en ambos jugadores, manteniendo sus zooms. El centro se situó en el área útil excluyendo el lateral derecho; el panel y el foco de teclado del jugador permanecieron abiertos/intactos. Se vio el aro temporal y se corrigió un solapamiento de los textos «Foco»/«Centro» en la barra DM.
 
 La revisión visual anterior no prueba cookies ni autorización HTTP; estas se comprobaron por separado en la prueba SQLite. El servidor de preview y sus tres pestañas se cerraron, y su directorio temporal se eliminó. No se tocó la base local, sus credenciales ni el servicio del usuario.
@@ -26,6 +26,12 @@ La revisión visual anterior no prueba cookies ni autorización HTTP; estas se c
 No se ejecutó `pnpm test:moderation`: el entorno carece de `TTRPG_TEST_DATABASE_URL` y `TTRPG_TEST_DB_CA_FILE`; la referencia temporal conservada a herramientas PostgreSQL apunta a binarios que ya no existen. No se usó SQLite como sustituto de PostgreSQL ni se relajó TLS. Preparar el entorno aislado de [database.md](../../guias/database.md) antes de ese gate. No hay cambios SQL ni migraciones en esta entrega.
 
 Warnings de herramientas: JSdom informa que no implementa canvas en algunos tests; el render visual se comprobó en navegador. Vite conserva advertencias de tamaño de chunks y directivas `use client` de dependencias ignoradas. No son errores de compilación.
+
+## Cierre de integración
+
+El usuario autorizó commit, merge a main y push. Código en `34d938c`, merge en `3d35876`. Tras integrar se ejecutó `./scripts/build-dmg.sh` correctamente (typecheck, compilación Electron y empaquetado macOS arm64).
+
+Artefacto local: `dist/TTRPG Effects-3.20.0-arm64.dmg`. `hdiutil verify` confirmó checksum válido. SHA-256: `75c7cadca21fbd022f0009b5cf145f98d87bb1305d33b7b885c0bd08dcce628e`. El DMG permanece fuera del control de versiones. Su generación no sustituye los recorridos nativos y de PostgreSQL pendientes arriba.
 
 ## Reproducción
 

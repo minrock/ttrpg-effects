@@ -1,6 +1,6 @@
 # Plan — 56 Cámaras libres y foco de atención
 
-**Spec fuente:** [spec.md](spec.md). **Estado:** Implementada en rama; evidencia y límites en [validacion.md](validacion.md). **Base:** `fc57cda`, versión 3.19.1, checkout limpio al iniciar.
+**Spec fuente:** [spec.md](spec.md). **Estado:** Integrada en main (`3d35876`); evidencia y límites en [validacion.md](validacion.md). **Base:** `fc57cda`, versión 3.19.1, checkout limpio al iniciar.
 
 ## Inspección y reutilización
 
@@ -56,7 +56,7 @@ Comandos durante construcción: `pnpm typecheck`, `pnpm lint`, `pnpm test --excl
 
 No hay migración SQL ni cambios a `.ttrpgscene`; no borrar datos ni sobrescribir configuraciones locales. Planificar actualización coordinada de clientes y API, conservando la experiencia base y mensajes de incompatibilidad durante mezcla de versiones. El transporte antiguo no queda como puerta trasera de zoom remoto.
 
-Implementación autorizada por el usuario después de la propuesta. Trabajo en `feature/sdd-foco-atencion`, sin commit, merge ni push en esta fase. El cierre registrará pruebas ejecutadas y límites de validación; la autorización de implementar no equivale a autorización de integrar.
+Implementación autorizada por el usuario después de la propuesta en `feature/sdd-foco-atencion`. Posteriormente autorizó explícitamente commit, integración a main y push. Implementación registrada en `34d938c` e integrada mediante `3d35876`; el registro de validación conserva los límites pendientes.
 
 ## Contrato técnico concretado
 
@@ -72,4 +72,4 @@ Implementación autorizada por el usuario después de la propuesta. Trabajo en `
 
 Código preparado en 3.20.0. La barra conserva zoom/centrado propios del DM y ofrece **Foco** y **Centro**, accesibles con teclado. Los controles principal/virtual dejan de conectarse al renderer; los helpers históricos de cálculo de preview permanecen internos sin emisores de UI. La inicialización local utiliza las dimensiones reales de la textura cuando una escena antigua no incluye `imageSize`, siempre que el jugador todavía no haya navegado.
 
-Consulta [validacion.md](validacion.md) para distinguir ensayos automáticos, prueba visual aislada y matriz de aceptación todavía pendiente. No se generó DMG porque no se ha solicitado integrar esta rama.
+Consulta [validacion.md](validacion.md) para distinguir ensayos automáticos, prueba visual aislada y matriz de aceptación todavía pendiente. El cierre de integración incluye la generación del DMG con `./scripts/build-dmg.sh`; su evidencia se registra en validacion.md.
