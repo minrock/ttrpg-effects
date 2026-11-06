@@ -30,3 +30,18 @@ El listener de 011 sustituye definitivamente la composición global 002–005. L
 - [Estado y decisiones transversales](../../estado-actual.md).
 
 Estos criterios consolidan comportamiento existente; no son una certificación nueva ni autorizan ampliar el alcance. Para un cambio posterior, crear una spec incremental y enlazar esta dependencia.
+
+
+## Corrección de recuperación — 3.21.1 (2026-11-05)
+
+Implementada en `fix/recuperacion-sesion-memoria`, pendiente de integración. Al caducar o revalidar el acceso se conserva el documento en memoria, pero se libera el lienzo Pixi y se suspende la resolución de imágenes de tokens. Reanudar correctamente reconstruye el lienzo y restaura su cámara.
+
+Un conflicto de revisión no activa sondeo ni renders periódicos. La cuenta regresiva solo existe durante Retry-After y termina al vencer. «Descartar borrador y recargar» desmonta el editor, libera sus recursos y vuelve a consultar partida/configuración/apertura; después se permite continuar o iniciar según el estado actual. No guarda el borrador descartado ni recarga toda la página con el documento anterior todavía activo.
+
+Los recursos de tokens ausentes o fallidos no disparan actualizaciones vacías del estado ni reintentos por movimientos del token. Los fallos se aíslan de las imágenes válidas; un cambio de referencia, contexto o recuperación de acceso permite intentarlo de nuevo. Las respuestas de un contexto cancelado no se aplican.
+
+[Diagnóstico y validación de la corrección](recuperacion-memoria.md).
+
+## Actualización 2026-11-05 — borradores del servicio
+
+[SDD 58](../58-borradores-recuperables/spec.md) implementa respaldo privado IndexedDB, borradores remotos separados y confirmación explícita. Sustituye para el cliente de servicio las decisiones anteriores de retener borradores solo en memoria y de usar una partición Electron efímera. Mantiene autenticación nueva al arrancar Electron y el flujo autónomo. La migración aditiva 8 conserva hasta tres generaciones por rama en SQLite/PostgreSQL; no cambia `.ttrpgscene` v2. Estado en rama y [límites de validación](../58-borradores-recuperables/validacion.md).

@@ -135,7 +135,7 @@ export async function exportLegacy(backup: string, target: string): Promise<Mani
     try { return await inspectTransfer(out.root); } catch (error) { unlinkSync(join(out.root, "manifest.json")); throw error; }
   } finally { for (const db of opened.reverse()) db.close(); rmSync(scratch, { recursive: true, force: true }); }
 }
-export async function exportOwned(config: DatabaseConfig, target: string): Promise<Manifest> {
+export async function exportOwned(config: DatabaseConfig, target: string, report?: (excludedDrafts:number)=>void): Promise<Manifest> {
   const unit = await identityDatabase(config);
   try { return await unit.transaction(async c => {
     const out = writer(target, "owned");
@@ -172,7 +172,7 @@ export async function exportOwned(config: DatabaseConfig, target: string): Promi
       offset += rows.length;
     }
     out.finish();
-    try { return await inspectTransfer(out.root); } catch (error) { unlinkSync(join(out.root, "manifest.json")); throw error; }
+    try { const manifest=await inspectTransfer(out.root); const excludedDrafts=Number((await c.query("SELECT COUNT(*) AS n FROM owned_drafts")).rows[0].n); report?.(excludedDrafts);return manifest; } catch (error) { unlinkSync(join(out.root, "manifest.json")); throw error; }
   }); } finally { await unit.close(); }
 }
 async function* items(root: string): AsyncGenerator<Item> {

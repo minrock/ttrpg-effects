@@ -70,14 +70,14 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Carreras010 ${kind
     const reused = randomUUID(), diceRequest = randomUUID();
     for (let i = 0; i < 3; i++) {
       const published = await command(i, "table", "scene", snapshot(assets[i === 2 ? 1 : 0]), reused); expect(published.status).toBe(200); mapContexts[i] = (published.json.state as { context: string }).context;
-      expect((await command(i, "table", "camera", { center: { x: i * 100, y: i * 20 }, zoom: i + 1 })).status).toBe(200);
+      expect((await command(i, "table", "camera", { center: { x: i * 100, y: i * 20 }, zoom: i + 1 })).status).toBe(409);
       expect((await command(i, "dice", "context", { token: mapContexts[i], sceneId: "scene", mapId: "map", sceneName: `PRIVADO_DADOS_${i}`, mapName: `PRIVADO_DADOS_${i}` })).status).toBe(200);
       const begun = await command(i, "dice", "begin", { requestId: reused, contextToken: mapContexts[i], draft: { ...defaultDiceDraft(), visibility: i === 0 ? "hidden" : "open", groups: [{ id: "f", damageType: "fire", dice: { d6: 1 } }] }, d20: null }, diceRequest);
       expect(begun.status).toBe(200);
       expect((await command(i, "dice", "complete", { rollId: (begun.json.value as { rollId: string }).rollId, simulation: { values: [{ id: "f:d6:0", value: i + 2 }], replay: { frameCount: 2, stepMs: 1000 / 30, durationMs: 1000 / 30, frames: [0, 0, 1, 0, 0, 0, 1, 0, 0, .5, 0, 0, 0, 1] } } })).status).toBe(200);
     }
     const states = await Promise.all(games.map((g, i) => http(s.port, `/api/v1/games/${g.id}/table/state`, `ttrpg_guest=${guests[i].token}`)));
-    for (const [i, result] of states.entries()) { expect(result.json.state).toMatchObject({ camera: { center: { x: i * 100, y: i * 20 }, zoom: i + 1 } }); expect(result.bytes.toString()).not.toContain("PRIVADO"); }
+    for (const result of states) { expect(result.json.state).toMatchObject({ cameraCommand: null }); expect(result.bytes.toString()).not.toContain("PRIVADO"); }
     expect((states[0].json.state as { dice: { presentation: unknown } }).dice.presentation).toBeNull(); expect((states[1].json.state as { dice: { presentation: unknown } }).dice.presentation).not.toBeNull();
     const survivor = await s.invitations.guests.admit(s.a2.id, { alias: "superviviente", secret: invitationSecret(starts[1]) }, randomUUID(), null), survivorStream = stream(s.port, s.a2.id, `ttrpg_guest=${survivor.token}`); await survivorStream.until(() => survivorStream.events.length > 0);
     await s.service.kick(s.aCookie, s.a2.id, guests[1].guest.participantId, { ...context(starts[1]), expectedInvitationVersion: 1 }, 1, randomUUID());

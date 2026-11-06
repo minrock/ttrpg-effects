@@ -24,7 +24,7 @@ it("migra una base con administrador, permite varios y conserva credenciales y s
         await c.query('INSERT INTO identity_user(id,name,email,"emailVerified","createdAt","updatedAt",role,enabled,"mustChangePassword","authVersion") VALUES($1,$2,$3,0,$4,$5,$6,1,0,0)', ["old-admin", "Anterior", "old@example.test", now, now, "admin"]);
         await c.query('INSERT INTO identity_account(id,"accountId","providerId","userId",password,"createdAt","updatedAt") VALUES($1,$2,$3,$4,$5,$6,$7)', ["old-credential", "old-admin", "credential", "old-admin", await passwordCodec.hash(password), now, now]);
       } finally { c.release(); }
-      expect(await applyMigrations(driver)).toEqual([7]);
+      expect(await applyMigrations(driver)).toEqual(migrations.slice(6).map(m=>m.version));
       expect(await applyMigrations(driver)).toEqual([]);
     } finally { await driver.close(); }
     service = await openIdentity(config, { secret: randomBytes(32).toString("base64url"), publicOrigin: "http://localhost:8787" });

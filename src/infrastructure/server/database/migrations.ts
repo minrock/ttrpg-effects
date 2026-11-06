@@ -64,6 +64,10 @@ export const migrations: readonly Migration[] = [{ version: 1, name: "catalogo-p
   "CREATE INDEX moderation_roster ON moderation_audit(opening_id)"
 ] }, { version: 7, name: "multiples-administradores-locales", statements: [
   "DROP INDEX identity_one_admin"
+] }, { version: 8, name: "borradores-recuperables", statements: [
+  "CREATE TABLE owned_drafts (owner_id TEXT NOT NULL REFERENCES identity_user(id) ON DELETE CASCADE, id TEXT NOT NULL, game_id TEXT NOT NULL, context TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0, sequence INTEGER NOT NULL DEFAULT 0, hash TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL, confirmed_sequence INTEGER NOT NULL DEFAULT 0, receipt_key TEXT, receipt_hash TEXT, receipt_result TEXT, PRIMARY KEY(owner_id,id), FOREIGN KEY(game_id,owner_id) REFERENCES ttrpg_games(id,owner_id))",
+  "CREATE INDEX owned_drafts_page ON owned_drafts(owner_id,updated_at DESC,id)",
+  "CREATE TABLE owned_draft_versions (owner_id TEXT NOT NULL, draft_id TEXT NOT NULL, revision INTEGER NOT NULL, sequence INTEGER NOT NULL, body TEXT NOT NULL, bytes INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(owner_id,draft_id,revision), FOREIGN KEY(owner_id,draft_id) REFERENCES owned_drafts(owner_id,id) ON DELETE CASCADE)"
 ] }];
 function checksum(migration: Migration): string { return createHash("sha256").update(JSON.stringify(migration)).digest("hex"); }
 async function tableNames(connection: SqlConnection, kind: SqlDriver["kind"]): Promise<string[]> {
@@ -74,7 +78,7 @@ async function tableNames(connection: SqlConnection, kind: SqlDriver["kind"]): P
 }
 export async function verifySchema(connection: SqlConnection, kind: SqlDriver["kind"], expected = migrations, allowPending = false): Promise<number> {
   const tables = await tableNames(connection, kind);
-  if (tables.some(name => !["ttrpg_control_migrations", "ttrpg_games", "identity_user", "identity_account", "identity_session", "identity_verification", "identity_audit", "identity_settings", "owned_resources", "owned_assets", "game_openings", "owned_operations", "owned_imports", "system_catalog", "system_versions", "retained_templates", "game_resources", "game_invitations", "guest_participants", "guest_credentials", "guest_operations", "invitation_audit", "moderation_audit"].includes(name))) throw new CatalogError("SCHEMA_INCOMPATIBLE");
+  if (tables.some(name => !["ttrpg_control_migrations", "ttrpg_games", "identity_user", "identity_account", "identity_session", "identity_verification", "identity_audit", "identity_settings", "owned_resources", "owned_assets", "game_openings", "owned_operations", "owned_imports", "system_catalog", "system_versions", "retained_templates", "game_resources", "game_invitations", "guest_participants", "guest_credentials", "guest_operations", "invitation_audit", "moderation_audit", "owned_drafts", "owned_draft_versions"].includes(name))) throw new CatalogError("SCHEMA_INCOMPATIBLE");
   if (!tables.includes("ttrpg_control_migrations")) {
     if (tables.length) throw new CatalogError("SCHEMA_INCOMPATIBLE");
     if (allowPending) return 0;
@@ -91,6 +95,7 @@ export async function verifySchema(connection: SqlConnection, kind: SqlDriver["k
   if (rows.length >= 4 && ["system_catalog", "system_versions", "retained_templates", "game_resources"].some(name => !tables.includes(name))) throw new CatalogError("SCHEMA_INCOMPATIBLE");
   if (rows.length >= 5 && ["game_invitations", "guest_participants", "guest_credentials", "guest_operations", "invitation_audit"].some(name => !tables.includes(name))) throw new CatalogError("SCHEMA_INCOMPATIBLE");
   if (rows.length >= 6 && !tables.includes("moderation_audit")) throw new CatalogError("SCHEMA_INCOMPATIBLE");
+  if (rows.length >= 8 && ["owned_drafts", "owned_draft_versions"].some(name => !tables.includes(name))) throw new CatalogError("SCHEMA_INCOMPATIBLE");
   if (!allowPending && rows.length !== expected.length) throw new CatalogError("MIGRATION_REQUIRED");
   return rows.length;
 }

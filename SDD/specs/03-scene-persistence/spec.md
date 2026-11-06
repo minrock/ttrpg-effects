@@ -146,3 +146,7 @@ Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md)
 ## Integracion de Dados (Spec 37)
 
 Dados, preferencias y log de spec 37 son efimeros durante la ejecucion de la app. No pertenecen al mapa/escena, no se serializan ni provocan guardado/dirty/undo. No hay cambio de version de `.ttrpgscene` ni migracion. [Spec 37](../37-dm-dice-rolls/spec.md).
+
+## Actualización 2026-11-05 — borradores del servicio
+
+[SDD 58](../58-borradores-recuperables/spec.md) implementa respaldo privado IndexedDB, borradores remotos separados y confirmación explícita. Sustituye para el cliente de servicio las decisiones anteriores de retener borradores solo en memoria y de usar una partición Electron efímera. Mantiene autenticación nueva al arrancar Electron y el flujo autónomo. La migración aditiva 8 conserva hasta tres generaciones por rama en SQLite/PostgreSQL; no cambia `.ttrpgscene` v2. Estado en rama y [límites de validación](../58-borradores-recuperables/validacion.md).

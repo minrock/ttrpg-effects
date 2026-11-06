@@ -145,3 +145,12 @@
   .service-editor-chrome .workspace-tools-menu { position:static; }
   .service-editor-chrome .workspace-header-actions { top:43px;right:8px; }
 }
+
+/* Estado compacto; los documentos solo se abren al elegir una recuperación. */
+.draft-recovery { display: flex; justify-content: flex-end; padding: 2px 8px; background: var(--panel-bg, #202529); }
+.draft-recovery > button { padding: 3px 9px; font-size: 12px; }
+.draft-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+.draft-recovery select { width: 100%; min-width: 0; }
+.draft-recovery .service-dialog { width: min(640px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; }
+.draft-recovery > button { color: #dbe4e2; background: #293b35; border: 1px solid #40564e; border-radius: 4px; cursor: pointer; }
+.draft-recovery > button:focus-visible { outline: 2px solid #91c9b0; outline-offset: 2px; }

@@ -1,3 +1,4 @@
+import { migrations } from "../database/migrations";
 import { afterEach, expect, it } from "vitest";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -5,9 +6,9 @@ import { randomUUID } from "node:crypto";
 import { fixture, cleanup, snapshot, png } from "./fixtures";
 import { defaultDiceDraft } from "../../../domain/dice/dice";
 afterEach(async () => { for (const action of cleanup.splice(0).reverse()) await action(); });
-for (const kind of ["sqlite", "postgres"] as const) it(`humo HTTP/SSE del artefacto compilado010 y migración5→6 ${kind}`, async () => {
+for (const kind of ["sqlite", "postgres"] as const) it(`humo HTTP/SSE del artefacto compilado010 y migración desde esquema 5 ${kind}`, async () => {
   const config = await fixture(kind, 5), env = { ...process.env, TTRPG_DB_DRIVER: config.driver, TTRPG_DEPLOYMENT: config.deployment, ...(config.driver === "sqlite" ? { TTRPG_DATA_DIR: config.dataDir } : { TTRPG_DATABASE_URL: config.url, TTRPG_DB_CA_FILE: config.caFile }) };
-  expect((await promisify(execFile)("pnpm", ["db:migrate"], { env })).stdout).toContain("migraciones 6 aplicadas");
+  expect((await promisify(execFile)("pnpm", ["db:migrate"], { env })).stdout).toContain(`migraciones ${migrations.slice(5).map(m=>m.version).join(", ")} aplicadas`);
   const asset = randomUUID();
   const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
     const child = spawn(process.execPath, ["src/infrastructure/server/moderation/test-fixtures/compiled-smoke.mjs"], { stdio: ["pipe", "pipe", "pipe"] }); let stdout = "", stderr = "";

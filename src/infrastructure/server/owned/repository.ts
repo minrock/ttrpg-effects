@@ -1,3 +1,4 @@
+import { draftRepository } from "./draft-repository";
 import { hostInvitationRepository } from "../invitations/host-repository";
 import { systemRepositories } from "./system-repository";
 import { SystemError } from "../../../application/services/system-catalog";
@@ -140,7 +141,8 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
   };
   commitEffects.beforeCommit(validateBudget);
   const invitations = hostInvitationRepository(execute, owner, clock);
-  const result: OwnedTransaction = { invitations, games, resources, assets, openings, systems, links, effects,
+  const drafts = draftRepository(execute, owner, clock);
+  const result: OwnedTransaction = { drafts, invitations, games, resources, assets, openings, systems, links, effects,
     async operation(operationId, context, content, work) {
       operationUsed = true;
       if (!z.uuid().safeParse(operationId).success || !context || context.length > 300) throw new OwnedError("VALIDATION");
@@ -167,5 +169,5 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
     const method: unknown = Reflect.get(target, key, receiver);
     return typeof method === "function" ? (...args: unknown[]) => run(async () => { if (privatePort) requireDm(); return Promise.resolve(Reflect.apply(method, target, structuredClone(args))); }) : method;
   } });
-  return { ...result, verifyInvariants: async () => { await validate(); await validateBudget(); }, invitations: tracked(invitations, true), games: tracked(games, true), resources: tracked(resources, true), assets: tracked(assets, true), openings: tracked(openings, true), systems: tracked(systems), links: tracked(links, true), operation: (...args) => run(() => result.operation(...args)) };
+  return { ...result, drafts: tracked(drafts, true), verifyInvariants: async () => { await validate(); await validateBudget(); }, invitations: tracked(invitations, true), games: tracked(games, true), resources: tracked(resources, true), assets: tracked(assets, true), openings: tracked(openings, true), systems: tracked(systems), links: tracked(links, true), operation: (...args) => run(() => result.operation(...args)) };
 }

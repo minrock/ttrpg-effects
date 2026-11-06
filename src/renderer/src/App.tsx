@@ -1,3 +1,4 @@
+import { useTokenImageResolution } from "./hooks/useTokenImageResolution";
 import { AreaContextToolbar } from "./components/workspace/AreaContextToolbar";
 import { copyArea, isAreaLocked, isContextualArea, setAreaLocked } from "../../domain/shapes/shapes";
 import { attentionFrame } from "../../domain/player/attention-focus";
@@ -329,6 +330,8 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const [sceneAside, setSceneAside] = useState<SceneAside>(() =>
     (scene.sceneAside) ?? createDefaultSceneAside()
   );
+  const draftBaselineRef=useRef<{scene:SceneDocument;sceneAside:SceneAside}|null>(null);
+  const sceneAsideRef=useRef(sceneAside);sceneAsideRef.current=sceneAside;
   const [monsterTemplates, setMonsterTemplates] = useState<readonly MonsterTemplate[]>([]);
   const [isMonsterTemplateManagerOpen, setIsMonsterTemplateManagerOpen] = useState(false);
   const [isCombatSetupOpen, setIsCombatSetupOpen] = useState(false);
@@ -499,42 +502,49 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     });
   }, [currentFilePath, scene.mapAnnotations.sceneLinks, scenesApi]);
 
+  useTokenImageResolution({
+    tokens: scene.tokens, urls: tokenImageUrls, api: imagesApi,
+    // La clave de navegación también cambia al reabrir el mismo archivo.
+    scope: JSON.stringify([scene.id, currentFilePath, scene.activeMapId, playerCameraSyncKey]),
+    active: service?.headerEnabled !== false,
+    setUrls: setTokenImageUrls,
+    onUnavailable: () => setFeedback("No se pudieron cargar algunas imágenes de tokens. Reemplaza la imagen o vuelve a abrir la escena para reintentar.")
+  });
+
+  const draftSnapshotRef = useRef<(() => import("../../application/services/draft-store").DraftSnapshot) | null>(null);
+  // Capturar solo al vencer el temporizador; mover cámara no serializa el documento.
+  const captureDraft = () => ({
+    context: service!.browser.draftContext(currentFilePath),
+    content: service!.browser.draftContent(createSceneSavePayload(sceneRef.current, sceneAside), {
+      camera: {x:dmCameraRef.current.center.x,y:dmCameraRef.current.center.y,zoom:dmCameraRef.current.zoom},
+      sidebar:isSidebarVisible, aside:isAsidePanelVisible, selectedId:interaction.selectedElementId
+    })
+  });
+  draftSnapshotRef.current = captureDraft;
+  const previousDraftScene = useRef({scene,sceneAside,currentFilePath});
   useEffect(() => {
-    if (imagesApi === undefined || scene.tokens.length === 0) {
-      return;
-    }
-
-    const missingTokens = scene.tokens.filter((token) => tokenImageUrls[token.id] === undefined);
-
-    if (missingTokens.length === 0) {
-      return;
-    }
-
-    let cancelled = false;
-    void Promise.all(
-      missingTokens.map(async (token) => [token.id, await imagesApi?.resolveTokenUrl(token.imagePath)] as const)
-    ).then((entries) => {
-      if (cancelled) {
-        return;
-      }
-
-      setTokenImageUrls((current) => {
-        const next = { ...current };
-
-        for (const [tokenId, url] of entries) {
-          if (typeof url === "string") {
-            next[tokenId] = url;
-          }
-        }
-
-        return next;
-      });
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [scene.tokens, tokenImageUrls, imagesApi]);
+    const previous=previousDraftScene.current;previousDraftScene.current={scene,sceneAside,currentFilePath};
+    if(draftBaselineRef.current?.scene===scene&&draftBaselineRef.current.sceneAside===sceneAside)return;
+    if(!service?.browser.drafts || previous.scene===scene&&previous.sceneAside===sceneAside&&previous.currentFilePath===currentFilePath)return;
+    const drafts=service.browser.drafts;
+    drafts.update(()=>draftSnapshotRef.current!());
+    // Crear/eliminar una figura se respalda al terminar el cambio, sin esperar al cierre.
+    if(previous.scene.shapes.length!==scene.shapes.length)void drafts.flushLocal().catch(()=>{});
+  }, [scene,sceneAside,currentFilePath,service?.browser]);
+  useEffect(()=>service?.browser.drafts?.onRestore(async (checkpoint,options)=>{
+    const restored=await service.browser.restoreDraft(checkpoint);
+    await runSceneOperation("cargada",async()=>restored,{recovery:!options?.confirmed});
+    setIsSidebarVisible(checkpoint.content.view.sidebar);setIsAsidePanelVisible(checkpoint.content.view.aside);
+    const selected=checkpoint.content.view.selectedId;
+    const visible=[...restored.scene.shapes,...restored.scene.tokens,...restored.scene.lights,...restored.scene.effects,...restored.scene.labels];
+    setInteraction(current=>({...current,selectedElementId:selected&&visible.some(v=>v.id===selected)?selected:null}));
+  }),[service?.browser]);
+  useEffect(()=>{
+    const drafts=service?.browser.drafts;if(!drafts)return;
+    const flush=()=>{void drafts.flushLocal().catch(()=>{});};
+    window.addEventListener("pagehide",flush);document.addEventListener("visibilitychange",flush);
+    return()=>{window.removeEventListener("pagehide",flush);document.removeEventListener("visibilitychange",flush);};
+  },[service?.browser]);
 
   // Phase 2: Autosave scene to sessionStorage on every change (debounced).
   // sessionStorage survives renderer reloads within the same Electron window session
@@ -638,7 +648,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const handleCameraChange = useCallback((camera: ViewportCameraSnapshot): void => {
     dmCameraRef.current = normalizeCameraSnapshot(camera);
     setDmZoom(current => current === camera.zoom ? current : camera.zoom);
-  }, []);
+    const drafts=service?.browser.drafts;
+    if(drafts?.checkpoint&&draftSnapshotRef.current)drafts.update(draftSnapshotRef.current,false);
+  }, [service?.browser]);
 
   const handleArcanePointerTrigger = useCallback((pointer: ArcanePointerBroadcast): void => {
     if (isPlayerWindowOpenRef.current) {
@@ -1852,9 +1864,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   async function allowServiceLeave(): Promise<boolean> {
     if (!service) return true;
     const snapshot = createSceneSavePayload(sceneRef.current, sceneAside);
-    if ((snapshot.maps.length === 0 && JSON.stringify(snapshot.sceneAside) === JSON.stringify(createDefaultSceneAside())) || lastSavedSceneJsonRef.current === JSON.stringify({ ...sceneRef.current, sceneAside })) return true;
+    if ((!hasCanvasWork(snapshot) && JSON.stringify(snapshot.sceneAside) === JSON.stringify(createDefaultSceneAside())) || lastSavedSceneJsonRef.current === JSON.stringify({ ...sceneRef.current, sceneAside })) return true;
     const choice = await service.confirmLeave();
-    if (choice === "discard") return true;
+    if (choice === "discard") { await service.browser.drafts?.flushLocal().catch(()=>{}); return true; }
     if (choice !== "save") return false;
     const saved = await saveCurrentScene();
     if (!saved.ok) { setFeedback(saved.error); return false; }
@@ -1874,7 +1886,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   }
   useEffect(() => {
     if (!service) return;
-    const beforeUnload = (event: BeforeUnloadEvent) => { if ((sceneRef.current.maps.length > 0 || JSON.stringify(sceneAside) !== JSON.stringify(createDefaultSceneAside())) && lastSavedSceneJsonRef.current !== JSON.stringify({ ...sceneRef.current, sceneAside })) { event.preventDefault(); event.returnValue = ""; } };
+    const beforeUnload = (event: BeforeUnloadEvent) => { if ((hasCanvasWork(sceneRef.current) || JSON.stringify(sceneAside) !== JSON.stringify(createDefaultSceneAside())) && lastSavedSceneJsonRef.current !== JSON.stringify({ ...sceneRef.current, sceneAside })) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [service, sceneAside]);
@@ -1925,12 +1937,13 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   async function runSceneOperation(
     actionLabel: "guardada" | "cargada",
     operation: () => Promise<SceneOperationResult>,
-    options?: { readonly playerEntryPoint?: WorldPoint }
+    options?: { readonly playerEntryPoint?: WorldPoint; readonly recovery?: boolean }
   ): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
 
     try {
+      const beforeScene=sceneRef.current, beforeAside=sceneAside;
       const result = await operation();
 
       if (!result.ok) {
@@ -1938,13 +1951,20 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
         return;
       }
 
+      if (actionLabel === "guardada" && (beforeScene !== sceneRef.current || beforeAside !== sceneAsideRef.current)) {
+        setCurrentFilePath(result.filePath || null);
+        lastSavedSceneJsonRef.current=JSON.stringify({...result.scene,sceneAside:result.scene.sceneAside});
+        setFeedback("Escena guardada; los cambios posteriores siguen pendientes.");
+        return;
+      }
+      if(service) await refreshMonsterTemplates();
       if (actionLabel === "cargada") resetMapImageSession(result.mapImageUrls, result.scene);
       setScene(result.scene);
       setMapAnnotationModal(null);
       setSceneLinkModalId(null);
-      if(service) await refreshMonsterTemplates();
       const loadedSceneAside = result.scene.sceneAside ?? createDefaultSceneAside();
       setSceneAside(loadedSceneAside);
+      draftBaselineRef.current={scene:sceneRef.current,sceneAside:loadedSceneAside};
       if (actionLabel === "cargada") {
         const loadedCamera = normalizeCameraSnapshot({
           center: { x: result.scene.camera.x, y: result.scene.camera.y },
@@ -1966,7 +1986,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
         setArcanePointerResetKey((current) => current + 1);
         setInformationAreaHighlightResetKey((current) => current + 1);
         syncSceneEntityCounters(result.scene);
-        publishLoadedPlayerScene({
+        if(!options?.recovery) publishLoadedPlayerScene({
           scene: result.scene,
           sceneAside: loadedSceneAside,
           mapImageUrl: result.mapImageUrl ?? null,
@@ -1976,8 +1996,8 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
         });
 
       }
-      setCurrentFilePath(result.filePath);
-      lastSavedSceneJsonRef.current = JSON.stringify({ ...result.scene, sceneAside: loadedSceneAside });
+      setCurrentFilePath(result.filePath || null);
+      lastSavedSceneJsonRef.current = options?.recovery ? null : JSON.stringify({ ...result.scene, sceneAside: loadedSceneAside });
       setFeedback(`Escena ${actionLabel}`);
 
       // Separate "scene-format-outdated" from generic warnings so it can get
@@ -3454,6 +3474,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           {isAsidePanelVisible ? <ChevronLeft aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
         </button>
         <MapViewport
+          suspended={service?.headerEnabled === false}
           sharedAnnotations={sharedAligned ? shared.items : undefined}
           ref={viewportHandleRef}
           map={mapState}
@@ -5123,6 +5144,10 @@ function getSceneObjectIds(scene: SceneDocument): readonly string[] {
     ...scene.fogOfWar.revealedAreas.map((area) => area.id),
     ...scene.fogOfWar.obstacles.map((obstacle) => obstacle.id)
   ];
+}
+
+function hasCanvasWork(scene:SceneDocument):boolean {
+  return scene.maps.length>0 || [scene.shapes,scene.lights,scene.effects,scene.tokens,scene.labels,scene.counters,scene.mapAnnotations.pins,scene.mapAnnotations.areas,scene.mapAnnotations.sceneLinks].some(items=>items.length>0);
 }
 
 function createSceneSavePayload(scene: SceneDocument, sceneAside: SceneAside): SceneDocument {

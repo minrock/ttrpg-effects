@@ -58,4 +58,46 @@ describe("MapViewport local shape update order", () => {
     expect(selection).toBe(shape.id);
     expect(engine.create).toHaveBeenCalledOnce();
   });
+  it("suspender libera Pixi, recuperar restaura cámara y una inicialización tardía se destruye", async () => {
+    const destroy = vi.fn(), setCameraSnapshot = vi.fn();
+    const viewport = new Proxy({ destroy, setCameraSnapshot }, { get(target, key, receiver) {
+      if (key === "then") return undefined;
+      return Reflect.has(target, key) ? Reflect.get(target, key, receiver) : vi.fn();
+    } });
+    engine.create.mockResolvedValue(viewport);
+    const scene = createDefaultScene();
+    const props = { map: null, grid: scene.grid, settings: scene.settings, darkness: scene.darkness, fogOfWar: scene.fogOfWar, shapes: [], selectedElementId: null } as unknown as ComponentProps<typeof MapViewport>;
+    await act(async () => root.render(<MapViewport {...props} suspended />));
+    expect(engine.create).not.toHaveBeenCalled();
+    await act(async () => root.render(<MapViewport {...props} suspended={false} />));
+    const camera = { center: { x: 150, y: 90 }, zoom: 2 };
+    engine.create.mock.calls[0][1].onCameraChange(camera);
+    await act(async () => root.render(<MapViewport {...props} suspended />));
+    expect(destroy).toHaveBeenCalledOnce();
+    await act(async () => root.render(<MapViewport {...props} suspended={false} />));
+    expect(setCameraSnapshot).toHaveBeenLastCalledWith(camera);
+    expect(engine.create).toHaveBeenCalledTimes(2);
+    await act(async () => root.render(<MapViewport {...props} suspended />));
+    let complete!: (value: typeof viewport) => void;
+    engine.create.mockImplementationOnce(() => new Promise(resolve => { complete = resolve; }));
+    await act(async () => root.render(<MapViewport {...props} suspended={false} />));
+    await act(async () => root.render(<MapViewport {...props} suspended />));
+    await act(async () => complete(viewport));
+    expect(destroy).toHaveBeenCalledTimes(3);
+  });
+
+  it("20 suspensiones y recuperaciones destruyen cada instancia antes de la siguiente",async()=>{
+    const destroy=vi.fn();
+    const viewport=new Proxy({destroy},{get(target,key,receiver){if(key==='then')return undefined;return Reflect.has(target,key)?Reflect.get(target,key,receiver):vi.fn();}});
+    engine.create.mockResolvedValue(viewport);
+    const scene=createDefaultScene();
+    const props={map:null,grid:scene.grid,settings:scene.settings,darkness:scene.darkness,fogOfWar:scene.fogOfWar,shapes:[],selectedElementId:null} as unknown as ComponentProps<typeof MapViewport>;
+    for(let cycle=1;cycle<=20;cycle++){
+      await act(async()=>root.render(<MapViewport {...props} suspended={false}/>));
+      expect(engine.create).toHaveBeenCalledTimes(cycle);expect(destroy).toHaveBeenCalledTimes(cycle-1);
+      await act(async()=>root.render(<MapViewport {...props} suspended/>));
+      expect(destroy).toHaveBeenCalledTimes(cycle);
+    }
+  });
+
 });

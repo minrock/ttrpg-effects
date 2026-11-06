@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-04. Versión: `package.json` 3.21.0, SDD 57 integrada en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-06. Versión en rama: `package.json` 3.22.1, SDD 58 y corrección de recuperación pendientes de integrar. Última entrega integrada: 3.21.0, SDD 57 en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -68,3 +68,15 @@ Estas son direcciones mencionadas o límites explícitos, no una cola aprobada:
 - Escalado horizontal, bus de eventos y recuperación durable del estado visual: requieren nuevas garantías de consistencia y autoridad.
 
 Cualquier otro alcance nuevo debe describir problema, usuario, criterios y exclusiones antes de convertirse en trabajo de fábrica. Las preguntas originales de requirements no se reabren automáticamente: primero contrastarlas con specs y código existentes.
+
+
+## Corrección pendiente de integración — Recuperación de sesión
+
+3.21.1 en `fix/recuperacion-sesion-memoria`: liberar el render durante suspensión, detener renders de conflictos, descartar el editor antes de recargar el contexto y acotar resolución de imágenes ausentes. [Diagnóstico y evidencia](specs/51-experiencia-servicio/recuperacion-memoria.md). Sin cambios de DB ni expedientes factory nuevos.
+
+
+## Implementación en rama — SDD 58: borradores recuperables
+
+[Spec 58](specs/58-borradores-recuperables/spec.md) y [plan](specs/58-borradores-recuperables/plan.md): respaldo IndexedDB a 1 s/máximo 5 s, borrador privado remoto a 5 s/máximo 30 s y confirmación manual separada. Incluye recuperación por cuenta/rama, conflictos sin sobrescritura, persistencia local selectiva de Electron servicio y contratos SQLite/PostgreSQL. Estado: implementada y consolidada para la versión 3.22.1 en `fix/recuperacion-local-figuras`, pendiente de merge y sin trabajo factory nuevo. Migración aditiva 8; DB operativa sin modificar. IndexedDB privado sustituye la prohibición anterior y Electron servicio usa partición persistente por origen, con limpieza de credenciales. [Evidencia y límites](specs/58-borradores-recuperables/validacion.md).
+
+Corrección 3.22.1 en `fix/recuperacion-local-figuras`: respalda figuras sin mapa, inicia escritura al crearlas y ofrece recuperar IndexedDB o cargar la escena. Conserva SDD 58 pendiente de integrar.

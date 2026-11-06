@@ -62,6 +62,7 @@ export interface MapViewportHandle {
 }
 
 interface MapViewportProps {
+  readonly suspended?: boolean;
   readonly sharedAnnotations?: readonly SharedAnnotation[];
   readonly onSharedShapePreview?: (shape: SceneShape | null) => void;
   readonly map: MapImageState | null;
@@ -174,6 +175,7 @@ interface MapViewportProps {
 }
 
 export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(function MapViewport({
+  suspended = false,
   sharedAnnotations,
   onSharedShapePreview,
   map,
@@ -280,6 +282,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef<PixiViewport | null>(null);
   const mapRef = useRef(map);
+  const retainedCameraRef = useRef<ViewportCameraSnapshot | null>(null);
   const mapImageLoadedRef = useRef(onMapImageLoaded);
   mapImageLoadedRef.current = onMapImageLoaded;
   const mapImageErrorRef = useRef(onMapImageError);
@@ -298,7 +301,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     showAttentionFocus: point => viewportRef.current?.showAttentionFocus(point),
     cancelCameraGesture: () => viewportRef.current?.cancelCameraGesture(),
     selectAttentionPoint: handler => viewportRef.current?.selectAttentionPoint(handler),
-    setCameraSnapshot: (camera) => viewportRef.current?.setCameraSnapshot(camera),
+    setCameraSnapshot: (camera) => { retainedCameraRef.current = camera; viewportRef.current?.setCameraSnapshot(camera); },
     getRandomVisibleWorldPoint: () => viewportRef.current?.getRandomVisibleWorldPoint() ?? { x: 0, y: 0 },
     getNearbyVisibleWorldPoint: (origin, excludedElementId) =>
       viewportRef.current?.getNearbyVisibleWorldPoint(origin, excludedElementId) ?? origin,
@@ -320,10 +323,11 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     let viewport: PixiViewport | null = null;
     let cancelled = false;
 
-    if (host === null) {
+    if (host === null || suspended) {
       return undefined;
     }
 
+    const retainedCamera = cameraSnapshot ?? retainedCameraRef.current;
     void PixiViewport.create(host, {
       onContextMenu: onContextMenuRequest,
       onElementSelect,
@@ -360,7 +364,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       onMagicalDarknessRadiusChange,
       onWaterLineRotationChange,
       onWaterPatternRotationChange,
-      onCameraChange,
+      onCameraChange: camera => { if (!cancelled) { retainedCameraRef.current = camera; onCameraChange?.(camera); } },
       onCameraInteractionEnd,
       onPlayerCameraControlMove,
       onArcanePointerTrigger,
@@ -403,15 +407,18 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       createdViewport.setNavigationEnabled(isNavigationEnabled);
       createdViewport.setFogPresentation(fogPresentation);
       createdViewport.setHiddenTokenPolicy(hiddenTokenPolicy);
-      if (cameraSnapshot !== null) {
-        createdViewport.setCameraSnapshot(cameraSnapshot);
+      if (retainedCamera !== null) {
+        createdViewport.setCameraSnapshot(retainedCamera);
       }
       if (playerCameraControlStateRef.current !== null) {
         createdViewport.setPlayerCameraControlState(playerCameraControlStateRef.current);
       }
       createdViewport.setGrabMode(isGrabMode);
+      createdViewport.setMapAdjustMode(isMapAdjustMode);
       createdViewport.setGridAdjustMode(isGridAdjustMode);
       createdViewport.setFogRevealMode(isFogRevealMode);
+      createdViewport.setFogRevealGuideRadius(fogRevealGuideRadius);
+      createdViewport.setDaytimeMaskPaintMode(isDaytimeMaskPaintMode, daytimeBrushTopology, daytimeMaskStrokeMode, daytimeBrushRadius);
       createdViewport.setFirePaintMode(isFirePaintMode);
       createdViewport.setPathDrawingMode(isPathDrawingMode);
       createdViewport.setPathPreview(pathPreviewPoints, pathPreviewHoverPoint);
@@ -434,7 +441,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [onSharedShapePreview, onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [suspended, onSharedShapePreview, onContextMenuRequest, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setEffectTool(fireTool ? "fire" : "lightning", fireTool ?? lightningTool, lightningResetKey);

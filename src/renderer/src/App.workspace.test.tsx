@@ -7,9 +7,14 @@ import type { ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { createDefaultSceneMap, createSceneWithMap, syncRuntimeFieldsFromActiveMap } from "../../domain/sessions/scene-maps";
 import type { MapViewport, MapViewportHandle } from "./components/MapViewport";
 import { App } from "./App";
+import { createSceneToken } from "../../domain/tokens/tokens";
 import { PlayerApp } from "./PlayerApp";
 import { TableSession } from "../../application/services/table-session";
 import { randomUUID } from "node:crypto";
+import { IDBFactory } from "fake-indexeddb";
+import { systemSeeds } from "../../domain/systems/system-catalog";
+import { IndexedDbDraftStore } from "../../infrastructure/browser/drafts/indexeddb-store";
+import { BrowserTableClient } from "../../infrastructure/browser/table-client";
 import type { TableEvent } from "../../shared/contracts/table";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
 import { connectInternalSceneLink } from "../../domain/annotations/internal-scene-links";
@@ -408,6 +413,28 @@ describe("App production workspace", () => {
     await click(button("Abrir dados"));
     expect(element('[role="tab"][aria-selected="true"]#right-tab-dice')).toBeTruthy();
   });
+  it("recuperar una escena con imagen ausente no repite la resolución indefinidamente", async () => {
+    const scene = parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
+    const token = createSceneToken({ id: "missing-token", name: "Ausente", type: "npc", imagePath: "missing.png", position: { x: 0, y: 0 }, size: "medium", tokens: [] });
+    sessionStorage.setItem("ttrpg:session-scene", JSON.stringify({ ...scene, maps: scene.maps.map(map => ({ ...map, tokens: [token] })), tokens: [token] }));
+    // El límite evita colgar la suite con la regresión original.
+    const resolveTokenUrl = vi.fn((): Promise<string | null> => resolveTokenUrl.mock.calls.length <= 5 ? Promise.resolve(null) : new Promise(() => {}));
+    const restored = parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
+    const loadScene = async () => ({ ok: true as const, scene: restored, filePath: "restored.ttrpgscene", tokenImageUrls: {}, warnings: [] });
+    const client = createClient({ resolveTokenUrl, loadScene } as unknown as TtrpgApi, { scenes: true, images: true, libraries: false, player: false, dice: false, nativeMenus: false });
+    await act(async () => root.render(<ClientProvider client={client}><App /></ClientProvider>));
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(resolveTokenUrl).toHaveBeenCalledOnce();
+    expect(props().tokens).toHaveLength(1);
+    // Cargar dos veces el mismo archivo permite un reintento explícito.
+    await click(element('[aria-label="Menu de escena"]')); await click(button("Cargar escena"));
+    expect(resolveTokenUrl).toHaveBeenCalledTimes(2);
+    resolveTokenUrl.mockResolvedValue("url:reparada");
+    await click(element('[aria-label="Menu de escena"]')); await click(button("Cargar escena"));
+    expect(resolveTokenUrl).toHaveBeenCalledTimes(3);
+    expect(props().tokens[0].imageUrl).toBe("url:reparada");
+  });
+
   it("protege cambios web ante guardar fallido/cancelar y no usa el autosave local", async () => {
     const scene=JSON.parse(sessionStorage.getItem("ttrpg:session-scene")!);
     const storage=vi.spyOn(Storage.prototype,"setItem");
@@ -492,6 +519,32 @@ describe("App production workspace", () => {
     await open(); await switchKind();
     expect(host.querySelector('.scene-link-modal')).toBeNull();
     expect(props().mapAnnotations.sceneLinks[0].connection?.peer).toMatchObject(kind === "remote" ? { mapId: "map-c", markerId: "c" } : { scenePath: target, markerId: "b" });
+  });
+
+  it.each([false,true])("respalda figuras en IndexedDB y las restaura en un editor nuevo (mapa: %s)",async(withMap)=>{
+    vi.useRealTimers();vi.stubGlobal("indexedDB",new IDBFactory());
+    const seed=systemSeeds[0],at=new Date().toISOString();
+    const http=new HttpTransport(vi.fn(async()=>new Response(JSON.stringify({ok:false,error:{code:"NOT_FOUND",message:"Sin servidor de borradores"}}),{status:404,headers:{"content-type":"application/json"}})));http.bindAccount("dm-test");
+    const owned={gameId:randomUUID(),configuration:{ref:seed.ref,definition:seed.definition,hash:"a".repeat(64),availability:"enabled" as const},version:{...seed.ref,state:"published" as const,createdAt:at,publishedAt:at,revision:1,availability:"enabled" as const,definition:seed.definition,hash:"a".repeat(64),templates:{}},table:new BrowserTableClient(http)};
+    const dialogs={selectScene:async()=>null,sceneName:async()=>null};
+    const browser=createBrowserClient(http,dialogs,undefined,owned);
+    const mount=async(value:typeof browser)=>act(async()=>root.render(<ClientProvider client={value.client}><App service={{browser:value,confirmLeave:async()=>"discard",logout:async()=>{}}}/></ClientProvider>));
+    await mount(browser);
+    if(withMap){
+      const content=browser.draftContent(createSceneWithMap(createDefaultSceneMap()),{camera:{x:0,y:0,zoom:1},sidebar:true,aside:true,selectedId:null});
+      await act(async()=>browser.drafts!.restore({schemaVersion:1,localDraftId:randomUUID(),ownerId:"dm-test",origin:location.origin,instanceId:null,context:browser.draftContext(null),content,remote:null,pending:null,sequence:1,hash:"",confirmedHash:null,createKey:randomUUID(),updatedAt:at}));
+    }
+    await rail("Areas");await option("Area circular");
+    expect(props().shapes).toHaveLength(1);
+    await act(async()=>browser.drafts!.flushLocal());
+    const local=new IndexedDbDraftStore(),entries=await local.list("dm-test",location.origin,owned.gameId);
+    expect(entries).toHaveLength(1);
+    const checkpoint=await local.read("dm-test",location.origin,entries[0].id);
+    expect(checkpoint.content.scene.maps).toHaveLength(withMap?1:0);expect(checkpoint.content.scene.shapes).toHaveLength(1);
+    await act(async()=>root.render(null));browser.clear();
+    const next=createBrowserClient(http,dialogs,undefined,owned);await mount(next);
+    await act(async()=>next.drafts!.restore(checkpoint));
+    expect(props().shapes).toHaveLength(1);expect(props().shapes[0].type).toBe("circle");next.clear();
   });
 
   it("restaura foco al menú real después de cancelar el selector de servicio",async()=>{

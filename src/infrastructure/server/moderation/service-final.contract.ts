@@ -27,12 +27,14 @@ for(const kind of ["sqlite","postgres"] as const){
       return new Response(r.status===204?null:r.bytes.toString(),{status:r.status,headers:{"content-type":"application/json"}});
     };
     const transport=new HttpTransport(fetcher,()=>{expired++;},"/api/v1/dm");transport.bindAccount(users.a.id);
+    const ownedGame=await app.backend.identity.authorized(users.aCookie,"dm",(_,tx)=>tx.games.create(users.a.id,"Borrador",{systemId:"generic",version:1}));
+    const configuration=await app.backend.identity.authorized(users.aCookie,"dm",(_,tx)=>tx.links.resolve(ownedGame.id));
     const seed=systemSeeds[0],at="2026-10-31T00:00:00.000Z";
-    const client=createBrowserClient(transport,{selectScene:async()=>null,sceneName:async()=>"Borrador privado A"},undefined,{gameId:randomUUID(),configuration:{ref:seed.ref,definition:seed.definition,hash:"a".repeat(64),availability:"enabled"},version:{...seed.ref,state:"published",createdAt:at,publishedAt:at,revision:1,availability:"enabled",definition:seed.definition,hash:"a".repeat(64),templates:{}},table:new BrowserTableClient(transport)});
+    const client=createBrowserClient(transport,{selectScene:async()=>null,sceneName:async()=>"Borrador privado A"},undefined,{gameId:ownedGame.id,configuration,version:{...seed.ref,state:"published",createdAt:at,publishedAt:at,revision:1,availability:"enabled",definition:seed.definition,hash:"a".repeat(64),templates:{}},table:new BrowserTableClient(transport)});
     const base=createDefaultScene(),scene={...base,sceneAside:{...base.sceneAside,notes:[{id:randomUUID(),name:"Privada",parentId:null,content:"PRIVADO_CENTINELA_CUENTA_A"}]}};
     // Una sesión válida previa no basta: el cookie cambia justo antes del POST nuevo.
     expect((await http(port,"/api/v1/identity/session",cookie,"GET",undefined,{"x-ttrpg-account":users.a.id})).status).toBe(200);
-    cookie=users.bCookie;
+    cookie=users.bCookie;client.drafts!.setActive(true);
     expect((await client.client.api.saveScene(scene)).ok).toBe(false);expect(expired).toBe(1);
     expect((await http(port,"/scenes",users.bCookie)).json.scenes).toEqual([]);
     expect((await http(port,"/games",users.bCookie,"GET",undefined,{"x-ttrpg-account":users.a.id})).status).toBe(401);

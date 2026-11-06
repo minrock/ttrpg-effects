@@ -166,3 +166,9 @@ Los gates fallan si PostgreSQL real/TLS no están disponibles; no omiten motor. 
 GET `/api/v1/dm/definitions/{scenes,monsters}/:id` devuelve `{ok,templates}` únicamente para los bindings de la instancia propia. Conserva definiciones privadas retenidas y versiones exactas; no resuelve referencias libres, no admite admin ni publica definiciones a invitados.
 
 El cliente011 separa presentaciones habilitadas para crear de la definición exacta retenida de cada instancia. Reutilizar una ficha de biblioteca comprueba su referencia exacta antes de agregarla; persistencia vuelve a validar autoridad/disponibilidad. Una coincidencia de templateId no convierte una privada en compartida ni cambia su binding.
+
+## Borradores recuperables (SDD 58)
+
+La migración 8 añade `owned_drafts` y `owned_draft_versions`. Los respaldos integrales de SQLite/PostgreSQL incluyen estas tablas; `export-owned` sigue excluyéndolas del paquete funcional y devuelve un aviso/conteo al operador. El manifiesto conserva su formato. Guarda configuración y secretos por separado.
+
+Para actualizar una instalación, detén la API, realiza su respaldo integral y ejecuta `pnpm build:api`, `pnpm build:web`, `pnpm db:migrate` y `pnpm start:api`. Esta implementación no ejecutó migraciones sobre la base de trabajo del usuario. No uses un paquete funcional como sustituto del backup para volver a una versión anterior del esquema.

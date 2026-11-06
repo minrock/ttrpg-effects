@@ -1,6 +1,6 @@
 # SDD — Especificaciones de TTRPG Effects
 
-Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-04**, versión **3.21.0** según `package.json` (SDD 57 integrada en main, `62c351a`).
+Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-06**, versión en rama **3.22.1** según `package.json` ([corrección de recuperación](specs/51-experiencia-servicio/recuperacion-memoria.md), pendiente de integración; main conserva 3.21.0, SDD 57, `62c351a`).
 
 1. Lee [estado actual y decisiones](estado-actual.md) para conocer qué existe y qué sigue pendiente.
 2. Consulta [arquitectura y datos](arquitectura.md) y la [operación local](guias/service-operations.md) para preparar una propuesta compatible.
@@ -14,7 +14,7 @@ SDD/
   estado-actual.md          Base vigente, decisiones y límites
   arquitectura.md           Clientes, servidor, persistencia y datos
   flujo.md                  Planificación → implementación → evidencia
-  specs/00-… a 57-…/        spec.md + plan.md por alcance
+  specs/00-… a 58-…/        spec.md + plan.md por alcance
   specs/templates/          Plantillas de planificación
   guias/                    Contratos detallados y operación
 factory/
@@ -60,6 +60,7 @@ Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan s
 | [55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) | Integrada en main, 3.19.1 (`90dc50e`); validación PostgreSQL/visual pendiente | [Plan](specs/55-mediciones-compartidas/plan.md) · [Evidencia](specs/55-mediciones-compartidas/validacion.md) |
 | [56 — Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) | Integrada en main, 3.20.0 (`3d35876`); cámaras libres y foco puntual | [Plan](specs/56-camaras-libres-foco-atencion/plan.md) |
 | [57 — Áreas contextuales: color, patrones, bloqueo y copia](specs/57-areas-contextuales/spec.md) | Integrada en main, 3.21.0 (`62c351a`); ver validación | [Plan](specs/57-areas-contextuales/plan.md) · [Evidencia](specs/57-areas-contextuales/validacion.md) |
+| [58 — Borradores recuperables y autoguardado del servicio](specs/58-borradores-recuperables/spec.md) | Implementada en rama; validación nativa de rendimiento pendiente | [Plan](specs/58-borradores-recuperables/plan.md) |
 
 ## Guías técnicas y operativas
 
@@ -79,8 +80,10 @@ Los 12 trabajos figuran integrados en el tablero; las specs 41–52 consolidan s
 
 ## Siguiente planificación
 
-La siguiente numeración disponible es **58** tras reservar la spec 57; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 58: …» y después «ejecuta con `$factory` la spec SDD …».
+La siguiente numeración disponible es **59** tras reservar la spec 58; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 59: …» y después «ejecuta con `$factory` la spec SDD …».
 
 ## Antecedentes de planificación de la fábrica
 
 [Migración a servicio](../factory/migracion-servicio.md), [cuentas y partidas](../factory/autenticacion-partidas.md), [prerrequisitos históricos](../factory/prerrequisitos-autenticacion.json), [informe de integración 006–009](../factory/integracion-006-009.md) y [cola ejecutada](../factory/backlog.md). Se conservan como procedencia de las entregas; sus restricciones temporales no sustituyen las decisiones vigentes de SDD.
+
+Corrección 3.22.1 en `fix/recuperacion-local-figuras`: respalda figuras sin mapa, inicia escritura al crearlas y ofrece recuperar IndexedDB o cargar la escena. Conserva SDD 58 pendiente de integrar.

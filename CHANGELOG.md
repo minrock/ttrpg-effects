@@ -1,5 +1,27 @@
 # Changelog
 
+## 3.22.1 — 2026-11-06 — Corrección
+
+- Las figuras del lienzo sin mapa se respaldan en IndexedDB: el borrador ya no usa el serializador de escenas confirmadas que exigía al menos un mapa.
+- Crear/eliminar figuras inicia el respaldo local inmediatamente; salir del editor intenta terminar la escritura pendiente y el indicador distingue «Guardando» de «Guardado».
+- Recuperación inicial simplificada: «Recuperar estado local» o «Cargar mapa nuevamente», sin esperar al listado remoto. Otras copias, versiones y exportación quedan en Más opciones.
+- Si la escena cambió, recuperar conserva el trabajo como copia; cargar el mapa no borra el respaldo local y permite elegir otro si el original ya no existe.
+
+## 3.22.0 — 2026-11-05 — Funcionalidad
+
+- SDD 58: respaldo privado IndexedDB tras 1 s sin editar (máximo 5 s) y borradores remotos tras 5 s (máximo 30 s), separados de Guardar escena y de la proyección a jugadores.
+- Recuperación de documento, notas, fichas, cámara y paneles; ramas por ventana, tres generaciones, exportación, copia y descarte explícito. Archivo de respaldos para partidas archivadas o eliminadas.
+- Confirmación transaccional con revisión de escena, journal de reintentos y recibos acotados; un ACK anterior no elimina cambios posteriores. Migración 8 compatible con SQLite y PostgreSQL.
+- Electron conectado conserva IndexedDB por origen y limpia credenciales antes de abrir la página; cerrar sesión elimina respaldos locales e invalida escritores anteriores.
+- Integra la corrección de memoria 3.21.1 conservada en esta rama. Evidencia y límites de validación en SDD 58; no implica despliegue ni migración de la DB operativa.
+
+## 3.21.1 — 2026-11-05 — Corrección
+
+- Recuperación de sesión: detener renders periódicos en conflictos sin reintento y cerrar la cuenta regresiva al vencer Retry-After.
+- Liberar el lienzo Pixi al suspender/revalidar el acceso, conservando borrador y cámara para recuperarlos después.
+- Descartar un borrador en conflicto desmonta el editor y consulta el contexto vigente sin recargar toda la página ni pasar por su confirmación de salida.
+- Evitar el ciclo de resolución de imágenes de tokens ausentes, aislar fallos parciales y descartar resultados de una sesión o referencia anterior.
+
 ## 3.21.0 — 2026-11-04 — Funcionalidad
 
 - SDD 57: barra contextual compartida para círculos y conos, con color, paleta de 29 patrones del catálogo, bloqueo/desbloqueo, eliminación y copia independiente.

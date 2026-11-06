@@ -214,7 +214,7 @@ function requireBuild(): void {
 for (const kind of ["sqlite", "postgres"] as const) it(`comando pnpm db:migrate compilado ${kind}, repetición sin pendientes`, async () => {
   requireBuild(); const config = await fixture(kind), env = commandEnv(config);
   const first = await exec("pnpm", ["db:migrate"], { env, timeout: 15000 });
-  expect(first.stdout).toContain(`Catálogo ${kind}: migraciones 1, 2, 3, 4, 5, 6 aplicadas`);
+  expect(first.stdout).toContain(`Catálogo ${kind}: migraciones ${migrations.map(m=>m.version).join(", ")} aplicadas`);
   const second = await exec("pnpm", ["db:migrate"], { env, timeout: 15000 });
   expect(second.stdout).toContain("sin migraciones pendientes");
   if (config.driver === "postgres") { expect(env.TTRPG_DATA_DIR).toBeUndefined(); expect(first.stdout + first.stderr).not.toContain(config.url); }
