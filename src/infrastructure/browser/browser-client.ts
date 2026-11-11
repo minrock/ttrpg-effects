@@ -2,7 +2,7 @@ import { syncActiveMapFromRuntimeFields } from "../../domain/sessions/scene-maps
 import { DraftCoordinator } from "../../application/services/draft-coordinator";
 import { IndexedDbDraftStore } from "./drafts/indexeddb-store";
 import { httpDraftStore } from "./drafts/http-store";
-import { contentHash, type DraftContent, type DraftCheckpoint, type DraftContext, type DraftConfirmation } from "../../domain/drafts/draft";
+import { sceneContentHash, contentHash, type DraftContent, type DraftCheckpoint, type DraftContext, type DraftConfirmation } from "../../domain/drafts/draft";
 import { Mutations } from "./mutations";
 import { resourceBindingsSchema, type ResourceBindings, type ResolvedSystem, type SystemVersion } from "../../domain/systems/system-catalog";
 import { BrowserTableClient } from "./table-client";
@@ -54,7 +54,7 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     return { gameId:owned.gameId, writerId:drafts?.writerId??crypto.randomUUID(), parentDraftId:null, sceneId:id, baseRevision:id?versions.get(`scenes/${id}`)?.revision??0:0, systemRef:owned.configuration.ref, systemHash:owned.configuration.hash };
   }
   function draftContent(scene:SceneDocument, view:DraftContent["view"]):DraftContent {
-    return {scene:parseSceneDocument(syncActiveMapFromRuntimeFields(scene)),bindings:sceneBindings(scene,currentBindings),view};
+    return {scene:parseSceneDocument(syncActiveMapFromRuntimeFields({...scene,camera:view.camera,editorView:{sidebar:view.sidebar,aside:view.aside,selectedId:view.selectedId}})),bindings:sceneBindings(scene,currentBindings),view};
   }
   const urlFor = (reference:string) => { const legacy=assetUrl(reference); return legacy && owned ? legacy.replace("/api/v1/assets/","/api/v1/dm/assets/") : legacy; };
   function binding(templateId:string|null) { if(!owned)throw new Error("Falta configuración de sistema.");return {scope:"catalog" as const,...owned.configuration.ref,templateId:templateId??"generic-markdown"}; }
@@ -102,8 +102,8 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
   async function save(scene: SceneDocument, reference?: string | null) {
     if(drafts?.checkpoint?.confirmation){
       const previous=drafts.checkpoint, command=previous.confirmation!, confirmed=await confirmDraft(command);
-      drafts.confirmed(confirmed.sceneId,confirmed.sceneRevision,command.hash);
       const saved=(await http.request(`/scenes/${confirmed.sceneId}`,resourceReply)).resource;
+      await drafts.confirmed(confirmed.sceneId,confirmed.sceneRevision,command.hash,draftContent(saved.scene,previous.content.view));
       const currentHash=await contentHash(draftContent(scene,previous.content.view));
       if(currentHash!==command.hash){
         remember(`scenes/${saved.id}`,saved);names.set(sceneReference(saved.id),saved.name);
@@ -118,7 +118,7 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     const key=reference?`scenes/${sceneId(reference)}`:undefined;
     if(owned&&key&&!versions.has(key))throw new Error("Vuelve a abrir la escena para conocer su revisión antes de guardar.");
     if (drafts && owned) {
-      const content = draftContent(scene, drafts.checkpoint?.content.view ?? {camera:scene.camera,sidebar:true,aside:true,selectedId:null});
+      const content = draftContent(scene, {...(scene.editorView??drafts.checkpoint?.content.view??{sidebar:true,aside:true,selectedId:null}),camera:scene.camera});
       const context = draftContext(reference ?? null);
       const head = await drafts.prepare(()=>({content,context}));
       if (head) {
@@ -126,8 +126,9 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
         const command:DraftConfirmation={hash,key:crypto.randomUUID(),draftId:head.id,revision:head.revision,sequence:head.sequence,payload:{name,mode:reference?"update":"copy",sceneRevision:reference?context.baseRevision:0,targetGameId:owned.gameId}};
         await drafts.pendingConfirmation(command);
         const confirmed = await confirmDraft(command);
-        drafts.confirmed(confirmed.sceneId,confirmed.sceneRevision,hash);
-        return hydrate((await http.request(`/scenes/${confirmed.sceneId}`,resourceReply)).resource);
+        const saved=(await http.request(`/scenes/${confirmed.sceneId}`,resourceReply)).resource;
+        await drafts.confirmed(confirmed.sceneId,confirmed.sceneRevision,hash,draftContent(saved.scene,content.view));
+        return hydrate(saved);
       }
     }
     const reply = await mutate(reference ? `/scenes/${sceneId(reference)}` : "/scenes", resourceReply, reference ? "PUT":"POST", {name,scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene,key?versions.get(key)?.bindings:currentBindings)}:{})},key?versions.get(key)?.revision:undefined);
@@ -214,6 +215,12 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
       for(const [monsterId,definition] of retained)retainedTemplates.set(monsterId,definition);
       return {...reply,filePath:id?sceneReference(id):""};
     },
+    isDraftSaved: async(value:DraftCheckpoint)=>{
+      if(!value.context.sceneId)return false;
+      const saved=(await http.request(`/scenes/${value.context.sceneId}`,resourceReply)).resource;
+      return await sceneContentHash(value.content)===await sceneContentHash({scene:saved.scene,bindings:saved.bindings??{monsters:{}},view:value.content.view});
+    },
+    latestSavedScene:async()=> owned?(await http.request(`/games/${owned.gameId}/last-scene`,z.object({ok,sceneId:z.uuid().nullable()}))).sceneId:null,
     openSaved: async(reference:string)=>load(reference),
     client:createClient(api,{scenes:true,images:true,libraries:true,templateAdministration:!owned,player:true,dice:true,nativeMenus:false},"service",owned?{
       forMonster:(id,templateId,available)=>{const retained=retainedTemplates.get(id);return retained&&retained.id===templateId?[retained,...available.filter(t=>t.id!==retained.id)]:available;},

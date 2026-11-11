@@ -57,3 +57,15 @@ it('detecta contenido alterado aunque el JSON siga siendo válido',async()=>{
  await expect(store.read(value.ownerId,value.origin,value.localDraftId)).rejects.toThrow('dañado');
  expect(await store.raw(value.ownerId,value.origin,value.localDraftId)).toBeDefined();
 });
+
+it('recupera el contenido íntegro de un respaldo con PUT cero y conserva el original exportable',async()=>{
+ const store=new IndexedDbDraftStore(new IDBFactory()),value=checkpoint();
+ const pending={key:crypto.randomUUID(),revision:0,put:{sequence:0,hash:value.hash,content:value.content,sceneId:null,baseRevision:0}};
+ const legacy={...value,sequence:0,pending,remote:{id:crypto.randomUUID(),context:value.context,revision:0,sequence:0,hash:'',updatedAt:value.updatedAt,confirmedSequence:0}};
+ await store.write(legacy);
+ const recovered=await store.read(value.ownerId,value.origin,value.localDraftId);
+ expect(recovered.content).toEqual(value.content);expect(recovered.pending).toBeNull();expect(recovered.sequence).toBe(1);
+ expect(await store.raw(value.ownerId,value.origin,value.localDraftId)).toEqual(legacy);
+ await store.write({...legacy,sequence:1,pending:{...pending,put:{...pending.put,hash:'a'.repeat(64)}}});
+ await expect(store.read(value.ownerId,value.origin,value.localDraftId)).rejects.toThrow('dañado');
+});

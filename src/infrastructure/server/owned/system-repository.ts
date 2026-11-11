@@ -92,6 +92,11 @@ export function systemRepositories(run: Execute, owner: string, role: "admin" | 
     }
   };
   const links: ResourceGameLinks = {
+    latestScene:gameId=>run(async c=>{
+      dm();await game(gameId);
+      const row=(await c.query("SELECT r.id FROM owned_resources r JOIN game_resources g ON g.owner_id=r.owner_id AND g.kind=r.kind AND g.resource_id=r.id WHERE g.owner_id=$1 AND g.game_id=$2 AND g.kind='scenes' ORDER BY r.updated_at DESC,r.sort_id ASC LIMIT 1",[owner,gameId])).rows[0];
+      return row?String(row.id):null;
+    }),
     validate,
     resolve: async id => systems.resolve(await game(id)),
     link: (gameId, kind, id) => run(async c => {

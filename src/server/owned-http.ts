@@ -88,6 +88,7 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
             if (parts.length === 1 && method === "GET") { query(url, ["limit", "offset"]); return { value: { ok: true, ...await games.list({ limit: numberQuery(url, "limit", 50, 1, 100), offset: numberQuery(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER) }) } }; }
             query(url, []);
             if (parts.length === 1 && method === "POST") { const input = parse(z.strictObject({ name: gameNameSchema, systemRef: systemRefSchema }), payload); const game = await games.create(input.name, input.systemRef); return { status: 201, location: `/api/v1/dm/games/${game.id}`, value: { ok: true, game } }; }
+            if(parts.length===3&&parts[2]==="last-scene"&&method==="GET")return {value:{ok:true,sceneId:await tx.links.latestScene(routeId(parts[1]))}};
             if (parts.length === 3 && parts[2] === "configuration" && method === "GET") return { value: { ok: true, configuration: await tx.links.resolve(routeId(parts[1])) } };
             if (parts.length === 3 && parts[2] === "resources" && method === "POST") { const input = parse(z.strictObject({ kind: z.enum(["scenes","monsters","npcs","player-characters"]), resourceId: z.uuid() }),payload); await tx.links.link(routeId(parts[1]),input.kind,input.resourceId); return { value: { ok: true } }; }
             if (parts.length !== 2) throw missing(); const key = routeId(parts[1]);

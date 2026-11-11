@@ -42,13 +42,13 @@ export interface DraftCheckpoint {
   context: DraftContext; remote: DraftHead | null; sequence: number; hash: string; updatedAt: string;
   content: DraftContent; pending: { key: string; revision: number; put: DraftPut } | null;
   confirmation?: DraftConfirmation | null;
-  createKey: string; confirmedHash: string | null;
+  createKey: string; confirmedHash: string | null; confirmedSceneHash?: string | null;
 }
 export const checkpointSchema = z.strictObject({
   schemaVersion: z.literal(1), localDraftId: z.uuid(), ownerId: z.string().min(1).max(128), origin: z.string().max(2048), instanceId: z.uuid().nullable(),
   confirmation:draftConfirmationSchema.nullable().optional(),
   context: draftContextSchema, remote: draftHeadSchema.nullable(), sequence: z.number().int().nonnegative(), hash: z.string(), updatedAt: z.string(),
-  content: draftContentSchema, pending: z.strictObject({ key: z.uuid(), revision: z.number().int().nonnegative(), put: draftPutSchema }).nullable(), createKey: z.uuid(), confirmedHash: z.string().nullable()
+  content: draftContentSchema, pending: z.strictObject({ key: z.uuid(), revision: z.number().int().nonnegative(), put: draftPutSchema }).nullable(), createKey: z.uuid(), confirmedHash: z.string().nullable(), confirmedSceneHash:z.string().nullable().optional()
 });
 export function encodedBytes(value: unknown): number { return new TextEncoder().encode(JSON.stringify(value)).byteLength; }
 /** Estable también después de normalizar JSON recibido. No acepta credenciales ni estado de render. */
@@ -66,4 +66,36 @@ export async function contentHash(content: DraftContent): Promise<string> {
 export function detachedScene(scene: SceneDocument): SceneDocument {
   const detach = (annotations: SceneDocument["mapAnnotations"]) => ({ ...annotations, sceneLinks: annotations.sceneLinks.map(link=>({...link, connection:null})) });
   return parseSceneDocument({ ...scene, id: crypto.randomUUID(), mapAnnotations: detach(scene.mapAnnotations), maps: scene.maps.map(map=>({...map,mapAnnotations:detach(map.mapAnnotations)})) });
+}
+
+/** El documento guardable, sin navegación ni selección: mover la cámara no requiere recuperación. */
+export async function sceneContentHash(content:DraftContent):Promise<string>{
+  const {camera,editorView,...scene}=content.scene;void camera;void editorView;
+  const maps=scene.maps.map(({camera,...map})=>{void camera;return map;});
+  const bytes=new TextEncoder().encode(canonical({scene:{...scene,maps},bindings:content.bindings}));
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+/** Compatibilidad acotada con respaldos 3.22.2: el servidor nunca aceptó un PUT de secuencia cero. */
+const zeroSequenceCheckpointSchema = checkpointSchema.extend({
+  confirmation: z.null().optional(),
+  remote: draftHeadSchema.extend({ revision: z.literal(0), sequence: z.literal(0), hash: z.literal("") }),
+  pending: z.strictObject({
+    key: z.uuid(), revision: z.literal(0),
+    put: draftPutSchema.extend({ sequence: z.literal(0) })
+  })
+});
+
+export async function readLocalCheckpoint(raw:unknown):Promise<DraftCheckpoint>{
+  const parsed=checkpointSchema.safeParse(raw);
+  if(parsed.success&&parsed.data.hash===await contentHash(parsed.data.content))return parsed.data;
+  const legacy=zeroSequenceCheckpointSchema.safeParse(raw);
+  if(legacy.success){
+    const value=legacy.data;
+    if(value.hash===await contentHash(value.content)&&value.pending.put.hash===await contentHash(value.pending.put.content)){
+      // No se reescribe el original: sigue disponible para exportar y la recuperación crea otra rama.
+      return {...value,sequence:Math.max(1,value.sequence),pending:null};
+    }
+  }
+  throw new Error("El respaldo es incompatible o está dañado. Prueba otra generación o exporta el original.");
 }

@@ -1,3 +1,4 @@
+import { createDefaultSceneMap } from "../domain/sessions/scene-maps";
 import { resourceBindingsSchema } from "../domain/systems/system-catalog";
 import { z } from "zod";
 import type { OwnedTransaction } from "../application/services/owned-store";
@@ -57,7 +58,9 @@ export async function ownedDraftRoute(tx: OwnedTransaction, owner: string, url: 
     await contextValid({...draft.context,gameId:input.targetGameId,sceneId:input.mode==="copy"?null:draft.context.sceneId});
     if(input.mode==="update"&&(input.targetGameId!==draft.context.gameId||input.sceneRevision!==draft.context.baseRevision))throw new HttpError(409,"CONFLICT","La revisión base cambió. Recupera como copia.");
     const scenes=new OwnedSceneService(tx,now);
-    const saved=await scenes.save(input.name,input.mode==="copy"?detachedScene(content.scene):content.scene,input.mode==="update"?draft.context.sceneId??undefined:undefined,input.sceneRevision,content.bindings);
+    let snapshot={...content.scene,camera:content.view.camera,editorView:{sidebar:content.view.sidebar,aside:content.view.aside,selectedId:content.view.selectedId}};
+    if(!snapshot.maps.length){const map=createDefaultSceneMap({...snapshot,id:"map-1",name:"Lienzo"});snapshot={...snapshot,id:map.id,name:map.name,activeMapId:map.id,maps:[map]};}
+    const saved=await scenes.save(input.name,input.mode==="copy"?detachedScene(snapshot):snapshot,input.mode==="update"?draft.context.sceneId??undefined:undefined,input.sceneRevision,content.bindings);
     await tx.links.link(input.targetGameId,"scenes",saved.id);
     await tx.drafts.confirmed(id,draft.revision,saved.id,saved.revision);
     return {value:{ok:true,sceneId:saved.id,sceneRevision:saved.revision,draftRevision:draft.revision,sequence:draft.sequence}};

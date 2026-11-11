@@ -332,6 +332,7 @@ export interface SceneDocumentV1 {
 }
 
 export interface SceneDocumentV2 extends SceneMapDocument {
+  readonly editorView?: { readonly sidebar:boolean; readonly aside:boolean; readonly selectedId:string|null };
   readonly version: typeof SCENE_DOCUMENT_VERSION;
   readonly maps: readonly SceneMapDocument[];
   readonly activeMapId: string | null;

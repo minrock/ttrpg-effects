@@ -1,17 +1,17 @@
-import { canonical, contentHash, type DraftCheckpoint, type DraftContent, type DraftContext, type DraftHead, type DraftConfirmation } from "../../domain/drafts/draft";
+import { sceneContentHash, canonical, contentHash, type DraftCheckpoint, type DraftContent, type DraftContext, type DraftHead, type DraftConfirmation } from "../../domain/drafts/draft";
 import type { DraftRemote } from "./draft-store";
 export interface DraftLocal {
   write(value:DraftCheckpoint):Promise<void>;
   enabled(ownerId:string):Promise<boolean>;
 }
-export interface DraftStatus { local:string; remote:string; confirmed:string; error:string; enabled:boolean; available:boolean|null }
+export interface DraftStatus { ready?:boolean; local:string; remote:string; confirmed:string; error:string; enabled:boolean; available:boolean|null }
 export interface DraftRestoreOptions { confirmed?:boolean }
 interface Snapshot { content:DraftContent; context:DraftContext }
 const message=(e:unknown)=>e instanceof Error?e.message:"No se pudo respaldar el borrador.";
 /** Dos destinos independientes. Solo referencias al último candidato y al envío incierto. */
 export class DraftCoordinator {
   private listeners=new Set<()=>void>();
-  private state:DraftStatus={local:"Sin cambios pendientes",remote:"Comprobando autoguardado…",confirmed:"Escena sin confirmar",error:"",enabled:true,available:null};
+  private state:DraftStatus={ready:false,local:"Sin cambios pendientes",remote:"Comprobando autoguardado…",confirmed:"Escena sin confirmar",error:"",enabled:true,available:null};
   private snapshot:(()=>Snapshot)|null=null;
   private current:DraftCheckpoint|null=null;
   private persisted:DraftCheckpoint|null=null;
@@ -65,12 +65,18 @@ export class DraftCoordinator {
     // Cambiar de documento retiene su respaldo independiente.
     const previous=sameDocument?prior:null;
     if(previous?.hash===hash&&previous.context.sceneId===value.context.sceneId&&previous.context.baseRevision===value.context.baseRevision){
-      this.captured=generation;this.generations.set(previous,contentGeneration);return;
+      this.captured=generation;this.generations.set(previous,contentGeneration);await this.refreshConfirmation(previous);return;
     }
     const next:DraftCheckpoint={schemaVersion:1,localDraftId:previous?.localDraftId??crypto.randomUUID(),ownerId:this.ownerId,origin:this.origin,instanceId:this.instanceId,
       context:{...value.context,writerId:this.writerId,parentDraftId:previous?.context.parentDraftId??null},remote:previous?.remote??null,sequence:(previous?.sequence??0)+1,hash,updatedAt:new Date().toISOString(),content:value.content,
-      pending:previous?.pending??null,confirmation:previous?.confirmation??null,createKey:previous?.createKey??crypto.randomUUID(),confirmedHash:previous?.confirmedHash??null};
-    this.current=next;this.captured=generation;this.generations.set(next,contentGeneration);
+      pending:previous?.pending??null,confirmation:previous?.confirmation??null,createKey:previous?.createKey??crypto.randomUUID(),confirmedHash:previous?.confirmedHash??null,confirmedSceneHash:previous?.confirmedSceneHash??null};
+    this.current=next;this.captured=generation;this.generations.set(next,contentGeneration);await this.refreshConfirmation(next);
+  }
+  private async refreshConfirmation(value:DraftCheckpoint){
+    const clean=value.confirmedSceneHash
+      ? value.confirmedSceneHash===await sceneContentHash(value.content)
+      : value.confirmedHash===value.hash;
+    if(this.current===value)this.status({confirmed:clean?"Escena guardada":"Cambios sin confirmar"});
   }
   async flushLocal():Promise<void>{
     if(this.localFlight){await this.localFlight;if(this.changed!==this.captured)return this.flushLocal();return;}
@@ -136,11 +142,22 @@ export class DraftCoordinator {
     if(this.current?.pending)throw new Error("El envío anterior no está confirmado. Reintenta antes de guardar la escena.");return this.current?.remote??null;
   }
   async pendingConfirmation(value:DraftConfirmation) { if(!this.current)throw new Error("Falta el borrador de la confirmación.");this.current.confirmation=value;await this.persist(this.current); }
-  confirmed(sceneId:string,revision:number,hash:string){
-    if(this.current){this.current.confirmation=null;this.current.context={...this.current.context,sceneId,baseRevision:revision};this.current.confirmedHash=hash;if(this.state.enabled)void this.local.write(this.current).catch(e=>this.status({error:message(e)}));}
-    this.status({confirmed:this.current?.hash===hash?"Escena guardada":"Escena guardada; hay cambios posteriores"});
+  async confirmed(sceneId:string,revision:number,hash:string,savedContent?:DraftContent){
+    await this.flushLocal().catch(()=>{});
+    if(this.current){
+      const saved=savedContent??(this.current.hash===hash?this.current.content:null);
+      const clean=this.current.hash===hash;
+      const content=clean&&saved?saved:this.current.content;
+      this.current={...this.current,content,hash:await this.hash(content),confirmation:null,
+        context:{...this.current.context,sceneId,baseRevision:revision},sequence:this.current.sequence+1,
+        confirmedHash:clean?await this.hash(content):hash,
+        confirmedSceneHash:saved?await sceneContentHash(saved):this.current.confirmedSceneHash,
+        updatedAt:new Date().toISOString()};
+      await this.persist(this.current);
+      this.status({confirmed:clean?"Escena guardada":"Escena guardada; hay cambios posteriores"});
+    }
   }
-  onRestore(listener:(value:DraftCheckpoint,options?:DraftRestoreOptions)=>Promise<void>){this.restoreListeners.add(listener);return()=>{this.restoreListeners.delete(listener);};}
+  onRestore(listener:(value:DraftCheckpoint,options?:DraftRestoreOptions)=>Promise<void>){this.restoreListeners.add(listener);this.status({ready:true});return()=>{this.restoreListeners.delete(listener);this.status({ready:this.restoreListeners.size>0});};}
   async restore(value:DraftCheckpoint,options?:DraftRestoreOptions){
     if(!this.restoreListeners.size)throw new Error("El editor aún se está preparando. Vuelve a intentar recuperar.");
     if(value.ownerId!==this.ownerId||value.origin!==this.origin)throw new Error("El borrador pertenece a otra cuenta u origen.");
@@ -149,8 +166,12 @@ export class DraftCoordinator {
     // Resolver envío incierto en la rama original antes de derivar, sin cambiar su cuerpo.
     if(value.pending&&value.remote){await this.remote.put(value.remote!.id,value.pending.revision,value.pending.key,value.pending.put);value={...value,pending:null};}
     for(const listener of this.restoreListeners)await listener(value,options);
-    this.current={...value,hash:await this.hash(value.content),localDraftId:crypto.randomUUID(),createKey:crypto.randomUUID(),sequence:0,remote:null,pending:null,context:{...value.context,writerId:this.writerId,parentDraftId:value.remote?.id??null}};
-    this.status({confirmed:options?.confirmed?"Escena guardada cargada":"Borrador recuperado; confirma para guardar la escena"});
+    this.current={...value,confirmedHash:options?.confirmed?await this.hash(value.content):value.confirmedHash,confirmedSceneHash:options?.confirmed?await sceneContentHash(value.content):value.confirmedSceneHash,hash:await this.hash(value.content),localDraftId:crypto.randomUUID(),createKey:crypto.randomUUID(),sequence:1,remote:null,pending:null,context:{...value.context,writerId:this.writerId,parentDraftId:value.remote?.id??null}};
+    this.snapshot=null;this.captured=this.changed;
+    this.generations.set(this.current,this.contentChanged);
+    clearTimeout(this.localTimer);clearTimeout(this.remoteTimer);this.localStart=null;this.remoteStart=null;
+    await this.persist(this.current);
+    this.status({error:"",remote:"Sin cambios pendientes",confirmed:options?.confirmed?"Escena guardada cargada":"Borrador recuperado; confirma para guardar la escena"});
   }
   async stop(){this.active=false;clearTimeout(this.localTimer);clearTimeout(this.remoteTimer);await Promise.allSettled([this.flushLocal(),this.remoteFlight]);this.disposed=true;this.listeners.clear();this.restoreListeners.clear();}
   dispose(){this.active=false;clearTimeout(this.localTimer);clearTimeout(this.remoteTimer);this.disposed=true;this.listeners.clear();this.restoreListeners.clear();}

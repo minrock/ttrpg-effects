@@ -330,3 +330,7 @@ Contrato y criterios CA-15–18 en [SDD 55](../55-mediciones-compartidas/spec.md
 Sustituye, al implementarse, la herencia de cámara DM al abrir/cambiar viewport, el bloqueo inicial de zoom y las órdenes de centro+zoom de los apartados anteriores. Cada jugador navega por su cuenta, con zoom inicialmente libre y candado exclusivamente local. Publicar o reconectar no cambia su cámara. El nuevo foco del DM modifica solo el centro exacto del canvas útil, conservando el zoom local en el instante de recepción y sin impedir navegación posterior.
 
 El cambio de mapa conserva zoom numérico propio y utiliza el centro de entrada público o centro del mapa destino; no compensa a partir de la cámara principal. Escena, visibilidad y permisos de edición siguen sujetos al DM. El contrato completo, inicialización, gestos activos y criterios CA-01–14 están en [SDD 56](../56-camaras-libres-foco-atencion/spec.md).
+
+### Corrección de auditoría — 2026-11-11
+
+El motor no se destruye/recrea cuando cambia la identidad del manejador contextual React. Un cambio de selección, zoom o publicación debe conservar la instancia y usar el callback vigente. Se verificó render real tras abrir Player View con imagen y efectos.

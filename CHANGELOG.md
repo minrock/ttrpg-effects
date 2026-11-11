@@ -1,5 +1,26 @@
 # Changelog
 
+## 3.23.0 — 2026-11-11 — Versión minor
+
+- Consolida el guardado completo de escenas y la recuperación desde IndexedDB y servidor.
+- Incluye las seis correcciones de auditoría documentadas en 3.22.3: Player View, recientes, enlaces, avisos, recuperación y actualización de imágenes.
+- Incremento minor solicitado por el usuario; conserva compatibilidad con escenas existentes.
+
+## 3.22.3 — 2026-11-11 — Corrección
+
+- Auditoría B01–B06: estabiliza el callback contextual del canvas del jugador para evitar recreaciones continuas de Pixi.
+- Protege cambios al abrir recientes con Cancelar/Descartar/Guardar; los errores de guardado conservan la escena y abrir el mismo archivo no restaura una copia anterior al guardado.
+- Valida enlaces internos contra los mapas actuales y deshabilita navegación a destinos ausentes; retira únicamente los avisos de imágenes reparadas.
+- Restaurar borradores utiliza secuencias positivas; permite recuperar copias 3.22.2 afectadas por un PUT cero tras comprobar ambos hashes, conservando el original exportable.
+- Actualizar imagen admite referencias privadas de DM con coincidencia exacta de ID y mantiene el rechazo de URLs externas.
+
+## 3.22.2 — 2026-11-06 — Corrección
+
+- Guardar escena confirma el documento completo del editor, incluyendo figuras, notas, cámara y disposición de paneles; también admite un lienzo sin imagen como mapa vacío.
+- Al reabrir una partida se carga su última escena guardada desde el servidor, incluso sin IndexedDB. La recuperación local solo se ofrece para cambios de contenido pendientes; navegar o cambiar paneles no basta para activarla.
+- La confirmación local se espera y conserva una huella del documento guardado. Un cambio posterior a la petición permanece pendiente y no se declara guardado por una respuesta anterior.
+- Regresiones con editor React, cliente HTTP, IndexedDB y API/SQLite temporales: guardar/cerrar/reabrir, recuperar cambios nuevos, dos guardados sucesivos y carga con IndexedDB vacío.
+
 ## 3.22.1 — 2026-11-06 — Corrección
 
 - Las figuras del lienzo sin mapa se respaldan en IndexedDB: el borrador ya no usa el serializador de escenas confirmadas que exigía al menos un mapa.

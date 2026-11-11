@@ -1,6 +1,7 @@
-import { contentHash, checkpointSchema, DRAFT_LIMITS, encodedBytes, type DraftCheckpoint, type DraftContext } from "../../../domain/drafts/draft";
+import { sceneContentHash, readLocalCheckpoint, DRAFT_LIMITS, encodedBytes, type DraftCheckpoint, type DraftContext } from "../../../domain/drafts/draft";
 export interface LocalDraftIndex {
   id:string; ownerId:string; origin:string; instanceId:string|null; context:DraftContext;
+  confirmedHash?:string|null; confirmedSceneHash?:string|null; sceneHash?:string;
   sequence:number; hash:string; updatedAt:string; remoteId:string|null; bytes:number; revisions:number[];
 }
 const DATABASE="ttrpg-drafts-v1";
@@ -21,8 +22,7 @@ export class IndexedDbDraftStore {
   }
   list(ownerId:string,origin:string,gameId?:string):Promise<LocalDraftIndex[]>{return this.run(["index"],"readonly",async tx=>(await request(tx.objectStore("index").getAll()) as LocalDraftIndex[]).filter(v=>v.ownerId===ownerId&&v.origin===origin&&(!gameId||v.context.gameId===gameId)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)));}
   async read(ownerId:string,origin:string,id:string,sequence?:number):Promise<DraftCheckpoint>{
-    const raw=await this.raw(ownerId,origin,id,sequence);const parsed=checkpointSchema.safeParse(raw);
-    if(!parsed.success||parsed.data.hash!==await contentHash(parsed.data.content))throw new Error("El respaldo es incompatible o está dañado. Prueba otra generación o exporta el original.");return parsed.data;
+    return readLocalCheckpoint(await this.raw(ownerId,origin,id,sequence));
   }
   raw(ownerId:string,origin:string,id:string,sequence?:number):Promise<unknown>{return this.run(["index","versions"],"readonly",async tx=>{
     const index=await request(tx.objectStore("index").get(id)) as LocalDraftIndex|undefined;
@@ -30,7 +30,8 @@ export class IndexedDbDraftStore {
     const row=await request(tx.objectStore("versions").get(`${id}:${sequence??index.sequence}`)) as {value:unknown}|undefined;
     if(!row)throw new Error("La generación local ya no está disponible.");return row.value;
   });}
-  write(value:DraftCheckpoint):Promise<void>{
+  async write(value:DraftCheckpoint):Promise<void>{
+    const sceneHash=await sceneContentHash(value.content);
     const bytes=encodedBytes(value);
     if(bytes>DRAFT_LIMITS.bytes) return Promise.reject(new Error("El respaldo supera 10 MiB. Reduce el documento o expórtalo; se conserva la copia anterior."));
     return this.run(["index","versions","preferences"],"readwrite",async tx=>{
@@ -48,7 +49,7 @@ export class IndexedDbDraftStore {
       if(indices.reduce((n,v)=>n+v.bytes,0)-(previous?.bytes??0)+branchBytes>DRAFT_LIMITS.localBytes)throw new Error("Se alcanzó el límite local de 50 MiB. Exporta o descarta un respaldo; no se borró ninguno.");
       await request(versions.put({key:`${value.localDraftId}:${value.sequence}`,value,bytes}));
       for(const seq of previous?.revisions??[])if(!keep.includes(seq))await request(versions.delete(`${value.localDraftId}:${seq}`));
-      const index:LocalDraftIndex={id:value.localDraftId,ownerId:value.ownerId,origin:value.origin,instanceId:value.instanceId,context:value.context,sequence:value.sequence,hash:value.hash,updatedAt:value.updatedAt,remoteId:value.remote?.id??null,bytes:branchBytes,revisions:keep};
+      const index:LocalDraftIndex={sceneHash,confirmedSceneHash:value.confirmedSceneHash,confirmedHash:value.confirmedHash,id:value.localDraftId,ownerId:value.ownerId,origin:value.origin,instanceId:value.instanceId,context:value.context,sequence:value.sequence,hash:value.hash,updatedAt:value.updatedAt,remoteId:value.remote?.id??null,bytes:branchBytes,revisions:keep};
       await request(tx.objectStore("index").put(index));
     });
   }

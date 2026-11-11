@@ -42,7 +42,7 @@ it("si hay conflicto recupera como copia sin sobrescribir el origen",async()=>{
 });
 it("una copia ilegible permite cargar el mapa y permanece exportable",async()=>{
  const t=setup();t.read.mockRejectedValue(new Error("El respaldo está dañado"));await t.render();await t.click("Recuperar estado local");expect(host.querySelector('[role="alert"]')?.textContent).toContain("dañado");expect(t.onRecovered).not.toHaveBeenCalled();
- await t.click("Cargar mapa nuevamente");expect(t.onRecovered).toHaveBeenCalledOnce();expect(t.browser.localDrafts.remove).not.toHaveBeenCalled();
+ await t.click("Cargar mapa nuevamente");await vi.waitFor(()=>expect(t.onRecovered).toHaveBeenCalledOnce());expect(t.browser.localDrafts.remove).not.toHaveBeenCalled();
 });
 it("sin escena asociada abre el selector de mapas con vuelta a recuperación",async()=>{
  const t=setup();t.cp.context.sceneId=null;await t.render();await t.click("Cargar mapa nuevamente");expect(host.textContent).toContain("Escenas guardadas en el servicio");await t.click("Cancelar");expect(host.textContent).toContain("¿Cómo quieres continuar?");expect(t.read).not.toHaveBeenCalled();
@@ -50,4 +50,31 @@ it("sin escena asociada abre el selector de mapas con vuelta a recuperación",as
 
 it("si el mapa guardado fue eliminado permite elegir otro sin perder el respaldo",async()=>{
  const t=setup();vi.mocked(t.browser.openSaved).mockRejectedValue(new ServiceError("NOT_FOUND","Escena ausente",404));await t.render();await t.click("Cargar mapa nuevamente");expect(host.textContent).toContain("Escenas guardadas en el servicio");expect(t.browser.localDrafts.remove).not.toHaveBeenCalled();
+});
+
+it("al reabrir una copia ya confirmada carga el servidor sin pedir recuperación",async()=>{
+ const t=setup();t.cp.confirmedHash=t.cp.hash;
+ vi.mocked(t.browser.localDrafts.list).mockResolvedValue([{id:t.cp.localDraftId,context:t.cp.context,updatedAt:t.cp.updatedAt,hash:t.cp.hash,confirmedHash:t.cp.hash} as never]);
+ await t.render();expect(host.querySelector("dialog")).toBeNull();expect(t.browser.openSaved).toHaveBeenCalledWith(`scene:${t.cp.context.sceneId}`);expect(t.restore).toHaveBeenCalledWith(expect.anything(),{confirmed:true});
+});
+
+it("sin IndexedDB carga la última escena confirmada de la partida",async()=>{
+ const t=setup();vi.mocked(t.browser.localDrafts.list).mockResolvedValue([]);t.browser.latestSavedScene=vi.fn().mockResolvedValue(t.cp.context.sceneId);
+ await t.render();expect(host.querySelector("dialog")).toBeNull();await vi.waitFor(()=>expect(t.restore).toHaveBeenCalled());expect(t.browser.openSaved).toHaveBeenCalledWith(`scene:${t.cp.context.sceneId}`);
+});
+it("cambios locales posteriores al guardado sí ofrecen recuperación",async()=>{
+ const t=setup();vi.mocked(t.browser.localDrafts.list).mockResolvedValue([{id:t.cp.localDraftId,context:t.cp.context,updatedAt:t.cp.updatedAt,hash:"nuevo",confirmedHash:"anterior",sceneHash:"figura nueva",confirmedSceneHash:"figura anterior"} as never]);
+ await t.render();expect(host.textContent).toContain("¿Cómo quieres continuar?");expect(t.browser.openSaved).not.toHaveBeenCalled();
+});
+it("mover cámara o paneles no dispara recuperación de una escena ya guardada",async()=>{
+ const t=setup();vi.mocked(t.browser.localDrafts.list).mockResolvedValue([{id:t.cp.localDraftId,context:t.cp.context,updatedAt:t.cp.updatedAt,hash:"vista nueva",confirmedHash:"vista anterior",sceneHash:"mismo documento",confirmedSceneHash:"mismo documento"} as never]);
+ await t.render();expect(host.querySelector("dialog")).toBeNull();await vi.waitFor(()=>expect(t.restore).toHaveBeenCalled());
+});
+it("una confirmación perdida se concilia con el servidor y no pide recuperar lo ya guardado",async()=>{
+ const t=setup();t.browser.isDraftSaved=vi.fn().mockResolvedValue(true);
+ await t.render();expect(host.querySelector("dialog")).toBeNull();await vi.waitFor(()=>expect(t.restore).toHaveBeenCalled());expect(t.browser.isDraftSaved).toHaveBeenCalledWith(t.cp);
+});
+it("si IndexedDB no está disponible todavía carga la escena del servidor",async()=>{
+ const t=setup();vi.mocked(t.browser.localDrafts.list).mockRejectedValue(new Error("IndexedDB bloqueada"));t.browser.latestSavedScene=vi.fn().mockResolvedValue(t.cp.context.sceneId);
+ await t.render();expect(host.querySelector("dialog")).toBeNull();await vi.waitFor(()=>expect(t.restore).toHaveBeenCalled());
 });

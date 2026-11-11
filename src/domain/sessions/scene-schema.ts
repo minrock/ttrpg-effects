@@ -579,6 +579,7 @@ const sceneMapDocumentSchema = z.object({
 }) satisfies z.ZodType<SceneMapDocument>;
 
 export const sceneDocumentV2Schema = z.object({
+  editorView: z.object({sidebar:z.boolean(),aside:z.boolean(),selectedId:z.string().max(256).nullable()}).optional(),
   version: z.literal(SCENE_DOCUMENT_VERSION),
   maps: z.array(sceneMapDocumentSchema),
   activeMapId: z.string().trim().min(1).nullable(),
@@ -624,6 +625,7 @@ export const sceneDocumentV2Schema = z.object({
     scene.mapAnnotations !== undefined &&
     scene.daytimeMask !== undefined;
   const parsedScene = {
+    ...(scene.editorView ? {editorView:scene.editorView} : {}),
     version: SCENE_DOCUMENT_VERSION,
     maps: scene.maps,
     activeMapId,

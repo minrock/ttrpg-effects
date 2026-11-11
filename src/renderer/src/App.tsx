@@ -157,6 +157,7 @@ import type {
   SceneFireEffect,
   SceneLightningEffect,
   SceneOperationResult,
+  SceneWarning,
   SceneToken
 } from "../../domain/sessions/scene-document";
 import {
@@ -242,7 +243,7 @@ import {
   type MapInformationArea,
   type MapInformationPin
 } from "../../domain/annotations/map-annotations";
-import { resolveInternalSceneLinkNavigationTarget } from "../../domain/annotations/internal-scene-link-navigation";
+import { validateInternalSceneLink, resolveInternalSceneLinkNavigationTarget } from "../../domain/annotations/internal-scene-link-navigation";
 import {
   connectInternalSceneLink,
   disconnectInternalSceneLink,
@@ -340,7 +341,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("Escena default en memoria");
-  const [warnings, setWarnings] = useState<readonly string[]>([]);
+  const [warnings, setWarnings] = useState<readonly SceneWarning[]>([]);
   const [needsResave, setNeedsResave] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [interaction, setInteraction] = useState(() => createInitialInteractionState());
@@ -394,6 +395,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const playerCameraSyncKeyRef = useRef(playerCameraSyncKey);
   playerCameraSyncKeyRef.current = playerCameraSyncKey;
   const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
+  const [pendingRecentScene, setPendingRecentScene] = useState<SceneOperationResult | null>(null);
   const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
     points: [],
@@ -463,7 +465,16 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   selectedElementIdRef.current = interaction.selectedElementId;
   sceneRef.current = scene;
 
-  const handleMapImageApplied = useCallback(() => {
+  const handleMapImageApplied = useCallback((next: SceneDocument, mapId: string, previousPath: string | null) => {
+    const references = [
+      ...next.maps.flatMap(map => [map.map.imagePath, ...map.tokens.map(token => token.imagePath)]),
+      ...next.sceneAside.monsters.map(item => item.imagePath), ...next.sceneAside.npcs.map(item => item.imagePath),
+      ...next.sceneAside.playerCharacters.map(item => item.imagePath)
+    ];
+    if (previousPath && (next.maps.find(map => map.id === mapId)?.map.imagePath === previousPath || !references.includes(previousPath))) {
+      setWarnings(current => current.filter(warning => warning.code !== "map-image-missing" || warning.path !== previousPath));
+    }
+    if (next.activeMapId !== mapId) return;
     setInteraction((current) => setMapAdjustMode(setActiveTool(current, "select"), false));
     setPathDraft({ points: [], hoverPoint: null });
     setWaterDraft({ points: [], hoverPoint: null });
@@ -484,23 +495,23 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     const markers = scene.mapAnnotations.sceneLinks;
     const requestId = sceneLinkValidationRequestId.current + 1;
     sceneLinkValidationRequestId.current = requestId;
-    setSceneLinkStatuses(Object.fromEntries(markers.map((marker) => [
-      marker.id,
-      marker.connection === null
-        ? { state: "unlinked" as const }
-        : { state: "validating" as const }
-    ])));
+    const internal = Object.fromEntries(markers.filter(marker => marker.connection?.peer.mapId !== undefined)
+      .map(marker => [marker.id, validateInternalSceneLink(scene, marker)]));
+    setSceneLinkStatuses({ ...Object.fromEntries(markers.map(marker => [marker.id,
+      marker.connection === null ? { state: "unlinked" as const } : { state: "validating" as const }
+    ])), ...internal });
 
-    if (currentFilePath === null || markers.length === 0 || scenesApi === undefined) return;
-    void scenesApi.validateSceneLinks({ scenePath: currentFilePath, markers }).then((result) => {
+    const external = markers.filter(marker => marker.connection !== null && marker.connection.peer.mapId === undefined);
+    if (currentFilePath === null || external.length === 0 || scenesApi === undefined) return;
+    void scenesApi.validateSceneLinks({ scenePath: currentFilePath, markers: external }).then((result) => {
       if (sceneLinkValidationRequestId.current !== requestId) return;
       if (result.ok) {
-        setSceneLinkStatuses(result.statuses);
+        setSceneLinkStatuses(current => ({ ...current, ...result.statuses, ...internal }));
       } else {
         setFeedback(result.error);
       }
     });
-  }, [currentFilePath, scene.mapAnnotations.sceneLinks, scenesApi]);
+  }, [currentFilePath, scene.maps, scene.activeMapId, scene.mapAnnotations.sceneLinks, scenesApi]);
 
   useTokenImageResolution({
     tokens: scene.tokens, urls: tokenImageUrls, api: imagesApi,
@@ -1832,7 +1843,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       return { ok: false, error: "La API de preload no esta disponible." };
     }
 
-    return scenesApi.saveScene(createSceneSavePayload(sceneRef.current, sceneAside), {
+    return scenesApi.saveScene(service?.browser.drafts ? captureDraft().content.scene : createSceneSavePayload(sceneRef.current, sceneAside), {
       suggestedFilePath: currentFilePath
     });
   }
@@ -1966,6 +1977,12 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       setSceneAside(loadedSceneAside);
       draftBaselineRef.current={scene:sceneRef.current,sceneAside:loadedSceneAside};
       if (actionLabel === "cargada") {
+        if(result.scene.editorView){
+          setIsSidebarVisible(result.scene.editorView.sidebar);setIsAsidePanelVisible(result.scene.editorView.aside);
+          const selected=result.scene.editorView.selectedId;
+          const entities=[...result.scene.shapes,...result.scene.tokens,...result.scene.lights,...result.scene.effects,...result.scene.labels];
+          setInteraction(current=>({...current,selectedElementId:selected&&entities.some(v=>v.id===selected)?selected:null}));
+        }
         const loadedCamera = normalizeCameraSnapshot({
           center: { x: result.scene.camera.x, y: result.scene.camera.y },
           zoom: result.scene.camera.zoom
@@ -2008,7 +2025,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       const isOutdated = result.warnings.some(
         (w) => w.code === "scene-format-outdated"
       );
-      setWarnings(genericWarnings.map((w) => w.message));
+      setWarnings(genericWarnings);
       setNeedsResave(isOutdated);
     } finally {
       setIsBusy(false);
@@ -2017,13 +2034,41 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
   useEffect(() => {
     const unsubscribe = nativeMenusApi?.onRecentSceneOpen((result) => {
-      void runSceneOperation("cargada", async () => result);
+      if (!result.ok) { setFeedback(result.error); return; }
+      const current = { ...sceneRef.current, sceneAside: sceneAsideRef.current };
+      const dirty = (hasCanvasWork(current) || JSON.stringify(current.sceneAside) !== JSON.stringify(createDefaultSceneAside()))
+        && lastSavedSceneJsonRef.current !== JSON.stringify(current);
+      if (dirty) setPendingRecentScene(result);
+      else void runSceneOperation("cargada", async () => result);
     });
 
     return () => {
       unsubscribe?.();
     };
   }, [runSceneOperation, nativeMenusApi]);
+
+  async function continueRecentScene(save:boolean):Promise<void> {
+    let next=pendingRecentScene;
+    if(!next||isBusy)return;
+    if(save){
+      setIsBusy(true);
+      const beforeScene=sceneRef.current,beforeAside=sceneAsideRef.current;
+      try {
+        const saved=await saveCurrentScene();
+        if(!saved.ok){setFeedback(saved.error);return;}
+        setCurrentFilePath(saved.filePath);
+        lastSavedSceneJsonRef.current=JSON.stringify(saved.scene);
+        if(beforeScene!==sceneRef.current||beforeAside!==sceneAsideRef.current){
+          setFeedback("La escena cambió durante el guardado. Revisa los cambios antes de abrir otra.");return;
+        }
+        // El menú nativo leyó el archivo antes de pedir confirmación; no recuperar su copia anterior.
+        if(next.ok&&saved.filePath===next.filePath)next=saved;
+      }catch(error){setFeedback(error instanceof Error?error.message:"No se pudo guardar la escena.");return;}
+      finally{setIsBusy(false);}
+    }
+    setPendingRecentScene(null);
+    await runSceneOperation("cargada",async()=>next!);
+  }
 
   async function handleAddSceneMap(): Promise<void> {
     setIsBusy(true);
@@ -3408,7 +3453,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
         </span>
         <span className="scene-status__version">v{appVersion}</span>
         {warnings.map((warning) => (
-          <strong key={warning}>{warning}</strong>
+          <strong key={`${warning.code}:${warning.path}:${warning.message}`}>{warning.message}</strong>
         ))}
       </aside>
       <div className={`app-workspace${isSidebarVisible ? "" : " is-sidebar-hidden"}${isAsidePanelVisible ? "" : " is-aside-hidden"}`}>
@@ -4754,6 +4799,18 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           {isSidebarVisible ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
         </button>
       </div>
+      {pendingRecentScene && <div className="modal-backdrop" onClick={()=>{if(!isBusy)setPendingRecentScene(null);}}>
+        <section className="confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="recent-scene-title"
+          onClick={event=>event.stopPropagation()} onKeyDown={event=>{event.stopPropagation();if(event.key==="Escape"&&!isBusy)setPendingRecentScene(null);}}>
+          <h2 id="recent-scene-title">Abrir escena reciente</h2>
+          <p>Hay cambios sin guardar. Guarda la escena actual o descártalos antes de abrir la seleccionada.</p>
+          <div className="modal-actions">
+            <button type="button" autoFocus disabled={isBusy} onClick={()=>setPendingRecentScene(null)}>Cancelar</button>
+            <button type="button" disabled={isBusy} onClick={()=>void continueRecentScene(false)}>Descartar y abrir</button>
+            <button type="button" disabled={isBusy} onClick={()=>void continueRecentScene(true)}>Guardar y abrir</button>
+          </div>
+        </section>
+      </div>}
       {isNewSceneDialogOpen ? (
         <div className="modal-backdrop" onClick={handleCancelNewScene}>
           <section

@@ -146,7 +146,7 @@ export function SceneLinkModal({
               <div>
                 <strong>{statusLabel(status)}</strong>
                 {status.state === "broken" ? <span>{status.message}</span> : null}
-                {marker.connection?.peer.mapId !== undefined ? <span>Mapa interno conectado</span> : null}
+                {status.state === "valid" && marker.connection?.peer.mapId !== undefined ? <span>Mapa interno conectado</span> : null}
                 {marker.connection !== null && marker.connection.peer.mapId === undefined ? <span>{marker.connection.peer.scenePath}</span> : null}
               </div>
             </div>
@@ -230,7 +230,7 @@ export function SceneLinkModal({
           <div>
             {marker.connection !== null ? (
               <>
-                <button type="button" onClick={() => void onNavigate()} disabled={busy}>
+                <button type="button" onClick={() => void onNavigate()} disabled={busy || status.state !== "valid"}>
                   <ExternalLink aria-hidden="true" />
                   Ir al mapa
                 </button>

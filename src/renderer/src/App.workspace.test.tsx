@@ -7,6 +7,8 @@ import type { ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { createDefaultSceneMap, createSceneWithMap, syncRuntimeFieldsFromActiveMap } from "../../domain/sessions/scene-maps";
 import type { MapViewport, MapViewportHandle } from "./components/MapViewport";
 import { App } from "./App";
+import { DraftRecovery } from "../../web/DraftRecovery";
+import { sceneServiceFixture, cleanupSceneService } from "../../infrastructure/browser/scene-save.fixture";
 import { createSceneToken } from "../../domain/tokens/tokens";
 import { PlayerApp } from "./PlayerApp";
 import { TableSession } from "../../application/services/table-session";
@@ -44,6 +46,10 @@ const viewport = vi.hoisted(() => ({
     setPlayerCameraControlState: vi.fn<MapViewportHandle["setPlayerCameraControlState"]>(),
     clearPlayerCameraControlState: vi.fn<MapViewportHandle["clearPlayerCameraControlState"]>()
   } satisfies MapViewportHandle
+}));
+
+vi.mock("../../render/pixi/map-image-resource", () => ({
+  prepareMapImageResource: vi.fn(async () => ({width:400,height:200,previewUrl:null,release:vi.fn()}))
 }));
 
 vi.mock("./components/MapViewport", async () => {
@@ -413,6 +419,55 @@ describe("App production workspace", () => {
     await click(button("Abrir dados"));
     expect(element('[role="tab"][aria-selected="true"]#right-tab-dice')).toBeTruthy();
   });
+  it.each(["Cancelar", "Descartar y abrir", "Guardar y abrir"])("recientes protege los cambios: %s",async(choice)=>{
+    const original=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Origen",shapes:[{id:"circle-1",type:"circle",points:[{x:0,y:0}],radius:20}]}));
+    const target=createSceneWithMap(createDefaultSceneMap({id:"b",name:"Destino"}));
+    sessionStorage.setItem("ttrpg:session-scene",JSON.stringify(original));
+    let receive!:(result:Awaited<ReturnType<TtrpgApi["loadScene"]>>)=>void;
+    const save=vi.fn(async()=>({ok:true as const,scene:original,filePath:"/original.ttrpgscene",warnings:[]}));
+    const client=createClient({onOpenMonsterTemplateManager:()=>()=>{},onRecentSceneOpen:(cb:typeof receive)=>{receive=cb;return()=>{};},saveScene:save} as unknown as TtrpgApi,{scenes:true,images:false,libraries:false,player:false,dice:false,nativeMenus:true});
+    await act(async()=>root.render(<ClientProvider client={client}><App/></ClientProvider>));
+    await act(async()=>receive({ok:true,scene:target,filePath:"/target.ttrpgscene",warnings:[]}));
+    expect(props().shapes).toHaveLength(1);expect(host.textContent).toContain("Abrir escena reciente");
+    await click(button(choice));
+    expect(props().shapes).toHaveLength(choice==="Cancelar"?1:0);
+    expect(save).toHaveBeenCalledTimes(choice==="Guardar y abrir"?1:0);
+  });
+
+  it("recientes conserva cambios si guardar falla o se cancela y no carga una copia obsoleta del mismo archivo",async()=>{
+    const original=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Origen",shapes:[{id:"circle-1",type:"circle",points:[{x:0,y:0}],radius:20}]}));
+    sessionStorage.setItem("ttrpg:session-scene",JSON.stringify(original));
+    let receive!:(result:Awaited<ReturnType<TtrpgApi["loadScene"]>>)=>void;
+    const save=vi.fn().mockResolvedValueOnce({ok:false,error:"Guardado cancelado"}).mockResolvedValueOnce({ok:false,error:"Sin espacio"}).mockResolvedValue({ok:true,scene:original,filePath:"/same.ttrpgscene",warnings:[]});
+    const client=createClient({onOpenMonsterTemplateManager:()=>()=>{},onRecentSceneOpen:(cb:typeof receive)=>{receive=cb;return()=>{};},saveScene:save} as unknown as TtrpgApi,{scenes:true,images:false,libraries:false,player:false,dice:false,nativeMenus:true});
+    await act(async()=>root.render(<ClientProvider client={client}><App/></ClientProvider>));
+    await act(async()=>receive({ok:true,scene:createSceneWithMap(createDefaultSceneMap()),filePath:"/same.ttrpgscene",warnings:[]}));
+    for(const message of ["Guardado cancelado","Sin espacio"]){await click(button("Guardar y abrir"));expect(props().shapes).toHaveLength(1);expect(host.textContent).toContain(message);expect(host.textContent).toContain("Abrir escena reciente");}
+    await click(button("Guardar y abrir"));expect(props().shapes).toHaveLength(1);expect(host.textContent).not.toContain("Abrir escena reciente");
+  });
+
+  it("eliminar un mapa invalida el enlace en memoria aunque el archivo aún lo conserve",async()=>{
+    const marker={id:"a",kind:"scene-link" as const,name:"Puerta",position:{x:0,y:0},locked:false,connection:null};
+    const a=createDefaultSceneMap({id:"a",name:"Origen",mapAnnotations:{pins:[],areas:[],sceneLinks:[marker]}});
+    const b=createDefaultSceneMap({id:"b",name:"Destino",mapAnnotations:{pins:[],areas:[],sceneLinks:[{...marker,id:"b"}]}});
+    const scene=connectInternalSceneLink(syncRuntimeFieldsFromActiveMap({...createSceneWithMap(a),maps:[a,b]}),{sourceMapId:"a",sourceMarkerId:"a",targetMapId:"b",targetMarkerId:"b",scenePath:"/scene.ttrpgscene",connectionId:"linked"});
+    sessionStorage.setItem("ttrpg:session-scene",JSON.stringify(scene));vi.spyOn(window,"confirm").mockReturnValue(true);
+    await act(async()=>root.render(<App/>));
+    await click(button("Eliminar Destino"));await act(async()=>props().onMapAnnotationPreview("a"));
+    expect(host.textContent).toContain("Conexion rota");expect(host.textContent).not.toContain("Mapa interno conectado");expect(button("Ir al mapa").disabled).toBe(true);
+  });
+
+  it("reparar la imagen retira solo su aviso de ausencia y conserva los otros avisos",async()=>{
+    const scene=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Ausente",map:{imagePath:"/missing.png",position:{x:0,y:0},scale:1,imageSize:{width:400,height:200}}}));
+    const client=createClient({loadScene:async()=>({ok:true,scene,filePath:"/scene.ttrpgscene",warnings:[{code:"map-image-missing",path:"/missing.png",message:"Imagen ausente"},{code:"scene-link-unresolved",path:"/other",message:"Enlace pendiente"}]}),resolveMapUrl:async()=>null,
+      selectReplacementMapImage:async()=>({status:"ready",imagePath:"/new.png",imageUrl:"map-asset:///new.png"})
+    } as unknown as TtrpgApi,{scenes:true,images:true,libraries:false,player:false,dice:false,nativeMenus:false});
+    await act(async()=>root.render(<ClientProvider client={client}><App/></ClientProvider>));
+    await click(element('[aria-label="Menu de escena"]'));await click(button("Cargar escena"));expect(host.textContent).toContain("Imagen ausente");
+    await click(button("Actualizar imagen de Ausente"));await click(button("Actualizar imagen",document.body));
+    expect(props().map?.imagePath).toBe("/new.png");expect(host.textContent).not.toContain("Imagen ausente");expect(host.textContent).toContain("Enlace pendiente");
+  });
+
   it("recuperar una escena con imagen ausente no repite la resolución indefinidamente", async () => {
     const scene = parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
     const token = createSceneToken({ id: "missing-token", name: "Ausente", type: "npc", imagePath: "missing.png", position: { x: 0, y: 0 }, size: "medium", tokens: [] });
@@ -520,6 +575,38 @@ describe("App production workspace", () => {
     expect(host.querySelector('.scene-link-modal')).toBeNull();
     expect(props().mapAnnotations.sceneLinks[0].connection?.peer).toMatchObject(kind === "remote" ? { mapId: "map-c", markerId: "c" } : { scenePath: target, markerId: "b" });
   });
+
+  it("Guardar escena, cerrar y reabrir usa servidor; una figura sin guardar sí ofrece recuperación",async()=>{
+    vi.useRealTimers();
+    HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};
+    const fixture=await sceneServiceFixture();
+    const settled=(check:()=>void)=>vi.waitFor(async()=>{await act(async()=>{await new Promise(resolve=>setTimeout(resolve,25));});check();},{timeout:10000});
+    try{
+      const mount=async(browser:ReturnType<typeof fixture.create>)=>act(async()=>root.render(<><DraftRecovery browser={browser} gameId={fixture.gameId} active onRecovered={()=>{}}/><ClientProvider client={browser.client}><App service={{browser,confirmLeave:async()=>"discard",logout:async()=>{}}}/></ClientProvider></>));
+      const browser=fixture.create();await mount(browser);await rail("Areas");await option("Area circular");
+      expect(props().shapes).toHaveLength(1);
+      await click(element<HTMLButtonElement>('[aria-label="Guardar escena"]'));await settled(()=>expect(host.textContent).toContain("Escena guardada"));
+      await act(async()=>browser.drafts!.flushLocal());
+      let entries=await browser.localDrafts.list(browser.drafts!.ownerId,browser.drafts!.origin,fixture.gameId);
+      expect(entries[0].sceneHash).toBe(entries[0].confirmedSceneHash);
+      await act(async()=>root.render(null));await browser.drafts!.stop();
+      const reopened=fixture.create();await mount(reopened);
+      await settled(()=>expect(props().shapes).toHaveLength(1));
+      expect(host.querySelector("dialog")).toBeNull();
+      await act(async()=>reopened.drafts!.flushRemote());
+      expect(reopened.drafts!.checkpoint?.pending).toBeNull();
+      expect(reopened.drafts!.getStatus().confirmed).toContain("Escena guardada");
+      await rail("Areas");await option("Area circular");expect(props().shapes).toHaveLength(2);
+      await act(async()=>reopened.drafts!.flushRemote());entries=await reopened.localDrafts.list(reopened.drafts!.ownerId,reopened.drafts!.origin,fixture.gameId);
+      expect(entries[0].sceneHash).not.toBe(entries[0].confirmedSceneHash);
+      await act(async()=>root.render(null));await reopened.drafts!.stop();
+      const pending=fixture.create();await mount(pending);
+      await settled(()=>expect(host.textContent).toContain("¿Cómo quieres continuar?"));
+      await click(button("Recuperar estado local",element("dialog")));await settled(()=>expect(props().shapes).toHaveLength(2));
+      const saved=await pending.openSaved(`scene:${await pending.latestSavedScene()}`);expect(saved.scene.shapes).toHaveLength(1);
+      await act(async()=>root.render(null));
+    }finally{await cleanupSceneService();}
+  },30000);
 
   it.each([false,true])("respalda figuras en IndexedDB y las restaura en un editor nuevo (mapa: %s)",async(withMap)=>{
     vi.useRealTimers();vi.stubGlobal("indexedDB",new IDBFactory());

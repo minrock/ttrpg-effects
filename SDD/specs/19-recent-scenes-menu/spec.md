@@ -30,7 +30,7 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
 - Recientes de mapas sueltos.
 - Miniaturas de escenas en el menu.
 - Sincronizar recientes por nube.
-- Fusionar escenas o preguntar por guardado antes de abrir reciente.
+- Fusionar escenas.
 
 ### Comportamiento
 
@@ -76,3 +76,7 @@ El usuario carga escenas desde `Cargar escena`. En sesiones de mesa es comun alt
 - Seleccionar una reciente rota muestra error y la retira de la lista.
 - La lista persiste al reiniciar la app.
 - Renderer sigue sin acceso directo a `fs`, `path`, `ipcRenderer` ni Electron internals.
+
+### Corrección de auditoría — 2026-11-11
+
+Antes de aplicar una escena reciente, si hay cambios locales, ofrecer Cancelar, Descartar y abrir, o Guardar y abrir. Cancelar o un fallo/cancelación al guardar conserva la escena actual. Si el archivo elegido es el mismo que se acaba de guardar, aplicar el resultado nuevo del guardado y nunca la lectura anterior del menú nativo. No requiere nuevas capacidades IPC.

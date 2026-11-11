@@ -17,14 +17,24 @@ export function DraftRecovery({browser,gameId,active,onRecovered,conflict=false}
   const [open,setOpen]=useState(false),[items,setItems]=useState<LocalDraftIndex[]>([]),[selected,setSelected]=useState(""),[generation,setGeneration]=useState(0),[error,setError]=useState(""),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[picking,setPicking]=useState(false),[disable,setDisable]=useState(false);
   const prompted=useRef(false);
   useEffect(()=>{
-    if(!active)return;let live=true;
-    void browser.localDrafts.list(drafts.ownerId,drafts.origin,gameId).then(entries=>{
+    if(!active||status.ready===false)return;let live=true;
+    void (async()=>{
+      const entries=await browser.localDrafts.list(drafts.ownerId,drafts.origin,gameId).catch(()=>[]);
       if(!live)return;setItems(entries);setSelected(current=>entries.some(v=>v.id===current)?current:entries[0]?.id??"");
-      if(!prompted.current&&entries.length)setOpen(true);
-      prompted.current=true;
-    }).catch(e=>{if(live){setError(e instanceof Error?e.message:"No se pudo leer el respaldo de este dispositivo.");setOpen(true);}});
+      if(prompted.current)return;
+      const latest=entries[0];
+      let clean=!!latest&&(!!latest.confirmedHash&&latest.confirmedHash===latest.hash||!!latest.confirmedSceneHash&&latest.confirmedSceneHash===latest.sceneHash);
+      // Incluye índices antiguos y confirmaciones cuya respuesta o escritura local se perdió.
+      if(latest&&!clean&&latest.context.sceneId&&browser.isDraftSaved){
+        try{clean=await browser.isDraftSaved(await browser.localDrafts.read(drafts.ownerId,drafts.origin,latest.id));}catch{/* Conservar la elección local si no puede verificarse. */}
+      }
+      if(!live)return;prompted.current=true;
+      if(latest&&!clean){setOpen(true);return;}
+      const sceneId=await browser.latestSavedScene?.()??latest?.context.sceneId;
+      if(live&&sceneId)await loadSaved(`scene:${sceneId}`);
+    })().catch(e=>{if(live){setError(e instanceof Error?e.message:"No se pudo abrir la escena guardada.");setOpen(true);}});
     return()=>{live=false;};
-  },[active,browser,drafts,gameId,refresh]);
+  },[active,browser,drafts,gameId,refresh,status.ready]);
   useEffect(()=>{if(active&&conflict){setOpen(true);setRefresh(n=>n+1);}},[active,conflict]);
   if(!active)return null;
   const entry=items.find(item=>item.id===selected);
@@ -51,7 +61,7 @@ export function DraftRecovery({browser,gameId,active,onRecovered,conflict=false}
       if(e instanceof ServiceError&&e.status===404){setOpen(false);setPicking(true);return;}
       throw e;
     }
-    const content=browser.draftContent(saved.scene,{camera:saved.scene.camera,sidebar:true,aside:true,selectedId:null});
+    const content=browser.draftContent(saved.scene,{camera:saved.scene.camera,...(saved.scene.editorView??{sidebar:true,aside:true,selectedId:null})});
     const value:DraftCheckpoint={schemaVersion:1,localDraftId:crypto.randomUUID(),ownerId:drafts.ownerId,origin:drafts.origin,instanceId:null,context:browser.draftContext(saved.filePath),remote:null,sequence:0,hash:await contentHash(content),updatedAt:new Date().toISOString(),content,pending:null,confirmation:null,createKey:crypto.randomUUID(),confirmedHash:null};
     await drafts.restore(value,{confirmed:true});setOpen(false);onRecovered();
   });}

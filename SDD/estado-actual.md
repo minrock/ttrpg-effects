@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-06. Versión en rama: `package.json` 3.22.1, SDD 58 y corrección de recuperación pendientes de integrar. Última entrega integrada: 3.21.0, SDD 57 en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-11. Versión en rama: `package.json` 3.23.0, SDD 58 y corrección de recuperación pendientes de integrar. Última entrega integrada: 3.21.0, SDD 57 en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -80,3 +80,9 @@ Cualquier otro alcance nuevo debe describir problema, usuario, criterios y exclu
 [Spec 58](specs/58-borradores-recuperables/spec.md) y [plan](specs/58-borradores-recuperables/plan.md): respaldo IndexedDB a 1 s/máximo 5 s, borrador privado remoto a 5 s/máximo 30 s y confirmación manual separada. Incluye recuperación por cuenta/rama, conflictos sin sobrescritura, persistencia local selectiva de Electron servicio y contratos SQLite/PostgreSQL. Estado: implementada y consolidada para la versión 3.22.1 en `fix/recuperacion-local-figuras`, pendiente de merge y sin trabajo factory nuevo. Migración aditiva 8; DB operativa sin modificar. IndexedDB privado sustituye la prohibición anterior y Electron servicio usa partición persistente por origen, con limpieza de credenciales. [Evidencia y límites](specs/58-borradores-recuperables/validacion.md).
 
 Corrección 3.22.1 en `fix/recuperacion-local-figuras`: respalda figuras sin mapa, inicia escritura al crearlas y ofrece recuperar IndexedDB o cargar la escena. Conserva SDD 58 pendiente de integrar.
+
+Corrección 3.22.2 en `fix/guardado-escena-confirmada`: confirmación completa y reapertura automática desde el servidor; IndexedDB solo solicita recuperación por cambios de contenido pendientes. Incluida en la entrega 3.23.0; pendiente de integración.
+
+## Correcciones de auditoría pendientes de integrar — 2026-11-11
+
+B01–B06 corregidos en `fix/hallazgos-auditoria-escena`, conservando los cambios previos de guardado. Entrega 3.23.0 por solicitud de incremento minor. El usuario autorizó commit y push de esta rama; sigue pendiente de integración a main. Evidencia y límites en [validación de auditoría](validaciones/2026-11-11-auditoria-escena.md).

@@ -4,7 +4,7 @@
 **Solicitud:** «Dale construye el spec y el plan de implementación que propones». La orden posterior «implementa» autoriza construir esta spec; no commits, merge ni push.
 **Base:** main `32bda9f` (3.21.0) y corrección local 3.21.1 de recuperación de sesión, todavía sin integrar. Rama documental: `feature/sdd-recuperacion-borradores`.
 **Dependencias:** [03 Persistencia](../03-scene-persistence/spec.md), [43 Navegador](../43-cliente-navegador/spec.md), [45 Electron servicio](../45-electron-servicio/spec.md), [46 Multi-DB](../46-persistencia-multidb/spec.md), [47 Identidad](../47-identidad-dm/spec.md), [48 Propiedad y sistemas](../48-partidas-sistemas/spec.md), [51 Experiencia de servicio](../51-experiencia-servicio/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md).
-**Trabajo factory:** sin asignar. **Versión en rama:** 3.22.1, fuente única `package.json`. [Validación y límites](validacion.md).
+**Trabajo factory:** sin asignar. **Versión en rama:** 3.22.2, fuente única `package.json`. [Validación y límites](validacion.md).
 
 ## Problema y objetivo
 
@@ -63,7 +63,7 @@ Sobre versionado independiente de `.ttrpgscene`, con:
 
 - `localDraftId`, `draftId` remoto nullable hasta crearlo, `writerId`, `parentDraftId` opcional, `schemaVersion`, `contentSequence`, hash del contenido y fechas; fechas de servidor como referencia entre dispositivos.
 - Cuenta propietaria y origen/instancia del servicio, partida, referencia exacta de sistema/hash, escena de origen nullable, revisión base de esa escena y bindings retenidos.
-- Documento normalizado mediante las reglas de escena, incluyendo mapas, objetos, notas y fichas incorporadas. Un adaptador de borrador admite el estado inicial sin mapas sin relajar el validador de escena confirmada.
+- Documento normalizado mediante las reglas de escena, incluyendo mapas, objetos, notas y fichas incorporadas. El borrador admite el estado inicial sin mapas. Al confirmar ese lienzo, el servicio crea un mapa sin imagen y conserva todos sus objetos; el archivo sigue cumpliendo el formato de escena v2.
 - Estado de trabajo permitido: mapa activo, cámara DM, selección todavía válida y disposición de paneles. No restaurar gestos en curso, diálogos, autoridad, apertura ni modo de publicación.
 - Dependencias efectivas con identidad/revisión cuando sean necesarias; no la caché completa de recursos consultados. Una ficha incorporada como copia no se convierte en dependencia viva por haber sido buscada.
 - Confirmación local/remota, revisión del borrador remoto, operación pendiente inmutable y última generación confirmada como escena.
@@ -133,3 +133,24 @@ En Electron servicio se conserva solo el almacenamiento de recuperación requeri
 La solicitud acepta desarrollar la propuesta documental de respaldo local y remoto con las frecuencias anteriores. Cuotas, ramificación por escritor y partición persistente selectiva se concretan aquí como decisiones implementadas en rama; la corrección 3.22.1 prioriza la recuperación local sencilla. No se promete recuperar retroactivamente contenido ya descartado antes de existir un respaldo.
 
 El [plan técnico](plan.md) divide construcción y pruebas. Las guías actuales siguen describiendo lo implementado hasta integrar esta spec. No hay bloqueos de producto para planificar; límites reales de navegador, partición Electron y migraciones se verifican en la primera etapa antes de habilitar la función.
+
+## Corrección 3.22.2 — guardar y reabrir sin recuperación innecesaria
+
+Guardar escena usa la captura actual completa del editor: objetos de todos los mapas, mapa activo, notas/fichas, configuración, cámara, paneles y selección válida. No toma un respaldo anterior de IndexedDB. Tras la confirmación del servidor, espera la actualización del índice local con la huella del documento realmente guardado; cambios posteriores al envío siguen pendientes.
+
+Al entrar nuevamente en una partida, sin cambios locales pendientes, el editor consulta la última escena confirmada asociada a esa partida y carga su contenido del servidor automáticamente. No requiere cuerpos de IndexedDB para reconstruirla; funciona con IndexedDB vacío o no disponible. La consulta es privada y acotada por propietario/partida. Si no hay escena guardada, se abre el editor vacío.
+
+La copia local más reciente solo activa «Recuperar estado local / Cargar mapa nuevamente» si contiene diferencias de documento no guardadas. La huella de comparación excluye cámara, paneles y selección: navegar no crea una recuperación pendiente. Los índices anteriores se concilian con la escena del servidor cuando no tienen la huella nueva. Copias anteriores permanecen en Más opciones; elegir el servidor no las elimina. Un error al verificar una copia no autoriza borrarla.
+
+Criterios de regresión adicionales:
+
+1. Dibujar, guardar, cerrar y reabrir carga exactamente las figuras guardadas sin diálogo de recuperación.
+2. Después de guardar, dibujar una figura más y cerrar sí ofrece recuperarla; cargar el servidor conserva la versión anterior y deja la copia local disponible.
+3. Vaciar IndexedDB después de guardar no impide reabrir la escena con su documento y vista guardados.
+4. Dos guardados sucesivos actualizan el mismo recurso y conservan el último contenido.
+5. Guardar un lienzo con figuras pero sin imagen crea un mapa vacío sin perder las figuras.
+6. Un fallo de servidor o una edición durante el envío no se marca como confirmación de cambios que el servidor no recibió.
+
+### Corrección de auditoría B05 — 2026-11-11
+
+Una rama restaurada comienza con secuencia positiva incluso antes de editar: reabrir y guardar inmediatamente no puede enviar PUT cero. Una notificación sin cambio documental no marca la escena como pendiente de confirmar. Las copias 3.22.2 con envío pendiente de secuencia cero solo se recuperan si el resto del esquema es válido, la rama remota sigue vacía y coinciden los hashes de contenido actual y pendiente. Se descarta únicamente ese envío imposible; el registro original no se sobrescribe y continúa exportable. Los envíos inciertos válidos siguen conservando su cuerpo y clave.

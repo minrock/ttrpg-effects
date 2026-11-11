@@ -82,7 +82,7 @@ Extraer un puerto para capturar documento + sceneAside + estado de trabajo usand
 
 No usar revalidate global para bloquear el editor por recursos de búsquedas. Comparar la escena base y los bindings efectivos; bibliotecas incorporadas como copia no son dependencias vivas. Enlaces recíprocos continúan por su caso de uso transaccional. Crear una copia exige IDs/referencias correctas y no roba conexiones de la escena fuente; presentar enlaces que requieran reconexión antes de confirmar.
 
-Si no existe una escena confirmable (p. ej., borrador nuevo sin mapa), el respaldo sigue disponible, pero Guardar explica el requisito. Sistema deshabilitado permite recuperar instancia existente con su referencia retenida; crear copia o trasladarla mantiene validaciones de usos nuevos. No actualizar bindings a latest.
+El lienzo sin imagen se confirma como un mapa vacío conservando sus objetos (corrección 3.22.2). Los errores de validación restantes conservan el respaldo. Sistema deshabilitado permite recuperar instancia existente con su referencia retenida; crear copia o trasladarla mantiene validaciones de usos nuevos. No actualizar bindings a latest.
 
 ## Secuencia de implementación
 
@@ -156,3 +156,12 @@ Rama `fix/recuperacion-local-figuras`, conserva el trabajo anterior sin commits.
 El cambio de número de figuras dispara flush local inmediato; el resto conserva 1/5 s. El proveedor de snapshot lee referencias actuales. `browser.clear` usa el cierre del coordinador que termina el respaldo pendiente. Las figuras también activan la advertencia de salida. La UI elige una copia local por defecto y ofrece recuperar/cargar mapa, con detalles avanzados contraídos; no depende del listado remoto. Cargar el mapa restaura como versión confirmada, sin borrar la copia. Conflictos se recuperan como copia con enlaces desconectados; no se reenvían operaciones inciertas al restaurar el estado local.
 
 Regresiones: App real → figuras con/sin mapa → IndexedDB → desmontaje → App nuevo → restauración; cierre antes del debounce; diálogo con servidor remoto sin respuesta, copia por conflicto, carga confirmada, respaldo dañado y escena eliminada. El render se sustituye en pruebas por un adaptador para comprobar estado sin GPU.
+
+## Corrección 3.22.2 — confirmación y apertura autoritativa
+
+- Comparación por huella de documento y bindings independiente del estado de navegación. Índice IndexedDB extendido con campos opcionales; no necesita recrear stores ni borrar datos existentes.
+- Confirmación asíncrona del coordinador: capturar cambios pendientes, registrar únicamente la generación reconocida y esperar la escritura de sus metadatos. El contenido normalizado devuelto por el servidor establece la base.
+- `editorView` opcional en escena v2 conserva paneles y selección; la cámara vigente se incluye en el mapa activo. La proyección pública continúa construyendo su DTO sin estos campos privados.
+- GET privado `/games/:id/last-scene`: referencia de la escena asociada con guardado más reciente, validando propietario. Reutiliza `game_resources` y `owned_resources`, sin migración SQL. La vista abre ese recurso por el flujo de carga existente, cuando el editor ya tiene su listener registrado.
+- Recuperación local reservada para contenido pendiente. Compatibilidad con índices anteriores y cuerpos corruptos, preservando opciones de exportación/carga.
+- Pruebas de integración contra API y SQLite temporales, además del editor React con adaptador de render simulado; cubrir el clic Guardar, desmontaje, nuevo cliente/editor, ausencia de diálogo y recuperación de una edición posterior.

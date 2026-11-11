@@ -104,3 +104,7 @@ La escala calculada debe sobrevivir exactamente al guardado y recarga, sin redon
 
 - Implementacion revisada y aceptada por el usuario.
 - Commit, publicacion, merge a main y construccion de instalador autorizados el 2026-10-22. Ver resultados de verificacion en el plan.
+
+### Correcciones de auditoría B04/B06 — 2026-11-11
+
+En servicio autenticado, admitir URLs privadas de assets del DM solo cuando su ID coincide exactamente con la referencia seleccionada. Reemplazar un mapa activo o inactivo debe llegar a la confirmación y conservar el resto de contenido. Al reparar una imagen, retirar su aviso de ausencia sin eliminar avisos de otras imágenes o enlaces; si otra entidad aún usa la referencia antigua ausente, conservar el aviso.

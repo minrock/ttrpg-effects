@@ -58,6 +58,20 @@ describe("MapViewport local shape update order", () => {
     expect(selection).toBe(shape.id);
     expect(engine.create).toHaveBeenCalledOnce();
   });
+  it("cambiar el menú contextual no recrea Pixi y utiliza la callback más reciente", async () => {
+    const destroy=vi.fn();
+    const viewport=new Proxy({destroy},{get(target,key,receiver){if(key==='then')return undefined;return Reflect.has(target,key)?Reflect.get(target,key,receiver):vi.fn();}});
+    engine.create.mockResolvedValue(viewport);
+    const scene=createDefaultScene();
+    const props={map:null,grid:scene.grid,settings:scene.settings,darkness:scene.darkness,fogOfWar:scene.fogOfWar,shapes:[],selectedElementId:null} as unknown as ComponentProps<typeof MapViewport>;
+    const first=vi.fn(),latest=vi.fn();
+    await act(async()=>root.render(<MapViewport {...props} onContextMenuRequest={first}/>));
+    for(let i=0;i<10;i++)await act(async()=>root.render(<MapViewport {...props} onContextMenuRequest={latest}/>));
+    expect(engine.create).toHaveBeenCalledOnce();expect(destroy).not.toHaveBeenCalled();
+    const request={targetElementId:'figura'};engine.create.mock.calls[0][1].onContextMenu(request);
+    expect(latest).toHaveBeenCalledWith(request);expect(first).not.toHaveBeenCalled();
+  });
+
   it("suspender libera Pixi, recuperar restaura cámara y una inicialización tardía se destruye", async () => {
     const destroy = vi.fn(), setCameraSnapshot = vi.fn();
     const viewport = new Proxy({ destroy, setCameraSnapshot }, { get(target, key, receiver) {

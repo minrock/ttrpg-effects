@@ -75,11 +75,32 @@ it('confirmar la generación enviada deja pendientes los cambios posteriores',as
  const t=setup();await vi.advanceTimersByTimeAsync(0);t.update('enviada');await t.co.flushRemote();const sent=t.co.checkpoint!;
  await t.co.pendingConfirmation({hash:sent.hash,key:id(),revision:sent.remote!.revision,sequence:sent.sequence,draftId:sent.remote!.id,payload:{name:'Guardada',mode:'copy',sceneRevision:0,targetGameId:context.gameId}});
  t.update('edición posterior');await t.co.flushLocal();await expect(t.co.flushRemote()).rejects.toThrow('manual pendiente');expect(t.co.checkpoint?.confirmation?.hash).toBe(sent.hash);
- t.co.confirmed(id(),1,sent.hash);expect(t.co.checkpoint?.content.scene.name).toBe('edición posterior');expect(t.co.getStatus().confirmed).toContain('cambios posteriores');t.co.dispose();
+ await t.co.confirmed(id(),1,sent.hash);expect(t.co.checkpoint?.content.scene.name).toBe('edición posterior');expect(t.co.getStatus().confirmed).toContain('cambios posteriores');t.co.dispose();
 });
 
 it('salir del editor antes del debounce conserva el último cambio local',async()=>{
  const t=setup();await vi.advanceTimersByTimeAsync(0);t.update('figura recién creada');
  await t.co.stop();expect(t.writes).toHaveLength(1);expect(t.writes[0].content.scene.name).toBe('figura recién creada');
  await vi.advanceTimersByTimeAsync(60000);expect(t.put).not.toHaveBeenCalled();
+});
+
+it('no resuelve Guardar antes de persistir la confirmación local',async()=>{
+ const t=setup();await vi.advanceTimersByTimeAsync(0);t.update('guardada');await t.co.flushRemote();
+ let release!:()=>void;t.local.write.mockImplementationOnce(()=>new Promise<void>(resolve=>{release=resolve;}));
+ let finished=false;const saving=t.co.confirmed(id(),1,t.co.checkpoint!.hash).then(()=>{finished=true;});
+ await vi.advanceTimersByTimeAsync(0);expect(finished).toBe(false);expect(release).toBeDefined();release();await saving;
+ expect(t.co.checkpoint!.confirmedHash).toBe(t.co.checkpoint!.hash);expect(t.co.checkpoint!.confirmedSceneHash).toBeTruthy();t.co.dispose();
+});
+
+it('restaurar una escena y guardar sin editar nunca envía secuencia cero',async()=>{
+ const t=setup();await vi.advanceTimersByTimeAsync(0);t.update('guardada');await t.co.flushLocal();
+ const saved=t.co.checkpoint!;t.co.onRestore(async()=>{});
+ await t.co.restore(saved,{confirmed:true});
+ await t.co.prepare(t.snapshot);
+ expect(t.put.mock.calls[0][3].sequence).toBeGreaterThan(0);
+ expect(t.co.checkpoint?.pending).toBeNull();expect(t.co.getStatus().confirmed).toBe('Escena guardada');
+ expect(t.writes.every(v=>!v.pending||v.pending.put.sequence>0)).toBe(true);
+ t.update('figura nueva');await t.co.flushRemote();
+ expect(t.co.getStatus().confirmed).toBe('Cambios sin confirmar');
+ expect(t.put.mock.calls.at(-1)![3].sequence).toBeGreaterThan(t.put.mock.calls[0][3].sequence);t.co.dispose();
 });

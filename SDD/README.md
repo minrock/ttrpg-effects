@@ -1,6 +1,6 @@
 # SDD — Especificaciones de TTRPG Effects
 
-Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-06**, versión en rama **3.22.1** según `package.json` ([corrección de recuperación](specs/51-experiencia-servicio/recuperacion-memoria.md), pendiente de integración; main conserva 3.21.0, SDD 57, `62c351a`).
+Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio, la evolución a servicio privado API + frontend y los cambios posteriores a la fábrica. Corte documental: **2026-11-11**, versión en rama **3.23.0** según `package.json` ([corrección de recuperación](specs/51-experiencia-servicio/recuperacion-memoria.md), pendiente de integración; main conserva 3.21.0, SDD 57, `62c351a`).
 
 1. Lee [estado actual y decisiones](estado-actual.md) para conocer qué existe y qué sigue pendiente.
 2. Consulta [arquitectura y datos](arquitectura.md) y la [operación local](guias/service-operations.md) para preparar una propuesta compatible.

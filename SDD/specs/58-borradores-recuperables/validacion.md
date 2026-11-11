@@ -1,5 +1,17 @@
 # Validación — SDD 58
 
+## Guardar y reabrir — 3.22.2, 2026-11-06
+
+Rama `fix/guardado-escena-confirmada`. Se reprodujo con una prueba fallida que una copia ya confirmada abría el diálogo de recuperación. El criterio era la existencia del índice, no sus diferencias respecto a la escena. Se añadió además persistencia de cámara/paneles y apertura autoritativa por partida.
+
+- Suite general: **153 archivos, 1359 pruebas correctas**. Después se ampliaron los casos de recuperación y se ejecutó su suite completa: **12/12**, incluidos dos casos nuevos (confirmación perdida e IndexedDB no disponible).
+- Cliente HTTP real, API y SQLite temporales: dos recorridos con/sin mapa, figuras/notas/cámara/paneles, dos guardados del mismo recurso, reapertura con IndexedDB vacío y rechazo de una partida inexistente.
+- Editor React real con render gráfico simulado: pulsar Guardar, desmontar, abrir otro cliente/editor y cargar la escena sin diálogo; agregar otra figura, cerrar sin guardar, reabrir y recuperar ambas mientras el servidor conserva una.
+- Coordinador: edición durante el envío conserva cambios pendientes y la confirmación espera la escritura local.
+- `pnpm typecheck`, `pnpm lint`, `git diff --check`, `pnpm build:api`, `pnpm build:web` y `pnpm build`: correctos. Permanecen avisos de tamaño de chunks/dependencias y de canvas no implementado en JSDOM.
+
+Las bases usadas fueron temporales y se retiraron al finalizar. No se modificaron la DB operativa ni los archivos .env. Esta corrección no necesita migraciones nuevas; reutiliza las tablas de SDD 58. No se ejecutaron nuevos contratos PostgreSQL ni un ciclo nativo Chrome/Electron en esta corrección; no se atribuyen esas evidencias a estas pruebas. No hubo commit, merge, push ni DMG de 3.22.2.
+
 ## Empaquetado 3.22.1 — 2026-11-06
 
 Por solicitud del usuario se consolida el trabajo en un commit de `fix/recuperacion-local-figuras`. `./scripts/build-dmg.sh` terminó correctamente y generó `dist/TTRPG Effects-3.22.1-arm64.dmg` para Apple Silicon. No hubo merge, push, despliegue ni cambios en la DB operativa. Los apartados siguientes conservan la evidencia histórica y sus limitaciones.
