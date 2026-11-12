@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-11. Versión en rama: `package.json` 3.23.0, SDD 58 y corrección de recuperación pendientes de integrar. Última entrega integrada: 3.21.0, SDD 57 en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-12. Entrega 3.25.0: cierre autorizado en `main` de SDD 58 (guardado y recuperación), correcciones de auditoría 3.23.0, celda de calibración/alineación de SDD 04 y reconstrucción automática del servicio. Conserva las entregas SDD 55–57 y expedientes 001–012. Las pruebas y límites se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -24,6 +24,8 @@ Una partida fija una versión de sistema. El catálogo separa reglas, datos y pr
 | Versión de sistema | Referencia exacta retenida y hash; módulos compilados | Resolver a la última versión o ejecutar plugins externos |
 | Invitación | Se renueva al abrir/reabrir; continuar conserva apertura | Rotar por cualquier recarga o pedir contraseña personal a jugador |
 | Expulsión | Revoca participante y rota enlace; los demás permanecen | Cambiar todas las credenciales o desconectar toda la mesa |
+| Alineación de grilla | Celda de calibración mueve el origen persistente por mapa; snap y medición comparten ese origen | Guía temporal independiente de la grilla |
+| Arranque API | `pnpm start:api` valida y reconstruye API y web antes de escuchar | Arrancar artefactos potencialmente obsoletos |
 | Menú | Una fila compartida, herramientas agrupadas en ancho estrecho | Cabecera de servicio y toolbar del editor apiladas |
 
 Electron autónomo conserva su gestión local de plantillas. Las restricciones administrativas son del servicio; no se trasladan silenciosamente al modo local.
@@ -55,7 +57,7 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. Los 
 
 [Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) implementa navegación propia y un foco puntual que centra el área útil conservando el zoom actual. Retira controles remotos, cámara principal/virtual y previews de la interfaz. Incluye API/SSE negociado e IPC específico. Implementada en `feature/sdd-foco-atencion` (`34d938c`) e integrada en `main` (`3d35876`), versión 3.20.0, con autorización explícita del usuario. [Plan técnico](specs/56-camaras-libres-foco-atencion/plan.md) y [evidencia/límites](specs/56-camaras-libres-foco-atencion/validacion.md).
 
-## Última entrega integrada — SDD 57
+## Entrega anterior — SDD 57
 
 [Áreas contextuales](specs/57-areas-contextuales/spec.md) implementa para círculos/conos una barra de selección con color, patrones cuadriculados de emojis existentes, bloqueo y copia. Conserva propiedad/moderación y separación entre figuras DM persistentes y dibujos efímeros de jugadores. [Plan técnico](specs/57-areas-contextuales/plan.md). Implementada en `feature/sdd-areas-contextuales` (`a09ea69`) e integrada en `main` (`62c351a`), 3.21.0, por orden explícita del usuario. No se inició un trabajo factory. [Validación y pendientes](specs/57-areas-contextuales/validacion.md).
 

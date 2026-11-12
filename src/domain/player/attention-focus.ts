@@ -17,7 +17,7 @@ export type AttentionFocusResult = { ok: true; delivered: number; incompatible: 
 export function attentionFrame(snapshot: Pick<PlayerWindowSnapshot, "scene" | "cameraSyncKey" | "mapNavigationKey">): string {
   const s = snapshot.scene;
   return JSON.stringify([snapshot.mapNavigationKey ?? null, snapshot.cameraSyncKey ?? 0, s.activeMapId, s.map.position, s.map.scale,
-    s.grid.cellSizeWorld, s.grid.layout, s.grid.unit, s.grid.distancePerCell, s.grid.metricDistancePerCell,
+    s.grid.origin?.x ?? 0, s.grid.origin?.y ?? 0, s.grid.cellSizeWorld, s.grid.layout, s.grid.unit, s.grid.distancePerCell, s.grid.metricDistancePerCell,
     s.settings.diagonalMode, s.settings.snapToGrid, s.compassOrientation]);
 }
 export function focusCamera(camera: ViewportCameraSnapshot, position: AttentionFocusEvent["position"]): ViewportCameraSnapshot {

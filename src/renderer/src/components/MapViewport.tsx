@@ -127,6 +127,7 @@ interface MapViewportProps {
   readonly waterPreviewHoverPoint: { readonly x: number; readonly y: number } | null;
   readonly onContextMenuRequest: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect: (elementId: string | null) => void;
+  readonly onGridCalibrationChange?: (grid: SceneGrid) => void;
   readonly onGridCellSizeChange: (cellSizeWorld: number) => void;
   readonly onMapRenderError: (message: string) => void;
   readonly onMapRendered: (message: string) => void;
@@ -240,6 +241,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
   waterPreviewHoverPoint,
   onContextMenuRequest,
   onElementSelect,
+  onGridCalibrationChange,
   onGridCellSizeChange,
   onMapRenderError,
   onMapRendered,
@@ -334,6 +336,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
     void PixiViewport.create(host, {
       onContextMenu: request => contextMenuRef.current?.(request),
       onElementSelect,
+      onGridCalibrationChange,
       onGridCellSizeChange,
       onMapRenderError,
       onMapRendered,
@@ -444,7 +447,7 @@ export const MapViewport = forwardRef<MapViewportHandle, MapViewportProps>(funct
       viewportRef.current = null;
       viewport?.destroy();
     };
-  }, [suspended, onSharedShapePreview, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
+  }, [suspended, onGridCalibrationChange, onSharedShapePreview, onElementSelect, onGridCellSizeChange, onMapRenderError, onMapRendered, onMapPositionChange, onElementMove, onLightDirectionChange, onLightRadiusChange, onDynamicLightDirectionChange, onShapeEndMove, onPathPointAdd, onPathPointerMove, onWaterPointAdd, onWaterPointerMove, onLightningCreate, onLightningChange, onFireCreate, onFireChange, onPathPointMove, onPathMove, onShapeDirectionChange, onShapeRadiusChange, onShapeRectResize, onFogRevealStroke, onDaytimeMaskStroke, onFirePaint, onFireZoneRadiusChange, onFireLightRadiusChange, onMagicalDarknessRadiusChange, onWaterLineRotationChange, onWaterPatternRotationChange, onCameraChange, onCameraInteractionEnd, onPlayerCameraControlMove, onArcanePointerTrigger, onRoomPinPlace, onSceneLinkPlace, onInformationAreaPaint, onInformationAreaHighlight, onMapAnnotationPreview]);
 
   useEffect(() => {
     viewportRef.current?.setEffectTool(fireTool ? "fire" : "lightning", fireTool ?? lightningTool, lightningResetKey);

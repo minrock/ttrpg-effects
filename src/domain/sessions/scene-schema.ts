@@ -421,6 +421,7 @@ export const sceneDocumentV1Schema = z.object({
     zoom: positiveNumber
   }),
   grid: z.object({
+    origin: z.object({ x: finiteNumber, y: finiteNumber }).optional(),
     enabled: z.boolean(),
     locked: z.boolean(),
     cellSizeWorld: positiveNumber,

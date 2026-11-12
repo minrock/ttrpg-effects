@@ -151,7 +151,7 @@ Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en 
 
 ## Servicio privado API
 
-`pnpm build:api` y `pnpm start:api` ejecutan la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
+`pnpm start:api` reconstruye API y frontend web antes de ejecutar la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
 
 ## Preparar el servicio
 
@@ -165,6 +165,8 @@ pnpm identity:password # Solo si generaste una contraseña temporal
 pnpm identity:provision-dm
 pnpm start:api
 ```
+
+Para los arranques posteriores basta `pnpm start:api`: ejecuta typecheck y compila API y web mediante `pnpm build:service`, luego carga `.env`. Si falla algún paso no abre el servicio. Detén la instancia anterior antes de arrancar otra para liberar el almacenamiento exclusivo.
 
 Los comandos de identidad son TTY y nunca aceptan contraseñas en argumentos. No se crean cuentas al arrancar. Setup conserva configuración existente y genera configuración nueva privada en `.env`, `.env.electron` y `.local/service/{data,backups,logs}`; los datos quedan ignorados porGit. Un entorno legado incompleto exige actualización explícita. No hay claves DM/jugador globales ni autorregistro.
 

@@ -15,8 +15,9 @@ export function getHexCenter(point: WorldPoint, cellSize: number): WorldPoint {
   return { x: hex.x * cellSize, y: hex.y * cellSize };
 }
 
-export function measureHexDistance(from: WorldPoint, to: WorldPoint, cellSize: number): number {
-  return distance(UnitHex.settings, getHexAtPoint(from, cellSize), getHexAtPoint(to, cellSize));
+export function measureHexDistance(from: WorldPoint, to: WorldPoint, cellSize: number, origin: WorldPoint = { x: 0, y: 0 }): number {
+  return distance(UnitHex.settings, getHexAtPoint({ x: from.x - origin.x, y: from.y - origin.y }, cellSize),
+    getHexAtPoint({ x: to.x - origin.x, y: to.y - origin.y }, cellSize));
 }
 
 export const MAX_HEX_GRID_CELLS = 8192;

@@ -89,13 +89,14 @@ export function snapTokenToGrid(
 ): WorldPoint {
   const cellSize = grid.cellSizeWorld;
   if (grid.layout === "hexagonal") return snapWorldPoint(point, grid);
-  const topLeftColumn = Math.floor(point.x / cellSize);
-  const topLeftRow = Math.floor(point.y / cellSize);
+  const origin = grid.origin ?? { x: 0, y: 0 };
+  const topLeftColumn = Math.floor((point.x - origin.x) / cellSize);
+  const topLeftRow = Math.floor((point.y - origin.y) / cellSize);
   const offset = (footprintCells * cellSize) / 2;
 
   return {
-    x: topLeftColumn * cellSize + offset,
-    y: topLeftRow * cellSize + offset
+    x: origin.x + topLeftColumn * cellSize + offset,
+    y: origin.y + topLeftRow * cellSize + offset
   };
 }
 

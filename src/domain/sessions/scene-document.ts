@@ -1,3 +1,4 @@
+import type { WorldPoint } from "../shared/coordinates";
 import type { SceneAside } from "./scene-aside";
 import type { CombatTracker } from "../combat/combat-tracker";
 import type { MapAnnotations } from "../annotations/map-annotations";
@@ -32,6 +33,7 @@ export interface SceneCamera {
 }
 
 export interface SceneGrid {
+  readonly origin?: WorldPoint;
   readonly enabled: boolean;
   readonly locked: boolean;
   readonly cellSizeWorld: number;

@@ -1,6 +1,6 @@
 # API privada del servicio de cuentas
 
-El artefacto `out/api/index.mjs` compone identidad, propiedad, invitaciones y runtime contextual. Requiere Node24. `pnpm start:api` carga `.env`; variables del entorno explícito tienen precedencia. No abre `ServiceStore`, no crea cuentas al arrancar y no adopta datos legados automáticamente.
+El artefacto `out/api/index.mjs` compone identidad, propiedad, invitaciones y runtime contextual. Requiere Node24. `pnpm start:api` ejecuta primero `pnpm build:service` (typecheck, API y frontend web); solo si termina correctamente inicia la API y carga `.env`; variables del entorno explícito tienen precedencia. No abre `ServiceStore`, no crea cuentas al arrancar y no adopta datos legados automáticamente.
 
 | Configuración | Uso |
 | --- | --- |

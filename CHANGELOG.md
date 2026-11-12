@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.25.0 — 2026-11-12 — Versión minor
+
+- `pnpm start:api` reconstruye y valida API y frontend web antes de iniciar; si falla la compilación no arranca el servicio. `dev:api` reutiliza este flujo sin compilar dos veces.
+- Cierre en main de la celda de calibración y alineación de grilla de 3.24.0, junto con las correcciones de guardado y auditoría pendientes de integración.
+
+## 3.24.0 — 2026-11-12 — Versión minor
+
+- El control de calibración muestra un cuadrado del tamaño de una celda: la esquina superior izquierda lo mueve y la inferior derecha ajusta su tamaño con proporción 1:1 y feedback visual.
+- Mover la celda de calibración alinea la grilla completa; el origen se guarda por mapa y lo usan snap, tokens, mediciones, pintura y publicación a jugadores. Reabrir selecciona una celda cercana al centro conservando la alineación.
+
 ## 3.23.0 — 2026-11-11 — Versión minor
 
 - Consolida el guardado completo de escenas y la recuperación desde IndexedDB y servidor.

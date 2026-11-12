@@ -7,7 +7,7 @@ export interface MeasurementSettings {
   readonly grid: Pick<
     SceneGrid,
     "cellSizeWorld" | "unit" | "distancePerCell" | "metricDistancePerCell"
-  > & Partial<Pick<SceneGrid, "layout">>;
+  > & Partial<Pick<SceneGrid, "layout" | "origin">>;
   readonly diagonalMode: DiagonalMode;
 }
 
@@ -29,7 +29,7 @@ export function measureDistance(
   const dxCells = Math.abs(to.x - from.x) / settings.grid.cellSizeWorld;
   const dyCells = Math.abs(to.y - from.y) / settings.grid.cellSizeWorld;
   const cells = settings.grid.layout === "hexagonal"
-    ? measureHexDistance(from, to, settings.grid.cellSizeWorld)
+    ? measureHexDistance(from, to, settings.grid.cellSizeWorld, settings.grid.origin)
     : measureCells(dxCells, dyCells, settings.diagonalMode);
   const value =
     settings.grid.unit === "ft"
@@ -131,8 +131,8 @@ export function snapWorldPoint(point: WorldPoint, input: GridGeometryInput, orig
     throw new Error("Cell size must be a positive number.");
   }
 
-  const ox = origin?.x ?? 0;
-  const oy = origin?.y ?? 0;
+  const ox = origin?.x ?? grid.origin?.x ?? 0;
+  const oy = origin?.y ?? grid.origin?.y ?? 0;
 
   if (grid.layout === "hexagonal") {
     const local = { x: point.x - ox, y: point.y - oy };
@@ -164,12 +164,12 @@ export function snapWorldPointToCellCenter(
     throw new Error("Cell size must be a positive number.");
   }
 
-  const ox = origin?.x ?? 0;
-  const oy = origin?.y ?? 0;
+  const ox = origin?.x ?? grid.origin?.x ?? 0;
+  const oy = origin?.y ?? grid.origin?.y ?? 0;
 
   if (grid.layout === "hexagonal") {
-    const center = getGridCellCenter(getGridCellAtPoint({ x: point.x - ox, y: point.y - oy }, grid));
-    return { x: center.x + ox, y: center.y + oy };
+    const center = getGridCellCenter(getGridCellAtPoint(point, { ...grid, origin: { x: ox, y: oy } }));
+    return center;
   }
 
   return {

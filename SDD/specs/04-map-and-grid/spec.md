@@ -1,5 +1,21 @@
 # Spec - Mapa y Grilla
 
+## Celda de calibración y alineación — 3.24.0
+
+Estado: implementada, cierre a main autorizado para 3.25.0. Fecha: 2026-11-12. Esta revisión sustituye la propuesta de mover únicamente una guía temporal.
+
+- Al activar `Ajustar grilla`, se resalta una celda real próxima al centro del mapa. En cuadrada se muestra un cuadrado de lado `cellSizeWorld`; en hexagonal se muestra el hexágono real.
+- Arrastrar la esquina **superior izquierda** del control traslada la grilla completa en X/Y para alinearla con la imagen. Conserva el tamaño de celda y las posiciones mundiales de imagen, cámaras y objetos existentes.
+- Arrastrar la esquina **inferior derecha** cambia el tamaño de la celda manteniendo fija el ancla superior izquierda. Conserva la proporción de la geometría, responde a ambos ejes y respeta los límites de tamaño vigentes. En hexagonal los tiradores corresponden a las esquinas del rectángulo envolvente.
+- El ancla tiene una cruz, resaltado y cursor de mano abierta/cerrada; el tirador de tamaño usa cursor diagonal. La ayuda aclara que mover el control cambia y guarda la alineación.
+- El puntero conserva el desplazamiento inicial del clic, sin saltos. Los tiradores tienen tolerancia fija en pantalla y prioridad sobre objetos debajo.
+- La posición de la grilla se guarda por mapa como `grid.origin`, en coordenadas mundo. Se incluye en escena, recuperación y publicación a jugadores. Las escenas antiguas sin origen conservan (0,0).
+- La selección del control es temporal: al reabrir se elige otra celda próxima al centro, respetando la alineación guardada. Desactivar, cancelar o perder foco termina el gesto y conserva la última calibración visible.
+- Snap de figuras, centros de medición, tokens y pintura usan la misma alineación. Las celdas pintadas y objetos anteriores conservan su geometría; nuevas colocaciones usan la grilla vigente.
+- La vista de jugador recibe la grilla publicada pero no puede calibrarla. Los borradores con distinta alineación no deben operar contra la publicación anterior.
+
+Aceptación: alinear una celda del mapa arrastrando el control, cambiar su tamaño sin perder el ancla, verificar snap y pintura coincidentes, guardar/reabrir conservando alineación y cambiar entre mapas con orígenes diferentes. Comprobar comportamiento con zoom/pan, grilla cuadrada/hexagonal, publicación y escenas antiguas.
+
 ## Extension aceptada - Actualizar imagen sin perder preparacion
 
 La [spec 36](../36-replace-map-image/spec.md), aceptada para cierre 2.7.0 el 2026-10-22, permite reemplazar el fondo de un mapa existente sin recrearlo ni recalibrar su grilla. Conservar posicion mundial, objetos y camaras; compensar resolucion modifica solo la escala de la imagen cuando mantiene la proporcion.

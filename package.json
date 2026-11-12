@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "3.23.0",
+  "version": "3.25.0",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:api": "pnpm typecheck && vite build --config src/server/vite.config.ts",
-    "start:api": "node --env-file-if-exists=.env out/api/index.mjs",
-    "dev:api": "pnpm build:api && pnpm start:api",
+    "start:api": "pnpm build:service && node --env-file-if-exists=.env out/api/index.mjs",
+    "dev:api": "pnpm start:api",
     "dev:web": "vite --config src/web/vite.config.ts",
     "build:web": "pnpm typecheck && vite build --config src/web/vite.config.ts",
     "dev:service": "node --env-file-if-exists=.env.electron node_modules/electron-vite/bin/electron-vite.js dev",
@@ -32,7 +32,8 @@
     "test:owned": "vitest run --config src/infrastructure/server/owned/vitest.config.ts",
     "test:invitations": "vitest run --config src/infrastructure/server/invitations/vitest.config.ts",
     "invitations:invalidate": "node --env-file-if-exists=.env out/api/invitation-invalidate.mjs",
-    "test:moderation": "vitest run --config src/infrastructure/server/moderation/vitest.config.ts"
+    "test:moderation": "vitest run --config src/infrastructure/server/moderation/vitest.config.ts",
+    "build:service": "pnpm typecheck && vite build --config src/server/vite.config.ts && vite build --config src/web/vite.config.ts"
   },
   "build": {
     "appId": "com.luismoncaris.ttrpg-effects",

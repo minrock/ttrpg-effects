@@ -2,7 +2,7 @@ import type { GridLayout, SceneGrid } from "../sessions/scene-document";
 import type { WorldPoint } from "../shared/coordinates";
 import { getHexCenter, HEX_UNIT_CORNERS } from "./hex-grid";
 
-export type GridGeometry = Pick<SceneGrid, "cellSizeWorld"> & { readonly layout?: GridLayout };
+export type GridGeometry = Pick<SceneGrid, "cellSizeWorld"> & { readonly layout?: GridLayout; readonly origin?: WorldPoint };
 export type GridGeometryInput = number | GridGeometry;
 
 // x/y remain the bounding-box origin in world space, including after free dragging.
@@ -21,11 +21,13 @@ export function resolveGridGeometry(grid: GridGeometryInput): GridGeometry {
 export function getGridCellAtPoint(point: WorldPoint, input: GridGeometryInput): GridCell {
   const grid = resolveGridGeometry(input);
   const size = grid.cellSizeWorld;
+  const origin = grid.origin ?? { x: 0, y: 0 };
+  point = { x: point.x - origin.x, y: point.y - origin.y };
   if (grid.layout === "hexagonal") {
     const center = getHexCenter(point, size);
-    return { x: center.x - size / 2, y: center.y - size / Math.sqrt(3), size, layout: "hexagonal" };
+    return { x: origin.x + center.x - size / 2, y: origin.y + center.y - size / Math.sqrt(3), size, layout: "hexagonal" };
   }
-  return { x: Math.floor(point.x / size) * size, y: Math.floor(point.y / size) * size, size };
+  return { x: origin.x + Math.floor(point.x / size) * size, y: origin.y + Math.floor(point.y / size) * size, size };
 }
 
 export function getGridCellHeight(cell: GridCell): number {
@@ -89,14 +91,16 @@ export function getGridCellRings(cells: readonly GridCell[]): { bright: GridCell
 export function getGridCellsInBrush(point: WorldPoint, radius: number, input: GridGeometryInput): readonly GridCell[] {
   const grid = resolveGridGeometry(input);
   const size = grid.cellSizeWorld;
+  const origin = grid.origin ?? { x: 0, y: 0 };
+  const local = { x: point.x - origin.x, y: point.y - origin.y };
   const hexagonal = grid.layout === "hexagonal";
   const rowStep = hexagonal ? size * Math.sqrt(3) / 2 : size;
   const cells: GridCell[] = [];
-  for (let row = Math.floor((point.y - radius) / rowStep) - 1; row <= Math.ceil((point.y + radius) / rowStep) + 1; row++) {
+  for (let row = Math.floor((local.y - radius) / rowStep) - 1; row <= Math.ceil((local.y + radius) / rowStep) + 1; row++) {
     const offset = hexagonal ? ((row % 2 + 2) % 2) * size / 2 : size / 2;
-    const y = row * rowStep + (hexagonal ? 0 : size / 2);
-    for (let column = Math.floor((point.x - radius) / size) - 1; column <= Math.ceil((point.x + radius) / size) + 1; column++) {
-      const x = column * size + offset;
+    const y = origin.y + row * rowStep + (hexagonal ? 0 : size / 2);
+    for (let column = Math.floor((local.x - radius) / size) - 1; column <= Math.ceil((local.x + radius) / size) + 1; column++) {
+      const x = origin.x + column * size + offset;
       if (Math.hypot(x - point.x, y - point.y) <= radius) {
         cells.push(getGridCellAtPoint({ x, y }, grid));
       }

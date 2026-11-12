@@ -2322,6 +2322,10 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     }));
   }
 
+  const handleGridCalibrationChange = useCallback((grid: SceneDocument["grid"]): void => {
+    setScene(current => ({ ...current, grid: { ...current.grid, origin: grid.origin, cellSizeWorld: grid.cellSizeWorld } }));
+  }, []);
+
   const handleGridCellSizeChange = useCallback((cellSizeWorld: number): void => {
     setScene((current) => ({
       ...current,
@@ -3580,6 +3584,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           waterPreviewHoverPoint={waterDraft.hoverPoint}
           onContextMenuRequest={handleContextMenuRequest}
           onElementSelect={handleElementSelect}
+          onGridCalibrationChange={handleGridCalibrationChange}
           onGridCellSizeChange={handleGridCellSizeChange}
           onMapRenderError={handleMapRenderError}
           onMapRendered={handleMapRendered}
@@ -4258,6 +4263,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 <Switch.Thumb className="switch-thumb" />
               </Switch.Root>
             </div>
+            {isGridAdjustMode && (
+              <small>Arrastra la esquina superior izquierda para alinear la grilla con el mapa; la inferior derecha para ajustar el tamaño de la celda. La alineación se guarda en la escena.</small>
+            )}
             <button
               type="button"
               className={interaction.isMapAdjustMode ? "is-active" : ""}
