@@ -1,3 +1,4 @@
+import { calibrateGrid, calibrationHeight } from "../../domain/grid/grid-calibration";
 import { drawAreaPattern } from "./area-pattern";
 import { isAreaLocked, isContextualArea } from "../../domain/shapes/shapes";
 import type { SharedAnnotation } from "../../shared/contracts/shared-annotations";
@@ -82,7 +83,7 @@ import { getAreaToolUiScale } from "./area-tool-screen-scale";
 import { getFireResizeTarget } from "./effect-control-geometry";
 import { getGridWindow, gridWindowCoversView, type GridWindow } from "../../domain/grid/grid-window";
 import { getHexGridSegments } from "../../domain/grid/hex-grid";
-import { getGridCellBoundary, getGridCellHeight, getGridCellKey, getGridCellRings, getGridCellVertices, getGridCellsInBrush, isPointInGridCell, type GridCell } from "../../domain/grid/grid-cell";
+import { getGridCellAtPoint, getGridCellBoundary, getGridCellHeight, getGridCellKey, getGridCellRings, getGridCellVertices, getGridCellsInBrush, isPointInGridCell, type GridCell } from "../../domain/grid/grid-cell";
 import { loadFirePatternAnimation, type FirePatternAnimation } from "./fire-pattern-animation";
 import { createFireFlameLayout, getFireFlameBudget, MAX_FIRE_FLAMES_PER_EFFECT } from "./fire-pattern-layout";
 import { ProceduralFireRenderer } from "./procedural-fire";
@@ -135,6 +136,7 @@ interface PointerDragState {
     | "pan"
     | "player-camera-move"
     | "calibrate"
+    | "calibration-move"
     | "map-move"
     | "element-move"
     | "effect-edit"
@@ -179,6 +181,7 @@ export interface PixiViewportOptions {
   readonly onSharedShapePreview?: (shape: SceneShape | null) => void;
   readonly onContextMenu?: (request: PixiContextMenuRequest) => void;
   readonly onElementSelect?: (elementId: string | null) => void;
+  readonly onGridCalibrationChange?: (grid: SceneGrid) => void;
   readonly onGridCellSizeChange?: (cellSizeWorld: number) => void;
   readonly onMapRenderError?: (message: string) => void;
   readonly onMapRendered?: (message: string) => void;
@@ -278,6 +281,8 @@ export class PixiViewport {
   private isZoomLocked = false;
   private isMapAdjustMode = false;
   private isGridAdjustMode = false;
+  private calibrationOrigin: WorldPoint | null = null;
+  private calibrationHover: "move" | "resize" | null = null;
   private isGrabMode = false;
   private isNavigationEnabled = false;
   private isSpaceNavigationActive = false;
@@ -505,8 +510,14 @@ export class PixiViewport {
   }
 
   setGridAdjustMode(isGridAdjustMode: boolean): void {
+    if (this.isGridAdjustMode !== isGridAdjustMode) {
+      this.cancelCalibrationDrag();
+      this.calibrationOrigin = null;
+      this.calibrationHover = null;
+    }
     this.isGridAdjustMode = isGridAdjustMode;
     this.drawSelectionLayer();
+    this.updateCursor();
   }
 
   setGrabMode(isGrabMode: boolean): void {
@@ -898,6 +909,12 @@ export class PixiViewport {
 
     if (!sameMap || map?.imageUrl !== previous?.imageUrl) {
       if (!sameMap) {
+        this.cancelCalibrationDrag();
+        this.calibrationOrigin = null;
+        if (this.calibrationHover !== null) {
+          this.calibrationHover = null;
+          this.updateCursor();
+        }
         this.clearAttentionFocus();
         this.clearMapImage();
         this.map = map;
@@ -926,6 +943,11 @@ export class PixiViewport {
 
   setGrid(grid: SceneGrid): void {
     const previous = this.grid;
+    if (previous && this.dragState?.mode !== "calibrate" && this.dragState?.mode !== "calibration-move" &&
+      (previous.layout !== grid.layout || previous.cellSizeWorld !== grid.cellSizeWorld ||
+        previous.origin?.x !== grid.origin?.x || previous.origin?.y !== grid.origin?.y)) {
+      this.calibrationOrigin = null;
+    }
     const fireTileSizeChanged = this.grid?.cellSizeWorld !== grid.cellSizeWorld;
     this.grid = grid;
     this.drawGrid();
@@ -934,7 +956,7 @@ export class PixiViewport {
       && previous.cellSizeWorld === grid.cellSizeWorld && previous.opacity === grid.opacity
       && previous.unit === grid.unit && previous.distancePerCell === grid.distancePerCell
       && previous.metricDistancePerCell === grid.metricDistancePerCell) {
-      if (previous.layout !== grid.layout) {
+      if (previous.layout !== grid.layout || previous.origin?.x !== grid.origin?.x || previous.origin?.y !== grid.origin?.y) {
         this.drawShapesAndMeasurementsLayer();
         this.drawSelectionLayer();
       }
@@ -1164,14 +1186,17 @@ export class PixiViewport {
     const layout = this.grid.layout ?? "square";
     const next = getGridWindow(this.camera, viewport, this.grid.cellSizeWorld, layout);
     const lineWidth = this.grid.lineWidth ?? 1;
-    const style = `${this.grid.cellSizeWorld}:${this.grid.opacity}:${lineWidth}:${layout}`;
+    const origin = this.grid.origin ?? { x: 0, y: 0 };
+    const style = `${this.grid.cellSizeWorld}:${this.grid.opacity}:${lineWidth}:${layout}:${origin.x}:${origin.y}`;
     if (this.gridWindowCache?.style === style && this.gridWindowCache.window.step === next.step
       && layer.children.length > 0 && gridWindowCoversView(this.gridWindowCache.window, this.camera, viewport)) return;
     clearContainerChildren(layer);
     this.gridWindowCache = { window: next, style };
-    const bounds = next.bounds;
+    const bounds = { left: next.bounds.left - origin.x, right: next.bounds.right - origin.x,
+      top: next.bounds.top - origin.y, bottom: next.bounds.bottom - origin.y };
     if (bounds.right <= bounds.left || bounds.bottom <= bounds.top) return;
     const grid = new Graphics();
+    grid.position.set(origin.x, origin.y);
     const cellSize = next.step;
     if (layout === "hexagonal") {
       for (const [x1, y1, x2, y2] of getHexGridSegments(bounds, cellSize)) {
@@ -1633,8 +1658,18 @@ export class PixiViewport {
     let effectHandle: LightningHandle | undefined;
     let grabOffset: WorldPoint | undefined;
     let moveStartPosition: WorldPoint | undefined;
+    const calibrationHandle = this.hitTestCalibrationHandle(point);
     if (event.button === 0) {
-      if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
+      if (calibrationHandle !== null && !this.isGrabMode && !this.isSpaceNavigationActive) {
+        mode = calibrationHandle === "move" ? "calibration-move" : "calibrate";
+        this.calibrationHover = calibrationHandle;
+        const worldPoint = this.screenToWorldPoint(point);
+        const origin = this.getCalibrationOrigin();
+        const cornerOffset = calibrationHandle === "resize" ? this.grid?.cellSizeWorld ?? 100 : 0;
+        const cornerHeight = calibrationHandle === "resize" && this.grid ? calibrationHeight(this.grid) : 0;
+        grabOffset = { x: worldPoint.x - origin.x - cornerOffset, y: worldPoint.y - origin.y - cornerHeight };
+        this.calibrationOrigin = origin;
+      } else if (this.isGrabMode || (this.isReadOnly && canNavigateReadOnly)) {
         mode = "pan";
         this.app.canvas.style.cursor = "grabbing";
       } else if (this.effectDraft !== null && !this.isReadOnly) {
@@ -1804,8 +1839,6 @@ export class PixiViewport {
           this.options.onElementSelect?.(hitElementId);
         } else if (!this.isReadOnly && this.isMapAdjustMode && this.mapSprite !== null) {
           mode = "map-move";
-        } else if (!this.isReadOnly && this.isGridAdjustMode && this.hitTestCalibrationHandle(point)) {
-          mode = "calibrate";
         }
       }
     }
@@ -1822,6 +1855,10 @@ export class PixiViewport {
       grabOffset,
       moveStartPosition
     };
+    if (mode === "calibration-move" || mode === "calibrate") {
+      this.updateCursor();
+      this.drawSelectionLayer();
+    }
   };
 
   private readonly handlePointerMove = (event: PointerEvent): void => {
@@ -1871,6 +1908,12 @@ export class PixiViewport {
     }
 
     if (this.dragState === null) {
+      const calibrationHover = this.hitTestCalibrationHandle(screenPoint);
+      if (calibrationHover !== this.calibrationHover) {
+        this.calibrationHover = calibrationHover;
+        this.updateCursor();
+        this.drawSelectionLayer();
+      }
       const newZone = this.hitTestPathHandles(screenPoint)?.zone ?? null;
       const isPlayerCameraHovered = this.hitTestPlayerCameraControl(screenPoint);
       if (
@@ -1890,13 +1933,17 @@ export class PixiViewport {
 
     const nextPoint = screenPoint;
 
-    if (this.dragState.mode === "calibrate") {
-      const worldPoint = this.screenToWorldPoint(nextPoint);
+    if (this.dragState.mode === "calibration-move") {
+      this.calibrationOrigin = subtractGrabOffset(this.screenToWorldPoint(nextPoint), this.dragState.grabOffset);
+      this.applyGridCalibration(this.calibrationOrigin);
+      this.drawSelectionLayer();
+    } else if (this.dragState.mode === "calibrate") {
+      const worldPoint = subtractGrabOffset(this.screenToWorldPoint(nextPoint), this.dragState.grabOffset);
       const origin = this.getCalibrationOrigin();
-      const cellSize = Math.abs(worldPoint.x - origin.x);
-      this.scheduleViewportUpdate("grid-cell-size", () => {
-        this.options.onGridCellSizeChange?.(cellSize);
-      });
+      // Proyectar sobre la diagonal mantiene ambos lados iguales al mover en X o Y.
+      const ratio = this.grid?.layout === "hexagonal" ? 2 / Math.sqrt(3) : 1;
+      const cellSize = Math.max(1, ((worldPoint.x - origin.x) + ratio * (worldPoint.y - origin.y)) / (1 + ratio * ratio));
+      this.applyGridCalibration(origin, cellSize);
     } else if (this.dragState.mode === "daytime-mask-paint") {
       this.appendDaytimeMaskStrokePoint(nextPoint);
       this.scheduleDaytimeMaskFeedbackRedraw();
@@ -2159,6 +2206,11 @@ export class PixiViewport {
     }
 
     this.dragState = null;
+    if (completedMode === "calibration-move" || completedMode === "calibrate") {
+      this.calibrationHover = event.type === "pointercancel" ? null : this.hitTestCalibrationHandle(releasePoint);
+      this.updateCursor();
+      this.drawSelectionLayer();
+    }
     if (completedMode === "pan") {
       this.options.onCameraInteractionEnd?.(cameraStateToSnapshot(this.camera));
       this.updateCursor();
@@ -2362,6 +2414,8 @@ export class PixiViewport {
   }
 
   private updateCursor(): void {
+    this.app.canvas.title = this.calibrationHover === "move" ? "Esquina superior izquierda: arrastra para alinear la grilla con el mapa"
+      : this.calibrationHover === "resize" ? "Esquina inferior derecha: arrastra para ajustar el tamaño de la grilla" : "";
     if (this.attentionPointHandler) { this.app.canvas.style.cursor = "crosshair"; return; }
     if (this.isGrabMode || (this.isNavigationEnabled && this.isSpaceNavigationActive)) {
       this.app.canvas.style.cursor = "grab";
@@ -2369,6 +2423,10 @@ export class PixiViewport {
       this.app.canvas.style.cursor = this.localEditableShapeIds !== null && this.isPathDrawingMode
         ? "crosshair"
         : this.localEditableShapeIds !== null && this.pathHoverZone !== null ? "grab" : "default";
+    } else if (this.dragState?.mode === "calibration-move") {
+      this.app.canvas.style.cursor = "grabbing";
+    } else if (this.calibrationHover !== null && this.isGridAdjustMode) {
+      this.app.canvas.style.cursor = this.calibrationHover === "move" ? "grab" : "nwse-resize";
     } else if (this.effectDraft !== null) {
       this.app.canvas.style.cursor = "crosshair";
     } else if (this.isPlayerCameraControlHovered) {
@@ -2452,6 +2510,7 @@ export class PixiViewport {
   };
 
   private readonly handleWindowBlur = (): void => {
+    this.cancelCalibrationDrag();
     this.cancelEffectEdit();
     if (!this.isSpaceNavigationActive && this.dragState?.mode !== "pan") {
       return;
@@ -2472,11 +2531,35 @@ export class PixiViewport {
     this.clearDragPreviews();
   }
 
+  private applyGridCalibration(anchor: WorldPoint, size?: number): void {
+    if (!this.grid) return;
+    const next = calibrateGrid(this.grid, anchor, size);
+    this.setGrid(next);
+    this.scheduleViewportUpdate("grid-cell-size", () => {
+      this.options.onGridCalibrationChange?.(next);
+    });
+  }
+
+  private cancelCalibrationDrag(): void {
+    if (this.dragState?.mode !== "calibration-move" && this.dragState?.mode !== "calibrate") return;
+    this.flushPendingViewportUpdates();
+    this.dragState = null;
+    this.calibrationHover = null;
+    this.updateCursor();
+    this.drawSelectionLayer();
+  }
+
   private readonly handleEffectCaptureLost = (): void => {
+    this.cancelCalibrationDrag();
     this.cancelEffectEdit();
   };
 
   private readonly handleEffectPointerLeave = (): void => {
+    if (this.dragState === null && this.calibrationHover !== null) {
+      this.calibrationHover = null;
+      this.updateCursor();
+      this.drawSelectionLayer();
+    }
     this.firePaintPointer = null;
     this.pendingViewportUpdates.delete("effect-pointer");
     if (this.effectDraft !== null) {
@@ -5028,36 +5111,48 @@ export class PixiViewport {
     const origin = this.getCalibrationOrigin();
     const cellSize = this.grid?.cellSizeWorld ?? 100;
     const handleX = origin.x + cellSize;
-    const handleY = origin.y;
-
-    return new Graphics()
-      .moveTo(origin.x, origin.y)
-      .lineTo(handleX, handleY)
-      .stroke({ color: 0xffd28a, width: 5, alpha: 0.95 })
-      .circle(origin.x, origin.y, 8)
-      .fill({ color: 0xffd28a })
-      .circle(handleX, handleY, 12)
+    const handleY = origin.y + calibrationHeight(this.grid ?? { cellSizeWorld: cellSize, layout: "square" });
+    const scale = 1 / this.camera.zoom;
+    const active = this.calibrationHover === "move" || this.dragState?.mode === "calibration-move";
+    const guide = new Graphics();
+    if (this.grid?.layout === "hexagonal") {
+      guide.poly(getGridCellVertices({ x: origin.x, y: origin.y, size: cellSize, layout: "hexagonal" }).flatMap(point => [point.x, point.y]));
+    } else {
+      guide.rect(origin.x, origin.y, cellSize, cellSize);
+    }
+    guide.fill({ color: 0xffd28a, alpha: 0.06 })
+      .stroke({ color: 0xffd28a, width: 3 * scale, alpha: 0.95 })
+      .circle(origin.x, origin.y, 11 * scale)
+      .fill({ color: active ? 0xffd28a : 0x1a1d1f })
+      .stroke({ color: 0xffd28a, width: (active ? 3 : 1) * scale })
+      .moveTo(origin.x - 6 * scale, origin.y)
+      .lineTo(origin.x + 6 * scale, origin.y)
+      .moveTo(origin.x, origin.y - 6 * scale)
+      .lineTo(origin.x, origin.y + 6 * scale)
+      .stroke({ color: active ? 0x1a1d1f : 0xffd28a, width: 2 * scale })
+      .circle(handleX, handleY, 12 * scale)
       .fill({ color: 0x1a1d1f })
-      .circle(handleX, handleY, 8)
+      .circle(handleX, handleY, 8 * scale)
       .fill({ color: 0xffd28a });
+    return guide;
   }
 
-  private hitTestCalibrationHandle(screenPoint: ScreenPoint): boolean {
-    if (this.grid === null || !this.grid.enabled) {
-      return false;
-    }
-
+  private hitTestCalibrationHandle(screenPoint: ScreenPoint): "move" | "resize" | null {
+    if (this.isReadOnly || !this.isGridAdjustMode || this.grid === null || !this.grid.enabled) return null;
     const worldPoint = this.screenToWorldPoint(screenPoint);
     const origin = this.getCalibrationOrigin();
-    const handle = {
-      x: origin.x + this.grid.cellSizeWorld,
-      y: origin.y
-    };
-    return Math.hypot(worldPoint.x - handle.x, worldPoint.y - handle.y) <= 20;
+    const moveDistance = Math.hypot(worldPoint.x - origin.x, worldPoint.y - origin.y);
+    const resizeDistance = Math.hypot(worldPoint.x - origin.x - this.grid.cellSizeWorld, worldPoint.y - origin.y - calibrationHeight(this.grid));
+    if (Math.min(moveDistance, resizeDistance) * this.camera.zoom > 16) return null;
+    return moveDistance < resizeDistance ? "move" : "resize";
   }
 
-  private getCalibrationOrigin(): { x: number; y: number } {
-    return this.map?.position ?? { x: 0, y: 0 };
+  private getCalibrationOrigin(): WorldPoint {
+    if (this.calibrationOrigin) return this.calibrationOrigin;
+    const point = this.map?.position ?? { x: 0, y: 0 };
+    if (!this.grid) return point;
+    const cell = getGridCellAtPoint(point, this.grid);
+    return { x: cell.x, y: cell.y };
   }
 
 }

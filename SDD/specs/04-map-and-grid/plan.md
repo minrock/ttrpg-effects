@@ -1,5 +1,32 @@
 # Plan - Mapa y Grilla
 
+## Celda de calibración y alineación — 3.24.0
+
+Fecha: 2026-11-12. Cierre e integración autorizados por el usuario para 3.25.0. Sustituye la guía móvil que no modificaba la grilla.
+
+1. Añadir `SceneGrid.origin?: WorldPoint`, validado como par finito por el schema; ausencia equivale a (0,0) y no altera documentos antiguos. No requiere migración incompatible.
+2. Compartir la traslación en `grid-cell.ts`, snap/medición y tokens. Restar el origen para cálculos locales y sumarlo una sola vez al volver a mundo; las celdas pintadas guardan sus posiciones absolutas.
+3. Extraer `calibrateGrid` y `calibrationHeight` como geometría pura. El origen cuadrado coincide con el ancla; el hexagonal con el centro de la celda seleccionada. Al redimensionar, normalizar el tamaño con el dominio y derivar de nuevo el origen conservando el ancla.
+4. `PixiViewport` selecciona una celda real cerca del centro al abrir. Mover cambia origen; redimensionar proyecta el puntero sobre la diagonal (considerando la relación ancho/alto hexagonal). Mantener el offset del clic para evitar saltos.
+5. Actualizar la grilla local durante el gesto y agrupar `onGridCalibrationChange` a un máximo de una publicación de estado por frame. App usa callback estable y actualiza tamaño/origen atómicamente; el flujo existente sincroniza el mapa activo, guardado y publicación. Flush al terminar/interrumpir el gesto.
+6. Incluir origen en la clave de cache de grilla, dibujar geometría local trasladada y conservar el límite de líneas/celdas. Cambiar solo origen redibuja grilla, selección y mediciones, sin reconstruir máscaras o texturas de mapa.
+7. `pnpm start:api` ejecuta `build:service` antes de abrir el listener, recompilando API y web en cada arranque. `dev:api` delega en el mismo comando; no depende de hooks de pnpm. Incluir origen en las comprobaciones de compatibilidad de dibujos compartidos y foco. Publicar/guardar usa el contrato de escena existente. Recompilar API y frontend web, además de Electron, por la extensión de schema.
+8. Mantener la guía fuera de persistencia, pero guardar alineación por mapa. No trasladar elementos colocados, cambiar cámaras ni añadir dependencias.
+
+Verificación: pruebas de origen cuadrado/hexagonal, snap, medición, tokens, pintura, serialización compatible, render/cache y gestos del control. Revisar en la interfaz alineación visual y nueva calibración; el comportamiento del control temporal probado previamente queda sustituido por este flujo.
+
+### Validación realizada — 2026-11-12
+
+- Suite completa: 1384 pruebas aprobadas y un fallo en `draft-coordinator.test.ts` («no resuelve Guardar antes de persistir la confirmación local»). La misma prueba pasa aislada con un worker tanto en HEAD previo como en esta rama; queda registrado como sensibilidad al entorno/temporización, sin modificar su implementación.
+- Tras el ajuste final: 42 pruebas de geometría, origen, render/cache e interacción aprobadas. Cubren también guardado y cambio entre dos mapas con orígenes independientes.
+- Typecheck, lint y builds Electron/web/API ejecutados. API local reiniciada para aceptar el campo nuevo; health responde correctamente.
+- Smoke visual en Electron aislado: mover celda 42 px en X y 30 px en Y desplaza todas las líneas; redimensionar de 100 a 150 mantiene la esquina superior izquierda. No se modificaron escenas del usuario.
+- Frontend web recompilado para Chrome. No se realizó una prueba manual de publicación entre dos navegadores.
+
+### Cierre 3.25.0
+
+Commit e integración a main autorizados por el usuario. Verificación final: 154 archivos y 1386 pruebas aprobadas con un worker; lint y typecheck correctos. `pnpm start:api` probado con datos aislados en 8791: reconstruyó API y web, ejecutó typecheck y respondió salud con versión 3.25.0; instancia detenida al terminar. No se reinició la API del usuario en 8787.
+
 ## Extension aceptada - Actualizar imagen
 
 Ver [plan 36](../36-replace-map-image/plan.md), implementado localmente el 2026-10-22. Preparar un recurso nuevo antes de sustituir el anterior, refrescar incluso una misma ruta y mantener camara/grilla independientes de la resolucion. Incluye metadata opcional de dimensiones y preservacion de precision de escala para evitar deriva al guardar. No reutilizar la factory de mapa nuevo ni invalidar todo el viewport durante el reemplazo.

@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-04. Versión: `package.json` 3.21.0, SDD 57 integrada en `main` mediante `62c351a`. Conserva la consolidación histórica de guías y expedientes 001–012 e incorpora SDD 55–57. Las pruebas realizadas y los límites pendientes se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-12. Entrega 3.25.0: cierre autorizado en `main` de SDD 58 (guardado y recuperación), correcciones de auditoría 3.23.0, celda de calibración/alineación de SDD 04 y reconstrucción automática del servicio. Conserva las entregas SDD 55–57 y expedientes 001–012. Las pruebas y límites se registran por entrega; integración no equivale a despliegue.
 
 ## Producto disponible
 
@@ -24,6 +24,8 @@ Una partida fija una versión de sistema. El catálogo separa reglas, datos y pr
 | Versión de sistema | Referencia exacta retenida y hash; módulos compilados | Resolver a la última versión o ejecutar plugins externos |
 | Invitación | Se renueva al abrir/reabrir; continuar conserva apertura | Rotar por cualquier recarga o pedir contraseña personal a jugador |
 | Expulsión | Revoca participante y rota enlace; los demás permanecen | Cambiar todas las credenciales o desconectar toda la mesa |
+| Alineación de grilla | Celda de calibración mueve el origen persistente por mapa; snap y medición comparten ese origen | Guía temporal independiente de la grilla |
+| Arranque API | `pnpm start:api` valida y reconstruye API y web antes de escuchar | Arrancar artefactos potencialmente obsoletos |
 | Menú | Una fila compartida, herramientas agrupadas en ancho estrecho | Cabecera de servicio y toolbar del editor apiladas |
 
 Electron autónomo conserva su gestión local de plantillas. Las restricciones administrativas son del servicio; no se trasladan silenciosamente al modo local.
@@ -55,7 +57,7 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. Los 
 
 [Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) implementa navegación propia y un foco puntual que centra el área útil conservando el zoom actual. Retira controles remotos, cámara principal/virtual y previews de la interfaz. Incluye API/SSE negociado e IPC específico. Implementada en `feature/sdd-foco-atencion` (`34d938c`) e integrada en `main` (`3d35876`), versión 3.20.0, con autorización explícita del usuario. [Plan técnico](specs/56-camaras-libres-foco-atencion/plan.md) y [evidencia/límites](specs/56-camaras-libres-foco-atencion/validacion.md).
 
-## Última entrega integrada — SDD 57
+## Entrega anterior — SDD 57
 
 [Áreas contextuales](specs/57-areas-contextuales/spec.md) implementa para círculos/conos una barra de selección con color, patrones cuadriculados de emojis existentes, bloqueo y copia. Conserva propiedad/moderación y separación entre figuras DM persistentes y dibujos efímeros de jugadores. [Plan técnico](specs/57-areas-contextuales/plan.md). Implementada en `feature/sdd-areas-contextuales` (`a09ea69`) e integrada en `main` (`62c351a`), 3.21.0, por orden explícita del usuario. No se inició un trabajo factory. [Validación y pendientes](specs/57-areas-contextuales/validacion.md).
 
@@ -68,3 +70,21 @@ Estas son direcciones mencionadas o límites explícitos, no una cola aprobada:
 - Escalado horizontal, bus de eventos y recuperación durable del estado visual: requieren nuevas garantías de consistencia y autoridad.
 
 Cualquier otro alcance nuevo debe describir problema, usuario, criterios y exclusiones antes de convertirse en trabajo de fábrica. Las preguntas originales de requirements no se reabren automáticamente: primero contrastarlas con specs y código existentes.
+
+
+## Corrección pendiente de integración — Recuperación de sesión
+
+3.21.1 en `fix/recuperacion-sesion-memoria`: liberar el render durante suspensión, detener renders de conflictos, descartar el editor antes de recargar el contexto y acotar resolución de imágenes ausentes. [Diagnóstico y evidencia](specs/51-experiencia-servicio/recuperacion-memoria.md). Sin cambios de DB ni expedientes factory nuevos.
+
+
+## Implementación en rama — SDD 58: borradores recuperables
+
+[Spec 58](specs/58-borradores-recuperables/spec.md) y [plan](specs/58-borradores-recuperables/plan.md): respaldo IndexedDB a 1 s/máximo 5 s, borrador privado remoto a 5 s/máximo 30 s y confirmación manual separada. Incluye recuperación por cuenta/rama, conflictos sin sobrescritura, persistencia local selectiva de Electron servicio y contratos SQLite/PostgreSQL. Estado: implementada y consolidada para la versión 3.22.1 en `fix/recuperacion-local-figuras`, pendiente de merge y sin trabajo factory nuevo. Migración aditiva 8; DB operativa sin modificar. IndexedDB privado sustituye la prohibición anterior y Electron servicio usa partición persistente por origen, con limpieza de credenciales. [Evidencia y límites](specs/58-borradores-recuperables/validacion.md).
+
+Corrección 3.22.1 en `fix/recuperacion-local-figuras`: respalda figuras sin mapa, inicia escritura al crearlas y ofrece recuperar IndexedDB o cargar la escena. Conserva SDD 58 pendiente de integrar.
+
+Corrección 3.22.2 en `fix/guardado-escena-confirmada`: confirmación completa y reapertura automática desde el servidor; IndexedDB solo solicita recuperación por cambios de contenido pendientes. Incluida en la entrega 3.23.0; pendiente de integración.
+
+## Correcciones de auditoría pendientes de integrar — 2026-11-11
+
+B01–B06 corregidos en `fix/hallazgos-auditoria-escena`, conservando los cambios previos de guardado. Entrega 3.23.0 por solicitud de incremento minor. El usuario autorizó commit y push de esta rama; sigue pendiente de integración a main. Evidencia y límites en [validación de auditoría](validaciones/2026-11-11-auditoria-escena.md).

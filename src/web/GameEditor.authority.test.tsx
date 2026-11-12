@@ -9,12 +9,13 @@ import { DialogBroker } from "./dialogs";
 import { HttpTransport, ServiceError } from "../infrastructure/browser/http";
 import { systemSeeds } from "../domain/systems/system-catalog";
 
-const state=vi.hoisted(()=>({revalidate:vi.fn(),expired:vi.fn(),guard:undefined as undefined|(()=>Promise<boolean>),broker:undefined as undefined|DialogBroker,terminals:[] as Array<(reason:string)=>void>,status:{phase:"connected",published:false,presence:null,error:null}}));
+const state=vi.hoisted(()=>({renders:vi.fn(),clear:vi.fn(),revalidate:vi.fn(),expired:vi.fn(),guard:undefined as undefined|(()=>Promise<boolean>),broker:undefined as undefined|DialogBroker,terminals:[] as Array<(reason:string)=>void>,status:{phase:"connected",published:false,presence:null,error:null}}));
 vi.mock("../renderer/src/App",()=>({App:({service,tablePanel}:{service:ServiceWorkspace;tablePanel?:ReactNode})=>{
+  state.renders();
   useEffect(()=>service.registerLeave?.(state.guard??(async()=>await service.confirmLeave()!==null)),[service]);
   return <><input aria-label="Borrador retenido" defaultValue="inicial"/>{tablePanel}</>;
 }}));
-vi.mock("../infrastructure/browser/browser-client",()=>({createBrowserClient:(_http:HttpTransport,broker:DialogBroker)=>{state.broker=broker;return {client:{},revalidate:state.revalidate,clear:vi.fn()};}}));
+vi.mock("../infrastructure/browser/browser-client",()=>({createBrowserClient:(_http:HttpTransport,broker:DialogBroker)=>{state.broker=broker;return {client:{},revalidate:state.revalidate,clear:state.clear};}}));
 vi.mock("../infrastructure/browser/contextual-table-client",()=>({contextualTableClient:(_context:unknown,onTerminal:(reason:string)=>void)=>{state.terminals.push(onTerminal);return {subscribeStatus:()=>()=>{},getStatus:()=>state.status,start:()=>()=>{},clear:()=>{}};}}));
 const id="01010101-0101-4101-8101-010101010101",at="2026-10-31T00:00:00.000Z",seed=systemSeeds[0];
 const configuration={ref:seed.ref,definition:seed.definition,hash:"a".repeat(64),availability:"enabled"};
@@ -26,14 +27,14 @@ const reply=(value:unknown)=>new Response(JSON.stringify(value),{headers:{"conte
 let host:HTMLDivElement,root:Root,http:HttpTransport,fetcher:ReturnType<typeof vi.fn<typeof fetch>>;
 let close:ReturnType<typeof vi.fn<() => void>>;
 beforeEach(()=>{
-  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});state.guard=undefined;state.broker=undefined;state.terminals=[];state.expired.mockClear();state.revalidate.mockReset().mockResolvedValue(undefined);
+  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});state.guard=undefined;state.broker=undefined;state.terminals=[];state.expired.mockClear();state.clear.mockClear();state.renders.mockClear();state.revalidate.mockReset().mockResolvedValue(undefined);
   host=document.createElement("div");document.body.append(host);root=createRoot(host);
   HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};
   close=vi.fn(function(this:HTMLDialogElement){this.removeAttribute("open");});HTMLDialogElement.prototype.close=close;
   fetcher=vi.fn<typeof fetch>(async input=>{const path=String(input);return reply(path.includes("participants?")?roster:path.endsWith("configuration")?{ok:true,configuration}:path.includes("/versions/")?{ok:true,version}:path.endsWith("/opening")||path.endsWith("heartbeat")?opening:{ok:true,game});});
   http=new HttpTransport(fetcher);http.bindAccount("a");
 });
-afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();});
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.restoreAllMocks();vi.useRealTimers();});
 async function render(active:boolean){await act(async()=>root.render(<><div hidden={!active} inert={!active}><GameEditor http={http} gameId={id} active={active} expired={state.expired} onExit={()=>{}} onLogout={async()=>{}} registerLeave={()=>()=>{}}/></div>{!active&&<AccountAccess retained http={http} onAccount={()=>{}}/>}</>));}
 async function click(label:string){const button=[...host.querySelectorAll("button")].find(b=>b.textContent===label);expect(button).toBeTruthy();await act(async()=>button!.click());}
 async function start(){await render(true);await click("Continuar partida");const node=host.querySelector<HTMLInputElement>('[aria-label="Borrador retenido"]')!;expect(node).toBeTruthy();node.value="pendiente privado";return node;}
@@ -147,4 +148,30 @@ it("los controles en la cabecera compartida conservan confirmaciones y ocultan d
     await renderWithHeader(false);expect(slot.hidden).toBe(true);expect(host.querySelector("dialog")).toBeNull();
     await renderWithHeader(true);expect(host.querySelector('[aria-label="Borrador retenido"]')).toBe(draft);
   } finally { await act(async()=>root.unmount());slot.remove(); }
+});
+
+
+it("conflicto tras caducidad queda quieto y descartar libera el editor antes de recuperar contexto", async () => {
+  vi.useFakeTimers();
+  let node = await start();
+  for (let cycle = 0; cycle < 3; cycle++) {
+    await render(false);
+    state.revalidate.mockRejectedValueOnce(new ServiceError("REVISION_CONFLICT", "El recurso guardado cambió", 409));
+    await render(true);
+    expect(host.querySelector('dialog[aria-label="Borrador retenido en conflicto"]')).not.toBeNull();
+    assertDraft(node);
+    const renders = state.renders.mock.calls.length, requests = fetcher.mock.calls.length;
+    await act(async () => vi.advanceTimersByTime(60000));
+    expect(state.renders).toHaveBeenCalledTimes(renders);
+    expect(fetcher).toHaveBeenCalledTimes(requests);
+    await click("Descartar borrador y recargar");
+    expect(node.isConnected).toBe(false);
+    expect(state.clear).toHaveBeenCalledTimes(cycle + 1);
+    expect(host.querySelector("dialog")).toBeNull();
+    expect(host.textContent).toContain("Continuar partida");
+    await click("Continuar partida");
+    const fresh = host.querySelector<HTMLInputElement>('[aria-label="Borrador retenido"]')!;
+    expect(fresh).not.toBe(node); expect(fresh.value).toBe("inicial");
+    node = fresh; node.value = "pendiente privado";
+  }
 });

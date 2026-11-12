@@ -61,7 +61,7 @@ export function SceneMapsSection({
         </button>
       </div>
       {maps.length === 0 ? (
-        <p className="sidebar-hint">Agrega al menos un mapa para poder guardar la escena.</p>
+        <p className="sidebar-hint">Agrega una imagen de mapa para usarla como fondo de la escena.</p>
       ) : (
         <ol className="scene-map-list" aria-label="Mapas de la escena">
           {maps.map((map) => (

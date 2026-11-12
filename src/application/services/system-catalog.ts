@@ -18,6 +18,7 @@ export interface SystemCatalog {
   definition(ref: DefinitionRef): Promise<MonsterTemplate>;
 }
 export interface ResourceGameLinks {
+  latestScene(gameId:string):Promise<string|null>;
   link(gameId: string, kind: Exclude<ResourceKind, "templates">, resourceId: string): Promise<void>;
   validate(gameId: string, kind: Exclude<ResourceKind, "templates">, resourceId: string): Promise<void>;
   resolve(gameId: string): Promise<ResolvedSystem>;

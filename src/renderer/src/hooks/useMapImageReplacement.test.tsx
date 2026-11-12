@@ -78,7 +78,7 @@ describe("map image replacement workflow", () => {
     act(() => hook.confirm("preserve-world-size"));
     expect(scene.activeMapId).toBe("a"); expect(scene.map).toBe(original);
     expect(scene.maps.find((map) => map.id === "b")?.map.scale).toBe(1);
-    expect(imageUrl).toContain("revision=old"); expect(applied).not.toHaveBeenCalled();
+    expect(imageUrl).toContain("revision=old"); expect(applied).toHaveBeenCalledWith(scene, "b", "/b.png");
   });
 
   it("cancellation releases prepared resources and makes no scene edits", async () => {

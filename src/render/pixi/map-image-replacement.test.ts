@@ -75,6 +75,7 @@ function createHarness() {
   const viewport = Object.assign(Object.create(PixiViewport.prototype) as Pick<PixiViewport,
     "setMap" | "setViewRole" | "setGrid" | "setDarkness" | "setCompassOrientation" | "destroy"> & Internals, {
     map: null as MapImageState | null, requestedMap: null, mapResource: null, pendingMapResource: null,
+    calibrationOrigin: null, calibrationHover: null,
     mapSprite: null as Sprite | null, colorMapSprite: null as Sprite | null, darkvisionMask: null,
     loadedMapUrl: null, mapLoadVersion: 0, tokenLoadVersion: 0, disposed: false,
     daytimeFeedbackTexture: null, daytimeFeedbackSignature: "", daytimeFeedbackRedrawFrame: null,

@@ -30,3 +30,8 @@ Esta consolidación no volvió a ejecutar los comandos de producto. La verificac
 ## Continuación
 
 Conservar las fronteras de dominio/aplicación/infraestructura/vista y los contratos de compatibilidad descritos en la spec. Una nueva entrega registra su delta, migraciones, criterio → evidencia, riesgos, estado de Git y autorización por separado. No reutilizar decisiones históricas como aprobación de código nuevo.
+
+
+## Corrección 3.21.1
+
+El flujo de recuperación se corrigió en GameEditor, App, MapViewport y el hook useTokenImageResolution. [Diagnóstico, regresiones y límites](recuperacion-memoria.md). La evidencia histórica anterior permanece separada del trabajo actual, pendiente de integración.

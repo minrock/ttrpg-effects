@@ -1,5 +1,58 @@
 # Changelog
 
+## 3.25.0 — 2026-11-12 — Versión minor
+
+- `pnpm start:api` reconstruye y valida API y frontend web antes de iniciar; si falla la compilación no arranca el servicio. `dev:api` reutiliza este flujo sin compilar dos veces.
+- Cierre en main de la celda de calibración y alineación de grilla de 3.24.0, junto con las correcciones de guardado y auditoría pendientes de integración.
+
+## 3.24.0 — 2026-11-12 — Versión minor
+
+- El control de calibración muestra un cuadrado del tamaño de una celda: la esquina superior izquierda lo mueve y la inferior derecha ajusta su tamaño con proporción 1:1 y feedback visual.
+- Mover la celda de calibración alinea la grilla completa; el origen se guarda por mapa y lo usan snap, tokens, mediciones, pintura y publicación a jugadores. Reabrir selecciona una celda cercana al centro conservando la alineación.
+
+## 3.23.0 — 2026-11-11 — Versión minor
+
+- Consolida el guardado completo de escenas y la recuperación desde IndexedDB y servidor.
+- Incluye las seis correcciones de auditoría documentadas en 3.22.3: Player View, recientes, enlaces, avisos, recuperación y actualización de imágenes.
+- Incremento minor solicitado por el usuario; conserva compatibilidad con escenas existentes.
+
+## 3.22.3 — 2026-11-11 — Corrección
+
+- Auditoría B01–B06: estabiliza el callback contextual del canvas del jugador para evitar recreaciones continuas de Pixi.
+- Protege cambios al abrir recientes con Cancelar/Descartar/Guardar; los errores de guardado conservan la escena y abrir el mismo archivo no restaura una copia anterior al guardado.
+- Valida enlaces internos contra los mapas actuales y deshabilita navegación a destinos ausentes; retira únicamente los avisos de imágenes reparadas.
+- Restaurar borradores utiliza secuencias positivas; permite recuperar copias 3.22.2 afectadas por un PUT cero tras comprobar ambos hashes, conservando el original exportable.
+- Actualizar imagen admite referencias privadas de DM con coincidencia exacta de ID y mantiene el rechazo de URLs externas.
+
+## 3.22.2 — 2026-11-06 — Corrección
+
+- Guardar escena confirma el documento completo del editor, incluyendo figuras, notas, cámara y disposición de paneles; también admite un lienzo sin imagen como mapa vacío.
+- Al reabrir una partida se carga su última escena guardada desde el servidor, incluso sin IndexedDB. La recuperación local solo se ofrece para cambios de contenido pendientes; navegar o cambiar paneles no basta para activarla.
+- La confirmación local se espera y conserva una huella del documento guardado. Un cambio posterior a la petición permanece pendiente y no se declara guardado por una respuesta anterior.
+- Regresiones con editor React, cliente HTTP, IndexedDB y API/SQLite temporales: guardar/cerrar/reabrir, recuperar cambios nuevos, dos guardados sucesivos y carga con IndexedDB vacío.
+
+## 3.22.1 — 2026-11-06 — Corrección
+
+- Las figuras del lienzo sin mapa se respaldan en IndexedDB: el borrador ya no usa el serializador de escenas confirmadas que exigía al menos un mapa.
+- Crear/eliminar figuras inicia el respaldo local inmediatamente; salir del editor intenta terminar la escritura pendiente y el indicador distingue «Guardando» de «Guardado».
+- Recuperación inicial simplificada: «Recuperar estado local» o «Cargar mapa nuevamente», sin esperar al listado remoto. Otras copias, versiones y exportación quedan en Más opciones.
+- Si la escena cambió, recuperar conserva el trabajo como copia; cargar el mapa no borra el respaldo local y permite elegir otro si el original ya no existe.
+
+## 3.22.0 — 2026-11-05 — Funcionalidad
+
+- SDD 58: respaldo privado IndexedDB tras 1 s sin editar (máximo 5 s) y borradores remotos tras 5 s (máximo 30 s), separados de Guardar escena y de la proyección a jugadores.
+- Recuperación de documento, notas, fichas, cámara y paneles; ramas por ventana, tres generaciones, exportación, copia y descarte explícito. Archivo de respaldos para partidas archivadas o eliminadas.
+- Confirmación transaccional con revisión de escena, journal de reintentos y recibos acotados; un ACK anterior no elimina cambios posteriores. Migración 8 compatible con SQLite y PostgreSQL.
+- Electron conectado conserva IndexedDB por origen y limpia credenciales antes de abrir la página; cerrar sesión elimina respaldos locales e invalida escritores anteriores.
+- Integra la corrección de memoria 3.21.1 conservada en esta rama. Evidencia y límites de validación en SDD 58; no implica despliegue ni migración de la DB operativa.
+
+## 3.21.1 — 2026-11-05 — Corrección
+
+- Recuperación de sesión: detener renders periódicos en conflictos sin reintento y cerrar la cuenta regresiva al vencer Retry-After.
+- Liberar el lienzo Pixi al suspender/revalidar el acceso, conservando borrador y cámara para recuperarlos después.
+- Descartar un borrador en conflicto desmonta el editor y consulta el contexto vigente sin recargar toda la página ni pasar por su confirmación de salida.
+- Evitar el ciclo de resolución de imágenes de tokens ausentes, aislar fallos parciales y descartar resultados de una sesión o referencia anterior.
+
 ## 3.21.0 — 2026-11-04 — Funcionalidad
 
 - SDD 57: barra contextual compartida para círculos y conos, con color, paleta de 29 patrones del catálogo, bloqueo/desbloqueo, eliminación y copia independiente.

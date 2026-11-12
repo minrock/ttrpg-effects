@@ -43,3 +43,14 @@ describe("prepare map image replacement", () => {
     expect(prepared).toEqual({ status: result.status, imagePath: result.imagePath, imageUrl: result.imageUrl });
   });
 });
+
+it('acepta assets del DM con el mismo id y rechaza rutas ajenas o referencias distintas',async()=>{
+ const id='d8564385-2809-42b5-8e11-ce899dd605a9';
+ for(const imageUrl of [`/api/v1/assets/${id}`,`/api/v1/dm/assets/${id}`]){
+  const result={status:'ready',imagePath:`asset:${id}`,imageUrl};
+  expect(await prepareMapImageReplacementUseCase({selectReplacementMapImage:vi.fn().mockResolvedValue(result)})).toEqual(result);
+ }
+ for(const imageUrl of [`https://otro.test/api/v1/dm/assets/${id}`,`/api/v1/dm/assets/${crypto.randomUUID()}`,`/api/v1/dm/assets/${id}?token=x`]){
+  expect(await prepareMapImageReplacementUseCase({selectReplacementMapImage:vi.fn().mockResolvedValue({status:'ready',imagePath:`asset:${id}`,imageUrl})})).toMatchObject({status:'error'});
+ }
+});

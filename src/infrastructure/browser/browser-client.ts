@@ -1,3 +1,8 @@
+import { syncActiveMapFromRuntimeFields } from "../../domain/sessions/scene-maps";
+import { DraftCoordinator } from "../../application/services/draft-coordinator";
+import { IndexedDbDraftStore } from "./drafts/indexeddb-store";
+import { httpDraftStore } from "./drafts/http-store";
+import { sceneContentHash, contentHash, type DraftContent, type DraftCheckpoint, type DraftContext, type DraftConfirmation } from "../../domain/drafts/draft";
 import { Mutations } from "./mutations";
 import { resourceBindingsSchema, type ResourceBindings, type ResolvedSystem, type SystemVersion } from "../../domain/systems/system-catalog";
 import { BrowserTableClient } from "./table-client";
@@ -41,6 +46,16 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
   const versions = new Map<string,{revision:number;bindings?:ResourceBindings}>();
   let currentResource: string | undefined;
   let currentBindings:ResourceBindings|undefined;
+  const localDrafts = new IndexedDbDraftStore();
+  const drafts = owned && http.accountId ? new DraftCoordinator(http.accountId, typeof location === "undefined" ? "" : location.origin, localDrafts, httpDraftStore(http)) : null;
+  function draftContext(reference: string | null): DraftContext {
+    if (!owned) throw new Error("Los borradores requieren una partida del servicio.");
+    const id = reference ? sceneId(reference) : null;
+    return { gameId:owned.gameId, writerId:drafts?.writerId??crypto.randomUUID(), parentDraftId:null, sceneId:id, baseRevision:id?versions.get(`scenes/${id}`)?.revision??0:0, systemRef:owned.configuration.ref, systemHash:owned.configuration.hash };
+  }
+  function draftContent(scene:SceneDocument, view:DraftContent["view"]):DraftContent {
+    return {scene:parseSceneDocument(syncActiveMapFromRuntimeFields({...scene,camera:view.camera,editorView:{sidebar:view.sidebar,aside:view.aside,selectedId:view.selectedId}})),bindings:sceneBindings(scene,currentBindings),view};
+  }
   const urlFor = (reference:string) => { const legacy=assetUrl(reference); return legacy && owned ? legacy.replace("/api/v1/assets/","/api/v1/dm/assets/") : legacy; };
   function binding(templateId:string|null) { if(!owned)throw new Error("Falta configuración de sistema.");return {scope:"catalog" as const,...owned.configuration.ref,templateId:templateId??"generic-markdown"}; }
   function sceneBindings(scene:SceneDocument,previous?:ResourceBindings):ResourceBindings {
@@ -63,9 +78,8 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     if (url !== null && url !== urlFor(reference)) throw new Error("Referencia de imagen inválida.");
     return url;
   };
-  async function hydrate(item: z.infer<typeof resource>): Promise<Extract<SceneOperationResult, {ok:true}>> {
-    names.set(sceneReference(item.id), item.name); remember(`scenes/${item.id}`,item); if(currentResource!==item.id)table.setSceneResource(undefined);currentResource=item.id;currentBindings=item.bindings;
-    if(owned)await definitions("scenes",item.id);
+  async function hydrate(item: z.infer<typeof resource>, recovery = false): Promise<Extract<SceneOperationResult, {ok:true}>> {
+    if(owned&&!recovery)await definitions("scenes",item.id);
     const refs = [...new Set(item.scene.maps.flatMap(m => [m.map.imagePath, ...m.tokens.map(t => t.imagePath)]).filter((r): r is string => !!r && !!assetUrl(r)))];
     const urls = new Map<string,string>();
     for (let i=0; i<refs.length; i+=200) {
@@ -74,17 +88,49 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     }
     const mapImageUrls = Object.fromEntries(item.scene.maps.flatMap(m => { const url = urls.get(m.map.imagePath ?? ""); return url ? [[m.id,url]] : []; }));
     const tokenImageUrls = Object.fromEntries(item.scene.tokens.flatMap(t => { const url = urls.get(t.imagePath); return url ? [[t.id,url]] : []; }));
+    names.set(sceneReference(item.id), item.name); remember(`scenes/${item.id}`,item); if(currentResource!==item.id)table.setSceneResource(undefined);currentResource=item.id;currentBindings=item.bindings;
     return { ok:true, scene:item.scene, filePath:sceneReference(item.id), mapImageUrl:mapImageUrls[item.scene.activeMapId ?? ""], mapImageUrls, tokenImageUrls,
       warnings:[...item.warnings.map(w => ({ code:w.code==="external-link-unresolved"?"scene-link-unresolved" as const:"scene-format-outdated" as const, message:w.message,path:"" })), ...item.missingImages.map(m => ({ code:"map-image-missing" as const,path:m.reference,message:`Imagen ausente: ${m.locations.join(", ")}. Usa Reemplazar imagen o el selector del token/ficha. Referencia: ${m.reference}` }))] };
   }
   async function load(reference: string) { return hydrate((await http.request(`/scenes/${sceneId(reference)}`,resourceReply)).resource); }
+  async function confirmDraft(command:DraftConfirmation) {
+    // El último recibo de la rama evita recrear una copia aunque caduque el diario general.
+    const current=await drafts!.remote.get(command.draftId);
+    if(current.draft.confirmedSequence>=command.sequence&&current.draft.context.sceneId)return {sceneId:current.draft.context.sceneId,sceneRevision:current.draft.context.baseRevision};
+    return http.request(`/drafts/${command.draftId}/confirm`,z.object({ok,sceneId:z.uuid(),sceneRevision:z.number(),draftRevision:z.number(),sequence:z.number()}),{method:"POST",headers:{"Content-Type":"application/json","If-Match":String(command.revision),"Idempotency-Key":command.key},body:JSON.stringify(command.payload)});
+  }
   async function save(scene: SceneDocument, reference?: string | null) {
+    if(drafts?.checkpoint?.confirmation){
+      const previous=drafts.checkpoint, command=previous.confirmation!, confirmed=await confirmDraft(command);
+      const saved=(await http.request(`/scenes/${confirmed.sceneId}`,resourceReply)).resource;
+      await drafts.confirmed(confirmed.sceneId,confirmed.sceneRevision,command.hash,draftContent(saved.scene,previous.content.view));
+      const currentHash=await contentHash(draftContent(scene,previous.content.view));
+      if(currentHash!==command.hash){
+        remember(`scenes/${saved.id}`,saved);names.set(sceneReference(saved.id),saved.name);
+        return save(scene,sceneReference(saved.id));
+      }
+      return hydrate(saved);
+    }
     const signal=http.sessionSignal;
     const name = reference ? names.get(reference) ?? (await http.request(`/scenes/${sceneId(reference)}`,resourceReply)).resource.name : await dialogs.sceneName("Nueva escena");
     ensureActive(signal);
     if (name === null) return {ok:false as const,error:"Guardado cancelado."};
     const key=reference?`scenes/${sceneId(reference)}`:undefined;
     if(owned&&key&&!versions.has(key))throw new Error("Vuelve a abrir la escena para conocer su revisión antes de guardar.");
+    if (drafts && owned) {
+      const content = draftContent(scene, {...(scene.editorView??drafts.checkpoint?.content.view??{sidebar:true,aside:true,selectedId:null}),camera:scene.camera});
+      const context = draftContext(reference ?? null);
+      const head = await drafts.prepare(()=>({content,context}));
+      if (head) {
+        const hash = await contentHash(content);
+        const command:DraftConfirmation={hash,key:crypto.randomUUID(),draftId:head.id,revision:head.revision,sequence:head.sequence,payload:{name,mode:reference?"update":"copy",sceneRevision:reference?context.baseRevision:0,targetGameId:owned.gameId}};
+        await drafts.pendingConfirmation(command);
+        const confirmed = await confirmDraft(command);
+        const saved=(await http.request(`/scenes/${confirmed.sceneId}`,resourceReply)).resource;
+        await drafts.confirmed(confirmed.sceneId,confirmed.sceneRevision,hash,draftContent(saved.scene,content.view));
+        return hydrate(saved);
+      }
+    }
     const reply = await mutate(reference ? `/scenes/${sceneId(reference)}` : "/scenes", resourceReply, reference ? "PUT":"POST", {name,scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene,key?versions.get(key)?.bindings:currentBindings)}:{})},key?versions.get(key)?.revision:undefined);
     return hydrate(reply.resource);
   }
@@ -150,7 +196,32 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     ...table.api
   };
   return {
-    table,
+    table, drafts, localDrafts, draftContent, draftContext,
+    restoreDraft: async (value:DraftCheckpoint):Promise<Extract<SceneOperationResult,{ok:true}>> => {
+      if(!owned||value.context.gameId!==owned.gameId||value.context.systemHash!==owned.configuration.hash)throw new Error("El borrador necesita una partida y un sistema compatibles. Expórtalo para conservarlo.");
+      if(value.confirmation){const confirmed=await confirmDraft(value.confirmation);value.context={...value.context,sceneId:confirmed.sceneId,baseRevision:confirmed.sceneRevision};value.confirmation=null;}
+      const id=value.context.sceneId;let recoveredName=value.content.scene.name||"Borrador recuperado";
+      if(id){const latest=await http.request(`/scenes/${id}`,resourceReply);recoveredName=latest.resource.name;if(latest.resource.revision!==value.context.baseRevision)throw new ServiceError("REVISION_CONFLICT","La escena guardada cambió. Recupera el borrador como copia para conservar ambas versiones.",409);}
+      const retained=new Map<string,z.infer<typeof template>>();
+      if(Object.keys(value.content.bindings.monsters).length){
+        const definitions=await http.json("/draft-definitions",z.object({ok,definitions:z.record(z.string(),template)}),"POST",value.content.bindings);
+        for(const [monsterId,definition] of Object.entries(definitions.definitions))retained.set(monsterId,definition);
+      }
+      const now=new Date().toISOString();
+      const reply=await hydrate({id:id??crypto.randomUUID(),name:recoveredName,createdAt:now,updatedAt:now,revision:id?value.context.baseRevision:undefined,scene:{...value.content.scene,camera:value.content.view.camera},bindings:value.content.bindings,warnings:[],missingImages:[]},true);
+      currentResource=id??undefined;currentBindings=value.content.bindings;
+      // Reconstruir definiciones por binding retenido, incluso si la plantilla ya no admite usos nuevos.
+      retainedTemplates.clear();
+      for(const [monsterId,definition] of retained)retainedTemplates.set(monsterId,definition);
+      return {...reply,filePath:id?sceneReference(id):""};
+    },
+    isDraftSaved: async(value:DraftCheckpoint)=>{
+      if(!value.context.sceneId)return false;
+      const saved=(await http.request(`/scenes/${value.context.sceneId}`,resourceReply)).resource;
+      return await sceneContentHash(value.content)===await sceneContentHash({scene:saved.scene,bindings:saved.bindings??{monsters:{}},view:value.content.view});
+    },
+    latestSavedScene:async()=> owned?(await http.request(`/games/${owned.gameId}/last-scene`,z.object({ok,sceneId:z.uuid().nullable()}))).sceneId:null,
+    openSaved: async(reference:string)=>load(reference),
     client:createClient(api,{scenes:true,images:true,libraries:true,templateAdministration:!owned,player:true,dice:true,nativeMenus:false},"service",owned?{
       forMonster:(id,templateId,available)=>{const retained=retainedTemplates.get(id);return retained&&retained.id===templateId?[retained,...available.filter(t=>t.id!==retained.id)]:available;},
       validateLibraryUse:async(id)=>{const entry=await monsters.get(id);if(!entry.ok)throw new Error(entry.error);const ref=versions.get(`monsters/${id}`)?.bindings?.root;if(!ref||ref.scope!=="catalog"||ref.systemId!==owned.configuration.ref.systemId||ref.version!==owned.configuration.ref.version||owned.configuration.availability!=="enabled"||owned.version.templates[ref.templateId]?.availability!=="enabled")throw new Error("Esta ficha conserva una presentación privada, deshabilitada o de otra versión. Puedes editar su instancia existente, pero no crear un vínculo nuevo en esta partida.");}
@@ -159,9 +230,9 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     name:(reference:string)=>names.get(reference)??"Escena del servicio",
     importFile:()=>result(async()=>{const signal=http.sessionSignal;const file=await chooseFile(".ttrpgscene,application/json",signal);ensureActive(signal);if(!file)return {ok:false as const,error:"Importación cancelada."};if(file.size>10*1024*1024)throw new Error("La escena supera el límite de 10 MiB.");const scene=parseSceneJson(await file.text());ensureActive(signal);const reply=await mutate("/scenes/import",resourceReply,"POST",{name:file.name.replace(/\.ttrpgscene$/i,"").slice(0,200)||"Escena importada",scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene)}:{})});return hydrate(reply.resource);}),
     exportFile:async(scene:SceneDocument,reference:string|null)=>downloadScene(serializeSceneDocument(scene),reference?names.get(reference)??"escena":"escena"),
-    revalidate:async()=>{if(!owned)return;for(const [key,stored] of versions){const [kind,id]=key.split("/");const path=kind==="scenes"?`/scenes/${id}`:`/libraries/${kind}/${id}`;const value=await http.request(path,z.object({ok,resource:z.object({revision:z.number()}).optional(),entry:z.object({revision:z.number()}).optional()}));if((value.resource??value.entry)?.revision!==stored.revision)throw new ServiceError("REVISION_CONFLICT","Los recursos cambiaron mientras la sesión estaba cerrada. Conserva tu borrador; descártalo explícitamente o vuelve a abrir la escena antes de guardar.",409);}},
+    revalidate:async()=>{if(!owned||!currentResource)return;const stored=versions.get(`scenes/${currentResource}`);if(!stored)return;const value=await http.request(`/scenes/${currentResource}`,resourceReply);if(value.resource.revision!==stored.revision)throw new ServiceError("REVISION_CONFLICT","La escena cambió mientras la sesión estaba cerrada. Recupera tu borrador como copia o abre la escena guardada; los respaldos se conservan.",409);},
     associateCurrent:async()=>{if(!owned||!currentResource)throw new Error("Guarda o abre la escena antes de asociarla a esta partida.");await mutations.send(`/games/${owned.gameId}/resources`,z.object({ok}),"POST",{kind:"scenes",resourceId:currentResource});table.setSceneResource(currentResource);},
-    clear:()=>{table.clear();http.invalidate();names.clear();versions.clear();retainedTemplates.clear();mutations.clear();uploads.clear();}
+    clear:()=>{void drafts?.stop();table.clear();http.invalidate();names.clear();versions.clear();retainedTemplates.clear();mutations.clear();uploads.clear();}
   };
 }
 export type BrowserClient = ReturnType<typeof createBrowserClient>;

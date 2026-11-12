@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, Menu, session } from "electron";
-import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { installNavigationPolicy, originPolicy } from "./window-policy";
 
 function escapeHtml(value: string): string {
@@ -10,8 +10,13 @@ export function recoveryDocument(origin: string): string {
   *{box-sizing:border-box}body{margin:0;background:#111315;color:#ebedef;font:18px system-ui;display:grid;min-height:100vh;place-items:center;padding:24px}main{width:min(100%,620px)}h1{font-size:28px}p{line-height:1.6;overflow-wrap:anywhere}a{display:inline-block;margin:12px 12px 0 0;padding:12px 18px;border:1px solid #758397;border-radius:8px;background:#303438;color:#ebedef;text-decoration:none}a:focus-visible{outline:3px solid #8cc7ff;outline-offset:4px}</style><main><p>TTRPG Effects · Modo servicio</p><h1>No se pudo conectar al servicio</h1><p>${escapeHtml(origin)}</p><p>Comprueba que el servicio esté encendido y que la conexión y el certificado HTTPS sean válidos. Después, reintenta.</p><a href="${escapeHtml(origin)}/">Reintentar</a><a href="${escapeHtml(origin)}/#ttrpg-recovery-quit">Salir</a></main></html>`;
 }
 export function startService(origin: string): BrowserWindow {
-  // Solo memoria, única por proceso/ventana; no comparte cookies del perfil local.
-  const serviceSession = session.fromPartition(`service-${randomUUID()}`);
+  // Borradores privados por origen; autenticación nueva incluso después de un crash.
+  const serviceSession = session.fromPartition(`persist:service-${createHash("sha256").update(new URL(origin).origin).digest("hex")}`);
+  let credentialsCleared = false;
+  async function clearCredentials() {
+    await serviceSession.clearStorageData({storages:["cookies", "localstorage", "serviceworkers", "cachestorage"]});
+    await serviceSession.clearAuthCache();
+  }
   const window = new BrowserWindow({
     width: 1440, height: 900, minWidth: 820, minHeight: 520, show: true,
     title: `TTRPG Effects · Servicio · ${origin}`, backgroundColor: "#111315",
@@ -34,7 +39,10 @@ export function startService(origin: string): BrowserWindow {
   async function connect(): Promise<void> {
     if (loading || window.isDestroyed()) return;
     loading = true;
-    try { await window.loadURL(`${origin}/`); }
+    try {
+      if (!credentialsCleared) { await clearCredentials(); credentialsCleared=true; }
+      await window.loadURL(`${origin}/`);
+    }
     catch {
       if (!window.isDestroyed()) await window.loadURL(recoveryUrl).catch(() => undefined);
     } finally { loading = false; }
@@ -45,6 +53,7 @@ export function startService(origin: string): BrowserWindow {
     if (url === `${origin}/#ttrpg-recovery-quit`) app.quit();
     else if (url === `${origin}/`) void connect();
   });
+  window.on("closed", () => { void clearCredentials().catch(() => undefined); });
   window.on("page-title-updated", event => event.preventDefault());
   const template: Electron.MenuItemConstructorOptions[] = [
     { label: "TTRPG Effects", submenu: [{ role: "about" }, { type: "separator" }, { role: "quit", label: "Salir" }] },

@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ quit: vi.fn(), confirm: vi.fn(), options: [] as Electron.BrowserWindowConstructorOptions[], handlers: new Map<string, (...args: unknown[]) => void>(), loadURL: vi.fn(), getURL: vi.fn(), fromPartition: vi.fn(), setMenu: vi.fn(), requests: vi.fn(), permission: vi.fn(), check: vi.fn(), open: vi.fn() }));
+const mocks = vi.hoisted(() => ({ quit: vi.fn(), confirm: vi.fn(), options: [] as Electron.BrowserWindowConstructorOptions[], handlers: new Map<string, (...args: unknown[]) => void>(), loadURL: vi.fn(), getURL: vi.fn(), fromPartition: vi.fn(), clearStorage: vi.fn(), clearAuth: vi.fn(), setMenu: vi.fn(), requests: vi.fn(), permission: vi.fn(), check: vi.fn(), open: vi.fn() }));
 vi.mock("electron", () => ({
   app: { quit: mocks.quit },
   dialog: { showMessageBoxSync: mocks.confirm },
@@ -13,14 +13,14 @@ vi.mock("electron", () => ({
   Menu: { buildFromTemplate: (value: unknown) => value, setApplicationMenu: mocks.setMenu }
 }));
 import { startService } from "./service-app";
-beforeEach(() => { vi.clearAllMocks(); mocks.options.length = 0; mocks.handlers.clear(); mocks.loadURL.mockResolvedValue(undefined); });
+beforeEach(() => { vi.clearAllMocks(); mocks.options.length = 0; mocks.handlers.clear(); mocks.loadURL.mockResolvedValue(undefined); mocks.clearStorage.mockResolvedValue(undefined); mocks.clearAuth.mockResolvedValue(undefined); mocks.fromPartition.mockReturnValue({clearStorageData:mocks.clearStorage,clearAuthCache:mocks.clearAuth}); });
 it("compone una ventana aislada con sandbox y menú sin acciones locales", () => {
   startService("https://mesa.example");
   const options = mocks.options[0];
   expect(options.webPreferences).toMatchObject({ sandbox: true, contextIsolation: true, nodeIntegration: false, nodeIntegrationInSubFrames: false, nodeIntegrationInWorker: false, webviewTag: false });
   expect(options.webPreferences).not.toHaveProperty("preload");
-  expect(mocks.fromPartition.mock.calls[0][0]).toMatch(/^service-/);
-  expect(mocks.fromPartition.mock.calls[0][0]).not.toContain("persist:");
+  expect(mocks.fromPartition.mock.calls[0][0]).toMatch(/^persist:service-/);
+  expect(mocks.clearStorage).toHaveBeenCalledWith({storages:["cookies","localstorage","serviceworkers","cachestorage"]});
   expect(JSON.stringify(mocks.setMenu.mock.calls)).not.toMatch(/recent|scene:|map:/);
   expect(mocks.open.mock.calls[0][0]()).toEqual({ action: "deny" });
   expect(mocks.check.mock.calls[0][0]()).toBe(false);
@@ -57,7 +57,7 @@ it("permite salir desde recuperación y no interpreta el enlace desde el servici
   expect(mocks.quit).toHaveBeenCalledOnce();
 });
 
-it("mantiene el veto al cancelar y pide consentimiento de nuevo antes de descartar", () => {
+it("mantiene el veto al cancelar y pide consentimiento de nuevo antes de descartar", async () => {
   const window = startService("https://mesa.example");
   expect(mocks.confirm).not.toHaveBeenCalled();
   const preventDefault = vi.fn();
@@ -71,7 +71,7 @@ it("mantiene el veto al cancelar y pide consentimiento de nuevo antes de descart
     detail: expect.stringContaining("guarda la escena antes de salir")
   }));
   expect(mocks.quit).not.toHaveBeenCalled();
-  expect(mocks.loadURL).toHaveBeenCalledTimes(1);
+  await vi.waitFor(()=>expect(mocks.loadURL).toHaveBeenCalledTimes(1));
   unload({ preventDefault });
   expect(mocks.confirm).toHaveBeenCalledTimes(2);
   expect(preventDefault).toHaveBeenCalledOnce();
@@ -83,4 +83,12 @@ it.each([-1, 0, 2, undefined])("no descarta ante una respuesta distinta de conse
   const preventDefault = vi.fn();
   mocks.handlers.get("will-prevent-unload")!({ preventDefault });
   expect(preventDefault).not.toHaveBeenCalled();
+});
+
+it("no carga el servicio si falla la limpieza de credenciales y conserva IndexedDB", async()=>{
+  mocks.clearStorage.mockRejectedValueOnce(new Error("fallo"));
+  startService("https://mesa.example");
+  await vi.waitFor(()=>expect(mocks.loadURL).toHaveBeenCalledTimes(1));
+  expect(mocks.loadURL.mock.calls[0][0]).toMatch(/^data:/);
+  expect(mocks.clearStorage.mock.calls[0][0].storages).not.toContain("indexdb");
 });

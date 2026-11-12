@@ -14,7 +14,7 @@ export async function runDataCommand(argv: string[], signal?: AbortSignal): Prom
   if (command === "backup-legacy") return backupLegacy(required("--source"), required("--target"));
   if (command === "restore-legacy") return restoreLegacy(required("--source"), required("--target"));
   if (command === "export-legacy") return exportLegacy(required("--source"), required("--target"));
-  if (command === "export-owned") { const target = required("--target"); return exportOwned(readDatabaseConfig(), target); }
+  if (command === "export-owned") { const target = required("--target"); let excludedDrafts=0;const manifest=await exportOwned(readDatabaseConfig(), target,n=>{excludedDrafts=n;});return {...manifest,excludedDrafts,notice:"La transferencia funcional excluye borradores. Usa un respaldo integral de la base para conservarlos."}; }
   const bundle = required("--bundle");
   if (command === "inspect") { const result = await inspectTransfer(bundle); return { version: result.version, dataset: result.dataset, counts: result.counts }; }
   if (options["--owner-map"] && (options["--owner"] || options["--game-name"])) throw new DataError("USAGE");

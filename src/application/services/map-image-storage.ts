@@ -19,5 +19,8 @@ export interface MapImageStorage {
 
 export const browserMapImageReplacementResultSchema = z.union([
   mapImageReplacementResultSchema,
-  z.object({ status: z.literal("ready"), imagePath: z.string(), imageUrl: z.string() }).refine(value => assetUrl(value.imagePath) === value.imageUrl && assetUrl(value.imagePath) !== null)
+  z.object({ status: z.literal("ready"), imagePath: z.string(), imageUrl: z.string() }).refine(value => assetUrl(value.imagePath) !== null && (
+    assetUrl(value.imagePath) === value.imageUrl ||
+    assetUrl(value.imagePath)!.replace("/api/v1/assets/", "/api/v1/dm/assets/") === value.imageUrl
+  ))
 ]);

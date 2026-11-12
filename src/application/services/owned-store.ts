@@ -1,3 +1,4 @@
+import type { DraftRepository } from "./draft-store";
 import type { InvitationRepository } from "./invitations";
 import type { ResourceBindings, SystemRef } from "../../domain/systems/system-catalog";
 import type { SystemCatalog, ResourceGameLinks } from "./system-catalog";
@@ -47,6 +48,7 @@ export interface CommitEffects {
   afterCommit(apply: () => void, uncertain: () => void): void;
 }
 export interface OwnedTransaction extends CatalogTransaction {
+  readonly drafts: DraftRepository;
   readonly systems: SystemCatalog;
   readonly links: ResourceGameLinks;
   readonly effects: CommitEffects;

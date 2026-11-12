@@ -37,7 +37,7 @@ interface Options {
   mapImageUrl: string | null;
   setMapImageUrl: (url: string | null) => void;
   onFeedback: (message: string) => void;
-  onApplied: () => void;
+  onApplied: (scene: SceneDocument, mapId: string, previousPath: string | null) => void;
 }
 
 function fingerprint(map: SceneMap): string {
@@ -221,9 +221,9 @@ export function useMapImageReplacement(options: Options) {
         const resource = pending.leases.shift();
         if (resource) appliedLease.current = { mapId: candidate.mapId, imageUrl: candidate.imageUrl, release: resource.release };
         latest.current.setMapImageUrl(candidate.imageUrl);
-        latest.current.onApplied();
       }
       latest.current.setScene(next);
+      latest.current.onApplied(next, candidate.mapId, candidate.previous.imagePath);
       latest.current.onFeedback(`Imagen de ${candidate.mapName} actualizada`);
       setPlayerError(null);
       cancel();

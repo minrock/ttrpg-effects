@@ -6,6 +6,30 @@ import { createDefaultScene } from "../../domain/sessions/default-scene";
 interface Harness { drawGrid(): void; getGridBounds(): unknown; camera: { center: { x: number; y: number }; zoom: number } }
 
 describe("grid render cache", () => {
+  it.each(["square", "hexagonal"] as const)("traslada la grilla %s sin regenerar máscaras y conserva el cache", layout => {
+    const layer = new Container();
+    const initial = { ...createDefaultScene().grid, layout };
+    const mask = vi.fn();
+    const viewport = Object.assign(Object.create(PixiViewport.prototype) as Pick<PixiViewport, "setGrid">, {
+      grid: initial, gridWindowCache: null, layers: new Map([["grid", layer]]),
+      camera: { center: { x: 0, y: 0 }, zoom: 1 },
+      app: { renderer: { width: 1000, height: 800 } },
+      drawDarkvisionLayer: mask, drawShapesAndMeasurementsLayer: vi.fn(), drawSelectionLayer: vi.fn()
+    });
+    viewport.setGrid(initial);
+    const old = layer.children[0];
+    const aligned = { ...initial, origin: { x: 27, y: -34 } };
+    viewport.setGrid(aligned);
+    const graphic = layer.children[0];
+    expect(old.destroyed).toBe(true);
+    expect(graphic.position.x).toBe(27);
+    expect(graphic.position.y).toBe(-34);
+    expect(mask).not.toHaveBeenCalled();
+    viewport.setGrid({ ...aligned });
+    expect(layer.children[0]).toBe(graphic);
+    layer.destroy({ children: true });
+  });
+
   it("invalidates grid and measurement visuals on layout changes, but no GPU visibility masks", () => {
     const layer = new Container();
     const grid = createDefaultScene().grid;

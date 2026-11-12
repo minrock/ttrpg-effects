@@ -24,7 +24,7 @@ export function ServiceDialog({title,onCancel,children}:{title:string;onCancel:(
     <h2>{title}</h2>{children}
   </dialog>;
 }
-function ScenePicker({browser,finish}:{browser:BrowserClient;finish:(value:string|null)=>void}) {
+export function ScenePicker({browser,finish}:{browser:BrowserClient;finish:(value:string|null)=>void}) {
   const [entries,setEntries]=useState<readonly SceneSummary[]>([]),[selected,setSelected]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(true),[retry,setRetry]=useState(0),[page,setPage]=useState(0),[total,setTotal]=useState(0);
   useEffect(()=>{let live=true;setBusy(true);setError("");setSelected("");void browser.listScenes(page*50).then(reply=>{if(live){setEntries(reply.scenes);setTotal(reply.total);}}).catch(error=>{if(live)setError(error.message);}).finally(()=>{if(live)setBusy(false);});return()=>{live=false;};},[browser,page,retry]);
   return <ServiceDialog title="Escenas guardadas en el servicio" onCancel={()=>finish(null)}>

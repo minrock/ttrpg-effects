@@ -512,3 +512,7 @@ Los siguientes datos pertenecen al estado de ejecucion y no al `.ttrpgscene`:
 3. **Navegacion DM:** el DM carga la escena destino con el flujo normal; el requisito especial de camara se aplica a Player View, que se centra en el marcador de entrada.
 4. **Reconfiguracion y desconexion:** la aplicacion intenta limpiar el extremo anterior; si no puede acceder a el, advierte que quedara una referencia rota en el otro archivo.
 5. **Marcador destino preexistente:** ambos extremos deben crearse previamente como marcadores sin enlazar; el selector no crea automaticamente un punto dentro del archivo externo.
+
+### Corrección de auditoría — 2026-11-11
+
+La validación de enlaces internos usa el documento en memoria: borrar un mapa o marcador destino marca el enlace roto antes de guardar. Solo una conexión recíproca válida habilita navegar; el modal no anuncia un destino conectado si está roto.

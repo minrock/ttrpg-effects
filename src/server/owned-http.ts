@@ -1,3 +1,4 @@
+import { ownedDraftRoute } from "./owned-drafts";
 import { SystemError } from "../application/services/system-catalog";
 import { systemRefSchema, systemIdSchema, systemDefinitionSchema, availabilitySchema, resourceBindingsSchema } from "../domain/systems/system-catalog";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -46,7 +47,7 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
       let bytes: Buffer | undefined, payload: unknown;
       if (upload) { bytes = await body(req, res, LIMITS.imageBytes); await images.validate(bytes, req.headers["content-type"] ?? ""); }
       else if (mutating) payload = await json(req, res);
-      const isReadPost = method === "POST" && ((parts[0] === "assets" && parts[1] === "resolve") || (parts[0] === "scene-links" && ["validate", "navigate"].includes(parts[1])));
+      const isReadPost = method === "POST" && ((parts[0] === "draft-definitions" && parts.length === 1) || (parts[0] === "assets" && parts[1] === "resolve") || (parts[0] === "scene-links" && ["validate", "navigate"].includes(parts[1])));
       const operationId = mutating && !isReadPost ? parse(operation, req.headers["idempotency-key"]) : undefined;
       const rawRevision = req.headers["if-match"];
       if (rawRevision !== undefined && (typeof rawRevision !== "string" || !/^(?:\d+|"\d+")$/.test(rawRevision))) throw invalid();
@@ -55,6 +56,10 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
       const result = await identity.authorized(cookie, permission, async (principal, tx): Promise<Result> => {
         const scenes = new OwnedSceneService(tx, now), games = ownedGames(principal.account.id, tx);
         const run = async (): Promise<Result> => {
+          if (permission === "dm" && (parts[0] === "drafts" || parts[0] === "draft-capabilities" || parts[0] === "draft-definitions" || parts[0] === "games" && parts[2] === "drafts")) {
+            const draft = await ownedDraftRoute(tx, principal.account.id, url, method, payload, expectedRevision, operationId, now);
+            if (draft) return draft;
+          }
           if (parts[0] === "systems") {
             query(url, []);
             if (parts.length === 2 && parts[1] === "selectable" && method === "GET") return { value: { ok: true, systems: await tx.systems.selectable() } };
@@ -83,6 +88,7 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
             if (parts.length === 1 && method === "GET") { query(url, ["limit", "offset"]); return { value: { ok: true, ...await games.list({ limit: numberQuery(url, "limit", 50, 1, 100), offset: numberQuery(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER) }) } }; }
             query(url, []);
             if (parts.length === 1 && method === "POST") { const input = parse(z.strictObject({ name: gameNameSchema, systemRef: systemRefSchema }), payload); const game = await games.create(input.name, input.systemRef); return { status: 201, location: `/api/v1/dm/games/${game.id}`, value: { ok: true, game } }; }
+            if(parts.length===3&&parts[2]==="last-scene"&&method==="GET")return {value:{ok:true,sceneId:await tx.links.latestScene(routeId(parts[1]))}};
             if (parts.length === 3 && parts[2] === "configuration" && method === "GET") return { value: { ok: true, configuration: await tx.links.resolve(routeId(parts[1])) } };
             if (parts.length === 3 && parts[2] === "resources" && method === "POST") { const input = parse(z.strictObject({ kind: z.enum(["scenes","monsters","npcs","player-characters"]), resourceId: z.uuid() }),payload); await tx.links.link(routeId(parts[1]),input.kind,input.resourceId); return { value: { ok: true } }; }
             if (parts.length !== 2) throw missing(); const key = routeId(parts[1]);
@@ -143,7 +149,7 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
           }
           throw missing();
         };
-        return operationId ? tx.operation(operationId, url.pathname, { method, query: url.search, payload: payload ?? null, revision: expectedRevision ?? null, mime: upload ? req.headers["content-type"] : null, bytes: bytes ? createHash("sha256").update(bytes).digest("hex") : null }, run) : run();
+        return operationId && !(parts[0] === "drafts" && parts.length === 2 && method === "PUT") ? tx.operation(operationId, url.pathname, { method, query: url.search, payload: payload ?? null, revision: expectedRevision ?? null, mime: upload ? req.headers["content-type"] : null, bytes: bytes ? createHash("sha256").update(bytes).digest("hex") : null }, run) : run();
       });
       if (result.asset) { res.setHeader("Content-Type", result.asset.mime); res.setHeader("Content-Length", result.asset.bytes.length); res.end(method === "HEAD" ? undefined : result.asset.bytes); return; }
       if (result.location) res.setHeader("Location", result.location);
