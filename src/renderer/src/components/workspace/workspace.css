@@ -92,6 +92,8 @@
 .workspace-context-tools button:hover:not(:disabled), .workspace-context-tools button[aria-pressed=true] { background: #8ed5b61c; border-color: #8ed5b666; }
 .workspace-context-tools .fire-tools, .workspace-context-tools .lightning-tools { display: flex; flex: 0 0 auto; gap: 4px; width: auto; margin: 0; }
 .workspace-context-tools label { display: flex; gap: 5px; align-items: center; font-size: 11px; }
+.workspace-context-tools input[type=range] { width: 120px; padding: 0; accent-color: #8ed5b6; }
+.workspace-context-tools output { min-width: 2.5ch; font-variant-numeric: tabular-nums; }
 .workspace-context-tools input { width: 55px; height: 28px; padding: 3px; color: #e8eeeb; background: #1a201c; border: 1px solid #4f5e54; border-radius: 3px; }
 .workspace-camera-dock { position: absolute; right: 12px; bottom: 14px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; z-index: 7; max-width: calc(100% - 24px); }
 .workspace-dm-camera, .workspace-camera-dock .player-camera-toolbar { display: flex; align-items: center; gap: 4px; width: max-content; max-width: 100%; padding: 4px 7px; min-height: 36px; background: #202621f5; border: 1px solid #7e8d7355; border-radius: 5px; color: #d1dcd5; font-size: 11px; box-shadow: 0 2px 10px #0002; }

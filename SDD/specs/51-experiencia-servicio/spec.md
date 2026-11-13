@@ -44,4 +44,14 @@ Los recursos de tokens ausentes o fallidos no disparan actualizaciones vacías d
 
 ## Actualización 2026-11-05 — borradores del servicio
 
-[SDD 58](../58-borradores-recuperables/spec.md) implementa respaldo privado IndexedDB, borradores remotos separados y confirmación explícita. Sustituye para el cliente de servicio las decisiones anteriores de retener borradores solo en memoria y de usar una partición Electron efímera. Mantiene autenticación nueva al arrancar Electron y el flujo autónomo. La migración aditiva 8 conserva hasta tres generaciones por rama en SQLite/PostgreSQL; no cambia `.ttrpgscene` v2. Estado en rama y [límites de validación](../58-borradores-recuperables/validacion.md).
+[SDD 58](../58-borradores-recuperables/spec.md) implementa respaldo privado IndexedDB, borradores remotos separados y confirmación explícita. Sustituye para el cliente de servicio las decisiones anteriores de retener borradores solo en memoria y de usar una partición Electron efímera. Mantiene autenticación nueva al arrancar Electron y el flujo autónomo. La migración aditiva 8 incorporó borradores; desde 3.27.0 se conserva una única copia por escena en SQLite/PostgreSQL, según SDD 58. No cambia `.ttrpgscene` v2. Evidencia y [límites de validación](../58-borradores-recuperables/validacion.md).
+
+## Actualización 2026-11-12 — supervisor de desarrollo
+
+- `pnpm start:api` y `dev:api` arrancan un supervisor local Node 24. Una compilación inicial de API y web prepara artefactos aislados en `out/dev-service/`; después Vite mantiene su caché y solo recompila los módulos afectados. No ejecuta el pipeline completo ni typecheck en cada guardado.
+- La API arranca únicamente cuando ambos compiladores han terminado correctamente. Ante cambios de API se solicita SIGTERM y se espera la salida antes de arrancar la nueva versión, conservando el cierre normal de conexiones y bloqueo SQLite. Los reinicios se serializan y agrupan; nunca hay dos instancias hijas simultáneas.
+- Un error de compilación mantiene la vigilancia, muestra el error y no arranca artefactos incompletos. Al corregirlo se reanuda automáticamente. Un fallo de arranque espera otro cambio de API o `.env`; no entra en un bucle de reinicios.
+- Los cambios web, CSS y assets públicos actualizan el frontend sin reiniciar una API sana. El usuario recarga el navegador; este alcance no agrega HMR ni recarga automática que pudiera interrumpir una escena.
+- Guardar `.env` reinicia la API y vuelve a leer el archivo. Se mantienen las variables explícitas del proceso; `TTRPG_WEB_DIR` apunta al frontend de desarrollo. No se imprimen secretos. Cambios de configuración Vite o dependencias requieren reiniciar el supervisor y producen un aviso.
+- Ctrl+C detiene la vigilancia y la API. Si el cierre de API excede 15 segundos, informa el PID y no abre otra instancia ni borra bloqueos de almacenamiento.
+- `pnpm build:service && pnpm start:api:built` conserva la ejecución estable validada, sin supervisor. Los datos, cuentas, migraciones y contratos HTTP son los mismos en ambos modos.

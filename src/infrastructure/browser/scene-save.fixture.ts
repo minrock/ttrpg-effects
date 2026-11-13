@@ -28,7 +28,7 @@ export async function sceneServiceFixture(){
  cleanups.push(()=>new Promise<void>(resolve=>{server.close(()=>resolve());server.closeAllConnections();}));await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));const address=server.address();if(!address||typeof address==="string")throw new Error("Sin puerto");
  const fetcher:typeof fetch=async(input,init={})=>new Promise((resolve,reject)=>{
   const headers=new Headers(init.headers);headers.set("host","localhost:8787");headers.set("origin",origin);headers.set("cookie",session.cookie);
-  const body=init.body?String(init.body):undefined;if(body)headers.set("content-length",String(Buffer.byteLength(body)));
+  const body=init.body?String(init.body):undefined;if(body&&!headers.has("content-length"))headers.set("content-length",String(Buffer.byteLength(body)));
   const req=request(`http://127.0.0.1:${address.port}${input}`,{method:init.method,headers:Object.fromEntries(headers)},res=>{const chunks:Buffer[]=[];res.on("data",c=>chunks.push(c));res.on("end",()=>resolve(new Response(Buffer.concat(chunks),{status:res.statusCode,headers:{"content-type":"application/json"}})));});req.on("error",reject);req.end(body);
  });
  const http=new HttpTransport(fetcher,()=>{},"/api/v1/dm");http.bindAccount(dm.id);

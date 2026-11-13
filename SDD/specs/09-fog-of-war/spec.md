@@ -12,7 +12,7 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 
 - Ocultar el mapa con una capa de fog of war configurable.
 - Activar/desactivar la niebla sin afectar la oscuridad ambiental existente.
-- Configurar opacidad, color y radio de revelado manual expresado en cuadros de la grilla activa.
+- Configurar opacidad, color y radio de revelado manual expresado en cuadros de la grilla activa. El control de radio es un slider de 0,5 a 8 cuadros, con paso de 0,5 y valor visible, en herramientas y ajustes.
 - Mantener el radio persistido en coordenadas de mundo para compatibilidad; el control lo convierte hacia/desde cuadros usando `grid.cellSizeWorld`.
 - Usar una celda de la grilla inicial (`100` unidades de mundo) como radio default de revelado para escenas nuevas; las escenas existentes conservan su radio guardado.
 - Mientras se edita el radio, mostrar en el centro del canvas un circulo guia con el tamano resultante.
@@ -74,3 +74,7 @@ Implementar una primera experiencia completa de niebla de guerra para sesiones p
 ### Referencia
 
 El bug `./bugs/bug-mask-lights-to-see-through-darkness-overlay/` sigue documentando el problema independiente donde las luces no revelan claramente el mapa a traves de la oscuridad ambiental.
+
+### Ajuste 3.27.2 — 2026-11-12
+
+El slider responde al arrastre y a las flechas del teclado. El radio se convierte a unidades de mundo usando la celda actual. Las escenas antiguas conservan su radio al cargar; al ajustar se aplica el rango y los pasos nuevos. No cambia el formato de escena ni la geometría de los trazos existentes.

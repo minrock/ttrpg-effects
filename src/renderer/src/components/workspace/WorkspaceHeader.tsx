@@ -27,6 +27,8 @@ interface WorkspaceHeaderProps {
 }
 
 export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
+  // Solo presentación: Electron servicio no expone el puente nativo del modo local.
+  const isElectron = /\bElectron\/\d+/.test(navigator.userAgent);
   const menu = useRef<HTMLDetailsElement>(null);
   const tools = useRef<HTMLDivElement>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -89,7 +91,7 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
       <span className="workspace-header-separator" />
       <button type="button" className="workspace-icon" title="Explorador" aria-label="Alternar explorador" aria-pressed={props.explorerVisible} onClick={props.onExplorer}><PanelLeft size={17} /></button>
       <button type="button" className="workspace-icon" title="Inspector" aria-label="Alternar inspector" aria-pressed={props.inspectorVisible} onClick={props.onInspector}><PanelRight size={17} /></button>
-      <button type="button" className="workspace-present" title={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} aria-label={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} disabled={props.busy} onClick={props.onPlayer}><Monitor size={16} /><span>Jugador</span></button>
+      {isElectron && <button type="button" className="workspace-present" title={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} aria-label={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} disabled={props.busy} onClick={props.onPlayer}><Monitor size={16} /><span>Jugador</span></button>}
     </div>
     </div>
   </Container>;

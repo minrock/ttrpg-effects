@@ -70,7 +70,7 @@ export function DraftArchive({http}:{http:HttpTransport}){
     <label>Nombre de la copia<input value={name} disabled={busy||!!pendingCopy.current} maxLength={200} onChange={e=>setName(e.target.value)}/></label>
     <button disabled={busy||!selected||!target||!name.trim()} onClick={()=>void copy()}>{pendingCopy.current?'Reintentar copia pendiente':'Guardar como copia'}</button>
     <button disabled={busy||!selected||!!pendingCopy.current} onClick={()=>setDiscard(true)}>Descartar este respaldo</button>
-    {discard&&<div><p>Se eliminará solo la rama seleccionada ({entry?'local':'remota'}) y sus generaciones. Esta acción no elimina la escena guardada.</p><button disabled={busy} onClick={()=>setDiscard(false)}>Cancelar</button><button disabled={busy} onClick={()=>void run(async()=>{if(entry)await local.remove(owner,origin,entry.id);else if(head)await remote.remove(head.id,head.revision);setDiscard(false);setSelected('');setReload(n=>n+1);})}>Confirmar descarte</button></div>}
+    {discard&&<div><p>Se eliminará solo la copia seleccionada ({entry?'local':'remota'}) de recuperación. Esta acción no elimina la escena guardada.</p><button disabled={busy} onClick={()=>setDiscard(false)}>Cancelar</button><button disabled={busy} onClick={()=>void run(async()=>{if(entry)await local.remove(owner,origin,entry.id);else if(head)await remote.remove(head.id,head.revision);setDiscard(false);setSelected('');setReload(n=>n+1);})}>Confirmar descarte</button></div>}
     {error&&<p role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}<footer><button disabled={busy} onClick={()=>setOpen(false)}>Cerrar</button></footer>
   </ServiceDialog>}</>;
 }

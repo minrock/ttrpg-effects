@@ -86,9 +86,10 @@ it('salir del editor antes del debounce conserva el último cambio local',async(
 
 it('no resuelve Guardar antes de persistir la confirmación local',async()=>{
  const t=setup();await vi.advanceTimersByTimeAsync(0);t.update('guardada');await t.co.flushRemote();
- let release!:()=>void;t.local.write.mockImplementationOnce(()=>new Promise<void>(resolve=>{release=resolve;}));
+ let entered!:()=>void;const writing=new Promise<void>(resolve=>{entered=resolve;});
+ let release!:()=>void;t.local.write.mockImplementationOnce(()=>new Promise<void>(resolve=>{release=resolve;entered();}));
  let finished=false;const saving=t.co.confirmed(id(),1,t.co.checkpoint!.hash).then(()=>{finished=true;});
- await vi.advanceTimersByTimeAsync(0);expect(finished).toBe(false);expect(release).toBeDefined();release();await saving;
+ await writing;expect(finished).toBe(false);release();await saving;
  expect(t.co.checkpoint!.confirmedHash).toBe(t.co.checkpoint!.hash);expect(t.co.checkpoint!.confirmedSceneHash).toBeTruthy();t.co.dispose();
 });
 

@@ -30,10 +30,10 @@ function setup(){
 it("ofrece la copia local directamente sin selector ni consulta remota",async()=>{
  const t=setup();await t.render();expect(host.querySelector("dialog")?.getAttribute("aria-label")).toBe("¿Cómo quieres continuar?");
  expect(host.querySelector("select")).toBeNull();expect(t.remoteList).not.toHaveBeenCalled();
- await t.click("Recuperar estado local");expect(t.read).toHaveBeenCalledWith("dm",location.origin,t.cp.localDraftId,undefined);expect(t.restore).toHaveBeenCalledWith(expect.objectContaining({content:t.cp.content,pending:null,confirmation:null}));expect(t.onRecovered).toHaveBeenCalledOnce();expect(host.querySelector("dialog")).toBeNull();
+ await t.click("Recuperar estado local");expect(t.read).toHaveBeenCalledWith("dm",location.origin,t.cp.localDraftId);expect(t.restore).toHaveBeenCalledWith(expect.objectContaining({content:t.cp.content,pending:null,confirmation:null}));expect(t.onRecovered).toHaveBeenCalledOnce();expect(host.querySelector("dialog")).toBeNull();
 });
 it("cargar mapa recupera la escena confirmada sin borrar ni leer el cuerpo local",async()=>{
- const t=setup();await t.render();await t.click("Cargar mapa nuevamente");expect(t.browser.openSaved).toHaveBeenCalledWith(`scene:${t.cp.context.sceneId}`);
+ const t=setup();await t.render();await t.click("Cargar mapa nuevamente");await vi.waitFor(()=>expect(t.restore).toHaveBeenCalled());expect(t.browser.openSaved).toHaveBeenCalledWith(`scene:${t.cp.context.sceneId}`);
  expect(t.restore).toHaveBeenCalledWith(expect.objectContaining({context:t.cp.context}),{confirmed:true});expect(t.read).not.toHaveBeenCalled();expect(t.browser.localDrafts.remove).not.toHaveBeenCalled();
 });
 it("si hay conflicto recupera como copia sin sobrescribir el origen",async()=>{

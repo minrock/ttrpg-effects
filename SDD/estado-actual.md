@@ -2,6 +2,8 @@
 
 Corte: 2026-11-12. Entrega 3.25.0: cierre autorizado en `main` de SDD 58 (guardado y recuperación), correcciones de auditoría 3.23.0, celda de calibración/alineación de SDD 04 y reconstrucción automática del servicio. Conserva las entregas SDD 55–57 y expedientes 001–012. Las pruebas y límites se registran por entrega; integración no equivale a despliegue.
 
+Cierre autorizado 3.27.2: vigilancia de desarrollo del servicio, corrección del 413 por cuota, una única copia de recuperación por escena en IndexedDB/servidor, botón «Jugador» exclusivo de Electron y slider de niebla de 0,5 a 8 cuadros en pasos de 0,5. Las escenas guardadas con nombre permanecen independientes. Integración en `main`, push y artefactos según el registro de validación de esta entrega.
+
 ## Producto disponible
 
 TTRPG Effects tiene dos modos: Electron autónomo para preparar/proyectar mesas con datos locales, y servicio privado API + frontend compartido entre navegador y Electron conectado. En servicio, las cuentas admin gestionan DMs y sistemas; cada DM prepara sus partidas y comparte una apertura con jugadores sin cuenta mediante enlace y alias.
@@ -25,7 +27,7 @@ Una partida fija una versión de sistema. El catálogo separa reglas, datos y pr
 | Invitación | Se renueva al abrir/reabrir; continuar conserva apertura | Rotar por cualquier recarga o pedir contraseña personal a jugador |
 | Expulsión | Revoca participante y rota enlace; los demás permanecen | Cambiar todas las credenciales o desconectar toda la mesa |
 | Alineación de grilla | Celda de calibración mueve el origen persistente por mapa; snap y medición comparten ese origen | Guía temporal independiente de la grilla |
-| Arranque API | `pnpm start:api` valida y reconstruye API y web antes de escuchar | Arrancar artefactos potencialmente obsoletos |
+| Arranque API | `pnpm start:api` compila inicialmente y vigila cambios; `start:api:built` ejecuta el build estable | Reiniciar sobre una compilación fallida o antes de liberar SQLite |
 | Menú | Una fila compartida, herramientas agrupadas en ancho estrecho | Cabecera de servicio y toolbar del editor apiladas |
 
 Electron autónomo conserva su gestión local de plantillas. Las restricciones administrativas son del servicio; no se trasladan silenciosamente al modo local.

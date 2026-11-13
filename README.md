@@ -151,7 +151,7 @@ Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en 
 
 ## Servicio privado API
 
-`pnpm start:api` reconstruye API y frontend web antes de ejecutar la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
+`pnpm start:api` vigila API y frontend web durante el desarrollo y ejecuta la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
 
 ## Preparar el servicio
 
@@ -166,7 +166,9 @@ pnpm identity:provision-dm
 pnpm start:api
 ```
 
-Para los arranques posteriores basta `pnpm start:api`: ejecuta typecheck y compila API y web mediante `pnpm build:service`, luego carga `.env`. Si falla algún paso no abre el servicio. Detén la instancia anterior antes de arrancar otra para liberar el almacenamiento exclusivo.
+Para desarrollar basta `pnpm start:api` (o `pnpm dev:api`): compila una vez y mantiene dos compiladores incrementales de Vite. Cambiar código de API reinicia el servidor después de cerrar la instancia anterior; cambiar frontend actualiza los archivos y solo requiere recargar Chrome. Los cambios de `.env` reinician la API y vuelven a cargar la configuración; el entorno explícito prevalece. Los artefactos temporales están en `out/dev-service/`, separados del build normal. No ejecuta typecheck en cada cambio: usa `pnpm typecheck` antes de cerrar el trabajo.
+
+Para ejecutar un build estable sin vigilancia: `pnpm build:service && pnpm start:api:built`. Detén la instancia anterior antes de iniciar cualquiera de los modos. Si cambias la configuración de Vite o dependencias, reinicia el supervisor. Ctrl+C cierra los compiladores y libera las conexiones del servidor.
 
 Los comandos de identidad son TTY y nunca aceptan contraseñas en argumentos. No se crean cuentas al arrancar. Setup conserva configuración existente y genera configuración nueva privada en `.env`, `.env.electron` y `.local/service/{data,backups,logs}`; los datos quedan ignorados porGit. Un entorno legado incompleto exige actualización explícita. No hay claves DM/jugador globales ni autorregistro.
 

@@ -1,4 +1,4 @@
-import { sceneContentHash, readLocalCheckpoint, DRAFT_LIMITS, encodedBytes, type DraftCheckpoint, type DraftContext } from "../../../domain/drafts/draft";
+import { sameRecoverySlot, sceneContentHash, readLocalCheckpoint, DRAFT_LIMITS, encodedBytes, type DraftCheckpoint, type DraftContext } from "../../../domain/drafts/draft";
 export interface LocalDraftIndex {
   id:string; ownerId:string; origin:string; instanceId:string|null; context:DraftContext;
   confirmedHash?:string|null; confirmedSceneHash?:string|null; sceneHash?:string;
@@ -20,7 +20,22 @@ export class IndexedDbDraftStore {
     const db=await this.open();const tx=db.transaction(stores,mode);const done=complete(tx);void done.catch(()=>{});
     try{const result=await work(tx);await done;return result;}catch(error){try{tx.abort();}catch{/* Ya abortada. */}throw error;}finally{db.close();}
   }
-  list(ownerId:string,origin:string,gameId?:string):Promise<LocalDraftIndex[]>{return this.run(["index"],"readonly",async tx=>(await request(tx.objectStore("index").getAll()) as LocalDraftIndex[]).filter(v=>v.ownerId===ownerId&&v.origin===origin&&(!gameId||v.context.gameId===gameId)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)));}
+  list(ownerId:string,origin:string,gameId?:string):Promise<LocalDraftIndex[]>{return this.run(["index","versions"],"readwrite",async tx=>{
+    const indices=(await request(tx.objectStore("index").getAll()) as LocalDraftIndex[]).filter(v=>v.ownerId===ownerId&&v.origin===origin&&(!gameId||v.context.gameId===gameId)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)||b.sequence-a.sequence);
+    const keep:LocalDraftIndex[]=[];
+    for(const index of indices){
+      if(keep.some(other=>sameRecoverySlot(other.context,index.context))){
+        for(const seq of index.revisions)await request(tx.objectStore("versions").delete(`${index.id}:${seq}`));
+        await request(tx.objectStore("index").delete(index.id));continue;
+      }
+      if(index.revisions.length===1&&index.revisions[0]===index.sequence){keep.push(index);continue;}
+      const latest=await request(tx.objectStore("versions").get(`${index.id}:${index.sequence}`)) as {bytes:number}|undefined;
+      for(const seq of index.revisions)if(seq!==index.sequence)await request(tx.objectStore("versions").delete(`${index.id}:${seq}`));
+      const compact={...index,revisions:[index.sequence],bytes:latest?.bytes??index.bytes};
+      await request(tx.objectStore("index").put(compact));keep.push(compact);
+    }
+    return keep;
+  });}
   async read(ownerId:string,origin:string,id:string,sequence?:number):Promise<DraftCheckpoint>{
     return readLocalCheckpoint(await this.raw(ownerId,origin,id,sequence));
   }
@@ -42,13 +57,19 @@ export class IndexedDbDraftStore {
       const indices=await request(tx.objectStore("index").getAll()) as LocalDraftIndex[];
       const previous=indices.find(v=>v.id===value.localDraftId);
       if(previous&&(previous.ownerId!==value.ownerId||previous.origin!==value.origin||previous.sequence>value.sequence))throw new Error("El respaldo cambió en otra ventana. Se conserva la versión anterior.");
+      const replaced=indices.filter(v=>v.id!==value.localDraftId && v.ownerId===value.ownerId && v.origin===value.origin && sameRecoverySlot(v.context,value.context));
+      if(replaced.some(v=>v.updatedAt>value.updatedAt))throw new Error("El respaldo cambió en otra ventana. Se conserva la copia más reciente.");
       const versions=tx.objectStore("versions");
       const keep=[value.sequence,...(previous?.revisions??[]).filter(n=>n!==value.sequence)].sort((a,b)=>b-a).slice(0,DRAFT_LIMITS.generations);
       let branchBytes=bytes;
       for(const seq of keep.filter(n=>n!==value.sequence)){const row=await request(versions.get(`${value.localDraftId}:${seq}`)) as {bytes:number}|undefined;branchBytes+=row?.bytes??0;}
-      if(indices.reduce((n,v)=>n+v.bytes,0)-(previous?.bytes??0)+branchBytes>DRAFT_LIMITS.localBytes)throw new Error("Se alcanzó el límite local de 50 MiB. Exporta o descarta un respaldo; no se borró ninguno.");
+      if(indices.reduce((n,v)=>n+v.bytes,0)-(previous?.bytes??0)-replaced.reduce((n,v)=>n+v.bytes,0)+branchBytes>DRAFT_LIMITS.localBytes)throw new Error("Se alcanzó el límite local de 50 MiB. Exporta o descarta un respaldo; no se borró ninguno.");
       await request(versions.put({key:`${value.localDraftId}:${value.sequence}`,value,bytes}));
       for(const seq of previous?.revisions??[])if(!keep.includes(seq))await request(versions.delete(`${value.localDraftId}:${seq}`));
+      for(const old of replaced){
+        for(const sequence of old.revisions)await request(versions.delete(`${old.id}:${sequence}`));
+        await request(tx.objectStore("index").delete(old.id));
+      }
       const index:LocalDraftIndex={sceneHash,confirmedSceneHash:value.confirmedSceneHash,confirmedHash:value.confirmedHash,id:value.localDraftId,ownerId:value.ownerId,origin:value.origin,instanceId:value.instanceId,context:value.context,sequence:value.sequence,hash:value.hash,updatedAt:value.updatedAt,remoteId:value.remote?.id??null,bytes:branchBytes,revisions:keep};
       await request(tx.objectStore("index").put(index));
     });

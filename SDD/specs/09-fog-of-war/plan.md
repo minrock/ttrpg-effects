@@ -208,3 +208,9 @@ Este documento describe de forma unificada el plan tecnico para implementar y ma
 - [ ] Smoke/manual test realizado si aplica.
 - [x] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [x] Sin dependencias nuevas no justificadas.
+
+## Ajuste 3.27.2 — slider de revelado
+
+Sustituir el campo numérico de `WorkspaceTools` y de ajustes en `App` por `input[type=range]` con mínimo 0,5, máximo 8 y paso 0,5. Mostrar el valor junto al control y dar ancho suficiente al slider de herramientas. `handleFogRevealRadiusChange` rechaza valores no finitos y limita/redondea antes de convertir por `grid.cellSizeWorld`. Mantener los valores cargados de escenas anteriores hasta la siguiente edición. Verificar cabecera/herramientas, dominio de visión, typecheck, lint y builds web/Electron antes de empaquetar.
+
+Validación de cierre 3.27.2: 1400 pruebas aprobadas en 156 archivos (`pnpm test --exclude '**/.local/**' --maxWorkers 4`), `pnpm lint`, `pnpm typecheck` y `pnpm build:service`. Se excluyen copias históricas privadas de `.local`, no pruebas de producto. La suite no sustituye los contratos PostgreSQL/TLS ni un recorrido visual nativo.

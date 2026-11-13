@@ -80,7 +80,7 @@ export function WorkspaceTools(props: WorkspaceToolsProps): JSX.Element {
       {group === "annotations" && <>{action("Pin de habitacion", <MapPin size={17} />, props.onPin)}{action("Area de informacion", <Pencil size={17} />, props.onArea)}{action("Conexion de mapa", <Route size={17} />, props.onLink)}{action("Texto DM", <Type size={17} />, props.onLabel)}</>}
       {group === "fog" && <>
         <button type="button" aria-label="Revelar niebla" title={props.fogEnabled ? "Revelar niebla" : "Activa la niebla en sus ajustes"} disabled={!props.fogEnabled || props.busy} aria-pressed={props.activeTool === "fog-reveal"} onClick={() => choose(props.onFog)}><Pencil size={17} /></button>
-        <label>Cuadros<input type="number" min="0.25" max="30" step="0.25" aria-label="Pincel de niebla en cuadros" value={props.fogCells} onChange={event => props.onFogCells(event.currentTarget.valueAsNumber)} /></label>
+        <label>Cuadros<input type="range" min="0.5" max="8" step="0.5" aria-label="Pincel de niebla en cuadros" value={props.fogCells} disabled={props.busy} onChange={event => props.onFogCells(event.currentTarget.valueAsNumber)} /><output>{props.fogCells.toLocaleString("es", { maximumFractionDigits: 2 })}</output></label>
         <button type="button" title="Ajustes de niebla" aria-label="Ajustes de niebla" onClick={() => props.onSettings("fog")}><Settings2 size={17} /></button>
       </>}
       {(props.activeTool === "path" || props.activeTool === "water") && <button type="button" aria-label="Terminar dibujo" title="Terminar dibujo" onClick={props.onConfirmDrawing}><Check size={17} /></button>}

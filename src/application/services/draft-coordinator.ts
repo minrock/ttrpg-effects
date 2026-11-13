@@ -102,7 +102,9 @@ export class DraftCoordinator {
       if(value.confirmation)throw Object.assign(new Error("Hay un guardado manual pendiente. Reintenta Guardar escena antes de sincronizar cambios nuevos."),{status:409});
       if(!value.remote){
         value.remote=await this.remote.create(value.context,value.createKey);
-        if(this.current?.localDraftId===value.localDraftId)this.current.remote=value.remote;
+        // Una nueva ventana reutiliza el último respaldo: continúa su secuencia sin duplicarlo.
+        value.sequence=Math.max(value.sequence,value.remote.sequence+1);
+        if(this.current?.localDraftId===value.localDraftId){this.current.remote=value.remote;this.current.sequence=Math.max(this.current.sequence,value.sequence);}
         await this.persist(this.current?.localDraftId===value.localDraftId?this.current:value);
       }
       if(!this.active||this.disposed)return;
@@ -163,10 +165,10 @@ export class DraftCoordinator {
     if(value.ownerId!==this.ownerId||value.origin!==this.origin)throw new Error("El borrador pertenece a otra cuenta u origen.");
     if(value.instanceId&&this.instanceId&&value.instanceId!==this.instanceId)throw new Error("El borrador pertenece a otra instancia. Exporta una copia antes de recuperarlo.");
     await this.flushLocal().catch(()=>{});if(this.remoteFlight)await this.remoteFlight.catch(()=>{});
-    // Resolver envío incierto en la rama original antes de derivar, sin cambiar su cuerpo.
+    // Resolver el envío incierto antes de reutilizar el respaldo, sin cambiar su cuerpo.
     if(value.pending&&value.remote){await this.remote.put(value.remote!.id,value.pending.revision,value.pending.key,value.pending.put);value={...value,pending:null};}
     for(const listener of this.restoreListeners)await listener(value,options);
-    this.current={...value,confirmedHash:options?.confirmed?await this.hash(value.content):value.confirmedHash,confirmedSceneHash:options?.confirmed?await sceneContentHash(value.content):value.confirmedSceneHash,hash:await this.hash(value.content),localDraftId:crypto.randomUUID(),createKey:crypto.randomUUID(),sequence:1,remote:null,pending:null,context:{...value.context,writerId:this.writerId,parentDraftId:value.remote?.id??null}};
+    this.current={...value,confirmedHash:options?.confirmed?await this.hash(value.content):value.confirmedHash,confirmedSceneHash:options?.confirmed?await sceneContentHash(value.content):value.confirmedSceneHash,hash:await this.hash(value.content),updatedAt:new Date().toISOString(),localDraftId:crypto.randomUUID(),createKey:crypto.randomUUID(),sequence:1,remote:null,pending:null,context:{...value.context,writerId:this.writerId,parentDraftId:null}};
     this.snapshot=null;this.captured=this.changed;
     this.generations.set(this.current,this.contentChanged);
     clearTimeout(this.localTimer);clearTimeout(this.remoteTimer);this.localStart=null;this.remoteStart=null;

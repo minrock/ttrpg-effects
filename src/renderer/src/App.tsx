@@ -2307,10 +2307,12 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   }
 
   function handleFogRevealRadiusChange(radiusInCells: number): void {
+    if (!Number.isFinite(radiusInCells)) return;
+    const cells = Math.min(8, Math.max(0.5, Math.round(radiusInCells * 2) / 2));
     setScene((current) => ({
       ...current,
       fogOfWar: updateFogOfWar(current.fogOfWar, {
-        revealRadius: radiusInCells * current.grid.cellSizeWorld
+        revealRadius: cells * current.grid.cellSizeWorld
       })
     }));
   }
@@ -4775,12 +4777,12 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
               />
             </label>
             <label>
-              Revelar (cuadros)
+              Revelar (cuadros): {(scene.fogOfWar.revealRadius / scene.grid.cellSizeWorld).toLocaleString("es", { maximumFractionDigits: 2 })}
               <input
-                type="number"
-                min="0.25"
-                max="30"
-                step="0.25"
+                type="range"
+                min="0.5"
+                max="8"
+                step="0.5"
                 value={scene.fogOfWar.revealRadius / scene.grid.cellSizeWorld}
                 onChange={(event) => handleFogRevealRadiusChange(event.currentTarget.valueAsNumber)}
                 onFocus={() => setIsFogRevealRadiusEditing(true)}

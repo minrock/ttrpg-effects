@@ -94,9 +94,9 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
   }
   async function load(reference: string) { return hydrate((await http.request(`/scenes/${sceneId(reference)}`,resourceReply)).resource); }
   async function confirmDraft(command:DraftConfirmation) {
-    // El último recibo de la rama evita recrear una copia aunque caduque el diario general.
+    // Solo la misma confirmación puede resolverse desde la cabeza; una edición posterior requiere su recibo exacto.
     const current=await drafts!.remote.get(command.draftId);
-    if(current.draft.confirmedSequence>=command.sequence&&current.draft.context.sceneId)return {sceneId:current.draft.context.sceneId,sceneRevision:current.draft.context.baseRevision};
+    if(current.draft.confirmedSequence===command.sequence&&current.draft.sequence===command.sequence&&current.draft.hash===command.hash&&current.draft.context.sceneId)return {sceneId:current.draft.context.sceneId,sceneRevision:current.draft.context.baseRevision};
     return http.request(`/drafts/${command.draftId}/confirm`,z.object({ok,sceneId:z.uuid(),sceneRevision:z.number(),draftRevision:z.number(),sequence:z.number()}),{method:"POST",headers:{"Content-Type":"application/json","If-Match":String(command.revision),"Idempotency-Key":command.key},body:JSON.stringify(command.payload)});
   }
   async function save(scene: SceneDocument, reference?: string | null) {

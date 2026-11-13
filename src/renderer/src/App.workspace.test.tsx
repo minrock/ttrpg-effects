@@ -403,7 +403,8 @@ describe("App production workspace", () => {
     expect(viewport.mount).toHaveBeenCalledOnce();
     expect(viewport.unmount).not.toHaveBeenCalled();
   });
-  it("publica web por acción explícita y no por la mera presencia de un jugador", async () => {
+  it("publica en Electron servicio por acción explícita y no por la mera presencia de un jugador", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36");
     const browser = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
     const publish = vi.fn(async () => ({ ok: true }));
     const open = vi.fn(async () => ({ ok: true }));
@@ -591,7 +592,7 @@ describe("App production workspace", () => {
       expect(entries[0].sceneHash).toBe(entries[0].confirmedSceneHash);
       await act(async()=>root.render(null));await browser.drafts!.stop();
       const reopened=fixture.create();await mount(reopened);
-      await settled(()=>expect(props().shapes).toHaveLength(1));
+      await settled(()=>{expect(props().shapes).toHaveLength(1);expect(reopened.drafts!.checkpoint).not.toBeNull();expect(reopened.drafts!.getStatus().confirmed).toContain("Escena guardada");});
       expect(host.querySelector("dialog")).toBeNull();
       await act(async()=>reopened.drafts!.flushRemote());
       expect(reopened.drafts!.checkpoint?.pending).toBeNull();

@@ -35,3 +35,19 @@ Conservar las fronteras de dominio/aplicación/infraestructura/vista y los contr
 ## Corrección 3.21.1
 
 El flujo de recuperación se corrigió en GameEditor, App, MapViewport y el hook useTokenImageResolution. [Diagnóstico, regresiones y límites](recuperacion-memoria.md). La evidencia histórica anterior permanece separada del trabajo actual, pendiente de integración.
+
+## Plan 2026-11-12 — supervisor de desarrollo
+
+1. Reutilizar la API `build({ build: { watch } })` de Vite con las dos configuraciones existentes; no agregar dependencias. Salidas separadas en `out/dev-service/api` y `out/dev-service/web` para conservar el build estable.
+2. Centralizar la vida del proceso Node en `scripts/watch-service.mjs`: cola de cierre/arranque, debounce, generación que descarta reinicios obsoletos, compuerta de compilación exitosa y limpieza ante señales. Esperar cierre antes de emitir nuevos módulos de API.
+3. Vigilar `.env` mediante `watchFile` y cargarlo exclusivamente en cada proceso hijo, sin conservar valores obsoletos en el supervisor. Incluir archivos/directorios públicos en la vigilancia del frontend. Avisar sobre cambios de configuración y lockfile que requieren reinicio completo.
+4. Cambiar `start:api`, mantener alias `dev:api` y agregar `start:api:built`. Documentar el flujo estable, recarga manual web y validación de tipos independiente.
+5. Probar con SQLite temporal y puerto aislado: arranque, cambio API, `.env`, error/corrección de compilación, frontend sin reinicio API, señales y liberación del bloqueo. Revisar lint/typecheck. Registrar resultados sin usar la base operativa.
+
+### Validación del supervisor — 2026-11-12
+
+- `pnpm lint`, `pnpm typecheck` y `git diff --check`: correctos.
+- Smoke real en `127.0.0.1:8793`, SQLite temporal migrado y compiladores Vite reales: arranque/health, cambio de API con PID nuevo, cambio de `.env`, error de sintaxis que detiene la API y recuperación automática tras corregirlo.
+- Cambio de frontend conservó el PID de API y devolvió HTTP 200 con HTML durante la recompilación. Creación y modificación de un asset público se copiaron sin reiniciar API.
+- SIGINT y SIGTERM terminaron el supervisor y el proceso hijo; el bloqueo SQLite quedó liberado. No se modificó contenido de `.env` ni la base operativa; pruebas detenidas al terminar.
+- Estado: implementación local en `feature/watchdog-api`, versión 3.26.0, pendiente de commit e integración. No se ejecutó la suite funcional completa, no hubo prueba visual/HMR y no se generó un DMG: el cambio afecta al arranque de desarrollo.

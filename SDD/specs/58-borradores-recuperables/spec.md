@@ -4,7 +4,7 @@
 **Solicitud:** «Dale construye el spec y el plan de implementación que propones». La orden posterior «implementa» autoriza construir esta spec; no commits, merge ni push.
 **Base:** main `32bda9f` (3.21.0) y corrección local 3.21.1 de recuperación de sesión, todavía sin integrar. Rama documental: `feature/sdd-recuperacion-borradores`.
 **Dependencias:** [03 Persistencia](../03-scene-persistence/spec.md), [43 Navegador](../43-cliente-navegador/spec.md), [45 Electron servicio](../45-electron-servicio/spec.md), [46 Multi-DB](../46-persistencia-multidb/spec.md), [47 Identidad](../47-identidad-dm/spec.md), [48 Propiedad y sistemas](../48-partidas-sistemas/spec.md), [51 Experiencia de servicio](../51-experiencia-servicio/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md).
-**Trabajo factory:** sin asignar. **Versión en rama:** 3.22.2, fuente única `package.json`. [Validación y límites](validacion.md).
+**Trabajo factory:** sin asignar. **Versión en rama:** 3.27.0, fuente única `package.json`. [Validación y límites](validacion.md).
 
 ## Problema y objetivo
 
@@ -38,8 +38,8 @@ Fuera de alcance: edición colaborativa del mismo documento, fusión automática
 ## Tres niveles de estado
 
 1. **Borrador en memoria:** documento editado y estado de trabajo. Separar contenido persistible de cámara/selección/herramientas y objetos Pixi.
-2. **Respaldo local:** IndexedDB del origen, por cuenta/partida/documento/rama de edición. Conserva hasta tres generaciones completas verificadas. No usar localStorage ni serializar en cada frame; una transacción termina antes de mostrar éxito.
-3. **Borrador en servidor:** recurso privado separado de la escena confirmada, con hasta tres generaciones. SQLite y PostgreSQL ofrecen el mismo contrato. «Guardar escena» confirma explícitamente una generación; autoguardar nunca modifica la escena canónica ni sus asociaciones/publicación.
+2. **Respaldo local:** IndexedDB del origen, por cuenta/partida/escena. Conserva únicamente la última copia, reemplazada transaccionalmente. No usar localStorage ni serializar en cada frame; una transacción termina antes de mostrar éxito.
+3. **Borrador en servidor:** recurso privado separado de la escena confirmada, con una única copia por cuenta/partida/escena. SQLite y PostgreSQL ofrecen el mismo contrato. «Guardar escena» confirma explícitamente una generación; autoguardar nunca modifica la escena canónica ni sus asociaciones/publicación.
 
 La UI muestra por separado «Respaldado en este dispositivo», «Borrador sincronizado», «Escena guardada», fechas de confirmación y errores. Un ACK de una generación vieja no marca como guardados cambios posteriores.
 
@@ -72,9 +72,9 @@ Se guardan referencias `asset:` y referencias de entidades, nunca bytes/base64 d
 
 ## Recuperación y conflictos
 
-1. Al acceder como el propietario y abrir el editor, consultar IndexedDB sin esperar capacidades ni listados remotos. Si hay una copia local, abrir «¿Cómo quieres continuar?» con la más reciente preseleccionada y su fecha. Las otras ramas permanecen accesibles en «Más opciones»; no se fusionan ni eliminan por orden de fecha.
+1. Al acceder como el propietario y abrir el editor, consultar IndexedDB sin esperar capacidades ni listados remotos. Si hay una copia local, abrir «¿Cómo quieres continuar?» con la más reciente preseleccionada y su fecha. Las copias de otras escenas permanecen accesibles en «Más opciones»; una misma escena no acumula ramas ni generaciones.
 2. Ofrecer dos acciones principales: **Recuperar estado local** (figuras, mapa, notas, fichas y vista de la copia local) y **Cargar mapa nuevamente** (escena confirmada en servidor). Si todavía no existe una escena asociada o fue eliminada, la segunda abre el selector de escenas. Cancelarlo vuelve a la recuperación.
-3. Cargar una escena no elimina el respaldo local. Más opciones agrupa otras copias, generaciones anteriores, exportación y desactivación explícita. Los borradores remotos permanecen en el archivo de partidas y el autoguardado remoto sigue independiente. No exigir elegir origen/UUID/generación para la recuperación habitual.
+3. Cargar una escena no elimina el respaldo local. Más opciones agrupa copias de otras escenas, exportación y desactivación explícita. Los borradores remotos permanecen en el archivo de partidas y el autoguardado remoto sigue independiente. No exigir elegir origen/UUID/generación para la recuperación habitual.
 4. Con misma revisión base y sistema compatible, continuar el contenido local. Reautenticar no convierte una respuesta de la sesión anterior en válida. La apertura y la publicación siguen siendo explícitas e independientes del borrador.
 5. Si cambió o desapareció la escena base, «Recuperar estado local» carga una copia independiente; el diálogo avisa de esa política. Se conserva el respaldo original. No sobrescribir el original, actualizar silenciosamente `If-Match` ni fusionar por «último gana». Guardar la copia genera un recurso nuevo con validaciones existentes y referencias de enlaces revisadas; no modifica los enlaces recíprocos de la original.
 6. Cambios en bibliotecas no usadas no bloquean. Referencias necesarias eliminadas o sistema incompatible se identifican: vista protegida/exportación del contenido recuperable y reparación explícita, sin publicar ni eludir bindings. Sistema deshabilitado conserva reglas de instancias existentes; no habilita crear una copia prohibida.
@@ -84,9 +84,9 @@ El diálogo de recuperación no mantiene un canvas por alternativa ni renders pe
 
 ## Varias pestañas, revisión e idempotencia
 
-Cada carga de editor genera un `writerId` nuevo; una reautenticación dentro de ese editor lo conserva. Una pestaña duplicada no hereda permiso de escritura sobre la rama original. Recuperar desde otra pestaña/dispositivo crea una rama derivada cuando se edite; no copia cuerpos automáticamente en cada recarga ni roba la rama activa. BroadcastChannel puede avisar, nunca autorizar o arbitrar escrituras.
+Cada carga genera un `writerId` nuevo, pero reutiliza el respaldo de la misma cuenta/partida/escena. No crea una rama derivada. La revisión CAS y la secuencia monotónica evitan sobrescribir desde una cabeza desactualizada; el cliente conserva el error de conflicto y permite recuperar/exportar. En IndexedDB se reemplaza el índice previo del mismo ámbito en una transacción y se rechazan escrituras con fecha anterior. BroadcastChannel no autoriza escrituras.
 
-Cada rama remota tiene revisión y secuencia monotónicas. El cliente persiste la petición incierta exacta antes de enviarla: identidad, secuencia, hash, revisión esperada y contenido. Repetir el mismo último envío devuelve su ACK sin nueva versión. Misma secuencia con contenido distinto se rechaza. Un envío antiguo nunca desplaza el nuevo; si no puede repetirse su ACK exacto se responde conflicto verificable y el cliente consulta la cabeza antes de actuar. Solo se acumula el último estado pendiente, y no se envía hasta resolver el resultado del anterior.
+Cada respaldo remoto tiene revisión y secuencia monotónicas. El cliente persiste la petición incierta exacta antes de enviarla: identidad, secuencia, hash, revisión esperada y contenido. Repetir el mismo último envío devuelve su ACK sin nueva versión. Misma secuencia con contenido distinto se rechaza. Un envío antiguo nunca desplaza el nuevo; si no puede repetirse su ACK exacto se responde conflicto verificable y el cliente consulta la cabeza antes de actuar. Solo se acumula el último estado pendiente, y no se envía hasta resolver el resultado del anterior.
 
 El autoguardado usa recibo acotado por rama, no una fila de `owned_operations` por pulsación/guardado. Crear rama, confirmar escena y descartar sí reutilizan operaciones transaccionales idempotentes de baja frecuencia. La confirmación incluye revisión esperada de escena y de borrador; documento/bindings, nueva revisión y referencia al checkpoint se confirman atómicamente. Una edición durante el request continúa pendiente después del ACK. Recuperar un request incierto nunca repite una confirmación como creación nueva.
 
@@ -96,8 +96,8 @@ El autoguardado usa recibo acotado por rama, no una fila de `owned_operations` p
 - El borrador no depende de la duración de la apertura. Caducidad/cierre/expulsión de jugadores no lo elimina. Deshabilitar la cuenta bloquea acceso/sincronización; no hay promesa de borrado remoto de datos ya presentes en un dispositivo.
 - Respaldo local activo por defecto para el DM, con aviso visible de que este dispositivo conserva contenido privado y opción de desactivarlo/eliminarlo. Restaurar requiere la misma cuenta autenticada. La separación por cuenta en UI no cifra datos frente a quien controla ese perfil del navegador; no presentar ese aislamiento como protección criptográfica.
 - Logout explícito pide resolver trabajo pendiente; después elimina copias locales de esa cuenta, conservando remotas confirmadas. Caducidad y cierre accidental no equivalen a logout ni borrado. Cambio de cuenta oculta la anterior y exige decisión para el borrador abierto; ninguna operación pendiente se envía con la cuenta nueva.
-- Presupuestos iniciales propuestos: sobre completo ≤10 MiB UTF-8, tres generaciones por rama, 50 MiB de contenido local por origen, 20 ramas y 256 MiB remotos por cuenta. Cuotas se cuentan transaccionalmente en bytes; metadatos/recibos también tienen límite. El almacenamiento físico del navegador puede rechazar antes por su propia cuota.
-- Rotar únicamente generaciones antiguas de la misma rama tras confirmar la escritura nueva; nunca borrar la última copia válida para liberar espacio. No purgar otras ramas con cambios pendientes automáticamente. Al alcanzar cuota, avisar, conservar memoria/última copia y permitir exportar o descartar ramas explícitamente. No hay caducidad temporal automática de borradores activos.
+- Presupuestos iniciales propuestos: sobre completo ≤10 MiB UTF-8, una copia por escena, 50 MiB de contenido local por origen, 20 ramas pendientes y 256 MiB remotos por cuenta (incluyendo copias confirmadas). Cuotas se cuentan transaccionalmente en bytes; metadatos/recibos también tienen límite. El almacenamiento físico del navegador puede rechazar antes por su propia cuota.
+- Reemplazar la copia de la misma escena al completar la nueva escritura; nunca borrar antes de guardar. Al consolidar datos históricos se conserva el respaldo con contenido más reciente; una reserva vacía no lo desplaza. No purgar copias de otras escenas para liberar espacio. Al alcanzar cuota, avisar, conservar memoria/última copia y permitir exportar o descartar ramas explícitamente. No hay caducidad temporal automática de borradores activos.
 - Corrupción/incompatibilidad de sobre: conservarlo sin renderizar, ofrecer generación válida anterior o exportación del sobre original; no sobrescribir automáticamente la evidencia. Una actualización de esquema local usa migración transaccional sin reset.
 
 ## Compatibilidad y operación
@@ -117,11 +117,11 @@ En Electron servicio se conserva solo el almacenamiento de recuperación requeri
 | CA-03 | Recarga y cierre/crash recuperan el último ACK local válido con notas, mapas, fichas y cámara; escenas nuevas también | Navegador real, fixtures pequeñas y cercanas a 10 MiB |
 | CA-04 | Caducar pausa API y lienzo; reautenticar misma cuenta recupera memoria/local sin perder cambios; otra cuenta no accede | Expiración/401 real, carreras y cambio de cuenta |
 | CA-05 | Conflicto identifica recurso; cambiar ficha no usada no bloquea; recuperar copia no modifica original ni reciprocidad | Pruebas de dependencias, enlaces y dos revisiones |
-| CA-06 | Dos pestañas/dispositivos conservan ramas; reintentos perdidos y mensajes atrasados no pisan versiones ni duplican confirmaciones | Concurrencia SQLite/PostgreSQL y dos pestañas reales |
+| CA-06 | Dos pestañas/dispositivos reutilizan el respaldo; reintentos perdidos y mensajes atrasados no pisan versiones ni duplican confirmaciones | Concurrencia SQLite/PostgreSQL y dos pestañas reales |
 | CA-07 | Guardar confirma una generación y conserva dirty posterior; idempotencia sobrevive reinicio API | ACK perdido, edición durante envío y reinicio |
 | CA-08 | Cuota/corrupción/almacenamiento denegado/429/red/5xx mantienen última copia y feedback; sin loops | Fallos inyectados y uso de almacenamiento real |
 | CA-09 | Logout, revocación, admin/invitado/otro DM y cuerpos manipulados respetan propiedad y limpieza | Contratos de seguridad en ambos motores |
-| CA-10 | Índices no descargan todos los cuerpos; tres versiones, cuotas y recibos acotados; ≥2000 autosaves sin agotar operaciones generales | Contrato de carga y recuento de filas/bytes |
+| CA-10 | Índices no descargan todos los cuerpos; una copia, cuotas y recibos acotados; ≥2000 autosaves sin agotar operaciones generales | Contrato de carga y recuento de filas/bytes |
 | CA-11 | Reiniciar Electron servicio conserva borrador pero exige autenticación; no cambia Electron autónomo ni aislamiento | Humo nativo, crash simulado, origen distinto y fallo de limpieza |
 | CA-12 | Servidor anterior permite respaldo local/guardado manual y comunica falta de capacidad una sola vez | Matriz cliente nuevo/antiguo y servidor nuevo/antiguo |
 | CA-13 | Migrar dos veces, transacción fallida, reinicio y backup integral conservan datos; transferencia funcional comunica exclusión | SQLite/PostgreSQL TLS reales, restauración aislada |
@@ -130,7 +130,7 @@ En Electron servicio se conserva solo el almacenamiento de recuperación requeri
 
 ## Decisiones y entrega
 
-La solicitud acepta desarrollar la propuesta documental de respaldo local y remoto con las frecuencias anteriores. Cuotas, ramificación por escritor y partición persistente selectiva se concretan aquí como decisiones implementadas en rama; la corrección 3.22.1 prioriza la recuperación local sencilla. No se promete recuperar retroactivamente contenido ya descartado antes de existir un respaldo.
+La solicitud acepta desarrollar la propuesta documental de respaldo local y remoto con las frecuencias anteriores. Cuotas, respaldo único por escena y partición persistente selectiva se concretan aquí como decisiones implementadas en rama; la corrección 3.22.1 prioriza la recuperación local sencilla. No se promete recuperar retroactivamente contenido ya descartado antes de existir un respaldo.
 
 El [plan técnico](plan.md) divide construcción y pruebas. Las guías actuales siguen describiendo lo implementado hasta integrar esta spec. No hay bloqueos de producto para planificar; límites reales de navegador, partición Electron y migraciones se verifican en la primera etapa antes de habilitar la función.
 
@@ -140,7 +140,7 @@ Guardar escena usa la captura actual completa del editor: objetos de todos los m
 
 Al entrar nuevamente en una partida, sin cambios locales pendientes, el editor consulta la última escena confirmada asociada a esa partida y carga su contenido del servidor automáticamente. No requiere cuerpos de IndexedDB para reconstruirla; funciona con IndexedDB vacío o no disponible. La consulta es privada y acotada por propietario/partida. Si no hay escena guardada, se abre el editor vacío.
 
-La copia local más reciente solo activa «Recuperar estado local / Cargar mapa nuevamente» si contiene diferencias de documento no guardadas. La huella de comparación excluye cámara, paneles y selección: navegar no crea una recuperación pendiente. Los índices anteriores se concilian con la escena del servidor cuando no tienen la huella nueva. Copias anteriores permanecen en Más opciones; elegir el servidor no las elimina. Un error al verificar una copia no autoriza borrarla.
+La copia local más reciente solo activa «Recuperar estado local / Cargar mapa nuevamente» si contiene diferencias de documento no guardadas. La huella de comparación excluye cámara, paneles y selección: navegar no crea una recuperación pendiente. Los índices anteriores se concilian con la escena del servidor cuando no tienen la huella nueva. Las copias de otras escenas permanecen en Más opciones. Desde 3.27.0, cada escena solo conserva su última copia. Un error al verificar una copia no autoriza borrarla.
 
 Criterios de regresión adicionales:
 
@@ -153,4 +153,23 @@ Criterios de regresión adicionales:
 
 ### Corrección de auditoría B05 — 2026-11-11
 
-Una rama restaurada comienza con secuencia positiva incluso antes de editar: reabrir y guardar inmediatamente no puede enviar PUT cero. Una notificación sin cambio documental no marca la escena como pendiente de confirmar. Las copias 3.22.2 con envío pendiente de secuencia cero solo se recuperan si el resto del esquema es válido, la rama remota sigue vacía y coinciden los hashes de contenido actual y pendiente. Se descarta únicamente ese envío imposible; el registro original no se sobrescribe y continúa exportable. Los envíos inciertos válidos siguen conservando su cuerpo y clave.
+Una rama restaurada comienza con secuencia positiva incluso antes de editar: reabrir y guardar inmediatamente no puede enviar PUT cero. Una notificación sin cambio documental no marca la escena como pendiente de confirmar. Las copias 3.22.2 con envío pendiente de secuencia cero solo se recuperan si el resto del esquema es válido, la rama remota sigue vacía y coinciden los hashes de contenido actual y pendiente. Se descarta únicamente ese envío imposible; el registro original sigue exportable hasta sustituirlo por la recuperación válida. Los envíos inciertos válidos siguen conservando su cuerpo y clave.
+
+## Corrección 2026-11-12 — cuotas al guardar y salir
+
+Se detectaron 20 ramas remotas, de las cuales 7 estaban confirmadas, con una generación máxima de aproximadamente 90 KB. El conteo de todas las ramas impedía crear la siguiente y devolvía incorrectamente 413. No era un exceso de tamaño del documento.
+
+- La cuota de 20 corresponde a ramas pendientes: vacías (`revision=0`) o con `sequence > confirmedSequence`. Confirmar la copia actual libera una plaza; la retención única de 3.27.0 sustituye el historial anterior.
+- Volver a escribir una rama confirmada reserva una plaza pendiente bajo la misma transacción; nunca permite superar el límite mediante reapertura. Reintentos idempotentes no consumen otra plaza.
+- Los cuerpos confirmados siguen contando en la cuota total de 256 MiB. Se conserva una copia por escena; no se purgan otras escenas ni se incrementa el límite HTTP de 10 MiB.
+- Cuotas agotadas: HTTP 409 con `DRAFT_BRANCH_LIMIT` o `DRAFT_STORAGE_LIMIT` y mensaje específico. Un cuerpo realmente excesivo conserva 413 (`PAYLOAD_TOO_LARGE` o `RESULT_TOO_LARGE`). Los errores no declaran la escena guardada y conservan las copias previas.
+- Guardar/salir/reabrir una escena de tamaño válido repetidamente debe funcionar tras más de 20 guardados, sin solicitar recuperación de cambios ya confirmados. Si existen 20 ramas realmente pendientes, el usuario debe confirmar o descartar una de ellas antes de crear otra; no se ofrece capacidad ilimitada.
+
+### Retención única — 3.27.0 (2026-11-12)
+
+- Clave lógica: cuenta + partida + escena; en IndexedDB también el origen. `sceneId=null` corresponde al lienzo sin guardar de esa partida. Cambiar de escena conserva una copia independiente de cada escena, sin crear escenas guardadas nuevas automáticamente.
+- Abrir/recuperar reutiliza el ID remoto y continúa su secuencia; contenido idéntico no genera PUT. La revisión técnica puede avanzar, pero solo queda un cuerpo recuperable.
+- Listar o crear respaldos consolida el historial remoto del propietario dentro de la transacción autorizada. Verifica esquema y hash del superviviente; ante corrupción revierte. Listar IndexedDB consolida índices/generaciones del ámbito solicitado.
+- Guardar escena mantiene su documento canónico separado; el aviso local solo corresponde a cambios sin confirmar. No hay selector de versiones anteriores.
+- Una confirmación incierta de una edición antigua no puede reconocerse con la cabeza de otra edición: se exige el recibo exacto o coincidencia de secuencia y hash.
+- Aceptación: 23 ciclos guardar/salir/reabrir de la misma escena dejan una escena guardada, un respaldo remoto con una versión y un índice local. Una escritura CAS atrasada se rechaza sin modificar el último estado.

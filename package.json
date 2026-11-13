@@ -1,6 +1,6 @@
 {
   "name": "ttrpg-effects",
-  "version": "3.25.0",
+  "version": "3.27.2",
   "description": "Desktop tool for TTRPG map effects and session projection.",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:api": "pnpm typecheck && vite build --config src/server/vite.config.ts",
-    "start:api": "pnpm build:service && node --env-file-if-exists=.env out/api/index.mjs",
+    "start:api": "node scripts/watch-service.mjs",
     "dev:api": "pnpm start:api",
     "dev:web": "vite --config src/web/vite.config.ts",
     "build:web": "pnpm typecheck && vite build --config src/web/vite.config.ts",
@@ -33,7 +33,8 @@
     "test:invitations": "vitest run --config src/infrastructure/server/invitations/vitest.config.ts",
     "invitations:invalidate": "node --env-file-if-exists=.env out/api/invitation-invalidate.mjs",
     "test:moderation": "vitest run --config src/infrastructure/server/moderation/vitest.config.ts",
-    "build:service": "pnpm typecheck && vite build --config src/server/vite.config.ts && vite build --config src/web/vite.config.ts"
+    "build:service": "pnpm typecheck && vite build --config src/server/vite.config.ts && vite build --config src/web/vite.config.ts",
+    "start:api:built": "node --env-file-if-exists=.env out/api/index.mjs"
   },
   "build": {
     "appId": "com.luismoncaris.ttrpg-effects",

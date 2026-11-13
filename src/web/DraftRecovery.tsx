@@ -14,7 +14,7 @@ function download(value:unknown){
 export function DraftRecovery({browser,gameId,active,onRecovered,conflict=false}:{browser:BrowserClient;gameId:string;active:boolean;onRecovered:()=>void;conflict?:boolean}){
   const drafts=browser.drafts!;
   const status=useSyncExternalStore(drafts.subscribe,drafts.getStatus);
-  const [open,setOpen]=useState(false),[items,setItems]=useState<LocalDraftIndex[]>([]),[selected,setSelected]=useState(""),[generation,setGeneration]=useState(0),[error,setError]=useState(""),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[picking,setPicking]=useState(false),[disable,setDisable]=useState(false);
+  const [open,setOpen]=useState(false),[items,setItems]=useState<LocalDraftIndex[]>([]),[selected,setSelected]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0),[picking,setPicking]=useState(false),[disable,setDisable]=useState(false);
   const prompted=useRef(false);
   useEffect(()=>{
     if(!active||status.ready===false)return;let live=true;
@@ -45,9 +45,9 @@ export function DraftRecovery({browser,gameId,active,onRecovered,conflict=false}
   }
   async function recover(){await run(async()=>{
     await drafts.flushLocal().catch(()=>{});
-    const value=memory??(entry?await browser.localDrafts.read(drafts.ownerId,drafts.origin,entry.id,generation||undefined):drafts.checkpoint);
+    const value=memory??(entry?await browser.localDrafts.read(drafts.ownerId,drafts.origin,entry.id):drafts.checkpoint);
     if(!value)throw new Error("Aún no hay un respaldo local para esta partida.");
-    // Recuperar no reenvía una operación incierta. El original y su journal siguen en IndexedDB.
+    // Recuperar el contenido local elegido, sin reenviar sus operaciones pendientes.
     const local={...value,pending:null,confirmation:null};
     try{await drafts.restore(local);}catch(e){
       if(!(e instanceof ServiceError)||!(e.status===404||e.code==="REVISION_CONFLICT"))throw e;
@@ -85,10 +85,10 @@ export function DraftRecovery({browser,gameId,active,onRecovered,conflict=false}
       {(error||status.error)&&<p role="alert">{error||status.error}</p>}
       <details><summary>Más opciones</summary>
         <p role="status">{status.local}<br/>{status.remote}<br/>{status.confirmed}</p>
+        <p>Se conserva solo la última copia de recuperación de cada escena. Los cambios nuevos reemplazan la anterior.</p>
         <p>Si la escena del servidor cambió o fue eliminada, tu trabajo se recuperará como una copia sin sobrescribirla. Los enlaces de esa copia se desconectan.</p>
-        {items.length>1&&<label>Otras copias de este dispositivo<select disabled={busy} value={selected} onChange={event=>{setSelected(event.target.value);setGeneration(0);}}>{items.map(item=><option key={item.id} value={item.id}>{new Date(item.updatedAt).toLocaleString()} · {item.context.sceneId?`Escena ${item.context.sceneId.slice(0,8)}`:"Lienzo sin guardar"}</option>)}</select></label>}
-        {(entry?.revisions?.length??0)>1&&<label>Versión local<select disabled={busy} value={generation} onChange={event=>setGeneration(Number(event.target.value))}><option value={0}>Más reciente</option>{entry!.revisions.slice(1).map(sequence=><option key={sequence} value={sequence}>Anterior ({sequence})</option>)}</select></label>}
-        <button disabled={busy||!entry} onClick={()=>void run(async()=>download(await browser.localDrafts.raw(drafts.ownerId,drafts.origin,entry!.id,generation||undefined)))}>Exportar copia local</button>
+        {items.length>1&&<label>Otras escenas de esta partida<select disabled={busy} value={selected} onChange={event=>{setSelected(event.target.value);}}>{items.map(item=><option key={item.id} value={item.id}>{new Date(item.updatedAt).toLocaleString()} · {item.context.sceneId?`Escena ${item.context.sceneId.slice(0,8)}`:"Lienzo sin guardar"}</option>)}</select></label>}
+        <button disabled={busy||!entry} onClick={()=>void run(async()=>download(await browser.localDrafts.raw(drafts.ownerId,drafts.origin,entry!.id)))}>Exportar copia local</button>
         <p>El respaldo contiene datos privados. Cerrar sesión explícitamente elimina las copias locales; la caducidad de sesión las conserva.</p>
         <button disabled={busy} onClick={()=>status.enabled?setDisable(true):void run(async()=>{await browser.localDrafts.setEnabled(drafts.ownerId,drafts.origin,true);drafts.setEnabled(true);await drafts.flushLocal();})}>{status.enabled?"Desactivar respaldo local":"Activar respaldo local"}</button>
         {disable&&<div><p>Se borrarán las copias locales de esta cuenta en este dispositivo. Exporta primero si quieres conservarlas.</p><button disabled={busy} onClick={()=>setDisable(false)}>Cancelar</button><button disabled={busy} onClick={()=>void run(async()=>{await browser.localDrafts.setEnabled(drafts.ownerId,drafts.origin,false);drafts.setEnabled(false);setDisable(false);setRefresh(n=>n+1);})}>Desactivar y borrar copias locales</button></div>}

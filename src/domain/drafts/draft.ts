@@ -3,7 +3,8 @@ import { sceneDocumentV2Schema, parseSceneDocument } from "../sessions/scene-sch
 import { resourceBindingsSchema, systemRefSchema } from "../systems/system-catalog";
 import type { SceneDocument } from "../sessions/scene-document";
 
-export const DRAFT_LIMITS = { bytes: 10 * 1024 * 1024, localBytes: 50 * 1024 * 1024, remoteBytes: 256 * 1024 * 1024, branches: 20, generations: 3 } as const;
+// branches limita ramas pendientes; las confirmadas siguen computando en remoteBytes.
+export const DRAFT_LIMITS = { bytes: 10 * 1024 * 1024, localBytes: 50 * 1024 * 1024, remoteBytes: 256 * 1024 * 1024, branches: 20, generations: 1 } as const;
 export const draftContextSchema = z.strictObject({
   gameId: z.uuid(), writerId: z.uuid(), parentDraftId: z.uuid().nullable(),
   sceneId: z.uuid().nullable(), baseRevision: z.number().int().nonnegative(),
@@ -98,4 +99,9 @@ export async function readLocalCheckpoint(raw:unknown):Promise<DraftCheckpoint>{
     }
   }
   throw new Error("El respaldo es incompatible o está dañado. Prueba otra generación o exporta el original.");
+}
+
+/** Una copia de recuperación por escena y partida; el lienzo sin guardar tiene su propio espacio. */
+export function sameRecoverySlot(a: Pick<DraftContext,"gameId"|"sceneId">, b: Pick<DraftContext,"gameId"|"sceneId">): boolean {
+  return a.gameId===b.gameId && a.sceneId===b.sceneId;
 }
