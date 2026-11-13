@@ -68,3 +68,25 @@ No se declara aceptación completa de la matriz CA-01…15 hasta resolver estas 
 Los artefactos API/web/Electron quedaron construidos. Para usar esta versión con datos reales: detener API, realizar respaldo integral de la base y ejecutar `pnpm db:migrate`, seguido de `pnpm start:api`. El migrador no se ejecutó sobre la base del usuario. La migración 8 es aditiva; un binario antiguo puede rechazar un esquema posterior, por lo que no se promete downgrade automático.
 
 Los respaldos IndexedDB contienen datos privados sin cifrado adicional; el editor avisa y permite desactivarlos. Logout explícito elimina las copias locales de esa cuenta; caducidad conserva las copias. Borrar datos del sitio o el perfil Electron elimina el respaldo local. Los respaldos remotos, su propiedad y sus cuotas son independientes de la escena confirmada.
+
+## Corrección 3.26.1 — 2026-11-12
+
+- Diagnóstico de solo lectura: 20 ramas (7 confirmadas), 26 generaciones, máximo 90.010 bytes por generación. La cuota de ramas devolvía el mismo 413 que un payload excesivo. No se borraron datos para resolverlo.
+- Regresión con API HTTP, SQLite temporal, cliente real e IndexedDB simulado: 23 ciclos de guardar/cerrar/reabrir, una sola escena actualizada y todas las ramas confirmadas retenidas. Reapertura desde servidor sin respaldo local.
+- Cuota de 20 pendientes: 409 `DRAFT_BRANCH_LIMIT`, copia local conservada, plaza liberada al confirmar y reactivación rechazada al volver a llenar la cuota sin modificar la generación anterior. Tamaño declarado superior a 10 MiB mantiene 413 `PAYLOAD_TOO_LARGE`.
+- Comando focalizado: `pnpm exec vitest run src/infrastructure/browser/scene-save-recovery.test.ts src/application/services/draft-coordinator.test.ts src/infrastructure/browser/drafts/indexeddb-store.test.ts --maxWorkers 1`: 48 pruebas aprobadas en 6 ejecuciones de archivo según los proyectos Vitest configurados.
+- PostgreSQL 18 local: clon temporal de la copia migrada con 20 ramas/7 confirmadas; permitió 7 nuevas pendientes y rechazó la siguiente y la reactivación de una confirmada. Base temporal eliminada. No equivale al gate completo PostgreSQL/TLS ni a una prueba visual en Chrome.
+- Watchdog operativo recompiló la API; salud del servicio local respondió versión 3.26.1. Sin migraciones, borrado de ramas, incremento de límite HTTP, commit ni merge. La rama `fix/guardar-salir-413` conserva los cambios pendientes del supervisor.
+
+## 2026-11-12 — 3.27.0, recuperación única
+
+- SQLite temporal + cliente HTTP + IndexedDB simulado: 23 ciclos guardar/salir/reabrir dejan una escena, un respaldo remoto con una versión y un índice local. Guardar figuras, notas, cámara y paneles conserva el contenido al reabrir sin IndexedDB.
+- Consolidación histórica local/remota, separación por cuenta/escena, rollback si el superviviente remoto está corrupto, cuotas, reintentos idempotentes, rechazo CAS de otra ventana y confirmación antigua sin recibo.
+- PostgreSQL 18 local: base temporal clonada de la migración previa, 20 respaldos se consolidaron en 4 ámbitos, 25 reaperturas reutilizaron el ID y quedó una versión por respaldo. Escritura CAS atrasada rechazada; las filas de escenas/recursos guardados quedaron idénticas. Base temporal eliminada al terminar; no modifica la base PostgreSQL del usuario. Esta prueba local sin TLS no sustituye el contrato de producción con TLS.
+- La limpieza de datos existentes ocurre al consultar/crear respaldos (servidor) o listar recuperación (IndexedDB). No se abrió ni recargó el navegador del usuario. La API de desarrollo responde versión 3.27.0.
+
+Validación final: 53 pruebas de persistencia/coordinador y 132 del editor/recuperación aprobadas; `pnpm typecheck`, `pnpm lint` y `git diff --check` sin errores. Se ajustó la expectativa del test de lectura local tras retirar el parámetro de generación.
+
+## Cierre 3.27.2 — 2026-11-12
+
+Autorización explícita para integrar y subir todo lo pendiente. Suite de producto sin duplicados históricos `.local`: 1400 pruebas aprobadas, 156 archivos, con cuatro workers. Las esperas de confirmación se sincronizan con la finalización de sus promesas/hash, y la prueba del botón de publicación usa Electron servicio conforme al nuevo contrato. Typecheck, lint y build API/web aprobados. Los builds mantienen avisos de tamaño de chunks; JSDOM avisa de canvas no implementado en pruebas que simulan el viewport.

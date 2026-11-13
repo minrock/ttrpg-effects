@@ -16,14 +16,14 @@ for(const kind of ['sqlite','postgres'] as const)describe(`Borradores reales ${k
     const content:DraftContent={scene:createDefaultScene(),bindings:{monsters:{}},view:{camera:{x:10,y:12,zoom:2},sidebar:true,aside:false,selectedId:null}};
     return {config,...auth,port,context,head,content};
   }
-  it('aislamiento, CAS, recibos durables, tres generaciones y confirmación atómica',async()=>{
+  it('aislamiento, CAS, recibos durables, una copia y confirmación atómica',async()=>{
     const t=await ready(),path=`/drafts/${t.head.id}`,put={sequence:1,hash:await contentHash(t.content),content:t.content,sceneId:null,baseRevision:0},key=randomUUID();
     for(const cookie of [t.bCookie,t.adminCookie,''])expect((await http(t.port,path,cookie)).status).toBe(cookie===t.bCookie?404:cookie?403:401);
     const first=await http(t.port,path,t.aCookie,'PUT',put,{'if-match':'0','idempotency-key':key});expect(first.status).toBe(200);
     expect((await http(t.port,path,t.aCookie,'PUT',put,{'if-match':'0','idempotency-key':key})).json).toEqual(first.json);
     expect((await http(t.port,path,t.aCookie,'PUT',{...put,sequence:2},{'if-match':'0'})).status).toBe(409);
     for(let sequence=2;sequence<=5;sequence++)expect((await http(t.port,path,t.aCookie,'PUT',{...put,sequence},{'if-match':String(sequence-1)})).status).toBe(200);
-    const read=await http(t.port,path,t.aCookie);expect((read.json.versions as unknown[]).length).toBe(3);expect(read.json.content).toEqual(t.content);
+    const read=await http(t.port,path,t.aCookie);expect((read.json.versions as unknown[]).length).toBe(1);expect(read.json.content).toEqual(t.content);
     expect((await http(t.port,'/scenes',t.aCookie)).json.total).toBe(0);
     const confirmKey=randomUUID(),command={name:'Confirmada',mode:'copy',sceneRevision:0,targetGameId:t.context.gameId};
     const saved=await http(t.port,path+'/confirm',t.aCookie,'POST',command,{'if-match':'5','idempotency-key':confirmKey});expect(saved.status).toBe(200);
@@ -31,13 +31,13 @@ for(const kind of ['sqlite','postgres'] as const)describe(`Borradores reales ${k
     expect((await http(t.port,'/scenes',t.aCookie)).json.total).toBe(1);
     expect((await http(t.port,path,t.aCookie)).json.draft).toMatchObject({confirmedSequence:5,context:{sceneId:saved.json.sceneId,baseRevision:1}});
     await t.identity.close();
-    const counts=await raw(t.config,async c=>(await c.query('SELECT COUNT(*) AS n FROM owned_draft_versions')).rows[0]);expect(Number(counts.n)).toBe(3);
+    const counts=await raw(t.config,async c=>(await c.query('SELECT COUNT(*) AS n FROM owned_draft_versions')).rows[0]);expect(Number(counts.n)).toBe(1);
   });
   it('2000 autoguardados no consumen el diario general; borrar no admite resurrección por PUT',async()=>{
     const t=await ready(),path=`/drafts/${t.head.id}`,hash=await contentHash(t.content);
     // Contrato de repositorio en transacciones reales; evita usar un mock SQL para la carga.
     for(let sequence=1;sequence<=2000;sequence++)await t.identity.authorized(t.aCookie,'dm',async(_,tx)=>tx.drafts.put(t.head.id,sequence-1,randomUUID(),{sequence,hash,content:t.content,sceneId:null,baseRevision:0}));
-    await t.identity.authorized(t.aCookie,'dm',async(_,tx)=>{expect((await tx.drafts.get(t.head.id)).versions).toHaveLength(3);});
+    await t.identity.authorized(t.aCookie,'dm',async(_,tx)=>{expect((await tx.drafts.get(t.head.id)).versions).toHaveLength(1);});
     expect((await http(t.port,path,t.aCookie,'DELETE',{}, {'if-match':'2000'})).status).toBe(200);
     expect((await http(t.port,path,t.aCookie,'PUT',{sequence:2001,hash,content:t.content,sceneId:null,baseRevision:0},{'if-match':'2000'})).status).toBe(404);
     await t.identity.close();const count=await raw(t.config,async c=>(await c.query('SELECT COUNT(*) AS n FROM owned_operations')).rows[0]);expect(Number(count.n)).toBeLessThan(10);

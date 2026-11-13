@@ -28,3 +28,7 @@ Esta consolidación no volvió a ejecutar los comandos de producto. La verificac
 ## Continuación
 
 Conservar las fronteras de dominio/aplicación/infraestructura/vista y los contratos de compatibilidad descritos en la spec. Una nueva entrega registra su delta, migraciones, criterio → evidencia, riesgos, estado de Git y autorización por separado. No reutilizar decisiones históricas como aprobación de código nuevo.
+
+## Ajuste 3.27.1 — 2026-11-12
+
+`WorkspaceHeader` muestra «Jugador» únicamente si el agente de navegador contiene la identificación de Electron. Es una condición de presentación, no de autorización; cubre Electron servicio, que no tiene preload ni puente nativo. Se conserva el callback existente y no se modifica la sincronización de la mesa. La regresión de cabecera comprueba Electron y Chrome con los demás controles disponibles.

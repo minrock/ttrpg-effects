@@ -9,9 +9,10 @@ describe("Workspace chrome", () => {
   let root: Root, host: HTMLDivElement;
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36");
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   });
-  afterEach(async () => { await act(async () => root.unmount()); host.remove(); });
+  afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
   function button(name: string): HTMLButtonElement {
     const node = [...host.querySelectorAll("button")].find(item => item.getAttribute("aria-label") === name || item.textContent === name);
     expect(node, name).toBeDefined(); return node!;
@@ -59,6 +60,10 @@ describe("Workspace chrome", () => {
       expect(target.querySelector("header")).toBeNull();
       expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(7);
       expect(target.textContent).not.toContain("Cerrar sesión");
+      vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36");
+      await act(async()=>root.render(<WorkspaceHeader {...props}/>));
+      expect(target.querySelector(".workspace-present")).toBeNull();
+      expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(6);
       const trigger=target.querySelector<HTMLButtonElement>('[aria-label="Herramientas del editor"]')!;
       await act(async()=>trigger.click());expect(trigger.getAttribute("aria-expanded")).toBe("true");
       const dice=target.querySelector<HTMLButtonElement>('[aria-label="Abrir dados"]')!;

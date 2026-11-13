@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.27.2 — 2026-11-12 — Corrección
+
+- El radio de revelar niebla se ajusta con slider de 0,5 a 8 cuadros en pasos de 0,5, con valor visible, tanto en herramientas como en ajustes. Conserva la conversión a unidades de mundo y las escenas existentes.
+- Cierre de los cambios de vigilancia del servicio, recuperación única, cuotas de guardado y botón Jugador exclusivo de Electron.
+
+## 3.27.1 — 2026-11-12 — Corrección
+
+- El botón «Jugador» de la cabecera solo aparece en Electron, tanto local como conectado al servicio; se oculta en Chrome y otros navegadores.
+
+## 3.27.0 — 2026-11-12 — Versión minor
+
+- Recuperación con una sola copia reciente por cuenta, partida y escena, sobrescrita de forma transaccional en IndexedDB y servidor. Reabrir reutiliza el respaldo y los cambios idénticos no generan nuevas versiones.
+- Consolidación de respaldos antiguos y retiro del selector de generaciones; conserva escenas guardadas independientes, aislamiento de cuentas y protección frente a escrituras atrasadas.
+
+## 3.26.1 — 2026-11-12 — Corrección
+
+- Guardar/salir y reabrir deja de agotar el límite de ramas remotas por contar borradores ya confirmados: la cuota de 20 plazas corresponde a trabajo pendiente; todos los historiales conservan el límite conjunto de 256 MiB.
+- Las cuotas de ramas y almacenamiento devuelven errores específicos, separados del 413 por tamaño real. No se eliminan borradores ni se aumenta el límite de peticiones.
+
+## 3.26.0 — 2026-11-12 — Versión minor
+
+- `start:api` y `dev:api` incorporan vigilancia incremental de API y frontend, con reinicio ordenado al modificar API o `.env` y espera ante errores de compilación.
+- Artefactos de desarrollo aislados, actualización web con recarga manual y cierre de conexiones antes de reiniciar; no ejecuta typecheck ni el build completo en cada cambio.
+- `start:api:built` permite ejecutar el build estable sin vigilancia después de `build:service`.
+
 ## 3.25.0 — 2026-11-12 — Versión minor
 
 - `pnpm start:api` reconstruye y valida API y frontend web antes de iniciar; si falla la compilación no arranca el servicio. `dev:api` reutiliza este flujo sin compilar dos veces.

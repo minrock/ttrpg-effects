@@ -12,7 +12,7 @@ Fusionar navegación de servicio, contexto de partida, controles del editor y pe
 
 1. Una fila de 44 px muestra navegación, partida, escena, herramientas y perfil; no hay logo duplicado ni fila vacía del editor.
 2. El editor comparte cabecera mediante portal con sus callbacks reales; Electron local conserva su cabecera autónoma.
-3. Bajo 1100 px las acciones del editor se agrupan en desplegable conservando guardar, combate, contadores, dados, explorador, inspector y jugador.
+3. Bajo 1100 px las acciones del editor se agrupan en desplegable conservando guardar, combate, contadores, dados, explorador e inspector. El botón «Jugador» aparece únicamente en Electron (local y servicio); se omite en Chrome y otros navegadores, tanto en la fila como en el desplegable.
 4. Escape cierra y devuelve foco; salir con puntero/foco cierra menús; sus teclas no disparan atajos del canvas.
 5. Suspensión de acceso oculta e inhabilita los controles compartidos; cerrar/reabrir conserva confirmaciones y protección de borrador.
 

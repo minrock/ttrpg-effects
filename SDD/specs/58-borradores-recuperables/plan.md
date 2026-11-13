@@ -27,7 +27,7 @@ El criterio de reutilización es conservar dominio/puertos y las restricciones d
 | Dominio | `src/domain/drafts/{draft,recovery,save-status}.ts` | Sobre versionado, comparación por rama/secuencia/hash, dirty, dependencias, límites y acciones de recuperación |
 | Aplicación | `src/application/services/{draft-store,draft-coordinator}.ts` | Puertos local/remoto, temporización 1/5 y 5/30, máximo un envío + una candidata, cancelación y ACK por generación |
 | Infraestructura cliente | `src/infrastructure/browser/drafts/{indexeddb-store,http-store,checkpoint-worker}.ts` | IDB transaccional, normalización/hash fuera del render, HTTP, journal de envío incierto y capacidades |
-| Infraestructura servidor | `src/infrastructure/server/owned/draft-repository.ts` | Revisión CAS, cuotas por cuenta, historial acotado y recibo de último envío en una transacción |
+| Infraestructura servidor | `src/infrastructure/server/owned/draft-repository.ts` | Revisión CAS, cuotas por cuenta, retención de una copia y recibo de último envío en una transacción |
 | HTTP/casos de uso | `src/server/owned-drafts.ts`, integración con `owned-http.ts` | Endpoints privados, auth al commit, confirmación de escena, exportación/descartes y errores seguros |
 | Contratos | `src/shared/contracts/drafts.ts` | Schemas estrictos, DTOs y versiones; nunca aceptar objeto React, caché HTTP o privilegios del cliente |
 | Vista | `src/web/DraftRecovery.tsx`, componentes de estado de guardado | Resumen/elección sin canvas adicional, estado de tres destinos, cuotas y acciones explícitas |
@@ -50,7 +50,7 @@ Identidad del escritorio: partición persistente derivada del origen validado, n
 Migración aditiva con dos tablas conceptuales:
 
 - `owned_drafts`: id generado en servidor, owner, game, writer, parent nullable, scene de origen nullable, revisión base, sistema/hash, estado activo/confirmado, head revision/sequence/hash, último recibo y fechas. PK/FK compuestas preservan propietario; origen de escena puede quedar inexistente sin destruir el borrador.
-- `owned_draft_versions`: owner/draft/revision, secuencia, cuerpo validado, bindings, hash, bytes y fecha; máximo tres filas por rama. Borrado explícito de borrador retira sus versiones en la misma transacción.
+- `owned_draft_versions`: owner/draft/revision, secuencia, cuerpo validado, bindings, hash, bytes y fecha; máximo una fila por respaldo. Borrado explícito de borrador retira sus versiones en la misma transacción.
 
 Los campos del sobre se validan igual en ambos drivers. La secuencia y revisión del servidor solo crecen; JSON/texto y fechas UTC portables, queries parametrizadas. El tamaño de peticiones/respuestas respeta 10 MiB incluyendo sobre; errores 413/422 sin truncado. Lecturas de índice paginadas, sin cuerpos embebidos. Cuotas se comprueban y aplican bajo exclusión de cuenta/transacción para evitar exceso por dos ramas concurrentes.
 
@@ -64,8 +64,8 @@ Todas las rutas bajo `/api/v1/dm`, mismo origen y cuenta esperada. Usan autoriza
 | --- | --- |
 | GET `/draft-capabilities` | Versión de sobre/protocolo y límites, sin contenido privado; 404 antiguo desactiva sincronización remota en esta sesión |
 | GET `/drafts` | Índice por dueño, filtros de partida/escena, paginación; incluye huérfanos sin revelar datos de otras cuentas |
-| POST `/games/:gameId/drafts` | Crear rama vacía con writer, parent y revisión base; id generado por servidor, idempotencia general, respuesta compacta |
-| GET `/drafts/:id` | Cabeza, historial de metadatos y cuerpo de versión solicitada; no devolver tres documentos si solo se pidió uno |
+| POST `/games/:gameId/drafts` | Reutilizar el respaldo por escena o crear uno vacío; id generado por servidor, idempotencia general, respuesta compacta |
+| GET `/drafts/:id` | Cabeza y único cuerpo vigente; versiones eliminadas devuelven ausente |
 | PUT `/drafts/:id` | Sobre, secuencia/hash y revisión esperada del borrador; recibo propio por rama, sin fila nueva en owned_operations por autosave |
 | POST `/drafts/:id/confirm` | Generación exacta, modo actualizar/copia, escena/revisión esperada o nombre/partida destino para copia; idempotencia general y confirmación atómica |
 | DELETE `/drafts/:id` | Descarte explícito con revisión esperada/idempotencia; requests antiguos de PUT reciben ausente/conflicto y no recrean rama |
@@ -91,7 +91,7 @@ El lienzo sin imagen se confirma como un mapa vacío conservando sus objetos (co
 3. **Respaldo local y recuperación mínima.** Adapter IDB, journal, rotación transaccional y errores de cuota/corrupción. Integrar memoria + sceneAside en App y recuperación inicial sin esperar capacidades remotas. Mantener UI de 3.21.1 sin canvas durante conflicto.
 4. **Persistencia y API remotas.** Migración portable, repositorio, CAS/recibos, índices, permisos y capacidades. Contratos SQLite/PostgreSQL TLS con ACK perdido/reinicio/contención. Solo entonces activar sincronización por defecto contra servidor compatible.
 5. **Confirmación y conflictos.** Transacción confirmar/copiar, dependencias efectivas, referencias/enlaces, conciliación de envío incierto. Mantener guardar manual antiguo como fallback sin prometer su atomicidad con un borrador remoto inexistente. No cambiar rutas existentes para clientes viejos de forma incompatible.
-6. **UI y clientes.** Indicador compacto, selector de ramas, recuperación, exportación, cuotas/logout y estado parcial. Partición Electron persistente selectiva; conservar local autónomo. Abrir escena guardada no borra respaldo; descartar sí requiere alcance explícito.
+6. **UI y clientes.** Indicador compacto, selector de escenas, recuperación, exportación, cuotas/logout y estado parcial. Partición Electron persistente selectiva; conservar local autónomo. Abrir escena guardada no borra respaldo; descartar sí requiere alcance explícito.
 7. **Carga, regresión y documentación.** Ejecutar matriz de aceptación y rendimiento, actualizar guías afectadas con comportamiento real, registrar pendientes. Incremento minor al completar producto; commit/merge y DMG solo al recibir orden.
 
 Las etapas son dependencias de una entrega, no trabajos factory iniciados. Si se solicita fábrica más adelante, crear expedientes que referencien estos criterios sin simular revisiones previas.
@@ -145,7 +145,7 @@ El esquema compartido queda en `src/domain/drafts/draft.ts`, sin duplicarlo en c
 
 Se añade POST `/draft-definitions`, lectura privada de presentaciones retenidas por binding. No publica fichas ni cambia usos permitidos. Confirmar un borrador sigue siendo una acción explícita: CAS de escena, creación/actualización, asociación a partida y marca de confirmación en una transacción. PUT de autoguardado usa su recibo propio; la transferencia funcional informa cuántos borradores excluye sin cambiar el formato del manifiesto.
 
-La interfaz incorpora `DraftRecovery` en el editor y `DraftArchive` en partidas. El archivo permite exportar/copiar respaldos de partidas archivadas/eliminadas a un destino compatible. El selector de generaciones anterior está en el editor. Los respaldos no incluyen imágenes inline ni objetos Pixi; los fallos de cuota conservan la generación anterior. Un contador de época por cuenta impide que un escritor previo al logout recree copias.
+La interfaz incorpora `DraftRecovery` en el editor y `DraftArchive` en partidas. El archivo permite exportar/copiar respaldos de partidas archivadas/eliminadas a un destino compatible. Desde 3.27.0 se retira el selector de generaciones del editor. Los respaldos no incluyen imágenes inline ni objetos Pixi; los fallos de cuota conservan la generación anterior. Un contador de época por cuenta impide que un escritor previo al logout recree copias.
 
 Las etapas de código están construidas. La matriz de validación anterior describe el objetivo; los resultados efectivamente ejecutados y las comprobaciones todavía pendientes se encuentran únicamente en [validacion.md](validacion.md). No registrar como ejecutados el perfil JS/GPU o la prueba nativa de reinicio de Electron sin evidencia.
 
@@ -165,3 +165,17 @@ Regresiones: App real → figuras con/sin mapa → IndexedDB → desmontaje → 
 - GET privado `/games/:id/last-scene`: referencia de la escena asociada con guardado más reciente, validando propietario. Reutiliza `game_resources` y `owned_resources`, sin migración SQL. La vista abre ese recurso por el flujo de carga existente, cuando el editor ya tiene su listener registrado.
 - Recuperación local reservada para contenido pendiente. Compatibilidad con índices anteriores y cuerpos corruptos, preservando opciones de exportación/carga.
 - Pruebas de integración contra API y SQLite temporales, además del editor React con adaptador de render simulado; cubrir el clic Guardar, desmontaje, nuevo cliente/editor, ausencia de diálogo y recuperación de una edición posterior.
+
+## Corrección de cuotas — 2026-11-12
+
+1. Compartir el conteo SQL de plazas pendientes entre creación y reactivación de ramas en `draft-repository.ts`. Ejecutarlo en la transacción autorizada existente para ambos motores. No requiere migración ni modificación de datos históricos.
+2. Distinguir cuotas de cuenta de tamaño de payload mediante errores de dominio y su mapeo HTTP. Conservar límites y política de reintentos (sin bucle automático ante 409).
+3. Reutilizar la fixture HTTP/SQLite/IndexedDB para probar 23 ciclos de guardado/cierre/reapertura, persistencia sin IndexedDB, cuota real de 20 pendientes, liberación al confirmar, reactivación denegada sin pérdida de datos y petición con tamaño declarado mayor de 10 MiB. Ejecutar regresiones del coordinador y almacenamiento local.
+
+## Ajuste de retención única — 3.27.0
+
+1. `sameRecoverySlot` compara partida/escena y `generations=1`. Cuenta/origen se filtran en el adaptador. Se mantienen schemas/tablas existentes.
+2. IndexedDB escribe la nueva copia y retira índices/generaciones anteriores de la misma escena dentro de la misma transacción. Listar consolida datos de versiones anteriores. La cuota descuenta los cuerpos reemplazados.
+3. `compactRecoveryCopies` consolida el historial remoto del propietario en list/create; prioriza el último respaldo con contenido frente a reservas vacías y valida su hash antes de retirar otros. PUT compacta el ámbito tras escritura CAS y retira versiones previas; confirmar mueve el respaldo al ID definitivo de escena.
+4. El coordinador adopta ID/secuencia remotos al reabrir, deduplica por hash y mantiene el diario de peticiones inciertas hasta resolverlo. `confirmDraft` no confunde una confirmación posterior con la pendiente anterior.
+5. UI sin selector de generaciones. Pruebas con SQLite temporal, IndexedDB simulado y PostgreSQL local clonado; consolidación histórica, rollback ante corrupción, aislamiento, CAS y repetición de guardados.
