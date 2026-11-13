@@ -1,6 +1,6 @@
 # Plan — 58 Borradores recuperables y autoguardado
 
-**Spec fuente:** [spec.md](spec.md). **Estado:** Implementado en rama; ver [validación](validacion.md). **Fecha:** 2026-11-05.
+**Spec fuente:** [spec.md](spec.md). **Estado:** Integrado en `main` hasta 3.27.2; ver [validación](validacion.md). **Fecha:** 2026-11-05.
 **Base:** HEAD `32bda9f`, main integrado 3.21.0. La rama `feature/sdd-recuperacion-borradores` se creó desde `fix/recuperacion-sesion-memoria` y conserva sus cambios sin commit de 3.21.1. No atribuir esos cambios a SDD 58 ni descartarlos. Integrar o portar explícitamente esa corrección antes de construir sobre otra base.
 
 ## Inspección y reutilización

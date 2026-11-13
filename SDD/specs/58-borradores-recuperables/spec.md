@@ -1,10 +1,10 @@
 # 58 — Borradores recuperables y autoguardado del servicio
 
-**Estado:** Implementada en rama; aceptación de rendimiento nativo pendiente. **Fecha:** 2026-11-05. **Tipo:** funcionalidad.
+**Estado:** Integrada en `main` hasta 3.27.2; aceptación de rendimiento nativo pendiente. **Fecha:** 2026-11-05. **Tipo:** funcionalidad.
 **Solicitud:** «Dale construye el spec y el plan de implementación que propones». La orden posterior «implementa» autoriza construir esta spec; no commits, merge ni push.
 **Base:** main `32bda9f` (3.21.0) y corrección local 3.21.1 de recuperación de sesión, todavía sin integrar. Rama documental: `feature/sdd-recuperacion-borradores`.
 **Dependencias:** [03 Persistencia](../03-scene-persistence/spec.md), [43 Navegador](../43-cliente-navegador/spec.md), [45 Electron servicio](../45-electron-servicio/spec.md), [46 Multi-DB](../46-persistencia-multidb/spec.md), [47 Identidad](../47-identidad-dm/spec.md), [48 Propiedad y sistemas](../48-partidas-sistemas/spec.md), [51 Experiencia de servicio](../51-experiencia-servicio/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md).
-**Trabajo factory:** sin asignar. **Versión en rama:** 3.27.0, fuente única `package.json`. [Validación y límites](validacion.md).
+**Trabajo factory:** sin asignar. **Versión de cierre:** 3.27.2, fuente única `package.json`. [Validación y límites](validacion.md).
 
 ## Problema y objetivo
 
