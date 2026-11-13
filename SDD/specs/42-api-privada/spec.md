@@ -23,7 +23,7 @@ La autenticación por dos claves compartidas y ServiceStore global de 002 es leg
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/private-api.md).
-- [Spec original](../../../factory/jobs/002-api-privada/spec.md), [construcción](../../../factory/jobs/002-api-privada/build.md) y [decisión](../../../factory/jobs/002-api-privada/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

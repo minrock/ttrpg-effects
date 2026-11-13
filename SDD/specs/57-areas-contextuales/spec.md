@@ -3,7 +3,7 @@
 **Estado:** Integrada en main (`62c351a`), versión 3.21.0; pendientes los recorridos de aceptación registrados en [validacion.md](validacion.md). **Fecha:** 2026-11-04. **Tipo:** funcionalidad.
 **Base:** `0c8d245`, producto 3.20.0. **Rama:** `feature/sdd-areas-contextuales`.
 **Dependencias:** [07 Formas](../07-shapes-and-measurement/spec.md), [03 Persistencia](../03-scene-persistence/spec.md), [39 Interfaz](../39-vtt-interface/spec.md), [44 Mesa](../44-mesa-sincronizada/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md), [56 Cámaras libres](../56-camaras-libres-foco-atencion/spec.md).
-**Trabajo factory:** sin asignar. **Versión de entrega:** 3.21.0; fuente oficial en package.json.
+**Evidencia:** validacion.md. **Versión de entrega:** 3.21.0; fuente oficial en package.json.
 
 ## Problema y objetivo
 

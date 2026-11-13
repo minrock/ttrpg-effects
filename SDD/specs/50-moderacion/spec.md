@@ -26,7 +26,7 @@ Un único proceso API por base. No hay bus distribuido, replay histórico de SSE
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/moderation.md).
-- [Spec original](../../../factory/jobs/010-moderacion-tiempo-real/spec.md), [construcción](../../../factory/jobs/010-moderacion-tiempo-real/build.md) y [decisión](../../../factory/jobs/010-moderacion-tiempo-real/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

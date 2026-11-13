@@ -22,7 +22,7 @@ El trabajo 012 se integró junto a 006–009. Sus 1206 pruebas históricas no so
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/service-operations.md).
-- [Spec original](../../../factory/jobs/012-build-reproducible/spec.md), [construcción](../../../factory/jobs/012-build-reproducible/build.md) y [decisión](../../../factory/jobs/012-build-reproducible/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

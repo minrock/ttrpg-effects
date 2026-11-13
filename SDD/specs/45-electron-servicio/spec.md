@@ -23,7 +23,7 @@ Las variables de claves compartidas de la entrega 005 ya no son configuración v
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/service-operations.md).
-- [Spec original](../../../factory/jobs/005-electron-servicio/spec.md), [construcción](../../../factory/jobs/005-electron-servicio/build.md) y [decisión](../../../factory/jobs/005-electron-servicio/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

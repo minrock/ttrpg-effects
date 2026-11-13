@@ -45,4 +45,4 @@ Las reglas de Electron local siguen aplicando a ese modo. Las diferencias del se
 | [37-dm-dice-rolls](specs/37-dm-dice-rolls/spec.md) | Spec 37 - Tiradas 3D abiertas y ocultas del DM | [Plan](specs/37-dm-dice-rolls/plan.md) |
 | [38-interface-lab](specs/38-interface-lab/spec.md) | Spec 38 - Laboratorio de interfaz VTT | [Plan](specs/38-interface-lab/plan.md) |
 | [39-vtt-interface](specs/39-vtt-interface/spec.md) | Spec 39 - Interfaz VTT integrada | [Plan](specs/39-vtt-interface/plan.md) |
-| [40-fabrica-software](specs/40-fabrica-software/spec.md) | Spec 40 — Fábrica de software para Codex | [Plan](specs/40-fabrica-software/plan.md) |
+| [40-fabrica-software](specs/40-fabrica-software/spec.md) | Spec 40 — Organización anterior retirada (SDD 40) | [Plan](specs/40-fabrica-software/plan.md) |

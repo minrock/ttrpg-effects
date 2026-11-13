@@ -2,7 +2,7 @@
 
 **Estado:** Propuesta. **Fecha:** AAAA-MM-DD. **Tipo:** funcionalidad / corrección / documentación.
 **Dependencias:** specs SDD y decisiones relacionadas.
-**Trabajo factory:** sin asignar o enlace al expediente. **Versión de entrega:** por determinar; fuente oficial en package.json.
+**Evidencia:** enlace a validacion.md cuando corresponda. **Versión de entrega:** por determinar; fuente oficial en package.json.
 
 ## Problema y objetivo
 

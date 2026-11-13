@@ -36,13 +36,11 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 
 ## Especificaciones SDD
 
-El punto de entrada de planificación es `SDD/README.md`. Lee `SDD/estado-actual.md` y las specs/planes relacionados antes de proponer un cambio. Las especificaciones y guías vigentes viven en `SDD/specs/` y `SDD/guias/`; las rutas antiguas `specs/` y `docs/` solo redirigen. Usa `SDD/flujo.md` y las plantillas para nuevos alcances. Conserva los expedientes de `factory/jobs/` como evidencia fechada; no confundas implementación local, aprobación técnica e integración.
+El punto de entrada de planificación es `SDD/README.md`. Lee `SDD/estado-actual.md` y las specs/planes relacionados antes de proponer un cambio. Las especificaciones y guías vigentes viven en `SDD/specs/` y `SDD/guias/`; las rutas antiguas `specs/` y `docs/` solo redirigen. Usa `SDD/flujo.md` y las plantillas para nuevos alcances. Conserva la evidencia de aceptación y validación junto a cada spec SDD; no confundas implementación local, revisión e integración.
 
-## Fábrica de software en Codex
+## Organización del trabajo
 
-Para ejecutar la fábrica usa `$factory` (o pide `/factory` como alias textual) y lee `.agents/skills/factory/SKILL.md`. Esa skill solicita explícitamente subagentes para especificar, construir, revisar seguridad/UX/UI/código y aprobar. Los perfiles están en `.codex/agents/`; el tablero y la cola, en `factory/`. Solo el orquestador escribe `factory/board.json`.
-
-La fábrica conserva las reglas anteriores: ramas `feature/` o `fix/`, commits y merge con autorización explícita, y DMG después de integrar. La aprobación técnica de un agente no equivale a la orden del usuario. Las tareas ordinarias fuera de la fábrica conservan su flujo habitual.
+La planificación y la evidencia se mantienen en SDD. La fábrica anterior fue retirada; no se presupone una skill, tablero, roles de agentes ni ciclos obligatorios. La organización agéntica futura se definirá por separado. Reutiliza el contrato SDD y respeta las autorizaciones de Git de este archivo.
 
 ## Versionado y changelog
 

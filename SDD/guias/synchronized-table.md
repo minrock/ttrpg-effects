@@ -72,7 +72,7 @@ Bootstrap se emite en la misma transición síncrona que registra la suscripció
 - Deduplicación por sesión+UUID durante **cinco minutos**, fingerprint de ruta/contexto/contenido. Reutilización distinta: 409. Reservas independientes por rol: hasta **20 000 resultados** cada una, **64 MiB estimados DM** y **8 MiB jugador** (más un resultado que cruce el umbral). Saturar reportes jugador no consume la reserva DM; una reserva llena rechaza nuevas transiciones de su rol hasta vencer entradas. El cliente reintenta una sola vez una respuesta de red incierta con el mismo UUID, inmediatamente dentro de la ventana.
 - JSON máximo **10 MiB**, imágenes **20 MiB**, simulación **1 MiB/24 dados**, highlights **10 000 celdas**. Cámaras finitas y zoom 0,01–100; viewport positivo hasta 32768 px y DPR hasta 16. Errores de contexto/revisión: 409; validación: 400/422; rol:403; sesión:401; cuotas HTTP:429.
 
-Pruebas ejecutables: `public-table-projection.test.ts`, `table-http.test.ts`, `table-client.test.ts`, más regresión HTTP/cliente/Player. Detalles y límites del recorrido visual quedan en el expediente [004/build](../../factory/jobs/004-mesa-sincronizada/build.md).
+Pruebas ejecutables: `public-table-projection.test.ts`, `table-http.test.ts`, `table-client.test.ts`, más regresión HTTP/cliente/Player. Detalles y límites del recorrido visual quedan en el expediente [004/build](../specs/44-mesa-sincronizada/aceptacion-historica.md).
 
 ## Mesas por partida/apertura (010)
 

@@ -27,7 +27,7 @@ El motor 004 se conserva; el transporte final usa partidas/aperturas y sobre con
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/synchronized-table.md).
-- [Spec original](../../../factory/jobs/004-mesa-sincronizada/spec.md), [construcción](../../../factory/jobs/004-mesa-sincronizada/build.md) y [decisión](../../../factory/jobs/004-mesa-sincronizada/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

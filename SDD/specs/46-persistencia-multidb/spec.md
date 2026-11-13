@@ -24,7 +24,7 @@ El soporte productivo PostgreSQL está implementado; no equivale a un despliegue
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/database.md).
-- [Spec original](../../../factory/jobs/006-persistencia-multidb/spec.md), [construcción](../../../factory/jobs/006-persistencia-multidb/build.md) y [decisión](../../../factory/jobs/006-persistencia-multidb/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

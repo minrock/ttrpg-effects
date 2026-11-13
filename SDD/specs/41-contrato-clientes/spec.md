@@ -25,7 +25,7 @@ La matriz original 001 sigue siendo antecedente; las capacidades de red pendient
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/client-architecture.md).
-- [Spec original](../../../factory/jobs/001-contrato-clientes/spec.md), [construcción](../../../factory/jobs/001-contrato-clientes/build.md) y [decisión](../../../factory/jobs/001-contrato-clientes/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

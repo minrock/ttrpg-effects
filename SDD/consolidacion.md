@@ -44,3 +44,7 @@ Integración completada por avance rápido en `main`: `c4e8831` (producto) y `a9
 `./scripts/build-dmg.sh` terminó correctamente en `main` después de integrar. Artefacto: `dist/TTRPG Effects-3.18.1-arm64.dmg`, verificado con `hdiutil verify` (checksum válido). SHA-256: `c38754fb5540df85453cf8767019b7b89207181f8efa914e8c96fbb6c9a5d08e`. Empaquetado interno sin firma, según configuración existente. El DMG corresponde al código 3.18.1; este registro posterior solo añade evidencia documental.
 
 Los archivos privados `.env`, `.env.electron` y `.local/service/data/control.sqlite` siguen ignorados y fuera de los commits. Los expedientes de fábrica y tablero no se alteraron.
+
+## Retirada de la organización anterior — 2026-11-13
+
+Las afirmaciones anteriores describen la consolidación de noviembre 4. Posteriormente el usuario autorizó eliminar la fábrica. Se rescataron criterios detallados en SDD 41–52 y se conservaron cierres/evidencia mediante referencias Git inmutables. Se retiró la carpeta operativa y la configuración exclusiva de agentes; ver [registro de retirada](retirada-factory.md).
