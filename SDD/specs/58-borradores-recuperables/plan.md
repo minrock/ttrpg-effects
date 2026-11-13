@@ -94,7 +94,7 @@ El lienzo sin imagen se confirma como un mapa vacío conservando sus objetos (co
 6. **UI y clientes.** Indicador compacto, selector de escenas, recuperación, exportación, cuotas/logout y estado parcial. Partición Electron persistente selectiva; conservar local autónomo. Abrir escena guardada no borra respaldo; descartar sí requiere alcance explícito.
 7. **Carga, regresión y documentación.** Ejecutar matriz de aceptación y rendimiento, actualizar guías afectadas con comportamiento real, registrar pendientes. Incremento minor al completar producto; commit/merge y DMG solo al recibir orden.
 
-Las etapas son dependencias de una entrega, no trabajos factory iniciados. Si se solicita fábrica más adelante, crear expedientes que referencien estos criterios sin simular revisiones previas.
+Las etapas son dependencias de una entrega. La organización del trabajo se decide por separado y utiliza estos criterios, sin atribuir revisiones o pruebas no realizadas.
 
 ## Validación prevista
 

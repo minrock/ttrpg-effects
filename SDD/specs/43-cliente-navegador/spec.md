@@ -23,7 +23,7 @@ El login por clave de 003 fue sustituido por 007–011. Los controles antes repa
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/browser-client.md).
-- [Spec original](../../../factory/jobs/003-cliente-navegador/spec.md), [construcción](../../../factory/jobs/003-cliente-navegador/build.md) y [decisión](../../../factory/jobs/003-cliente-navegador/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

@@ -34,4 +34,4 @@ Seleccionar comandos reales de package.json: pnpm typecheck, lint, test y builds
 
 ## Cierre
 
-Registrar documentación actualizada, criterios satisfechos o pendientes, versión de producto si aplica, expediente factory, decisión técnica y permisos Git vigentes. Implementado, revisado e integrado son estados distintos. No marcar completado un check que no se ejecutó.
+Registrar documentación actualizada, criterios satisfechos o pendientes, versión de producto si aplica, evidencia por criterio, resultado de revisión y permisos Git vigentes. Implementado, revisado e integrado son estados distintos. No marcar completado un check que no se ejecutó.

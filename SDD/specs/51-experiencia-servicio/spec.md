@@ -25,7 +25,7 @@ El listener de 011 sustituye definitivamente la composición global 002–005. L
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/service-operations.md).
-- [Spec original](../../../factory/jobs/011-experiencia-autenticacion/spec.md), [construcción](../../../factory/jobs/011-experiencia-autenticacion/build.md) y [decisión](../../../factory/jobs/011-experiencia-autenticacion/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

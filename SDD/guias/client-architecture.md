@@ -1,6 +1,6 @@
 # Contrato de clientes y paridad del servicio
 
-Cliente compartido con transporteElectron local y servicio contextual3.13.0. Desde 3.3.0 existe el [servicio HTTP privado](private-api.md) con autenticación y recursos opacos; el [cliente navegador 3.4.0](browser-client.md) implementa HTTP; la [mesa sincronizada 3.5.0](synchronized-table.md) completa SSE y dados. La matriz siguiente conserva las responsabilidades previstas de adaptación de `factory/migracion-servicio.md`.
+Cliente compartido con transporteElectron local y servicio contextual3.13.0. Desde 3.3.0 existe el [servicio HTTP privado](private-api.md) con autenticación y recursos opacos; el [cliente navegador 3.4.0](browser-client.md) implementa HTTP; la [mesa sincronizada 3.5.0](synchronized-table.md) completa SSE y dados. La matriz siguiente conserva las responsabilidades previstas de adaptación de la migración inicial al servicio, conservada en [SDD 41](../specs/41-contrato-clientes/aceptacion-historica.md).
 
 ## Fronteras implementadas
 
@@ -73,7 +73,7 @@ No cambia `.ttrpgscene`: formato 2 y carga/migración de legado 1, mapas, enlace
 
 Las capacidades solo ayudan a presentar disponibilidad. La API autentica y autoriza por rol; la frontera `publicTableProjection` elimina ramas privadas antes de transmitir. Las reglas y límites de assets, presencia, SSE, idempotencia y dados se detallan en [mesa sincronizada](synchronized-table.md). El snapshot local Electron conserva su transporte; nunca se usa sin reconstrucción como frontera pública.
 
-Pruebas de composición: `src/renderer/src/client/ClientProvider.test.tsx`. Compatibilidad/versionado/IPC: `src/preload/index.test.ts`. Las suites existentes siguen cubriendo formato, enlaces, reemplazo de imagen, workspace, privacidad y herramientas Player. El expediente `factory/jobs/001-contrato-clientes/build.md` registra las verificaciones reales y límites de humo.
+Pruebas de composición: `src/renderer/src/client/ClientProvider.test.tsx`. Compatibilidad/versionado/IPC: `src/preload/index.test.ts`. Las suites existentes siguen cubriendo formato, enlaces, reemplazo de imagen, workspace, privacidad y herramientas Player. [La evidencia inicial de SDD 41](../specs/41-contrato-clientes/aceptacion-historica.md) enlaza las verificaciones y límites del humo original.
 
 La matriz de adaptación histórica de este documento se complementa con la [paridad efectiva y evidencias 3.4.0](browser-client.md#matriz-de-paridad-y-evidencia). `createClient` acepta metadato opcional `assetReferences: "service"` para representación de imágenes en notas; no es autorización.
 

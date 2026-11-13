@@ -24,7 +24,7 @@ El jugador ya no usa contraseña global. Las invitaciones no prometen veto perma
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/invitations.md).
-- [Spec original](../../../factory/jobs/009-invitaciones-jugadores/spec.md), [construcción](../../../factory/jobs/009-invitaciones-jugadores/build.md) y [decisión](../../../factory/jobs/009-invitaciones-jugadores/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

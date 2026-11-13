@@ -23,7 +23,7 @@ Añadir `pnpm typecheck` y `pnpm lint` al cambiar TypeScript; seleccionar regres
 
 ## Evidencia disponible
 
-[Build histórico](../../../factory/jobs/011-experiencia-autenticacion/build.md) y sus revisiones. El tablero registra `5a074b5209bc8a978f69ad7f5660643ec794ec6c` como integración; no se modificó ese estado.
+[Build histórico](aceptacion-historica.md) y sus revisiones. El registro histórico conserva `5a074b5209bc8a978f69ad7f5660643ec794ec6c` como integración. La fábrica se retiró el 2026-11-13; esta evidencia no se volvió a ejecutar.
 
 Esta consolidación no volvió a ejecutar los comandos de producto. La verificación documental queda en [el registro de consolidación](../../consolidacion.md). Para UI nueva, probar teclado, ancho estrecho y recorrido real; una fixture visual no demuestra autenticación ni sincronización con API real.
 

@@ -24,7 +24,7 @@ El mínimo 15 y el índice de administrador único de 007 fueron sustituidos por
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/identity.md).
-- [Spec original](../../../factory/jobs/007-cuentas-dm/spec.md), [construcción](../../../factory/jobs/007-cuentas-dm/build.md) y [decisión](../../../factory/jobs/007-cuentas-dm/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

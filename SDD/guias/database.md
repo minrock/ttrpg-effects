@@ -75,7 +75,7 @@ pnpm build:web
 
 El certificado de prueba debe cubrir localhost y 127.0.0.1, pero no 127.1, para la prueba negativa de hostname; el servidor debe escuchar loopback. El gate falla si falta configuración, no existe PostgreSQL o no están los artefactos compilados. No simula PostgreSQL ni hace skip verde. La suite general no incluye los archivos `.contract.ts`: el comando test:db los selecciona expresamente. Las mismas pruebas de repositorio/migraciones corren en ambos motores y se añaden TLS, comandos compilados y humo del listener final.
 
-La evidencia real de construcción y limpieza está en [build 006](../../factory/jobs/006-persistencia-multidb/build.md). El gate no certifica despliegue remoto, carga prolongada ni todas las plataformas.
+La evidencia real de construcción y limpieza está en [build 006](../specs/46-persistencia-multidb/aceptacion-historica.md). El gate no certifica despliegue remoto, carga prolongada ni todas las plataformas.
 
 ## Compatibilidad y respaldo
 

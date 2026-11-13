@@ -1,6 +1,6 @@
 # Estado actual y decisiones vigentes
 
-Corte: 2026-11-12. Entrega 3.25.0: cierre autorizado en `main` de SDD 58 (guardado y recuperación), correcciones de auditoría 3.23.0, celda de calibración/alineación de SDD 04 y reconstrucción automática del servicio. Conserva las entregas SDD 55–57 y expedientes 001–012. Las pruebas y límites se registran por entrega; integración no equivale a despliegue.
+Corte: 2026-11-12. Entrega 3.25.0: cierre autorizado en `main` de SDD 58 (guardado y recuperación), correcciones de auditoría 3.23.0, celda de calibración/alineación de SDD 04 y reconstrucción automática del servicio. Conserva las entregas SDD 55–57 y la trazabilidad inicial de SDD 41–52. Las pruebas y límites se registran por entrega; integración no equivale a despliegue.
 
 Cierre autorizado 3.27.2: vigilancia de desarrollo del servicio, corrección del 413 por cuota, una única copia de recuperación por escena en IndexedDB/servidor, botón «Jugador» exclusivo de Electron y slider de niebla de 0,5 a 8 cuadros en pasos de 0,5. Las escenas guardadas con nombre permanecen independientes. Integración en `main`, push y artefactos según el registro de validación de esta entrega.
 
@@ -34,7 +34,7 @@ Electron autónomo conserva su gestión local de plantillas. Las restricciones a
 
 ## Integración y evidencia
 
-El [tablero](../factory/board.json) marca 001–012 como integrados, con SHA y expedientes. Las specs SDD 41–52 enlazan esos trabajos y registran las sustituciones funcionales. No se cambió el tablero para esta consolidación.
+La organización anterior de fábrica se retiró el 2026-11-13. Las specs SDD 41–52 incluyen criterios iniciales y enlaces a evidencia inmutable; la [correspondencia de cierres](retirada-factory.md) conserva los SHA de integración sin depender de un tablero.
 
 Los cambios de administradores/contraseñas 3.14–3.17 y cabecera 3.18–3.18.1 estaban pendientes al iniciar la consolidación. El usuario autorizó después commit e integración: el producto quedó registrado en `c4e8831`, junto al cierre documental desde `feature/sdd-consolidado`. Las specs 53–54 no simulan rondas ni aprobación de fábrica. Resultados nuevos y cierre en [registro de consolidación](consolidacion.md).
 
@@ -71,7 +71,7 @@ Estas son direcciones mencionadas o límites explícitos, no una cola aprobada:
 - Despliegue productivo concreto: infraestructura, dominio/HTTPS, PostgreSQL, respaldo y operación. El soporte del motor existe; falta decidir y ejecutar un despliegue específico.
 - Escalado horizontal, bus de eventos y recuperación durable del estado visual: requieren nuevas garantías de consistencia y autoridad.
 
-Cualquier otro alcance nuevo debe describir problema, usuario, criterios y exclusiones antes de convertirse en trabajo de fábrica. Las preguntas originales de requirements no se reabren automáticamente: primero contrastarlas con specs y código existentes.
+Cualquier otro alcance nuevo debe describir problema, usuario, criterios y exclusiones antes de comenzar su implementación. Las preguntas originales de requirements no se reabren automáticamente: primero contrastarlas con specs y código existentes.
 
 
 ## Corrección pendiente de integración — Recuperación de sesión

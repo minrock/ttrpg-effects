@@ -25,7 +25,7 @@ La propuesta inicial de plantillas editables por DM queda sustituida por catálo
 ## Detalle y trazabilidad
 
 - [Guía de referencia](../../guias/owned-data.md).
-- [Spec original](../../../factory/jobs/008-partidas-propiedad/spec.md), [construcción](../../../factory/jobs/008-partidas-propiedad/build.md) y [decisión](../../../factory/jobs/008-partidas-propiedad/decision.md).
+- [Criterios y evidencia de la entrega inicial](aceptacion-historica.md).
 - [Plan y validación](plan.md).
 - [Estado y decisiones transversales](../../estado-actual.md).
 

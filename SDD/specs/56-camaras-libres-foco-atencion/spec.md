@@ -4,7 +4,7 @@
 **Fecha:** 2026-11-04. **Tipo:** cambio funcional compatible con escenas existentes.
 **Base:** `fc57cda`, producto 3.19.1. **Rama:** `feature/sdd-foco-atencion`.
 **Dependencias:** [15 Player View](../15-player-window/spec.md), [24 Control de cámara](../24-player-camera-control/spec.md), [32 Preview de viewport](../32-player-viewport-preview/spec.md), [39 Interfaz VTT](../39-vtt-interface/spec.md), [41 Clientes](../41-contrato-clientes/spec.md), [44 Mesa](../44-mesa-sincronizada/spec.md), [50 Moderación](../50-moderacion/spec.md), [55 Dibujos compartidos](../55-mediciones-compartidas/spec.md).
-**Trabajo factory:** sin asignar. **Versión de entrega:** 3.20.0.
+**Evidencia:** validacion.md. **Versión de entrega:** 3.20.0.
 
 ## Problema y objetivo
 

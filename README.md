@@ -4,7 +4,7 @@ Herramienta para preparar y proyectar mesas TTRPG: Electron autónomo y servicio
 
 ## Especificaciones SDD
 
-La planificación y documentación vigente se reúnen en [SDD](SDD/README.md): [estado actual](SDD/estado-actual.md), [arquitectura y datos](SDD/arquitectura.md), specs de escritorio/servidor y [flujo para nuevas especificaciones](SDD/flujo.md). Los expedientes de la fábrica conservan la evidencia de cada entrega.
+La planificación y documentación vigente se reúnen en [SDD](SDD/README.md): [estado actual](SDD/estado-actual.md), [arquitectura y datos](SDD/arquitectura.md), specs de escritorio/servidor y [flujo para nuevas especificaciones](SDD/flujo.md). Los criterios y la evidencia histórica de cada entrega están enlazados desde SDD.
 
 ## Interfaz de mesa
 
@@ -14,11 +14,9 @@ Player View mantiene la escena del DM protegida y agrega mediciones de linea/cam
 
 El salto mayor es una decision de lanzamiento; las escenas `.ttrpgscene` existentes siguen siendo compatibles. Alcance y verificaciones en [spec 39](SDD/specs/39-vtt-interface/spec.md) y su [plan](SDD/specs/39-vtt-interface/plan.md).
 
-## Fábrica de software con Codex
+## Planificación por especificaciones
 
-Usa `$factory <funcionalidad>` para especificar, construir y revisar un cambio con subagentes. `$factory siguiente` toma un elemento de la cola; `$factory aprobar <id>` autoriza integrar un trabajo preparado y `$factory rehacer <id> <nota>` abre otro ciclo de correcciones. Commits y merge respetan la autorización explícita indicada en `AGENTS.md`.
-
-Para ver el tablero, ejecuta `python3 -m http.server 8765 --bind 127.0.0.1 --directory factory` y abre [el visor local](http://127.0.0.1:8765/dashboard.html). El botón «Ver ejemplo» permite explorar el flujo con datos ficticios. Instrucciones y estructura en [factory/README.md](factory/README.md); alcance en [spec 40](SDD/specs/40-fabrica-software/spec.md).
+Usa [el flujo SDD](SDD/flujo.md) para definir alcance, plan y validación. La organización anterior de agentes fue retirada; [criterios conservados y trazabilidad](SDD/retirada-factory.md).
 
 ## Arquitectura de clientes
 
@@ -182,4 +180,4 @@ La cabecera del servicio reúne navegación (☰), partida, escena, herramientas
 
 [Identidad](SDD/guias/identity.md): múltiples administradores locales, provisiónDM, cambio de contraseñas temporales, disable/reset/revocación. [Datos privados y catálogo](SDD/guias/owned-data.md): dos propietarios aislados, versiones publicadas retenidas, CAS/bindings y transferencia explícita sin tocar el perfilElectron. [Invitaciones](SDD/guias/invitations.md): alias, cookie por partida, continuidad/reapertura deliberada. [Moderación](SDD/guias/moderation.md): participantes identificados por alias+discriminador, expulsión atómica con nuevo enlace y supervivientes estables.
 
-Los gates de DB/identidad/datos/invitaciones/moderación requieren PostgreSQL temporal real conTLS. El gate de moderación incluye composición final compilada y respaldo/restauración integral de ambos motores. Las pantallas se verifican también con navegador/Electron reales; evidencia y límites en el expediente011. `.ttrpgscene` conserva v2 y lectura/migraciónv1.
+Los gates de DB/identidad/datos/invitaciones/moderación requieren PostgreSQL temporal real conTLS. El gate de moderación incluye composición final compilada y respaldo/restauración integral de ambos motores. Las pantallas se verifican también con navegador/Electron reales; evidencia y límites en [SDD 51](SDD/specs/51-experiencia-servicio/aceptacion-historica.md). `.ttrpgscene` conserva v2 y lectura/migraciónv1.
