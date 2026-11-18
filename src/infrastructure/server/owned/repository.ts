@@ -11,6 +11,9 @@ import type { Execute, CatalogClock } from "../database/catalog-repository";
 import { catalogRepository } from "../database/catalog-repository";
 import type { Row } from "../database/driver";
 import { resourceRecord, searchText } from "./records";
+import { campaignRepository } from "./campaign-repository";
+import { OwnedSceneService } from "../../../server/owned-scene-service";
+import { arcPreparationRepository } from "./arc-preparation-repository";
 const kinds = z.enum(["scenes", "templates", "monsters", "npcs", "player-characters"]);
 const id = z.string().min(1).max(128);
 const pageSchema = z.object({ limit: z.number().int().min(1).max(100).default(50), offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0), text: z.string().max(200).default("") }).strict();
@@ -52,7 +55,7 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
     return action();
   });
   const games: OwnedTransaction["games"] = {
-    create: (candidate, name, systemRef) => scoped(candidate, async () => { if (!systemRef) throw new SystemError("VALIDATION"); await bindings.newGame(systemRef); return catalog.create(owner, name, systemRef); }),
+    create: (candidate, name, systemRef) => scoped(candidate, async () => { if (!systemRef) throw new SystemError("VALIDATION"); await bindings.newGame(systemRef); const game = await catalog.create(owner, name, systemRef); await campaigns.ensureInitial(game); return game; }),
     find: (candidate, key) => scoped(candidate, () => catalog.find(owner, key)),
     list: (candidate, page) => scoped(candidate, () => catalog.list(owner, page)),
     update: (candidate, key, patch, revision) => scoped(candidate, () => catalog.update(owner, key, patch, revision)),
@@ -77,6 +80,7 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
     async put(kind, value, revision, requestedBindings) {
       if (kind === "templates") throw new SystemError("IMMUTABLE");
       check(kind, value.id); expected(revision, true); const normalized = resourceRecord(kind, value);
+      if (kind === "scenes" && revision > 0) await campaigns.assertSceneWritable(value.id);
       const bound = await bindings.write(kind, value.id, normalized, requestedBindings);
       const name = "name" in normalized ? normalized.name : normalized.characterName;
       const created = "createdAt" in normalized ? normalized.createdAt : normalized.updatedAt;
@@ -97,6 +101,7 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
     async remove(kind, key, revision) {
       if (kind === "templates") throw new SystemError("IMMUTABLE");
       check(kind, key); expected(revision);
+      if (kind === "scenes") await campaigns.assertSceneWritable(key);
       const current = await resources.get(kind, key);
       if (!current) throw new OwnedError("NOT_FOUND");
       if (current.revision !== revision) throw new OwnedError("CONFLICT");
@@ -109,6 +114,44 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
     async create(key, mime, bytes) {
       if (!z.uuid().safeParse(key).success || !["image/png", "image/jpeg", "image/webp"].includes(mime) || bytes.length < 1 || bytes.length > 20 * 1024 * 1024) throw new OwnedError("VALIDATION");
       await execute(async c => { const result = await c.query("INSERT INTO owned_assets(owner_id,id,mime,bytes,sha256,byte_length) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(owner_id,id) DO NOTHING", [owner, key, mime, bytes, createHash("sha256").update(bytes).digest("hex"), bytes.length]); if (!result.changes) throw new OwnedError("CONFLICT"); });
+    }
+  };
+  const campaignBase = campaignRepository(run, owner, clock, async (campaignId, arcId, input) => {
+    const resource = await new OwnedSceneService({ resources, assets }, () => clock.now().getTime()).save(input.name, input.scene, undefined, 0, input.bindings);
+    // Sólo la creación puede enlazar una escena; no expone la asociación de
+    // recursos existentes como operación pública.
+    await links.link(campaignId, "scenes", resource.id);
+    return campaignBase.linkScene(campaignId, arcId, resource.id);
+  });
+  const campaigns: ReturnType<typeof campaignRepository> = {
+    ...campaignBase,
+    async create(input, idempotencyKey) {
+      await bindings.newGame(input.systemRef);
+      return campaignBase.create(input, idempotencyKey);
+    },
+    attachScene: campaignBase.attachScene
+  };
+  const arcPreparation = arcPreparationRepository(run, owner, clock, {
+    assertSceneWritable: campaigns.assertSceneWritable,
+    async validateNewMonster(campaignId, templateId, binding) {
+      const game = await games.find(owner, campaignId); if (!game) throw new OwnedError("NOT_FOUND");
+      if (binding.scope !== "catalog" || binding.systemId !== game.systemRef.systemId || binding.version !== game.systemRef.version || binding.templateId !== templateId) throw new SystemError("INCOMPATIBLE");
+      const version = await systems.get(game.systemRef);
+      if (version.state !== "published" || version.availability !== "enabled" || version.templates[templateId]?.availability !== "enabled") throw new SystemError("DISABLED");
+    }
+  });
+  const campaignLinks = {
+    ...links,
+    async link(gameId: string, kind: Exclude<ResourceKind, "templates">, resourceId: string) {
+      await campaigns.assertCampaignWritable(gameId);
+      if (kind === "scenes") await campaigns.assertSceneWritable(resourceId);
+      if (kind === "scenes") {
+        // Reflexión valida el padre existente y sólo crea el inicial para
+        // recursos legados sin padre. Hacerla antes evita insertar un link
+        // cruzado que la migración12 prohíbe.
+        await campaigns.reflectLegacySceneLink(gameId, resourceId);
+      }
+      await links.link(gameId, kind, resourceId);
     }
   };
   const ownGame = async (key: string) => { const game = await games.find(owner, key); if (!game) throw new OwnedError("NOT_FOUND"); return game; };
@@ -142,7 +185,7 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
   commitEffects.beforeCommit(validateBudget);
   const invitations = hostInvitationRepository(execute, owner, clock);
   const drafts = draftRepository(execute, owner, clock);
-  const result: OwnedTransaction = { drafts, invitations, games, resources, assets, openings, systems, links, effects,
+  const result: OwnedTransaction = { campaigns, arcPreparation, drafts, invitations, games, resources, assets, openings, systems, links: campaignLinks, effects,
     async operation(operationId, context, content, work) {
       operationUsed = true;
       if (!z.uuid().safeParse(operationId).success || !context || context.length > 300) throw new OwnedError("VALIDATION");
@@ -169,5 +212,5 @@ export function ownedRepositories(run: Execute, identity: IdentitySessionDto, cl
     const method: unknown = Reflect.get(target, key, receiver);
     return typeof method === "function" ? (...args: unknown[]) => run(async () => { if (privatePort) requireDm(); return Promise.resolve(Reflect.apply(method, target, structuredClone(args))); }) : method;
   } });
-  return { ...result, drafts: tracked(drafts, true), verifyInvariants: async () => { await validate(); await validateBudget(); }, invitations: tracked(invitations, true), games: tracked(games, true), resources: tracked(resources, true), assets: tracked(assets, true), openings: tracked(openings, true), systems: tracked(systems), links: tracked(links, true), operation: (...args) => run(() => result.operation(...args)) };
+  return { ...result, campaigns: tracked(campaigns, true), arcPreparation: tracked(arcPreparation, true), drafts: tracked(drafts, true), verifyInvariants: async () => { await validate(); await validateBudget(); }, invitations: tracked(invitations, true), games: tracked(games, true), resources: tracked(resources, true), assets: tracked(assets, true), openings: tracked(openings, true), systems: tracked(systems), links: tracked(campaignLinks, true), operation: (...args) => run(() => result.operation(...args)) };
 }

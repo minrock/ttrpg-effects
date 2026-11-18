@@ -72,7 +72,7 @@ export function PlayerCharacterLibraryModal({
     setFeedback(null);
     setIsLoading(librariesApi !== undefined);
     if (librariesApi === undefined) {
-      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
+      setFeedback({ message: "La API del servicio no está disponible.", kind: "error" });
       return;
     }
     async function refresh(): Promise<void> {
@@ -127,7 +127,7 @@ export function PlayerCharacterLibraryModal({
 
   async function saveCharacterDraft(): Promise<void> {
     if (librariesApi === undefined) {
-      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
+      setFeedback({ message: "La API del servicio no está disponible.", kind: "error" });
       return;
     }
     if ((draft.characterName ?? "").trim() === "") {
@@ -186,7 +186,7 @@ export function PlayerCharacterLibraryModal({
     setEntries((current) => upsertEntry(current, optimistic));
 
     if (librariesApi === undefined) {
-      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
+      setFeedback({ message: "La API del servicio no está disponible.", kind: "error" });
       return;
     }
 

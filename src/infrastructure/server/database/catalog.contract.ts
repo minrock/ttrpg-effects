@@ -219,18 +219,18 @@ for (const kind of ["sqlite", "postgres"] as const) it(`comando pnpm db:migrate 
   expect(second.stdout).toContain("sin migraciones pendientes");
   if (config.driver === "postgres") { expect(env.TTRPG_DATA_DIR).toBeUndefined(); expect(first.stdout + first.stderr).not.toContain(config.url); }
 });
-it("start:api rechaza identidad incompleta antes de datos/socket y no filtra URL", async () => {
+it("start:api:built rechaza identidad incompleta antes de datos/socket y no filtra URL", async () => {
   requireBuild(); const config = await fixture("postgres"); if (config.driver !== "postgres") throw new Error();
   const root = realpathSync(mkdtempSync(join(tmpdir(), "ttrpg-guard-"))); cleanups.push(async () => { rmSync(root, { recursive: true, force: true }); });
   for (const deployment of ["local", "production"] as const) {
-    try { await exec("pnpm", ["start:api"], { env: { ...commandEnv({ ...config, deployment }), TTRPG_DATA_DIR: join(root, "no-crear") }, timeout: 10000 }); throw new Error("Arranque inesperado"); }
+    try { await exec("pnpm", ["start:api:built"], { env: { ...commandEnv({ ...config, deployment }), TTRPG_DATA_DIR: join(root, "no-crear") }, timeout: 10000 }); throw new Error("Arranque inesperado"); }
     catch (error) {
       const result = error as { code?: number; stdout?: string; stderr?: string };
       expect(result.code).not.toBe(0); expect(result.stderr).toContain("TTRPG_AUTH_SECRET"); expect(result.stdout).not.toContain("lista.");
       expect(result.stderr).not.toContain(config.url); expect(existsSync(join(root, "no-crear"))).toBe(false);
     }
   }
-  await expect(exec("pnpm", ["start:api"], { env: { ...commandEnv({ driver: "sqlite", deployment: "local", dataDir: join(root, "no-crear") }), TTRPG_DEPLOYMENT: "production" }, timeout: 10000 })).rejects.toMatchObject({ code: 1 });
+  await expect(exec("pnpm", ["start:api:built"], { env: { ...commandEnv({ driver: "sqlite", deployment: "local", dataDir: join(root, "no-crear") }), TTRPG_DEPLOYMENT: "production" }, timeout: 10000 })).rejects.toMatchObject({ code: 1 });
   expect(existsSync(join(root, "no-crear"))).toBe(false);
 });
 it("API compilada exige catálogo migrado y retira las claves globales", async () => {

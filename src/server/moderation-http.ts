@@ -1,4 +1,5 @@
 import { TableConflict } from "../application/services/table-session";
+import { ServiceDiceError } from "../application/services/service-dice-session";
 import { annotationCommandSchema } from "../shared/contracts/shared-annotations";
 import { AnnotationError } from "../application/services/shared-annotations";
 import { createHash } from "node:crypto";
@@ -19,6 +20,8 @@ import { json } from "./request-body";
 import { HttpError } from "./errors";
 import { readGuestCookie } from "./invitation-http";
 import { executeTableCommand } from "./table-actions";
+import { executeServiceDiceAction, serviceDiceActor } from "./service-dice-actions";
+import { serviceDiceHistoryQuerySchema } from "../shared/contracts/service-dice";
 interface Scope { annotationExpiresAt?: string; context: GameContext; system: ResolvedSystem; participant?: string; alias?: string; discriminator?: number; expiresAt?: string; roster?: string; deliver(effect: () => void): Promise<void>; assets: OwnedTransaction["assets"]["get"]; publish?: (snapshot: ReturnType<typeof tablePayloads.scene.parse>, resource?: string, operation?: { owner: string; id: string; fingerprint: string }) => Promise<void> }
 export const isModerationPath = (path: string) => /^\/api\/v1\/(dm\/)?games\/[^/]+\/(participants|table|dice|assets)(\/|$)/.test(path);
 export function createModerationHttp(identity: IdentityService, invitations: InvitationService, service: ReturnType<typeof moderation>, registry: GameRuntimeRegistry, lease: RuntimeLease, origin: string, now = Date.now) {
@@ -86,7 +89,18 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
       if (query.focusVersion && !focus) throw new InvitationError("INVALID_INPUT");
       const annotations = query.annotationsVersion === "1" && family === "table" && ["state", "events"].includes(action);
       if (query.annotationsVersion && !annotations) throw new InvitationError("INVALID_INPUT");
-      if (Object.keys(query).length) { const expected = openingContextSchema.extend({ generation: z.coerce.number().int().min(1), annotationsVersion: z.literal("1").optional(), areaToolsVersion: z.literal("1").optional(), focusVersion: z.literal("1").optional() }).parse(query); if (expected.openingId !== captured!.openingId || expected.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó."); }
+      const sceneDiceMutation = !!dm && family === "table" && action === "scene" && req.method === "POST";
+      const diceVersion = query.diceVersion === "1" && family === "table" && (["state", "events"].includes(action) || sceneDiceMutation);
+      if (query.diceVersion && !diceVersion) throw new InvitationError("INVALID_INPUT");
+      if (Object.keys(query).length) {
+        if (sceneDiceMutation) {
+          if (Object.keys(query).length !== 1 || query.diceVersion !== "1") throw new InvitationError("INVALID_INPUT");
+        } else {
+          const expectedQuery = { ...query }; delete expectedQuery.offset; delete expectedQuery.limit; delete expectedQuery.revision;
+          const expected = openingContextSchema.extend({ generation: z.coerce.number().int().min(1), annotationsVersion: z.literal("1").optional(), areaToolsVersion: z.literal("1").optional(), focusVersion: z.literal("1").optional(), diceVersion: z.literal("1").optional() }).parse(expectedQuery);
+          if (expected.openingId !== captured!.openingId || expected.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó.");
+        }
+      }
       if (family === "table" && action === "events" && req.method === "GET") {
         const cursor = req.headers["last-event-id"];
         if (cursor !== undefined && (typeof cursor !== "string" || cursor.length > 200 || !/^[a-f0-9-]{36}:[a-f0-9-]{36}:\d{1,16}:[a-f0-9-]{36}:(dm|player):\d{1,16}$/.test(cursor))) throw new InvitationError("INVALID_INPUT");
@@ -107,7 +121,7 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
               res.off("close", disconnected);
               if (reason && res.headersSent && !res.destroyed) {
                 const state = table.state(role);
-                const terminal = { protocolVersion: 2, ...metadata(scope), epoch: state.epoch, context: state.context, revision: state.revision, serverTime: now(), sequence: table.transportSequence(role), type: "terminal", terminal: reason };
+                const terminal = { protocolVersion: 2, ...metadata(scope), ...(diceVersion ? { diceVersion: 1 as const } : {}), epoch: state.epoch, context: state.context, revision: state.revision, serverTime: now(), sequence: table.transportSequence(role), type: "terminal", terminal: reason };
                 if (res.writableLength === 0) res.end(`event: table\ndata: ${JSON.stringify(terminal)}\n\n`); else res.destroy();
               } else if (res.headersSent && !res.destroyed && !res.writableEnded) res.end();
             };
@@ -128,17 +142,20 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
                   if (closed) return;
                   const table = registry.runtime(current.context);
                   if (event) {
-                    const frame = event.type === "bootstrap" ? { ...event, epoch: table.epoch, context: table.context, revision: table.revision, serverTime: now(), sequence: table.transportSequence(role), state: table.state(role, connection!.id) } : event;
+                    const currentActor = serviceDiceActor(role, current.context.ownerId, current.participant ? { id: current.participant, alias: current.alias!, discriminator: current.discriminator! } : undefined);
+                    const frame = event.type === "bootstrap" ? { ...event, epoch: table.epoch, context: table.context, revision: table.revision, serverTime: now(), sequence: table.transportSequence(role), state: diceVersion ? table.stateWithService(role, currentActor, connection!.id) : table.state(role, connection!.id) } : event;
                     if (frame.epoch !== table.epoch || frame.context !== table.context || frame.revision < table.revision || frame.sequence <= deliveredSequence) return;
                     if (frame.type === "focus" && (Number((frame.payload as { expiresAt: number }).expiresAt) <= now() || !table.connection(key, connection?.id).ready)) return;
                     deliveredSequence = frame.sequence;
                     const extension = annotations ? table.annotations.state(current.participant, areaTools) : undefined;
                     const value = { ...frame, serverTime: now(), protocolVersion: 2, ...metadata(current),
-                      ...(frame.type === "bootstrap" && frame.state ? { state: { ...frame.state, ...(extension ? { annotations: extension } : {}) } } : {}),
-                      ...(frame.type === "scene" ? { payload: { ...table.state(role, connection?.id), ...(extension ? { annotations: extension } : {}) } } : {}),
+                      ...(diceVersion ? { diceVersion: 1 as const } : {}),
+                      ...(frame.type === "bootstrap" && frame.state ? { state: diceVersion ? { ...frame.state, protocolVersion: 2, ...metadata(current), ...(extension ? { annotations: extension } : {}) } : { ...frame.state, ...(extension ? { annotations: extension } : {}) } } : {}),
+                      ...(frame.type === "scene" ? { payload: { ...(diceVersion ? table.stateWithService(role, currentActor, connection?.id) : table.state(role, connection?.id)), ...(extension ? { annotations: extension } : {}) } } : {}),
+                      ...((frame as { type: string }).type === "service-dice" ? { payload: table.serviceState(currentActor) } : {}),
                       ...(frame.type === "annotations" ? { payload: extension } : {}) };
                     write(`id: ${game}:${current.context.openingId}:${current.context.generation}:${frame.epoch}:${role}:${frame.sequence}\nevent: table\ndata: ${JSON.stringify(value)}\n\n`);
-                  } else { write(`: heartbeat ${now()}\n\n`); if (dm && roster !== current.roster) { roster = current.roster; write(`event: table\ndata: ${JSON.stringify({ protocolVersion: 2, ...metadata(current), epoch: table.epoch, context: table.context, revision: table.revision, serverTime: now(), type: "roster", sequence: table.transportSequence(role), payload: { revision: roster } })}\n\n`); } }
+                  } else { write(`: heartbeat ${now()}\n\n`); if (dm && roster !== current.roster) { roster = current.roster; write(`event: table\ndata: ${JSON.stringify({ protocolVersion: 2, ...metadata(current), ...(diceVersion ? { diceVersion: 1 } : {}), epoch: table.epoch, context: table.context, revision: table.revision, serverTime: now(), type: "roster", sequence: table.transportSequence(role), payload: { revision: roster } })}\n\n`); } }
                 }); });
               }).catch(() => close("access-ended")).finally(() => { pendingBytes -= size; if (!event) heartbeatPending = false; });
             };
@@ -149,7 +166,8 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
               res.writeHead(200, { "Content-Type": "text/event-stream", Connection: "keep-alive", "X-Accel-Buffering": "no" }); res.flushHeaders();
               if (unusable()) { close(); return; }
               if (annotations && scope.participant) table.annotations.register({ participant: scope.participant, alias: scope.alias!, discriminator: scope.discriminator!, expiresAt: Date.parse(scope.annotationExpiresAt ?? scope.expiresAt!) }, key);
-              connection = table.connect(key, role, queue, scope.participant, focus);
+              const serviceActor = serviceDiceActor(role, scope.context.ownerId, scope.participant ? { id: scope.participant, alias: scope.alias!, discriminator: scope.discriminator! } : undefined);
+              connection = table.connect(key, role, queue, scope.participant, focus, serviceActor, diceVersion);
               // connect puede cerrar sincrónicamente si el bootstrap excede la cola.
               if (closed || unusable()) { connection.close(); close(); return; }
               timer = setInterval(() => queue(), 1000); timer.unref();
@@ -185,15 +203,35 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
       if (req.method === "GET") {
         await authorize(async scope => { same(scope.context); await scope.deliver(() => {
           const table = registry.runtime(scope.context);
+          const diceActor = serviceDiceActor(role, scope.context.ownerId, scope.participant ? { id: scope.participant, alias: scope.alias!, discriminator: scope.discriminator! } : undefined);
+          if (family === "dice" && action === "capabilities") send(res, { ok: true, version: 1, limits: { reservationMs: 20000, historyDefault: 10, historyMax: 50, publicHistory: 500, dmHistory: 1000 } });
+          else if (family === "dice" && action === "v1/state") send(res, { ok: true, state: table.serviceState(diceActor) });
+          else if (family === "dice" && action === "v1/history") send(res, { ok: true, page: table.serviceDice.history(diceActor, serviceDiceHistoryQuerySchema.parse({ offset: query.offset, limit: query.limit, ...(query.revision === undefined ? {} : { revision: query.revision }) })) });
+          else if (family === "dice" && /^v1\/operations\/[a-f0-9-]{36}$/.test(action)) send(res, { ok: true, operation: table.serviceDice.operation(diceActor, action.slice("v1/operations/".length)) });
+          else {
           if (annotations && scope.participant) table.annotations.register({ participant: scope.participant, alias: scope.alias!, discriminator: scope.discriminator!, expiresAt: Date.parse(scope.annotationExpiresAt ?? scope.expiresAt!) }, key);
-          if (family === "table" && action === "state") send(res, { ok: true, state: { ...table.state(role), protocolVersion: 2, ...metadata(scope), ...(annotations ? { annotations: table.annotations.state(scope.participant, areaTools) } : {}) } });
+          if (family === "table" && action === "state") send(res, { ok: true, state: { ...(diceVersion ? table.stateWithService(role, diceActor) : table.state(role)), protocolVersion: 2, ...metadata(scope), ...(annotations ? { annotations: table.annotations.state(scope.participant, areaTools) } : {}) } });
           else if (family === "dice" && action === "public") send(res, { ok: true, value: table.dice.getPublicState() });
           else if (family === "dice" && action === "sizes") send(res, { ok: true, value: table.sizes(role) });
-          else if (family === "dice" && action === "session" && dm) send(res, { ok: true, value: table.dice.getDmState() });
+          else if (family === "dice" && action === "session" && dm) throw new HttpError(426, "DICE_UPGRADE_REQUIRED", "Actualiza el cliente para usar los dados de servicio.");
           else throw new HttpError(404, "NOT_FOUND", "No se encontró el recurso.");
+          }
         }); }); return;
       }
       if (req.method !== "POST") throw new InvitationError("INVALID_INPUT");
+      if (family === "dice" && /^v1\/(begin|complete|fail|dismiss|private-context|visibility|clear-history)$/.test(action)) {
+        const input = contextualMutationSchema.parse(await json(req, res, 1024 * 1024, requestAbort.signal));
+        if (input.openingId !== captured!.openingId || input.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó.");
+        await authorize(async scope => {
+          same(scope.context);
+          await scope.deliver(() => {
+            const actor = serviceDiceActor(role, scope.context.ownerId, scope.participant ? { id: scope.participant, alias: scope.alias!, discriminator: scope.discriminator! } : undefined);
+            const ack = executeServiceDiceAction(registry.runtime(scope.context), actor, action.slice(3), input.command);
+            send(res, ack);
+          });
+        });
+        return;
+      }
       if (family === "table" && action === "annotations") {
         const input = contextualMutationSchema.parse(await json(req, res, 16384, requestAbort.signal));
         const command = mutationSchema.parse(input.command), payload = annotationCommandSchema.parse(command.payload);
@@ -209,7 +247,9 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
         }); }); return;
       }
       const tableActions = dm ? ["focus", "scene", "camera", "camera-command", "pointer", "area-highlight"] : ["camera-report", "ready", "map-image-status"];
-      const diceActions = dm ? ["context", "preferences", "begin", "complete", "fail", "dismiss", "visibility", "clear-history", "size", "render-status"] : ["render-status"];
+      const legacyDiceActions = ["context", "preferences", "begin", "complete", "fail", "dismiss", "visibility", "clear-history", "size"];
+      if (family === "dice" && legacyDiceActions.includes(action)) throw new HttpError(426, "DICE_UPGRADE_REQUIRED", "Actualiza el cliente para usar los dados de servicio.");
+      const diceActions = dm ? [...legacyDiceActions, "render-status"] : ["render-status"];
       if (!(family === "table" ? tableActions : diceActions).includes(action)) throw new HttpError(403, "FORBIDDEN", "La operación no está permitida.");
       const input = contextualMutationSchema.parse(await json(req, res, action === "focus" ? 4096 : undefined, requestAbort.signal));
       if (input.openingId !== captured!.openingId || input.generation !== captured!.generation) throw new HttpError(409, "OPENING_CHANGED", "La apertura de esta mesa finalizó.");
@@ -219,13 +259,16 @@ export function createModerationHttp(identity: IdentityService, invitations: Inv
         same(scope.context);
         if (family === "table" && action === "scene") {
           await scope.publish!(scenePayload, input.sceneResourceId, { owner: key, id: command.requestId, fingerprint: createHash("sha256").update(JSON.stringify(input)).digest("hex") });
-          await scope.deliver(() => send(res, { ok: true, state: { ...registry.runtime(scope.context).state(role), protocolVersion: 2, ...metadata(scope) } }));
+          await scope.deliver(() => {
+            const actor = serviceDiceActor(role, scope.context.ownerId);
+            send(res, { ok: true, state: { ...(diceVersion ? registry.runtime(scope.context).stateWithService(role, actor) : registry.runtime(scope.context).state(role)), protocolVersion: 2, ...metadata(scope) } });
+          });
         } else await scope.deliver(() => send(res, executeTableCommand(registry.runtime(scope.context), key, family, action, role, command)));
       });
     } catch (error) {
       if (res.destroyed) return;
       if (res.headersSent) { res.destroy(); return; }
-      const status = error instanceof TableConflict ? 409 : error instanceof AnnotationError ? error.status : error instanceof HttpError ? error.status : error instanceof ZodError ? 400 : error instanceof InvitationError ? ({ GUEST_UNAUTHORIZED: 401, INVALID_INPUT: 400, REVISION_CONFLICT: 409, OPERATION_CONTENT_CONFLICT: 409, RATE_LIMITED: 429 }[error.code as "GUEST_UNAUTHORIZED"] ?? 503) : error instanceof IdentityError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, PASSWORD_CHANGE_REQUIRED: 403 }[error.code as "UNAUTHORIZED"] ?? 503) : error instanceof OwnedError ? ({ NOT_FOUND: 404, VALIDATION: 400, CONFLICT: 409, OPERATION_CONTENT_CONFLICT: 409, OPERATION_BUDGET: 429 }[error.code as "NOT_FOUND"] ?? 503) : 503;
+      const status = error instanceof TableConflict ? 409 : error instanceof ServiceDiceError ? (error.code === "FORBIDDEN" ? 403 : error.code === "DICE_RATE_LIMITED" ? 429 : 409) : error instanceof AnnotationError ? error.status : error instanceof HttpError ? error.status : error instanceof ZodError ? 400 : error instanceof InvitationError ? ({ GUEST_UNAUTHORIZED: 401, INVALID_INPUT: 400, REVISION_CONFLICT: 409, OPERATION_CONTENT_CONFLICT: 409, RATE_LIMITED: 429 }[error.code as "GUEST_UNAUTHORIZED"] ?? 503) : error instanceof IdentityError ? ({ UNAUTHORIZED: 401, FORBIDDEN: 403, PASSWORD_CHANGE_REQUIRED: 403 }[error.code as "UNAUTHORIZED"] ?? 503) : error instanceof OwnedError ? ({ NOT_FOUND: 404, VALIDATION: 400, CONFLICT: 409, OPERATION_CONTENT_CONFLICT: 409, OPERATION_BUDGET: 429 }[error.code as "NOT_FOUND"] ?? 503) : 503;
       res.statusCode = status; if (!req.complete) res.setHeader("Connection", "close");
       send(res, { ok: false, error: { code: error instanceof TableConflict ? "ANNOTATION_CONFLICT" : status === 503 ? "UNAVAILABLE" : status === 400 ? "INVALID_INPUT" : error instanceof Error && "code" in error ? String((error as { code: string }).code) : "UNAVAILABLE", message: status === 503 ? "No se pudo completar la operación. Consulta el estado antes de reintentar." : status === 400 ? "Los datos no son válidos." : (error as Error).message } });
     } finally { releaseAuthentication(); releaseRequest(); }

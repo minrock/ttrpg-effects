@@ -65,6 +65,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Invitaciones reale
     await expect(s.service.guests.authorized(s.a2.id, guest.token!, async g => g)).rejects.toMatchObject({ code: "GUEST_UNAUTHORIZED" });
     const login = await s.identity.login(s.a.email, changed, "enable"), newStart = await s.service.start(login.cookie, s.a1.id, null, 1, randomUUID());
     const second = await s.service.guests.admit(s.a1.id, { secret: invitationSecret(newStart), alias: "archivo" }, randomUUID(), null);
+    await s.service.end(login.cookie, s.a1.id, context(newStart), 1, randomUUID());
     await s.identity.authorized(login.cookie, "dm", (_, tx) => ownedGames(s.a.id, tx).update(s.a1.id, { state: "archived" }, 1));
     await s.identity.authorized(login.cookie, "dm", (_, tx) => ownedGames(s.a.id, tx).update(s.a1.id, { state: "ready" }, 2));
     await expect(s.service.guests.authorized(s.a1.id, second.token!, async g => g)).rejects.toMatchObject({ code: "GUEST_UNAUTHORIZED" });

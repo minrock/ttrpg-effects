@@ -18,6 +18,9 @@ import { composeImportedSceneMap } from "../../application/use-cases/compose-imp
 import { assetUrl, sceneId, sceneReference } from "../../shared/contracts/service-references";
 import { HttpTransport, ServiceError, result } from "./http";
 import { downloadScene, selectBrowserFile } from "./files";
+import { materializeReservedSceneEntity } from "../../domain/campaigns/scene-snapshot";
+import { snapshotPreparedEntity } from "../../domain/campaigns/arc-preparation";
+import { arcSceneDtoSchema, campaignPageSchema, preparedEntityDtoSchema, scenePreparationReservationSchema, type PreparedEntityDto, type ScenePreparationReservationDto } from "../../shared/contracts/campaigns";
 
 const ok = z.literal(true);
 const id = z.uuid();
@@ -33,12 +36,12 @@ const monster = z.object({ ...commonEntry, name: z.string(), system: z.string(),
 const npc = z.object({ ...commonEntry, name: z.string(), notes: z.string() });
 const character = z.object({ ...commonEntry, characterName: z.string(), playerName: z.string(), level: z.string(), species: z.string(), classes: z.string(), stats: z.object({ strength:z.string(),constitution:z.string(),dexterity:z.string(),intelligence:z.string(),wisdom:z.string(),charisma:z.string() }), initiative:z.string(),armorClass:z.string(),passivePerception:z.string(),hitPoints:z.string(),spellSaveDc:z.string(),speeds:z.string(),notes:z.string() });
 const asset = z.object({ ok, asset: z.object({ id, reference: z.string(), url: z.string(), mimeType: z.string(), byteLength: z.number() }) });
-const inactive = () => () => {};
+type BrowserSceneSummary = Pick<import("../../shared/contracts/http-api").SceneSummary, "id" | "name">;
 export interface BrowserDialogs {
   selectScene(): Promise<string | null>;
   sceneName(initial: string): Promise<string | null>;
 }
-export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs, chooseFile = selectBrowserFile, owned?: { gameId:string; configuration:ResolvedSystem; version:SystemVersion; table:BrowserTableClient }) {
+export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs, chooseFile = selectBrowserFile, owned?: { gameId:string; arcId?:string; configuration:ResolvedSystem; version:SystemVersion; table:BrowserTableClient }) {
   const names = new Map<string, string>();
   const table = owned?.table ?? new BrowserTableClient(http);
   const mutations = new Mutations(http);
@@ -56,6 +59,28 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
   function draftContent(scene:SceneDocument, view:DraftContent["view"]):DraftContent {
     return {scene:parseSceneDocument(syncActiveMapFromRuntimeFields({...scene,camera:view.camera,editorView:{sidebar:view.sidebar,aside:view.aside,selectedId:view.selectedId}})),bindings:sceneBindings(scene,currentBindings),view};
   }
+  const arcPreparation = owned ? {
+    list: async (selection: { readonly campaignId: string; readonly arcId: string }, query: { readonly limit?: number; readonly offset?: number; readonly text?: string } = {}) => {
+      const params = new URLSearchParams();
+      if (query.limit !== undefined) params.set("limit", String(query.limit));
+      if (query.offset !== undefined) params.set("offset", String(query.offset));
+      if (query.text) params.set("text", query.text);
+      const suffix = params.size ? `?${params}` : "";
+      return http.request(`/campaigns/${selection.campaignId}/arcs/${selection.arcId}/preparation${suffix}`, z.object({ ok, ...campaignPageSchema(preparedEntityDtoSchema).shape }));
+    },
+    snapshot: (prepared: PreparedEntityDto) => snapshotPreparedEntity(prepared),
+    reserve: async (selection: { readonly campaignId: string; readonly arcId: string; readonly sceneId: string }, preparedId: string, idempotencyKey: string): Promise<ScenePreparationReservationDto> => {
+      const assertCurrent = () => {
+        if (!currentResource) throw new Error("Guarda o importa la escena antes de usar una ficha preparada.");
+        if (!owned.arcId || selection.campaignId !== owned.gameId || selection.arcId !== owned.arcId || selection.sceneId !== currentResource) throw new Error("La ficha preparada solo puede reservarse para la escena guardada del arco actual.");
+      };
+      assertCurrent();
+      const reply = await http.request(`/campaigns/${selection.campaignId}/arcs/${selection.arcId}/preparation/${preparedId}/instance`, z.object({ ok, reservation: scenePreparationReservationSchema }), { method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey }, body: JSON.stringify({ sceneId: selection.sceneId }) });
+      assertCurrent();
+      if (reply.reservation.sceneId !== currentResource) throw new Error("La escena cambió mientras se reservaba la ficha preparada. Vuelve a intentarlo.");
+      return reply.reservation;
+    }
+  } : undefined;
   const urlFor = (reference:string) => { const legacy=assetUrl(reference); return legacy && owned ? legacy.replace("/api/v1/assets/","/api/v1/dm/assets/") : legacy; };
   function binding(templateId:string|null) { if(!owned)throw new Error("Falta configuración de sistema.");return {scope:"catalog" as const,...owned.configuration.ref,templateId:templateId??"generic-markdown"}; }
   function sceneBindings(scene:SceneDocument,previous?:ResourceBindings):ResourceBindings {
@@ -88,11 +113,29 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     }
     const mapImageUrls = Object.fromEntries(item.scene.maps.flatMap(m => { const url = urls.get(m.map.imagePath ?? ""); return url ? [[m.id,url]] : []; }));
     const tokenImageUrls = Object.fromEntries(item.scene.tokens.flatMap(t => { const url = urls.get(t.imagePath); return url ? [[t.id,url]] : []; }));
-    names.set(sceneReference(item.id), item.name); remember(`scenes/${item.id}`,item); if(currentResource!==item.id)table.setSceneResource(undefined);currentResource=item.id;currentBindings=item.bindings;
+    names.set(sceneReference(item.id), item.name); remember(`scenes/${item.id}`,item); currentResource=item.id;table.setSceneResource(item.id);currentBindings=item.bindings;
     return { ok:true, scene:item.scene, filePath:sceneReference(item.id), mapImageUrl:mapImageUrls[item.scene.activeMapId ?? ""], mapImageUrls, tokenImageUrls,
       warnings:[...item.warnings.map(w => ({ code:w.code==="external-link-unresolved"?"scene-link-unresolved" as const:"scene-format-outdated" as const, message:w.message,path:"" })), ...item.missingImages.map(m => ({ code:"map-image-missing" as const,path:m.reference,message:`Imagen ausente: ${m.locations.join(", ")}. Usa Reemplazar imagen o el selector del token/ficha. Referencia: ${m.reference}` }))] };
   }
-  async function load(reference: string) { return hydrate((await http.request(`/scenes/${sceneId(reference)}`,resourceReply)).resource); }
+  async function ensureOwnedScene(reference: string) {
+    // Aperturas heredadas sin arco mantienen el selector global; el editor contextual siempre aporta arcId.
+    if (!owned?.arcId) return;
+    const target = sceneId(reference);
+    for (let offset = 0, total = 0; offset === 0 || offset < total;) {
+      const page = await http.request(`/campaigns/${owned.gameId}/arcs/${owned.arcId}/scenes?limit=100&offset=${offset}`, z.object({ ok, ...campaignPageSchema(arcSceneDtoSchema).shape }));
+      if (page.items.some(scene => scene.sceneId === target)) return;
+      total = page.total;
+      offset += page.items.length;
+      if (page.items.length === 0) break;
+    }
+    throw new Error("La escena seleccionada no pertenece al arco actual.");
+  }
+  async function load(reference: string) {
+    await ensureOwnedScene(reference);
+    const saved = (await http.request(`/scenes/${sceneId(reference)}`,resourceReply)).resource;
+    await ensureOwnedScene(reference);
+    return hydrate(saved);
+  }
   async function confirmDraft(command:DraftConfirmation) {
     // Solo la misma confirmación puede resolverse desde la cabeza; una edición posterior requiere su recibo exacto.
     const current=await drafts!.remote.get(command.draftId);
@@ -123,7 +166,7 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
       const head = await drafts.prepare(()=>({content,context}));
       if (head) {
         const hash = await contentHash(content);
-        const command:DraftConfirmation={hash,key:crypto.randomUUID(),draftId:head.id,revision:head.revision,sequence:head.sequence,payload:{name,mode:reference?"update":"copy",sceneRevision:reference?context.baseRevision:0,targetGameId:owned.gameId}};
+        const command:DraftConfirmation={hash,key:crypto.randomUUID(),draftId:head.id,revision:head.revision,sequence:head.sequence,payload:{name,mode:reference?"update":"copy",sceneRevision:reference?context.baseRevision:0,targetGameId:owned.gameId,...(!reference&&owned.arcId?{targetArcId:owned.arcId}:{})}};
         await drafts.pendingConfirmation(command);
         const confirmed = await confirmDraft(command);
         const saved=(await http.request(`/scenes/${confirmed.sceneId}`,resourceReply)).resource;
@@ -131,7 +174,7 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
         return hydrate(saved);
       }
     }
-    const reply = await mutate(reference ? `/scenes/${sceneId(reference)}` : "/scenes", resourceReply, reference ? "PUT":"POST", {name,scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene,key?versions.get(key)?.bindings:currentBindings)}:{})},key?versions.get(key)?.revision:undefined);
+    const reply = await mutate(reference ? `/scenes/${sceneId(reference)}` : "/scenes", resourceReply, reference ? "PUT":"POST", {name,scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene,key?versions.get(key)?.bindings:currentBindings)}:{}),...(!reference&&owned?{campaignId:owned.gameId,...(owned.arcId?{arcId:owned.arcId}:{})}:{})},key?versions.get(key)?.revision:undefined);
     return hydrate(reply.resource);
   }
   async function upload() {
@@ -192,7 +235,6 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     searchPlayerCharacterLibrary:characters.search,getPlayerCharacterLibraryEntry:characters.get,savePlayerCharacterLibraryEntry:characters.save,
     openMapImage:openImage,openTokenImage:openImage,openAsideImage:openImage,resolveMapUrl:resolveUrl,resolveTokenUrl:resolveUrl,resolveAsideUrl:resolveUrl,
     selectReplacementMapImage:async()=>{try {const selected=await upload();return selected?{status:"ready",imagePath:selected.imagePath,imageUrl:selected.imageUrl}:{status:"cancelled"};}catch(error){return {status:"error",error:error instanceof Error?error.message:"No se pudo subir la imagen."};}},
-    onRecentSceneOpen:inactive,onOpenMonsterTemplateManager:inactive,
     ...table.api
   };
   return {
@@ -209,7 +251,7 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
       }
       const now=new Date().toISOString();
       const reply=await hydrate({id:id??crypto.randomUUID(),name:recoveredName,createdAt:now,updatedAt:now,revision:id?value.context.baseRevision:undefined,scene:{...value.content.scene,camera:value.content.view.camera},bindings:value.content.bindings,warnings:[],missingImages:[]},true);
-      currentResource=id??undefined;currentBindings=value.content.bindings;
+      currentResource=id??undefined;table.setSceneResource(id??undefined);currentBindings=value.content.bindings;
       // Reconstruir definiciones por binding retenido, incluso si la plantilla ya no admite usos nuevos.
       retainedTemplates.clear();
       for(const [monsterId,definition] of retained)retainedTemplates.set(monsterId,definition);
@@ -222,16 +264,20 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     },
     latestSavedScene:async()=> owned?(await http.request(`/games/${owned.gameId}/last-scene`,z.object({ok,sceneId:z.uuid().nullable()}))).sceneId:null,
     openSaved: async(reference:string)=>load(reference),
-    client:createClient(api,{scenes:true,images:true,libraries:true,templateAdministration:!owned,player:true,dice:true,nativeMenus:false},"service",owned?{
+    client:createClient(api,{scenes:true,images:true,libraries:true,templateAdministration:!owned,player:true,dice:true},"service",owned?{
       forMonster:(id,templateId,available)=>{const retained=retainedTemplates.get(id);return retained&&retained.id===templateId?[retained,...available.filter(t=>t.id!==retained.id)]:available;},
       validateLibraryUse:async(id)=>{const entry=await monsters.get(id);if(!entry.ok)throw new Error(entry.error);const ref=versions.get(`monsters/${id}`)?.bindings?.root;if(!ref||ref.scope!=="catalog"||ref.systemId!==owned.configuration.ref.systemId||ref.version!==owned.configuration.ref.version||owned.configuration.availability!=="enabled"||owned.version.templates[ref.templateId]?.availability!=="enabled")throw new Error("Esta ficha conserva una presentación privada, deshabilitada o de otra versión. Puedes editar su instancia existente, pero no crear un vínculo nuevo en esta partida.");}
-    }:undefined,owned?table.annotations:undefined),
-    listScenes:async(offset=0)=>{const reply=await http.request(`/scenes?limit=50&offset=${offset}`,z.object({ok,scenes:z.array(summary),total:z.number().int().nonnegative()}));for(const scene of reply.scenes)names.set(sceneReference(scene.id),scene.name);return reply;},
+    }:undefined,owned?table.annotations:undefined,arcPreparation,table.serviceDice),
+    listScenes:async(offset=0):Promise<{scenes:readonly BrowserSceneSummary[];total:number}>=>{
+      if(owned?.arcId){const page=await http.request(`/campaigns/${owned.gameId}/arcs/${owned.arcId}/scenes?limit=50&offset=${offset}`,z.object({ok,...campaignPageSchema(arcSceneDtoSchema).shape}));const scenes=page.items.map(scene=>({id:scene.sceneId,name:scene.name}));for(const scene of scenes)names.set(sceneReference(scene.id),scene.name);return {scenes,total:page.total};}
+      const reply=await http.request(`/scenes?limit=50&offset=${offset}`,z.object({ok,scenes:z.array(summary),total:z.number().int().nonnegative()}));for(const scene of reply.scenes)names.set(sceneReference(scene.id),scene.name);return reply;
+    },
     name:(reference:string)=>names.get(reference)??"Escena del servicio",
-    importFile:()=>result(async()=>{const signal=http.sessionSignal;const file=await chooseFile(".ttrpgscene,application/json",signal);ensureActive(signal);if(!file)return {ok:false as const,error:"Importación cancelada."};if(file.size>10*1024*1024)throw new Error("La escena supera el límite de 10 MiB.");const scene=parseSceneJson(await file.text());ensureActive(signal);const reply=await mutate("/scenes/import",resourceReply,"POST",{name:file.name.replace(/\.ttrpgscene$/i,"").slice(0,200)||"Escena importada",scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene)}:{})});return hydrate(reply.resource);}),
+    importFile:()=>result(async()=>{const signal=http.sessionSignal;const file=await chooseFile(".ttrpgscene,application/json",signal);ensureActive(signal);if(!file)return {ok:false as const,error:"Importación cancelada."};if(file.size>10*1024*1024)throw new Error("La escena supera el límite de 10 MiB.");const scene=parseSceneJson(await file.text());ensureActive(signal);const reply=await mutate("/scenes/import",resourceReply,"POST",{name:file.name.replace(/\.ttrpgscene$/i,"").slice(0,200)||"Escena importada",scene:JSON.parse(serializeSceneDocument(scene)),...(owned?{bindings:sceneBindings(scene),campaignId:owned.gameId,...(owned.arcId?{arcId:owned.arcId}:{})}:{})});return hydrate(reply.resource);}),
     exportFile:async(scene:SceneDocument,reference:string|null)=>downloadScene(serializeSceneDocument(scene),reference?names.get(reference)??"escena":"escena"),
     revalidate:async()=>{if(!owned||!currentResource)return;const stored=versions.get(`scenes/${currentResource}`);if(!stored)return;const value=await http.request(`/scenes/${currentResource}`,resourceReply);if(value.resource.revision!==stored.revision)throw new ServiceError("REVISION_CONFLICT","La escena cambió mientras la sesión estaba cerrada. Recupera tu borrador como copia o abre la escena guardada; los respaldos se conservan.",409);},
     associateCurrent:async()=>{if(!owned||!currentResource)throw new Error("Guarda o abre la escena antes de asociarla a esta partida.");await mutations.send(`/games/${owned.gameId}/resources`,z.object({ok}),"POST",{kind:"scenes",resourceId:currentResource});table.setSceneResource(currentResource);},
+    materializePreparation:(scene:SceneDocument,reservation:ScenePreparationReservationDto)=>{const value=materializeReservedSceneEntity(scene,currentBindings??{monsters:{}},reservation);currentBindings=value.bindings;return value;},
     clear:()=>{void drafts?.stop();table.clear();http.invalidate();names.clear();versions.clear();retainedTemplates.clear();mutations.clear();uploads.clear();}
   };
 }

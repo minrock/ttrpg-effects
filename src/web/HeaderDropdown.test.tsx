@@ -28,3 +28,16 @@ it("Escape restaura foco; salir, seleccionar y abrir otro desplegable cierran el
     expect(second.open).toBe(false);
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
+
+it("una acción que pide conservar el panel no altera el patrón por defecto", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  const host = document.createElement("div"); document.body.append(host); const root = createRoot(host);
+  try {
+    await act(async () => root.render(<HeaderDropdown title="Escenas" label="Escenas"><button data-dropdown-keep-open="true">Reintentar</button><button>Cerrar</button></HeaderDropdown>));
+    const details = host.querySelector("details")!, summary = host.querySelector("summary")!;
+    await act(async () => { summary.click(); [...host.querySelectorAll("button")].find(button => button.textContent === "Reintentar")!.click(); });
+    expect(details.open).toBe(true);
+    await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "Cerrar")!.click());
+    expect(details.open).toBe(false);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});

@@ -4,7 +4,7 @@
 
 > **SDD 56 / 3.20.0, integrada en main:** cámaras independientes. El DM usa foco efímero para cambiar el centro sin tocar el zoom. `camera` y `camera-command` se rechazan; el foco nunca forma parte del bootstrap. [Contrato y validación](../specs/56-camaras-libres-foco-atencion/plan.md).
 
-La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. Electron local conservaIPC.
+La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. La UI es exclusivamente web desde SDD62.
 
 ## Conectar jugadores
 
@@ -80,7 +80,7 @@ La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/
 
 ## Dibujos compartidos — SDD 55 / 3.19.1
 
-En servicio, mediciones, caminos, círculos, conos y rectángulos/cuadrados de jugadores se comparten en una capa efímera independiente de la escena. Cada jugador modifica/limpia los propios; el DM puede retirarlos o limpiar la capa con confirmación. Alias y discriminador provienen de la admisión autenticada. En el DM, «Dibujos de jugadores» comparte la pestaña Mesa del lateral derecho con participantes e invitaciones; ambos menús se despliegan dentro del lateral y usan su desplazamiento, sin flotantes independientes. El jugador accede a su alias, sistema, estado de conexión, salida y «Visible para la mesa» desde el lateral derecho retráctil (pestaña con chevrón en el borde derecho, como en el DM). Escape lo cierra; en pantallas estrechas comienza cerrado. El panel muestra nombres completos; las etiquetas del mapa acortan nombres largos. Electron autónomo conserva herramientas locales.
+En servicio, mediciones, caminos, círculos, conos y rectángulos/cuadrados de jugadores se comparten en una capa efímera independiente de la escena. Cada jugador modifica/limpia los propios; el DM puede retirarlos o limpiar la capa con confirmación. Alias y discriminador provienen de la admisión autenticada. En el DM, «Dibujos de jugadores» comparte la pestaña Mesa del lateral derecho con participantes e invitaciones; ambos menús se despliegan dentro del lateral y usan su desplazamiento, sin flotantes independientes. El jugador accede a su alias, sistema, estado de conexión, salida y «Visible para la mesa» desde el lateral derecho retráctil (pestaña con chevrón en el borde derecho, como en el DM). Escape lo cierra; en pantallas estrechas comienza cerrado. El panel muestra nombres completos; las etiquetas del mapa acortan nombres largos. Las herramientas locales del navegador se mantienen.
 
 La extensión `annotationsVersion=1` se solicita junto a `openingId`/`generation` en `table/state` y `table/events`. Añade `annotations` (versión, tiempo de servidor, secuencia, escena de origen, autor propio e items) fuera de `snapshot.scene`; clientes antiguos no reciben eventos nuevos. Los comandos usan POST `table/annotations` bajo los namespaces contextual DM/invitado existentes, con contexto/requestId y revisión de figura. El servidor deriva las medidas con las reglas publicadas. El adaptador expone el puerto opcional `TtrpgClient.annotations`, sin ampliar IPC privilegiado.
 
@@ -96,3 +96,20 @@ El jugador empieza con zoom local desbloqueado. Publicar, reconectar o promover 
 En el DM, **Foco** permite elegir un punto; Escape o clic derecho cancela. **Centro** enfoca el centro de su propia vista, también accesible por teclado. El menú contextual ofrece **Enfocar aquí a los jugadores**. El servidor exige coincidencia con la publicación y jugadores compatibles/listos; informa las ventanas excluidas. Cada jugador conserva su zoom y puede navegar inmediatamente después. Un aro de 1,5 segundos señala el punto.
 
 Negociar `focusVersion=1` en estado/SSE, separado de `annotationsVersion=1`. Enviar `POST /api/v1/dm/games/:gameId/table/focus` con el sobre contextual vigente y request `{requestId, sceneId, frame, position}`. No acepta zoom ni destinatarios. El evento `focus` lleva ID del servidor y caducidad máxima de cinco segundos. Límite de body 4 KiB, dos focos/segundo con ráfaga de cuatro. Se conserva idempotencia cinco minutos sin retener un último foco reproducible.
+
+
+## Dados de jugadores — SDD 61
+
+Entrega local 3.32.0 validada: [contrato C-61](../specs/61-dados-jugadores/plan.md) y [evidencia](../specs/61-dados-jugadores/validacion.md). La nueva capacidad es independiente del protocolo de dados local y no amplía preload/IPC.
+
+El cliente contextual negocia `GET /dice/capabilities` antes de usar `/dice/v1/*` y de solicitar `diceVersion=1` en las lecturas/stream. Los GET de estado, historial y operación se vinculan a partida/apertura/generación; los POST llevan `{openingId, generation, command}` y un `requestId` propio por acción. El servidor deriva actor y rol de la autoridad autenticada. Una clave repetida con contenido distinto se rechaza; ante respuesta incierta el cliente consulta el recibo, conserva la simulación y reintenta la misma operación sin volver a tirar.
+
+`ServiceDiceSession` mantiene una reserva/presentación pública y una oculta DM independientes. La pública ocupa la mesa desde begin hasta cierre; no existe cola automática. La selección de cada participante se conserva mientras espera. Solo el autor completa o falla su reserva; autor y DM pueden cerrar por ID. La reserva vence a los 20 segundos y el tick del runtime la libera sin necesitar una nueva petición. El resumen sobre el mapa de una tirada DM puede ocultarse; su resultado público permanece completo en el historial. Las tiradas de jugadores siempre muestran sus valores.
+
+La proyección de jugador incluye únicamente estado e historial públicos. Las mutaciones ocultas no modifican su secuencia ni su cuota de recibos. Cada canal retiene hasta 500 entradas; el DM ve hasta 1000 combinadas. Páginas de 10 por defecto, máximo 50, con revisión para evitar mezclar páginas de historias distintas. El historial no contiene trayectorias. Tras asentarse se conserva únicamente la pose final para reconectar sin repetir animación o audio. Limpiar historial no cierra dados en pantalla.
+
+Una nueva publicación retira la presentación anterior y conserva el historial de esa apertura. Navegar por una escena privada DM no cancela una pública. Salir o revocar cancela reservas pendientes de ese participante; no retira resultados ya aceptados. Cerrar/reabrir/expirar la apertura o descartar su runtime libera estado, recibos y logs. No se escriben tiradas en SQL ni en `.ttrpgscene`.
+
+Las rutas de dados anteriores de la tabla superior describen el protocolo histórico. En el servicio con C-61 las mutaciones legacy requieren actualizar cliente (426), mientras las capacidades no soportadas mantienen la vista base de mesa disponible. Desde SDD62 no existe cliente autónomo; los contratos históricos se conservan como antecedentes del protocolo.
+
+La apertura inicial de SSE espera la decisión de capacidades de dados como máximo 1,5 s. Si no responde, se cancela esa consulta y continúa la mesa base; una respuesta tardía no altera una sesión nueva. Sin negociación, bootstrap conserva sobre contextual v2 con estado interno v1; sólo la extensión negociada usa estado contextual v2.

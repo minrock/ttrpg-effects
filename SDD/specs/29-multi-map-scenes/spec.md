@@ -441,3 +441,8 @@ Esta migracion debe ser forward-only: una vez guardada en formato nuevo, la esce
 Relampagos de spec 35 pertenecen al mapa activo. Guardar/cambiar/importar preserva geometria, semilla y reloj por mapa. Al abandonar un mapa se cancela el borrador y se liberan sus recursos; al volver se retoma la fase vigente.
 
 Contrato y verificacion detallados en [spec 35](../35-lightning-effects/spec.md) y su [plan](../35-lightning-effects/plan.md). Esta extension no cierra pendientes historicos de este documento.
+
+
+## Ajuste del explorador — 2026-11-17
+
+[SDD59 revisión0.10](../59-campanas-arcos-escenas/spec.md#escenas-propias-de-cada-arco--revisión-010-2026-11-17) retira el acceso «Agregar a escena» de la sección Mapas. La acción «Agregar mapa» y las operaciones existentes permanecen; la infraestructura portable de importación no se elimina. Implementación en curso, con evidencia futura en SDD59.

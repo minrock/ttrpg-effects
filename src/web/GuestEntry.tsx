@@ -12,6 +12,16 @@ import { Mutations, ok, failureMessage } from "./service-model";
 import { captureInvitation } from "./invitation-fragment";
 export type CapturedInvitation=ReturnType<typeof captureInvitation>;
 const reply=guestSchema.extend({ok,replayed:z.boolean().optional()});
+const guestAssetReply=z.object({ok,assets:z.record(z.string(),z.string().nullable())});
+export function createGuestAssetResolver(http:HttpTransport,openingId:string,generation:number){
+  const query=new URLSearchParams({openingId,generation:String(generation)}).toString();
+  return async(reference:string):Promise<string|null>=>{
+    const parsed=z.uuid().safeParse(reference.startsWith("asset:")?reference.slice(6):"");
+    if(!parsed.success)return null;
+    const reply=await http.request(`/assets/resolve?${query}`,guestAssetReply,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ids:[parsed.data]})});
+    return reply.assets[parsed.data]??null;
+  };
+}
 export function GuestEntry({gameId,invitation}:{gameId:string;invitation:CapturedInvitation}){
   const[guest,setGuest]=useState<GuestDto|null>(null),[alias,setAlias]=useState(""),[link,setLink]=useState(""),[checking,setChecking]=useState(true),[error,setError]=useState(""),[busy,setBusy]=useState(false),[terminal,setTerminal]=useState("");
   const secret=useRef<string|undefined>(undefined);const captured=useRef(false);
@@ -28,9 +38,11 @@ export function GuestEntry({gameId,invitation}:{gameId:string;invitation:Capture
 function GuestWorkspace({guest,onTerminal,onLeave,error}:{guest:GuestDto;onTerminal:(reason:string)=>void;onLeave:()=>void;error:string}){
   const callback=useRef(onTerminal);callback.current=onTerminal;
   const table=useMemo(()=>contextualTableClient({gameId:guest.gameId,openingId:guest.openingId,generation:guest.generation,audience:"player"},reason=>callback.current(reason)),[guest.gameId,guest.openingId,guest.generation]);
-  const client=useMemo(()=>{const base=createBrowserClient(new HttpTransport(fetch,()=>{}),new DialogBroker());return createClient({...base.client.api,...table.api},{scenes:false,images:true,libraries:false,templateAdministration:false,player:true,dice:true,nativeMenus:false},"service",undefined,table.annotations);},[table]);
+  const assetHttp=useMemo(()=>new HttpTransport(fetch,()=>{},`/api/v1/games/${guest.gameId}`),[guest.gameId]);
+  const resolveGuestAsset=useMemo(()=>createGuestAssetResolver(assetHttp,guest.openingId,guest.generation),[assetHttp,guest.openingId,guest.generation]);
+  const client=useMemo(()=>{const base=createBrowserClient(assetHttp,new DialogBroker());return createClient({...base.client.api,resolveMapUrl:resolveGuestAsset,resolveTokenUrl:resolveGuestAsset,resolveAsideUrl:resolveGuestAsset,...table.api},{scenes:false,images:true,libraries:false,templateAdministration:false,player:true,dice:true},"service",undefined,table.annotations,undefined,table.serviceDice);},[assetHttp,resolveGuestAsset,table]);
   const status=useSyncExternalStore(table.subscribeStatus,table.getStatus);
-  useEffect(()=>{const stop=table.start("player");return()=>{stop();table.clear();};},[table]);
+  useEffect(()=>{const stop=table.start("player");return()=>{stop();table.clear();assetHttp.invalidate();};},[assetHttp,table]);
   const tablePanel = <section className="player-table-session" aria-label="Datos de la mesa">
     <h3>Tu acceso</h3>
     <p className="player-table-session__alias">{guest.alias} #{guest.discriminator}</p>

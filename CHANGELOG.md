@@ -1,5 +1,102 @@
 # Changelog
 
+## 3.35.0 — 2026-11-17 — Versión minor
+
+- SDD62: el producto se concentra en navegador y servicio Node.js; se retiran Electron, preload, IPC, empaquetado nativo y comandos de DMG.
+- `pnpm dev`, `pnpm build` y `pnpm start` operan el supervisor, los builds y el servidor web estable respectivamente. Los comandos API, web, identidad, datos y Storybook permanecen disponibles.
+- La preparación crea y protege únicamente `.env`; no crea, reescribe ni cambia permisos de perfiles `.env.electron` históricos. Se conservan datos, formatos, repositorios y locks del servicio.
+
+## 3.34.0 — 2026-11-17 — Versión minor
+
+- Consolida las entregas de campañas, arcos y escenas propias de cada arco, con preparación separada de NPCs/monstruos y navegación contextual del editor.
+- Incluye dados públicos de jugadores e historial por rol, recuperación de borradores ante conflictos de apertura y publicación explícita desde Chrome.
+- Reúne Storybook y los controles compartidos de interfaz: sidebar administrativo, breadcrumbs, switches, selectores y autocompletado de plantillas.
+- Conserva las migraciones existentes hasta el esquema 12 y la compatibilidad del formato `.ttrpgscene`; este cierre no añade migraciones ni incorpora la propuesta de Django/caché.
+
+## 3.33.0 — 2026-11-17 — Versión minor
+
+- SDD59: cada escena de servicio pertenece a un único arco; crear, importar, copiar y recuperar dentro del editor conservan el arco contextual sin compartir la misma escena entre arcos.
+- La administración crea escenas directamente en su arco, admite nombres repetidos con IDs independientes y elimina la asociación de una escena existente y «Agregar a escena» del explorador.
+- La carga contextual solo ofrece escenas del arco actual y la preparación verifica la escena persistida antes y después de reservar, para no materializar una respuesta atrasada en otra escena.
+- El formato portátil `.ttrpgscene`, el editor autónomo y las acciones restantes de mapas se conservan sin cambios.
+
+## 3.32.2 — 2026-11-17 — Corrección
+
+- SDD33: se retira del mapa el acceso flotante duplicado para administrar contadores. La acción «Contadores» de la cabecera conserva el gestor, y las barras de DM y Player View mantienen sus controles y lectura.
+
+## 3.32.1 — 2026-11-17 — Corrección
+
+- SDD59: el formulario de monstruos usa un selector compacto y reutilizable de Plantilla con búsqueda, teclado y lista desplazable, sin límite de diez resultados ni radios visibles.
+- La consulta visible permanece separada del ID confirmado: Escape, Tab, clic exterior y composición IME no sustituyen el vínculo retenido ni envían el formulario.
+- Storybook incorpora historias interactivas del selector y de su integración con preparación de arco, incluidas lista larga, sin coincidencias, plantilla retenida y estado deshabilitado.
+
+## 3.32.0 — 2026-11-15 — Versión minor
+
+- SDD61: los jugadores del servicio disponen de pestaña Dados con el compositor compartido, preferencias propias y tiradas siempre públicas.
+- Una tirada pública ocupa la mesa hasta su cierre por el autor o el DM; el historial conserva públicas para jugadores y públicas/ocultas para DM, sin repetir simulación al reconectar.
+- El resumen numérico sobre el mapa es independiente del historial público. Se refuerzan autoría, revocación, expiración e idempotencia HTTP/SSE.
+- Select compartido con espacio para la flecha y catálogo Storybook de dados por rol; Electron autónomo conserva su flujo de proyección.
+
+## 3.31.2 — 2026-11-15 — Corrección
+
+- Al caducar una apertura durante la recuperación de un borrador, el editor comprueba una sola vez su estado actual y permite continuar la misma apertura o iniciar otra de forma explícita, sin repetir el heartbeat caducado ni publicar la escena.
+- El traspaso al cambiar de apertura conserva el último borrador capturado, incluso sin respaldo persistente, y bloquea el cambio si no puede confirmar la copia local requerida.
+
+## 3.31.1 — 2026-11-15 — Corrección
+
+- El botón «Jugador» vuelve a estar disponible en Chrome y otros navegadores para publicar explícitamente la escena actual; Electron conectado conserva la publicación y el modo autónomo conserva su ventana de jugador.
+
+## 3.31.0 — 2026-11-15
+
+### Añadido
+
+- El menú de campaña del editor lista las escenas de la campaña actual agrupadas por arco, con carga paginada, selección contextual y reintento ante errores parciales.
+
+## 3.30.3 — 2026-11-15 — Corrección
+
+- En Chrome y otros navegadores, la cabecera del editor muestra solo el nombre de la escena cargada, sin desplegable ni nombre del mapa; Electron conserva su menú de escena.
+
+## 3.30.2 — 2026-11-15 — Corrección
+
+- El menú de navegación del editor muestra «Campañas» para volver al catálogo, coherente con la administración.
+
+## 3.30.1 — 2026-11-15 — Corrección
+
+- Las migas de administración muestran los destinos anteriores como texto subrayado navegable y la hoja actual como texto, sin la apariencia residual de botón.
+
+## 3.30.0 — 2026-11-15 — Versión minor
+
+- SDD 59: la preparación de cada arco separa NPCs y monstruos en rutas y catálogos propios, con filtros de API antes de paginar, formularios directos y acciones de editar o borrar.
+- Las fichas preparadas muestran procedencia, resumen y plantilla legible; borrar conserva las copias ya usadas por escenas y las campañas inactivas permanecen en consulta.
+
+## 3.29.1 — 2026-11-14 — Corrección
+
+- La administración del servicio usa un sidebar estructural fuera del editor, con jerarquía contextual de campañas, arcos, escenas y preparación; el menú flotante anterior desaparece.
+- La hamburguesa muestra u oculta la columna en escritorio y abre un drawer accesible en pantallas estrechas, sin cambiar la cabecera, los portales ni las guardas del editor.
+
+## 3.29.0 — 2026-11-14 — Versión minor
+
+- SDD 60: incorpora Storybook local para documentar y verificar componentes de interfaz aislados, con contextos de catálogo, documentación y auditoría de accesibilidad.
+- El catálogo mantiene aislados motores, entradas de aplicación y código privilegiado mediante una validación de imports y del grafo Vite durante el build.
+
+## 3.28.2 — 2026-11-14 — Corrección
+
+- Los listados de campañas, arcos y escenas usan una columna completa en pantallas estrechas y dos columnas iguales desde escritorio, incluso con una única tarjeta.
+- Las acciones de campaña alinean sus iconos y textos como un conjunto centrado, manteniendo los botones de solo icono accesibles.
+- «Campaña activa», los ajustes del editor y las anotaciones usan el mismo switch accesible de 40 × 22 px, sin alterar las confirmaciones de estado.
+
+## 3.28.1 — 2026-11-13 — Corrección
+
+- El catálogo ya no ofrece un archivo global de borradores: al abrir una escena, solo propone recuperar cambios pendientes de esa escena y conserva las demás copias sin mezclar su selección.
+- Elegir una escena abre el editor sin la pantalla intermedia; conserva una apertura vigente mediante heartbeat, inicia una caducada y vuelve al arco ante fallos o cierre explícito.
+- El estado de respaldo se muestra de forma compacta en el footer del editor, con detalle accesible para el dispositivo, el servidor y los errores.
+
+## 3.28.0 — 2026-11-13 — Versión minor
+
+- SDD 59: campañas, arcos y escenas con catálogo administrativo, portadas recuperables, consulta de campañas inactivas y selección explícita antes de abrir el editor.
+- Preparación permanente por arco y reserva de copias de NPCs o monstruos para la escena; conserva plantillas, enlaces y el comportamiento autónomo existente.
+- La publicación contextual conserva la escena fuente y la vista de jugador muestra únicamente fichas e imágenes autorizadas, sin notas privadas ni entidades ocultas.
+
 ## 3.27.2 — 2026-11-12 — Corrección
 
 - El radio de revelar niebla se ajusta con slider de 0,5 a 8 cuadros en pasos de 0,5, con valor visible, tanto en herramientas como en ajustes. Conserva la conversión a unidades de mundo y las escenas existentes.

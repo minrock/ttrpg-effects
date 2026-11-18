@@ -7,6 +7,9 @@ import type { SceneDocument } from "../../../domain/sessions/scene-document";
 import type { MapImageReplacementResult } from "../../../application/services/map-image-storage";
 import { prepareMapImageResource } from "../../../render/pixi/map-image-resource";
 import { useMapImageReplacement } from "./useMapImageReplacement";
+import { createClient, type TtrpgClient } from "../../../shared/api/client";
+import type { TtrpgApi } from "../../../shared/api/ttrpg-api";
+import { ClientProvider } from "../client/ClientProvider";
 
 vi.mock("../../../render/pixi/map-image-resource", () => ({ prepareMapImageResource: vi.fn() }));
 
@@ -28,6 +31,7 @@ describe("map image replacement workflow", () => {
   const choose = vi.fn<() => Promise<MapImageReplacementResult>>();
   const resolveUrl = vi.fn<(path: string) => Promise<string | null>>();
   let report: (value: { imageUrl: string; ok: boolean; error?: string }) => void;
+  let client: TtrpgClient;
 
   function Harness() {
     const [current, setCurrent] = useState(() => addSceneMap(createSceneWithMap(createDefaultSceneMap({
@@ -48,15 +52,15 @@ describe("map image replacement workflow", () => {
     choose.mockResolvedValue({ status: "ready", imagePath: "/new.png", imageUrl: "map-asset:///new.png?revision=1" });
     resolveUrl.mockImplementation(async (path) => `map-asset://${path}?revision=resolved`);
     vi.mocked(prepareMapImageResource).mockResolvedValue({ width: 400, height: 200, previewUrl: "data:image/png;base64,preview", release });
-    Object.defineProperty(window, "ttrpg", { configurable: true, value: {
+    client = createClient({
       selectReplacementMapImage: choose, resolveMapUrl: resolveUrl,
       onPlayerMapImageStatus: (callback: typeof report) => { report = callback; return () => {}; }
-    } });
+    } as unknown as TtrpgApi, { scenes: false, images: true, libraries: false, player: true, dice: false });
     container = document.createElement("div"); document.body.append(container); root = createRoot(container);
-    act(() => root.render(<Harness />));
+    act(() => root.render(<ClientProvider client={client}><Harness /></ClientProvider>));
   });
 
-  afterEach(() => { act(() => root.unmount()); container.remove(); Reflect.deleteProperty(window, "ttrpg"); });
+  afterEach(() => { act(() => root.unmount()); container.remove(); });
 
   it("prepares privately, then changes only the active image and retains world size", async () => {
     const before = scene;

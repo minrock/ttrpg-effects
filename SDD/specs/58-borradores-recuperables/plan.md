@@ -179,3 +179,50 @@ Regresiones: App real → figuras con/sin mapa → IndexedDB → desmontaje → 
 3. `compactRecoveryCopies` consolida el historial remoto del propietario en list/create; prioriza el último respaldo con contenido frente a reservas vacías y valida su hash antes de retirar otros. PUT compacta el ámbito tras escritura CAS y retira versiones previas; confirmar mueve el respaldo al ID definitivo de escena.
 4. El coordinador adopta ID/secuencia remotos al reabrir, deduplica por hash y mantiene el diario de peticiones inciertas hasta resolverlo. `confirmDraft` no confunde una confirmación posterior con la pendiente anterior.
 5. UI sin selector de generaciones. Pruebas con SQLite temporal, IndexedDB simulado y PostgreSQL local clonado; consolidación histórica, rollback ante corrupción, aislamiento, CAS y repetición de guardados.
+
+## FIX-01 — Recuperación con apertura rechazada (2026-11-15)
+
+**Fuente:** delta [FIX-01-CA-01–04](spec.md) y contexto de selección campaña/arco/escena de SDD59. **Estado:** implementado y validado localmente en **3.31.2**, sin integración Git. Rama `fix/recuperacion-borrador-409`, conservando cambios locales. Una tarea frontend [FIX-01](tareas.md), sin cambio de API, persistencia o backend. [Resultados y límites](validacion-fix-01.md).
+
+### Diagnóstico contrastado y fronteras
+
+`GameEditor.LiveEditor` revalida partida/configuración, recursos del cliente y heartbeat, pero transforma cualquier fallo en mensaje/retryable sin conservar la fase. Con borradores habilitados, deriva únicamente `conflict=true` a `DraftRecovery` y oculta el mensaje original. `onRecovered` incrementa `attempt`, volviendo a enviar el heartbeat con el mismo openingId/generation rechazados. Este 409 de apertura no es un conflicto de escena ni un PUT incierto del borrador. El 405 de un GET manual a una URL de heartbeat tampoco identifica el código del POST fallido.
+
+El backend existente rechaza una apertura ausente, cerrada, sustituida o caducada; la corrección no revive su lease ni modifica esa autorización. El frontend reutiliza GET de apertura y las operaciones start/heartbeat vigentes. La ruta de reapertura forzada, que retira una apertura aún vigente, no es la solución automática a este fallo.
+
+### Contrato de recuperación mínimo
+
+1. Conservar el fallo de revalidación con su fase (partida/configuración, documento, apertura), estado HTTP, mensaje seguro, retryable y retryAt. Solo un error de la fase heartbeat correspondiente a apertura rechazada entra en este flujo. Mantener las políticas de 401, red/429/5xx y conflicto canónico; no clasificar todos los 409 ni HOST_UNAVAILABLE sin su fase como pérdida de apertura.
+2. Un único diálogo conserva y muestra la causa. Al rechazo de apertura, efectuar **una GET automática** de su estado, cancelable por cambio de cuenta/partida/selección/apertura o desactivación; no montar bucles de consulta ni POST automáticos. Mostrar «Comprobando apertura…». Fallo de GET ofrece «Reintentar comprobación» manual; no permite iniciar a ciegas.
+3. GET vigente compatible ofrece «Continuar partida»; GET caducada/cerrada/ausente ofrece «Iniciar nueva apertura». La acción explícita es la confirmación en ese mismo diálogo: exponer previamente nueva invitación y reingreso de participantes cuando corresponda. No añadir una etapa intermedia o un tercer diálogo. Respetar autoridad actual y no tomar silenciosamente una apertura de otra pestaña.
+4. Recuperar/Abrir escena guardada puede cambiar el documento por elección humana, pero no borra el error de apertura ni vuelve a enviar sus identificadores viejos. Mantener el editor suspendido y el autoguardado remoto inactivo hasta completar la revalidación. Separar «contenido recuperado» de «mesa autorizada». Continuar/iniciar usa la lectura vigente y CAS existentes; una carrera devuelve estado recuperable, nunca actualiza automáticamente If-Match ni reintenta start con una revisión nueva.
+5. Antes de cualquier cambio de key que remonte `LiveEditor`, finalizar captura del documento y comprobar su conservación. `flushLocal()` resuelto no prueba escritura cuando el respaldo está deshabilitado; comprobar checkpoint, estado habilitado y ACK real o conservar explícitamente el checkpoint en un traspaso en memoria autorizado. Si no se garantiza conservación, bloquear transición, mantener memoria y exportación. No confiar en cleanup `browser.clear/stop`, que absorbe fallos.
+6. Traspasar el **checkpoint exacto** elegido/recuperado junto con su estado confirmado/dirty al nuevo editor, ligado a cuenta/origen/partida/selección y transición; restaurarlo una vez antes de la carga automática de escena seleccionada. No buscar simplemente «la última copia de sceneId»: una recuperación por conflicto puede tener sceneId=null y ser una copia independiente. No perder esa copia ni reemplazarla por la escena de la URL. No mostrar otro selector de recuperación innecesario. No descartar ni reenviar pending/confirmation por este parche; si existe una operación incierta sin resolver, conservarla y usar el flujo previo o bloquear la transición, sin inventar confirmaciones.
+7. Revalidar identidad/propiedad/configuración y contexto antes de adoptar apertura y entregar estado. Invalidar respuestas viejas; no reactivar cliente, portal o canvas de otra cuenta/generación. Una vez restaurado el documento y autorizada la nueva apertura, reconectar la mesa sin publicar: publicar sigue siendo la acción explícita existente.
+
+### Acuerdo UX y límites
+
+Consulta resuelta con `/root/ux_campaign_scene_menu` y PM: título «La apertura de la partida cambió»; una GET inicial automática seguida de la acción apropiada en el mismo `ServiceDialog`; busy textual, teclado/Escape y foco conservados. No mover foco a un botón que aparece si el usuario ya lo desplazó. Mantener Volver al arco y exportación; cancelar no borra la copia. El texto dice «guardado en este dispositivo» solo con respaldo confirmado; si únicamente existe memoria, describirla sin prometer durabilidad. Conservar el flujo actual de copia por conflicto de escena y sus enlaces desconectados.
+
+No rediseñar coordinación de borradores ni ampliar el protocolo. Un propietario frontend modifica GameEditor/DraftRecovery y sus pruebas; el PM mantiene spec/evidencia/seguimiento. No hay backend paralelo. Si se necesita cambiar persistencia o contrato del coordinador más allá de reutilizar sus APIs, devolver el límite al PM antes de ampliar ownership.
+
+### Verificación prevista
+
+| Criterio del delta | Casos mínimos | Evidencia |
+| --- | --- | --- |
+| FIX-01-CA-01 | POST heartbeat409 con copia local: causa visible, una GET; recuperar/cargar no repiten heartbeat viejo; conflicto de recurso distinto conserva flujo anterior | GameEditor y DraftRecovery con contador de requests |
+| FIX-01-CA-02 | Vigente→continuar, caducada/ausente→start explícito; cancelar no muta; copia exacta/dirty y selección conservados tras remount, incluso sceneId=null; nunca publicación | React con fixture de documento y API sintética real |
+| FIX-01-CA-03 | GET fallido, CAS cambiado entre lectura/clic, cuota/IDB deshabilitado, restauración aún pendiente, otra cuenta, revocación/respuesta tardía, red429/5xx | Reloj/puertos controlados y regresiones existentes |
+| FIX-01-CA-04 | Teclado/390px, recorrido Chrome y Electron servicio, patch/changelog | Capturas y resultados del PM, distinguiendo mocks de plataforma |
+
+```bash
+pnpm exec vitest run src/web/GameEditor.test.tsx src/web/GameEditor.authority.test.tsx src/web/DraftRecovery.test.tsx src/application/services/draft-coordinator.test.ts
+pnpm typecheck
+pnpm lint
+pnpm build:web
+pnpm build
+```
+
+QA usa apertura y borradores sintéticos, sin mutar datos operativos del usuario. Una fixture puede provocar caducidad o devolver 409; registrar si es simulación HTTP o servicio real. Contratos backend sin cambios se reutilizan como referencia; no ejecutar migraciones ni certificar su semántica por mocks frontend. La ejecución posterior pasó los comandos anteriores y añadió `GameEditor.opening-recovery.test.tsx` (70 pruebas totales). La recuperación real se verificó en Chromium integrado y Electron servicio, incluido teclado; Chrome/390 px quedó sin completar al bloquearse el Mac. No hay cambios de CSS en este parche.
+
+Precisiones de despacho PM: priorizar handoff explícito `DraftCheckpoint` entre editor anterior/nuevo y flush local como barrera cuando está habilitado. `restore()` no equivale a ACK durable porque su persistencia absorbe errores; verificar escritura o conservar handoff en memoria sin afirmar respaldo local. Baseline del delta en `.local/validation/draft409/baseline`; fixture sintética reutilizable en `.local/validation/player-button54/qa-context.json` (API 8877 parada al preparar el plan). No intervenir servicio operativo 8787 ni Storybook 6006 del usuario; el PM coordina los entornos de QA.

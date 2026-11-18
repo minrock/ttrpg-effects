@@ -8,7 +8,10 @@ import { defaultDiceDraft } from "../../../domain/dice/dice";
 afterEach(async () => { for (const action of cleanup.splice(0).reverse()) await action(); });
 for (const kind of ["sqlite", "postgres"] as const) it(`humo HTTP/SSE del artefacto compilado010 y migración desde esquema 5 ${kind}`, async () => {
   const config = await fixture(kind, 5), env = { ...process.env, TTRPG_DB_DRIVER: config.driver, TTRPG_DEPLOYMENT: config.deployment, ...(config.driver === "sqlite" ? { TTRPG_DATA_DIR: config.dataDir } : { TTRPG_DATABASE_URL: config.url, TTRPG_DB_CA_FILE: config.caFile }) };
-  expect((await promisify(execFile)("pnpm", ["db:migrate"], { env })).stdout).toContain(`migraciones ${migrations.slice(5).map(m=>m.version).join(", ")} aplicadas`);
+  // El checkout aislado comparte node_modules por enlace; `pnpm db:migrate` intenta
+  // reinstalarlo al detectar su raíz y no llega a ejecutar la migración. El artefacto
+  // compilado es exactamente el ejecutable que invoca ese script.
+  expect((await promisify(execFile)(process.execPath, ["out/api/db-migrate.mjs"], { env })).stdout).toContain(`migraciones ${migrations.slice(5).map(m=>m.version).join(", ")} aplicadas`);
   const asset = randomUUID();
   const result = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
     const child = spawn(process.execPath, ["src/infrastructure/server/moderation/test-fixtures/compiled-smoke.mjs"], { stdio: ["pipe", "pipe", "pipe"] }); let stdout = "", stderr = "";

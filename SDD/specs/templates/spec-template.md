@@ -32,4 +32,4 @@ Separar bloqueo real de mejora futura. Registrar decisiones aceptadas con proced
 
 ## Entrega y evidencia
 
-Enlazar `plan.md` del mismo directorio, guías afectadas y expediente cuando exista. Tras implementar, registrar criterio → resultado, límites de verificación y estado de Git. Conservar evidencia anterior cuando el contrato evolucione.
+Enlazar `plan.md` y `tareas.md` del mismo directorio cuando existan, guías afectadas y expediente cuando corresponda. La especificación puede entregarse antes del plan de implementación. Tras implementar, registrar criterio → resultado, límites de verificación y estado de Git. Conservar evidencia anterior cuando el contrato evolucione.

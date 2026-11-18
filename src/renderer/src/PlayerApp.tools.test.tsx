@@ -4,12 +4,14 @@ import { attentionFrame, type AttentionFocusEvent } from "../../domain/player/at
 import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TtrpgApi } from "../../preload/ttrpg-api";
+import type { TtrpgApi } from "../../shared/api/ttrpg-api";
+import { createClient, type TtrpgClient } from "../../shared/api/client";
 import type { PlayerWindowSnapshot, ViewportCameraSnapshot } from "../../domain/player/player-window";
 import type { SceneShape } from "../../domain/sessions/scene-document";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import type { MapViewport } from "./components/MapViewport";
 import { PlayerApp } from "./PlayerApp";
+import { ClientProvider } from "./client/ClientProvider";
 
 type ViewportProps = ComponentProps<typeof MapViewport>;
 const viewport = vi.hoisted(() => ({
@@ -52,6 +54,7 @@ describe("PlayerApp local tools", () => {
   let onScene: (snapshot: PlayerWindowSnapshot) => void;
   let initial: PlayerWindowSnapshot;
   let onFocus: (event: AttentionFocusEvent) => void;
+  let client: TtrpgClient;
   const saveScene = vi.fn<TtrpgApi["saveScene"]>();
   const publishPlayerScene = vi.fn<TtrpgApi["publishPlayerScene"]>();
 
@@ -135,17 +138,16 @@ describe("PlayerApp local tools", () => {
       saveScene,
       publishPlayerScene
     } satisfies Partial<TtrpgApi>;
-    Object.defineProperty(window, "ttrpg", { configurable: true, value: api });
+    client = createClient(api as unknown as TtrpgApi, { scenes: false, images: false, libraries: false, player: true, dice: false });
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root.render(<PlayerApp />));
+    await act(async () => root.render(<ClientProvider client={client}><PlayerApp /></ClientProvider>));
   });
 
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
-    Reflect.deleteProperty(window, "ttrpg");
     vi.clearAllTimers();
     vi.useRealTimers();
   });
@@ -153,7 +155,7 @@ describe("PlayerApp local tools", () => {
   it("keeps table data in a retractable sidebar without resetting drawings or camera", async () => {
     expect(container.querySelector("#player-table-sidebar")).toBeNull();
     const local = await createCircle();
-    await act(async () => root.render(<PlayerApp tablePanel={<details open><summary>Datos de la mesa</summary><button aria-label="Salir de la partida">Salir de la partida</button></details>} />));
+    await act(async () => root.render(<ClientProvider client={client}><PlayerApp tablePanel={<details open><summary>Datos de la mesa</summary><button aria-label="Salir de la partida">Salir de la partida</button></details>} /></ClientProvider>));
     const sidebar = container.querySelector<HTMLElement>("#player-table-sidebar")!;
     const toggle = container.querySelector<HTMLButtonElement>('[aria-controls="player-table-sidebar"]')!;
     if (sidebar.hidden) await act(async () => toggle.click());

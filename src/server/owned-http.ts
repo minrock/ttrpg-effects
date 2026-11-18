@@ -1,4 +1,6 @@
 import { ownedDraftRoute } from "./owned-drafts";
+import { campaignRoute } from "./campaign-http";
+import { arcPreparationRoute } from "./arc-preparation-http";
 import { SystemError } from "../application/services/system-catalog";
 import { systemRefSchema, systemIdSchema, systemDefinitionSchema, availabilitySchema, resourceBindingsSchema } from "../domain/systems/system-catalog";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -20,6 +22,8 @@ import { body, json } from "./request-body";
 import { HttpError, missing, invalid } from "./errors";
 import { LIMITS } from "./config";
 import { characterSchema, monsterSchema, npcSchema, parse, query, routeId, sceneInputSchema, resolveSchema, numberQuery } from "./schemas";
+import { sceneDestinationSchema } from "../shared/contracts/campaigns";
+import { parseSceneDocument } from "../domain/sessions/scene-schema";
 const operation = z.uuid();
 const revision = z.number().int().min(1);
 const revisions = z.record(z.uuid(), revision);
@@ -56,6 +60,12 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
       const result = await identity.authorized(cookie, permission, async (principal, tx): Promise<Result> => {
         const scenes = new OwnedSceneService(tx, now), games = ownedGames(principal.account.id, tx);
         const run = async (): Promise<Result> => {
+          if (permission === "dm") {
+            const preparation = await arcPreparationRoute(tx, url, method, parts, payload, expectedRevision);
+            if (preparation) return preparation;
+            const campaign = await campaignRoute(tx, url, method, parts, payload, expectedRevision);
+            if (campaign) return campaign;
+          }
           if (permission === "dm" && (parts[0] === "drafts" || parts[0] === "draft-capabilities" || parts[0] === "draft-definitions" || parts[0] === "games" && parts[2] === "drafts")) {
             const draft = await ownedDraftRoute(tx, principal.account.id, url, method, payload, expectedRevision, operationId, now);
             if (draft) return draft;
@@ -90,7 +100,7 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
             if (parts.length === 1 && method === "POST") { const input = parse(z.strictObject({ name: gameNameSchema, systemRef: systemRefSchema }), payload); const game = await games.create(input.name, input.systemRef); return { status: 201, location: `/api/v1/dm/games/${game.id}`, value: { ok: true, game } }; }
             if(parts.length===3&&parts[2]==="last-scene"&&method==="GET")return {value:{ok:true,sceneId:await tx.links.latestScene(routeId(parts[1]))}};
             if (parts.length === 3 && parts[2] === "configuration" && method === "GET") return { value: { ok: true, configuration: await tx.links.resolve(routeId(parts[1])) } };
-            if (parts.length === 3 && parts[2] === "resources" && method === "POST") { const input = parse(z.strictObject({ kind: z.enum(["scenes","monsters","npcs","player-characters"]), resourceId: z.uuid() }),payload); await tx.links.link(routeId(parts[1]),input.kind,input.resourceId); return { value: { ok: true } }; }
+            if (parts.length === 3 && parts[2] === "resources" && method === "POST") { const input = parse(z.strictObject({ kind: z.enum(["scenes","monsters","npcs","player-characters"]), resourceId: z.uuid() }),payload), gameId = routeId(parts[1]); await tx.campaigns.assertCampaignWritable(gameId); if (input.kind === "scenes") throw new OwnedError("CONFLICT"); await tx.links.link(gameId,input.kind,input.resourceId); return { value: { ok: true } }; }
             if (parts.length !== 2) throw missing(); const key = routeId(parts[1]);
             if (method === "GET") { const game = await games.find(key); if (!game) throw missing(); return { value: { ok: true, game } }; }
             if (method === "PATCH") { const patch = parse(z.strictObject({ name: gameNameSchema.optional(), state: gameStateSchema.optional() }).refine(p => Object.keys(p).length > 0), payload); return { value: { ok: true, game: await games.update(key, patch, expected()) } }; }
@@ -99,13 +109,19 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
           if (parts[0] === "scenes") {
             if (parts.length === 1 && method === "GET") { query(url, ["limit", "offset"]); const list = await tx.resources.list("scenes", { limit: numberQuery(url, "limit", 50, 1, 100), offset: numberQuery(url, "offset", 0, 0, Number.MAX_SAFE_INTEGER) }); return { value: { ok: true, scenes: list.items.map(({ value: v, revision }) => ({ id: v.id, name: v.name, createdAt: v.createdAt, updatedAt: v.updatedAt, revision })), total: list.total } }; }
             query(url, []);
-            if ((parts.length === 1 || parts.length === 2 && parts[1] === "import") && method === "POST") { const input = parse(sceneInputSchema.extend({ bindings: resourceBindingsSchema.optional() }), payload); const resource = await scenes.save(input.name, input.scene, undefined, 0, input.bindings); return { status: 201, location: `/api/v1/dm/scenes/${resource.id}`, value: { ok: true, resource } }; }
+            if ((parts.length === 1 || parts.length === 2 && parts[1] === "import") && method === "POST") {
+              const input = parse(sceneInputSchema.extend({ ...sceneDestinationSchema.shape, bindings: resourceBindingsSchema.optional() }), payload);
+              const arc = await tx.campaigns.resolveSceneArc(input.campaignId, input.arcId);
+              const created = await tx.campaigns.createScene(input.campaignId, arc.id, { name: input.name, scene: parseSceneDocument(input.scene), bindings: resourceBindingsSchema.parse(input.bindings ?? { monsters: {} }) }, "owned-http");
+              const resource = await scenes.get(created.sceneId);
+              return { status: 201, location: `/api/v1/dm/scenes/${resource.id}`, value: { ok: true, resource } };
+            }
             const key = routeId(parts[1]);
             if (parts.length === 4 && parts[2] === "links" && parts[3] === "candidates" && method === "GET") return { value: await new OwnedSceneLinksService(scenes).candidates(sceneReference(key)) };
             if (parts.length === 3 && parts[2] === "export" && method === "GET") return { value: (await scenes.get(key)).scene, exportId: key };
             if (parts.length !== 2) throw missing();
             if (method === "GET") return { value: { ok: true, resource: await scenes.get(key) } };
-            if (method === "PUT") { const input = parse(sceneInputSchema.extend({ bindings: resourceBindingsSchema.optional() }), payload); return { value: { ok: true, resource: await scenes.save(input.name, input.scene, key, expected(), input.bindings) } }; }
+            if (method === "PUT") { const input = parse(sceneInputSchema.extend({ bindings: resourceBindingsSchema.optional() }), payload); await scenes.get(key); await tx.campaigns.assertSceneParent(key); return { value: { ok: true, resource: await scenes.save(input.name, input.scene, key, expected(), input.bindings) } }; }
             if (method === "DELETE") { parse(z.strictObject({}), payload); await tx.resources.remove("scenes", key, expected()); return { value: { ok: true } }; }
           }
           if (parts[0] === "assets") {
@@ -156,9 +172,9 @@ export function createOwnedHttp(identity: IdentityService, origin: string, now =
       if (result.exportId) res.setHeader("Content-Disposition", `attachment; filename="scene-${result.exportId}.ttrpgscene"`);
       send(res, result.status ?? 200, result.value);
     } catch (error) {
-      const failure = error instanceof HttpError ? error : error instanceof IdentityError ? { status: ({ INVALID_INPUT: 400, UNAUTHORIZED: 401, FORBIDDEN: 403, PASSWORD_CHANGE_REQUIRED: 403, CONFLICT: 409, NOT_FOUND: 404, RATE_LIMITED: 429, UNAVAILABLE: 503 })[error.code], code: error.code, message: error.message } : error instanceof OwnedError || error instanceof CatalogError || error instanceof SystemError ? { status: error.code === "FORBIDDEN" ? 403 : error.code === "NOT_FOUND" ? 404 : ["CONFLICT", "REVISION_CONFLICT", "OPERATION_CONTENT_CONFLICT", "TEMPLATE_REFERENCED", "IMMUTABLE", "DISABLED", "INCOMPATIBLE", "DRAFT_BRANCH_LIMIT", "DRAFT_STORAGE_LIMIT"].includes(error.code) ? 409 : error.code === "OPERATION_BUDGET" ? 429 : error.code === "RESULT_TOO_LARGE" ? 413 : error.code === "VALIDATION" ? 422 : error.code === "CORRUPT" ? 500 : 503, code: error.code, message: error.message } : { status: 503, code: "UNAVAILABLE", message: "No se pudo completar la operación." };
+      const failure = error instanceof HttpError ? error : error instanceof IdentityError ? { status: ({ INVALID_INPUT: 400, UNAUTHORIZED: 401, FORBIDDEN: 403, PASSWORD_CHANGE_REQUIRED: 403, CONFLICT: 409, NOT_FOUND: 404, RATE_LIMITED: 429, UNAVAILABLE: 503 })[error.code], code: error.code, message: error.message } : error instanceof OwnedError || error instanceof CatalogError || error instanceof SystemError ? { status: error.code === "FORBIDDEN" ? 403 : error.code === "NOT_FOUND" ? 404 : ["CONFLICT", "CAMPAIGN_INACTIVE", "CAMPAIGN_OPEN", "SCENE_SHARED_INACTIVE", "REVISION_CONFLICT", "OPERATION_CONTENT_CONFLICT", "TEMPLATE_REFERENCED", "IMMUTABLE", "DISABLED", "INCOMPATIBLE", "DRAFT_BRANCH_LIMIT", "DRAFT_STORAGE_LIMIT"].includes(error.code) ? 409 : error.code === "OPERATION_BUDGET" ? 429 : error.code === "RESULT_TOO_LARGE" ? 413 : error.code === "VALIDATION" ? 422 : error.code === "CORRUPT" ? 500 : 503, code: error.code, message: error.message } : { status: 503, code: "UNAVAILABLE", message: "No se pudo completar la operación." };
       if (!req.complete) res.setHeader("Connection", "close");
-      send(res, failure.status, { ok: false, error: { code: failure.code, message: failure.message, ...(error instanceof OwnedError && error.retryAt ? { retryAt: error.retryAt } : {}) } });
+      send(res, failure.status, { ok: false, error: { code: failure.code, message: failure.message, ...(error instanceof OwnedError && error.retryAt ? { retryAt: error.retryAt } : {}), ...(error instanceof OwnedError && error.code === "SCENE_SHARED_INACTIVE" && error.campaignId ? { campaignId: error.campaignId } : {}) } });
     }
   };
 }

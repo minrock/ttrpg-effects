@@ -1,12 +1,9 @@
 // @vitest-environment jsdom
-import { readFileSync } from "node:fs";
-import { act, useEffect, useState, type ComponentProps } from "react";
-import { createPortal } from "react-dom";
+import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InterfaceLab } from "./InterfaceLab";
 import { LabCanvas, type LabCanvasProps } from "./LabCanvas";
-import { LabDice } from "./LabDice";
 
 const canvasLifecycle = vi.hoisted(() => ({ mount: vi.fn(), unmount: vi.fn() }));
 vi.mock("./LabCanvas", () => ({ LabCanvas: vi.fn(function MockLabCanvas(props: LabCanvasProps) {
@@ -15,15 +12,6 @@ vi.mock("./LabCanvas", () => ({ LabCanvas: vi.fn(function MockLabCanvas(props: L
     return () => { canvasLifecycle.unmount(); };
   }, []);
   return <div data-testid={props.player ? "player-canvas" : "dm-canvas"} tabIndex={0} />;
-}) }));
-vi.mock("./LabDice", () => ({ LabDice: vi.fn(function MockLabDice({ active, viewport }: ComponentProps<typeof LabDice>) {
-  const [rolls, setRolls] = useState(0);
-  return <>
-    <div className="dice-panel" data-testid="lab-dice" hidden={!active}>
-      <button type="button" aria-label="Tirada de prueba" onClick={() => setRolls(value => value + 1)}>{rolls}</button>
-    </div>
-    {viewport && createPortal(<div className="dice-overlay is-visible" data-testid="private-dice-overlay">Private roll</div>, viewport)}
-  </>;
 }) }));
 
 const dialogMethods = {
@@ -80,7 +68,6 @@ describe("UI lab shell", () => {
   function canvas(player = false): LabCanvasProps {
     return vi.mocked(LabCanvas).mock.calls.filter(([props]) => Boolean(props.player) === player).at(-1)![0];
   }
-  function dice(): ComponentProps<typeof LabDice> { return vi.mocked(LabDice).mock.calls.at(-1)![0]; }
   async function click(target: HTMLElement): Promise<void> { await act(async () => target.click()); }
   async function fill(target: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
     await act(async () => {
@@ -151,34 +138,6 @@ describe("UI lab shell", () => {
     expect(host.querySelectorAll(".lab-map-item")).toHaveLength(canvas().scene.maps.length);
   });
 
-  it("keeps dice mounted across inspector tabs and panel toggles and guards dice keyboard events", async () => {
-    await render();
-    expect(dice().active).toBe(false);
-    expect(dice().viewport).toBe(element('[aria-label="Mesa de juego"]'));
-    const diceHost = element('[data-testid="lab-dice"]');
-    await click(element('[aria-label="Abrir dados"]'));
-    expect(dice().active).toBe(true);
-    expect(button("Dados", tabs("Panel derecho")).getAttribute("aria-selected")).toBe("true");
-    expect(host.querySelector('[aria-label="Nombre del mapa"]')).toBeNull();
-    await click(element('[aria-label="Tirada de prueba"]'));
-    await key("f");
-    const roll = element('[aria-label="Tirada de prueba"]');
-    await key("h", roll);
-    await key("Escape", roll);
-    expect(canvas().tool).toBe("fire");
-    await click(button("Propiedades", tabs("Panel derecho")));
-    expect(dice().active).toBe(false);
-    expect(element('[data-testid="lab-dice"]')).toBe(diceHost);
-    await key("ArrowRight", button("Propiedades", tabs("Panel derecho")));
-    expect(dice().active).toBe(true);
-    expect(document.activeElement).toBe(button("Dados", tabs("Panel derecho")));
-    expect(roll.textContent).toBe("1");
-    await click(element('[aria-label="Cerrar inspector"]'));
-    expect(element('[aria-label="Inspector"]').hidden).toBe(true);
-    await click(element('[aria-label="Abrir inspector"]'));
-    expect(element('[data-testid="lab-dice"]')).toBe(diceHost);
-    expect(element('[aria-label="Tirada de prueba"]').textContent).toBe("1");
-  });
 
   it("passes tool and shape changes to the canvas and Escape clears tool, selection, focus and menus", async () => {
     await render();
@@ -236,51 +195,33 @@ describe("UI lab shell", () => {
     expect(canvas().tool).toBe("pan");
   });
 
-  it("reuses one canvas across Player Preview and hides the private dice portal through CSS", async () => {
-    const styles = ["../components/dice/dice.css", "./ui-lab.css"].map(path => {
-      const style = document.createElement("style");
-      style.textContent = readFileSync(new URL(path, import.meta.url), "utf8");
-      document.head.append(style);
-      return style;
-    });
-    try {
-      await render();
-      await key("f");
-      const canvasElement = element('[data-testid="dm-canvas"]');
-      const overlay = element('[data-testid="private-dice-overlay"]');
-      const canvasSelector = '[data-testid="dm-canvas"], [data-testid="player-canvas"]';
-      expect(overlay.parentElement).toBe(element('[aria-label="Mesa de juego"]'));
-      expect(getComputedStyle(overlay).display).not.toBe("none");
-      expect(getComputedStyle(overlay).visibility).toBe("visible");
-      expect(canvasLifecycle.mount).toHaveBeenCalledOnce();
-      await click(button("Vista del jugador"));
-      expect(host.querySelectorAll(canvasSelector)).toHaveLength(1);
-      expect(element('[data-testid="player-canvas"]')).toBe(canvasElement);
-      expect(canvas(true)).toMatchObject({ player: true, tool: "select", selectedId: null });
-      expect(canvasLifecycle.mount).toHaveBeenCalledOnce();
-      expect(canvasLifecycle.unmount).not.toHaveBeenCalled();
-      expect(element('[data-testid="private-dice-overlay"]')).toBe(overlay);
-      expect(getComputedStyle(overlay).display).toBe("none");
-      const preview = element<HTMLDialogElement>('dialog[aria-label="Vista previa del jugador"]');
-      expect(preview.open).toBe(true);
-      expect(preview.contains(canvasElement)).toBe(false);
-      await click(button("Volver al DM", preview));
-      expect(host.querySelectorAll(canvasSelector)).toHaveLength(1);
-      expect(element('[data-testid="dm-canvas"]')).toBe(canvasElement);
-      expect(canvas()).toMatchObject({ player: false, tool: "fire" });
-      expect(canvasLifecycle.mount).toHaveBeenCalledOnce();
-      expect(canvasLifecycle.unmount).not.toHaveBeenCalled();
-      expect(element('[data-testid="private-dice-overlay"]')).toBe(overlay);
-      expect(getComputedStyle(overlay).display).not.toBe("none");
-      expect(getComputedStyle(overlay).visibility).toBe("visible");
-      await act(async () => root.render(null));
-      expect(canvasLifecycle.unmount).toHaveBeenCalledOnce();
-    } finally { styles.forEach(style => style.remove()); }
+  it("reuses one canvas across Player Preview", async () => {
+    await render();
+    await key("f");
+    const canvasElement = element('[data-testid="dm-canvas"]');
+    const canvasSelector = '[data-testid="dm-canvas"], [data-testid="player-canvas"]';
+    expect(canvasLifecycle.mount).toHaveBeenCalledOnce();
+    await click(button("Vista del jugador"));
+    expect(host.querySelectorAll(canvasSelector)).toHaveLength(1);
+    expect(element('[data-testid="player-canvas"]')).toBe(canvasElement);
+    expect(canvas(true)).toMatchObject({ player: true, tool: "select", selectedId: null });
+    expect(canvasLifecycle.mount).toHaveBeenCalledOnce();
+    expect(canvasLifecycle.unmount).not.toHaveBeenCalled();
+    const preview = element<HTMLDialogElement>('dialog[aria-label="Vista previa del jugador"]');
+    expect(preview.open).toBe(true);
+    expect(preview.contains(canvasElement)).toBe(false);
+    await click(button("Volver al DM", preview));
+    expect(host.querySelectorAll(canvasSelector)).toHaveLength(1);
+    expect(element('[data-testid="dm-canvas"]')).toBe(canvasElement);
+    expect(canvas()).toMatchObject({ player: false, tool: "fire" });
+    expect(canvasLifecycle.mount).toHaveBeenCalledOnce();
+    expect(canvasLifecycle.unmount).not.toHaveBeenCalled();
+    await act(async () => root.render(null));
+    expect(canvasLifecycle.unmount).toHaveBeenCalledOnce();
   });
 
-  it("propagates map renaming to the map list, canvas and dice context without changing the context token", async () => {
+  it("propagates map renaming to the map list and canvas", async () => {
     await render();
-    const initialContext = dice().context;
     await fill(element<HTMLInputElement>('[aria-label="Nombre del mapa"]'), "Sala del eclipse");
     const scene = canvas().scene;
     expect(scene.name).toBe("Sala del eclipse");
@@ -288,7 +229,6 @@ describe("UI lab shell", () => {
     expect(element(".lab-map-name").textContent).toBe(scene.name);
     expect(element(".lab-map-breadcrumb").textContent).toBe(scene.name);
     expect(element(".lab-inspector-title h2").textContent).toBe(scene.name);
-    expect(dice().context).toEqual({ ...initialContext, mapName: scene.name });
   });
 
   it("imports a local image as a MIME data URL and retains it after renaming and switching maps", async () => {
@@ -320,7 +260,6 @@ describe("UI lab shell", () => {
     await click(mapButton("Puente del rio"));
     expect(canvas().scene).toMatchObject({ id: imported.id, activeMapId: imported.id, name: "Puente del rio", map: { imageSize } });
     expect(canvas().imageUrl).toBe(dataUrl);
-    expect(dice().context).toMatchObject({ mapId: imported.id, mapName: "Puente del rio" });
   });
 
   it("replaces the current image without replacing its map, effects or annotation markers", async () => {
@@ -328,7 +267,7 @@ describe("UI lab shell", () => {
     const { read, decode } = mockLocalImage(dataUrl, imageSize);
     const file = new File([new Uint8Array([137, 80, 78, 71])], "replacement.png", { type: "image/png" });
     await render();
-    const original = canvas().scene, originalContext = dice().context;
+    const original = canvas().scene;
     expect(original.effects.length).toBeGreaterThan(0);
     expect(original.mapAnnotations.pins.length).toBeGreaterThan(0);
     await click(button("Actualizar imagen"));
@@ -346,13 +285,10 @@ describe("UI lab shell", () => {
     expect(replaced.mapAnnotations).toEqual(original.mapAnnotations);
     expect(canvas().imageUrl).toBe(dataUrl);
     expect(element<HTMLImageElement>(".lab-map-item.is-active img").src).toBe(dataUrl);
-    expect(dice().context).toEqual(originalContext);
     expect(host.querySelectorAll(".lab-map-item")).toHaveLength(original.maps.length);
   });
 
-  it("keeps tabs, switches, map inputs and notes usable without preload or browser storage access", async () => {
-    const preloadAccess = vi.fn(() => { throw new Error("Preload access is forbidden in the UI lab."); });
-    vi.stubGlobal("ttrpg", new Proxy({}, { get: preloadAccess, set: preloadAccess }));
+  it("keeps tabs, switches, map inputs and notes usable without browser storage access", async () => {
     const storageGet = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("Storage reads are forbidden in the UI lab."); });
     const storageSet = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage writes are forbidden in the UI lab."); });
     await render();
@@ -363,10 +299,6 @@ describe("UI lab shell", () => {
     expect(canvas().scene.name).toBe("Mesa sin persistencia");
     await click(button("Mapa", tabs("Ambito del explorador")));
     expect(host.querySelector(".lab-object-list")).not.toBeNull();
-    await click(element('[aria-label="Abrir dados"]'));
-    expect(dice().active).toBe(true);
-    await click(button("Propiedades", tabs("Panel derecho")));
-    expect(dice().active).toBe(false);
     await click(element('[aria-label="Notas de la escena"]'));
     await click(element(".lab-note-row"));
     await fill(element<HTMLInputElement>("dialog input"), "Nota en memoria");
@@ -376,7 +308,6 @@ describe("UI lab shell", () => {
     await click(element(".lab-note-row"));
     expect(element<HTMLTextAreaElement>("dialog textarea").value).toBe("Revisar el puente.");
     await act(async () => root.render(null));
-    expect(preloadAccess).not.toHaveBeenCalled();
     expect(storageGet).not.toHaveBeenCalled();
     expect(storageSet).not.toHaveBeenCalled();
   });
@@ -481,9 +412,5 @@ describe("UI lab shell", () => {
     await click(element('[aria-label="Notas de la escena"]'));
     expect(explorer.hidden).toBe(false);
     expect(inspector.hidden).toBe(true);
-    await click(element('[aria-label="Abrir dados"]'));
-    expect(inspector.hidden).toBe(false);
-    expect(explorer.hidden).toBe(width < 1100);
-    expect(dice().active).toBe(true);
   });
 });

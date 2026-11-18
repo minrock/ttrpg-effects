@@ -1134,7 +1134,6 @@ body {
   top: 56px;
 }
 
-.scene-counters-overlay__manage,
 .scene-counter-bar__actions button {
   display: grid;
   place-items: center;
@@ -1149,12 +1148,6 @@ body {
 .scene-counter-bar__actions button.is-player-visible {
   border-color: rgb(123 199 178 / 62%);
   color: #a8ecd9;
-}
-
-.scene-counters-overlay__manage {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
 }
 
 .scene-counters-overlay__stack {
@@ -1307,8 +1300,6 @@ body {
   background: transparent;
 }
 
-.scene-counters-overlay__manage:hover,
-.scene-counters-overlay__manage:focus-visible,
 .scene-counter-bar__actions button:hover,
 .scene-counter-bar__actions button:focus-visible {
   border-color: #ffd28a;
@@ -2451,7 +2442,7 @@ body {
   width: 100%;
 }
 
-.sidebar-accordion-content button {
+.sidebar-accordion-content button:not(.shared-switch) {
   min-height: 34px;
   border: 1px solid rgb(244 241 232 / 16%);
   border-radius: 8px;
@@ -2462,12 +2453,12 @@ body {
   cursor: pointer;
 }
 
-.sidebar-accordion-content button:hover:not(:disabled) {
+.sidebar-accordion-content button:not(.shared-switch):hover:not(:disabled) {
   border-color: rgb(255 197 107 / 60%);
   background: #2e3638;
 }
 
-.sidebar-accordion-content button.is-active {
+.sidebar-accordion-content button:not(.shared-switch).is-active {
   border-color: rgb(255 210 138 / 70%);
   color: #1a1d1f;
   background: #ffd28a;
@@ -2510,44 +2501,6 @@ body {
 .switch-control small {
   color: #aeb8b2;
   font-size: 0.74rem;
-}
-
-.sidebar-accordion-content .switch-root {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 0 0 auto;
-  width: 48px;
-  height: 28px;
-  min-height: 28px;
-  border: 1px solid rgb(244 241 232 / 18%);
-  border-radius: 999px;
-  padding: 0;
-  background: #111315;
-  cursor: pointer;
-  overflow: hidden;
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.sidebar-accordion-content .switch-root[data-state="checked"] {
-  border-color: rgb(255 210 138 / 70%);
-  background: #ffd28a;
-}
-
-.switch-thumb {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: #f4f1e8;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 28%);
-  transform: translateX(2px);
-  transition: transform 160ms ease, background 160ms ease;
-}
-
-.sidebar-accordion-content .switch-root[data-state="checked"] .switch-thumb {
-  background: #1a1d1f;
-  transform: translateX(22px);
 }
 
 .selected-properties-content {
@@ -5392,7 +5345,7 @@ body {
   background: var(--editor-input);
 }
 
-.sidebar-accordion-content button {
+.sidebar-accordion-content button:not(.shared-switch) {
   border-color: #263040;
   color: var(--editor-text-soft);
   background: #1a212b;
@@ -5400,13 +5353,13 @@ body {
   font-weight: 650;
 }
 
-.sidebar-accordion-content button:hover:not(:disabled) {
+.sidebar-accordion-content button:not(.shared-switch):hover:not(:disabled) {
   border-color: #33404f;
   color: #fff;
   background: #212a36;
 }
 
-.sidebar-accordion-content button.is-active {
+.sidebar-accordion-content button:not(.shared-switch).is-active {
   border-color: rgb(240 185 92 / 48%);
   color: var(--editor-accent);
   background: rgb(240 185 92 / 13%);
@@ -5434,31 +5387,6 @@ body {
   color: var(--editor-dim);
   font-family: var(--editor-mono);
   font-size: 0.62rem;
-}
-
-.sidebar-accordion-content .switch-root {
-  width: 40px;
-  height: 22px;
-  min-height: 22px;
-  border-color: var(--editor-border-strong);
-  background: var(--editor-input);
-}
-
-.sidebar-accordion-content .switch-root[data-state="checked"] {
-  border-color: var(--editor-accent);
-  background: rgb(240 185 92 / 24%);
-}
-
-.switch-thumb {
-  width: 16px;
-  height: 16px;
-  background: var(--editor-dim);
-  transform: translateX(2px);
-}
-
-.sidebar-accordion-content .switch-root[data-state="checked"] .switch-thumb {
-  background: var(--editor-accent);
-  transform: translateX(20px);
 }
 
 .token-list-row {

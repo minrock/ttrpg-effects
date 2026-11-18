@@ -9,7 +9,7 @@ import { invalid, missing } from "./errors";
 import { idSchema } from "./schemas";
 
 export class OwnedSceneService {
-  constructor(private readonly store: OwnedTransaction, private readonly now: () => number) {}
+  constructor(private readonly store: Pick<OwnedTransaction, "resources" | "assets">, private readonly now: () => number) {}
   async resolve(reference: string): Promise<string | null> {
     const id = reference.startsWith("asset:") ? reference.slice(6) : "";
     return idSchema.safeParse(id).success && await this.store.assets.has(id) ? `/api/v1/dm/assets/${id}` : null;

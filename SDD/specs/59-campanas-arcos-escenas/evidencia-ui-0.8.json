@@ -1,0 +1,106 @@
+{
+  "date": "2026-11-15",
+  "revision": "0.8",
+  "version": "3.31.0",
+  "task": "T-15",
+  "criteria": [
+    "CA-29",
+    "CA-30",
+    "CA-31"
+  ],
+  "status": "validated locally; not merged",
+  "branch": "feature/escenas-menu-campana",
+  "authorization": "Q-0013: Sí, crear la rama y continuar. Branch only; local changes preserved; no history writes.",
+  "implementation": [
+    "CampaignSceneMenu with complete sequential pagination, per-arc associations, current/blocked rows and late-result cancellation",
+    "GameEditor to ServiceApp navigation with one guard, compatible beforeCommit and full LiveEditor context key",
+    "HeaderDropdown opt-in keep-open for retry; five real-component Storybook stories"
+  ],
+  "checks": [
+    {
+      "command": "pnpm test src/web/CampaignSceneMenu.test.tsx src/web/HeaderDropdown.test.tsx src/web/GameEditor.test.tsx src/web/GameEditor.authority.test.tsx src/web/ServiceApp.test.tsx --exclude '.local/**' --maxWorkers 4",
+      "result": "59 passed in 5 files",
+      "record": ".local/validation/campaign-scene-menu08/t15-builder.log.md"
+    },
+    {
+      "command": "pnpm typecheck; pnpm lint",
+      "result": "passed",
+      "record": ".local/validation/campaign-scene-menu08/t15-builder.log.md"
+    },
+    {
+      "command": "pnpm build:web; pnpm build; pnpm build-storybook",
+      "result": "passed; existing use-client and chunk-size warnings",
+      "record": ".local/validation/campaign-scene-menu08/t15-builder.log.md"
+    }
+  ],
+  "automatedCoverage": [
+    "Pagination beyond 100 arcs/scenes, separate arc associations and no-progress rejection",
+    "Closing during awaited page stops subsequent requests and stale rows",
+    "Late results do not steal focus after leaving trigger",
+    "Expired authority while guard is pending prevents URL commit",
+    "Catalog return to identical selection and existing opening/action regressions"
+  ],
+  "review": "Technical lead read-only review closed catalog/editor, void beforeCommit compatibility, cancellation/focus and busy transition findings; not a general audit.",
+  "connectedQa": {
+    "environment": "Fresh synthetic fixture /private/tmp/ttrpg-menu59-08-wkpyropw, API8877 backend3.30.0 compatible and current frontend3.31.0. No user data.",
+    "browser": [
+      "Two arcs, six associations, exactly one Actual, inactive-campaign row disabled",
+      "Same scene in second arc to initial arc updates URL and prepared records from none to three",
+      "Actual is no-op; cancel dirty-map rename preserves URL/document and focuses trigger; discard opens Santuario",
+      "Campañas then identical selected scene re-enters editor",
+      "Escape closes and returns focus; Tab advances; no browser application console errors observed"
+    ],
+    "widths": [
+      390,
+      1440
+    ],
+    "measurements": {
+      "narrow": {
+        "viewport": 390,
+        "documentWidth": 390,
+        "panelLeft": 8,
+        "panelRight": 364.9140625
+      },
+      "desktop": {
+        "viewport": 1440,
+        "panelLeft": 164.8984375,
+        "panelRight": 521.8125
+      }
+    },
+    "electron": "New isolated userData/sessionData profile; login with synthetic account, catalog to editor, grouped menu, switch Foco to Santuario and Escape focus verified. Version3.31.0 visible. Three Skia mailbox GPU messages in process output; no navigation failure observed.",
+    "openingInvariant": "Read-only SQLite snapshots identical before/after browser and Electron: same opening id, generation12, state and invitation version/date. No reopen/rotate/publish action performed.",
+    "snapshots": [
+      ".local/validation/campaign-scene-menu08/opening-before.json",
+      ".local/validation/campaign-scene-menu08/opening-after-browser.json",
+      ".local/validation/campaign-scene-menu08/opening-after-electron.json"
+    ],
+    "screenshots": [
+      ".local/validation/campaign-scene-menu08/menu-desktop.png",
+      ".local/validation/campaign-scene-menu08/menu-narrow.png",
+      ".local/validation/campaign-scene-menu08/menu-electron.png"
+    ]
+  },
+  "storybook": {
+    "stories": [
+      "ActualYTextoLargo",
+      "Cargando",
+      "Vacio",
+      "ListaLarga",
+      "ErrorRecuperable"
+    ],
+    "result": "Real component with synthetic transport. Loading/status, empty, alert/retry stays open verified. 20-row long list at390: own scroll388/781; panel x8..374; actions visible; Tab from last row reaches Reabrir. Header context corrected to avoid page-padding clipping.",
+    "index": {
+      "stories": 72,
+      "docs": 33
+    },
+    "measurement": ".local/validation/campaign-scene-menu08/story-long-narrow.json",
+    "screenshot": ".local/validation/campaign-scene-menu08/story-long-narrow.png"
+  },
+  "cleanup": "Synthetic API8877 and isolated Electron stopped; no listener, process or control.lock remains. QA tabs closed and viewport reset. User API8787, Storybook6006 and Kanban8766 not stopped.",
+  "limits": [
+    "No new backend/DB/full-suite or autonomous Electron QA; no migration or real-data mutation.",
+    "Connected fixture has six associations; pagination beyond100 is automated coverage, not a real-browser large-catalog test.",
+    "No new native 200% zoom QA; narrow/desktop checks and native navigation are the observed coverage.",
+    "No git add/commit/push/merge, publication or DMG. Local validated checkout is not integration or a new operational API deployment."
+  ]
+}

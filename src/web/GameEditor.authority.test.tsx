@@ -2,32 +2,37 @@
 import { act, useEffect, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { GameEditor } from "./GameEditor";
+import { GameEditor, LiveEditor } from "./GameEditor";
 import { AccountAccess } from "./AccountAccess";
 import type { ServiceWorkspace } from "./workspace";
 import { DialogBroker } from "./dialogs";
 import { HttpTransport, ServiceError } from "../infrastructure/browser/http";
-import { systemSeeds } from "../domain/systems/system-catalog";
+import { systemSeeds, type ResolvedSystem, type SystemVersion } from "../domain/systems/system-catalog";
+import type { GameMetadata } from "../domain/games/game-metadata";
+import type { OpeningReply } from "./service-model";
+import { createDefaultScene } from "../domain/sessions/default-scene";
+import { DraftCoordinator } from "../application/services/draft-coordinator";
 
-const state=vi.hoisted(()=>({renders:vi.fn(),clear:vi.fn(),revalidate:vi.fn(),expired:vi.fn(),guard:undefined as undefined|(()=>Promise<boolean>),broker:undefined as undefined|DialogBroker,terminals:[] as Array<(reason:string)=>void>,status:{phase:"connected",published:false,presence:null,error:null}}));
+const state=vi.hoisted(()=>({renders:vi.fn(),clear:vi.fn(),revalidate:vi.fn(),expired:vi.fn(),guard:undefined as undefined|(()=>Promise<boolean>),broker:undefined as undefined|DialogBroker,terminals:[] as Array<(reason:string)=>void>,status:{phase:"connected",published:false,presence:null,error:null},browser:undefined as unknown}));
 vi.mock("../renderer/src/App",()=>({App:({service,tablePanel}:{service:ServiceWorkspace;tablePanel?:ReactNode})=>{
   state.renders();
   useEffect(()=>service.registerLeave?.(state.guard??(async()=>await service.confirmLeave()!==null)),[service]);
+  useEffect(()=>service.browser.drafts?.onRestore(async()=>{}),[service.browser]);
   return <><input aria-label="Borrador retenido" defaultValue="inicial"/>{tablePanel}</>;
 }}));
-vi.mock("../infrastructure/browser/browser-client",()=>({createBrowserClient:(_http:HttpTransport,broker:DialogBroker)=>{state.broker=broker;return {client:{},revalidate:state.revalidate,clear:state.clear};}}));
+vi.mock("../infrastructure/browser/browser-client",()=>({createBrowserClient:(_http:HttpTransport,broker:DialogBroker)=>{state.broker=broker;return state.browser??{client:{},revalidate:state.revalidate,clear:state.clear};}}));
 vi.mock("../infrastructure/browser/contextual-table-client",()=>({contextualTableClient:(_context:unknown,onTerminal:(reason:string)=>void)=>{state.terminals.push(onTerminal);return {subscribeStatus:()=>()=>{},getStatus:()=>state.status,start:()=>()=>{},clear:()=>{}};}}));
 const id="01010101-0101-4101-8101-010101010101",at="2026-10-31T00:00:00.000Z",seed=systemSeeds[0];
-const configuration={ref:seed.ref,definition:seed.definition,hash:"a".repeat(64),availability:"enabled"};
-const game={id,ownerId:"a",name:"Campaña",systemRef:seed.ref,state:"ready",createdAt:at,updatedAt:at,revision:1};
-const version={...seed.ref,state:"published",createdAt:at,publishedAt:at,revision:1,availability:"enabled",definition:seed.definition,hash:configuration.hash,templates:{}};
-const opening={ok:true,opening:{id,gameId:id,generation:1,revision:1,state:"open"},invitation:null,systemRef:seed.ref,status:"fresh"};
+const configuration:ResolvedSystem={ref:seed.ref,definition:seed.definition,hash:"a".repeat(64),availability:"enabled"};
+const game:GameMetadata={id,ownerId:"a",name:"Campaña",systemRef:seed.ref,state:"ready",createdAt:at,updatedAt:at,revision:1};
+const version:SystemVersion={...seed.ref,state:"published",createdAt:at,publishedAt:at,revision:1,availability:"enabled",definition:seed.definition,hash:configuration.hash,templates:{}};
+const opening:OpeningReply={ok:true,opening:{id,gameId:id,generation:1,revision:1,state:"open"},invitation:null,systemRef:seed.ref,status:"fresh"};
 const roster={ok:true,openingId:id,generation:1,status:"open",items:[{participantId:"player",alias:"Luz",discriminator:1,admission:"admitted",presence:"connected",admittedAt:at}],total:1,revision:1,presenceSequence:1};
 const reply=(value:unknown)=>new Response(JSON.stringify(value),{headers:{"content-type":"application/json"}});
 let host:HTMLDivElement,root:Root,http:HttpTransport,fetcher:ReturnType<typeof vi.fn<typeof fetch>>;
 let close:ReturnType<typeof vi.fn<() => void>>;
 beforeEach(()=>{
-  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});state.guard=undefined;state.broker=undefined;state.terminals=[];state.expired.mockClear();state.clear.mockClear();state.renders.mockClear();state.revalidate.mockReset().mockResolvedValue(undefined);
+  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});state.guard=undefined;state.broker=undefined;state.terminals=[];state.browser=undefined;state.expired.mockClear();state.clear.mockClear();state.renders.mockClear();state.revalidate.mockReset().mockResolvedValue(undefined);
   host=document.createElement("div");document.body.append(host);root=createRoot(host);
   HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};
   close=vi.fn(function(this:HTMLDialogElement){this.removeAttribute("open");});HTMLDialogElement.prototype.close=close;
@@ -97,8 +102,10 @@ for(const action of ["close","reopen"] as const)for(const order of ["terminal-be
   await act(async()=>{refreshed=true;refresh.resolve(reply(action==="close"?closed:next));});
   expect(host.textContent).not.toContain("Tu acceso a esta partida ya no está disponible");expect(host.querySelector("dialog")).toBeNull();
   if(action==="close"){
-    expect(host.textContent).toContain("Estado del anfitrión: Acceso caducado");expect(host.textContent).not.toContain("Continuar partida");await click("Iniciar partida");
-    expect(fetcher.mock.calls.some(([input])=>String(input).endsWith("/opening/start"))).toBe(true);
+    expect(fetcher.mock.calls.some(([input])=>String(input).endsWith("/opening/start"))).toBe(false);
+    expect(host.querySelector('[aria-label="Borrador retenido"]')).toBeNull();
+    expect(state.terminals).toHaveLength(1);
+    return;
   }
   expect(host.querySelector('[aria-label="Borrador retenido"]')?.closest('[hidden]')).toBeNull();
   expect(state.terminals).toHaveLength(2);
@@ -150,6 +157,24 @@ it("los controles en la cabecera compartida conservan confirmaciones y ocultan d
   } finally { await act(async()=>root.unmount());slot.remove(); }
 });
 
+it("el menú de campaña entrega una asociación al único callback de navegación sin abrir ni publicar", async () => {
+  const arcId="22222222-2222-4222-8222-222222222222",sceneId="33333333-3333-4333-8333-333333333333";
+  const select=vi.fn(async()=>true),fallback=fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async input=>{
+    const path=String(input);
+    if(path.includes(`/campaigns/${id}/arcs?`))return reply({ok:true,items:[{id:arcId,campaignId:id,name:"Arco activo",description:"",coverAssetId:null,revision:1,createdAt:at,updatedAt:at,sceneCount:1}],total:1,limit:100,offset:0});
+    if(path.includes(`/arcs/${arcId}/scenes`))return reply({ok:true,items:[{sceneId,arcId,campaignId:id,name:"Escena del menú",revision:1,coverRevision:0,customCoverAssetId:null,mapCount:0,map0ImagePath:null,map0AssetId:null,cover:{source:"placeholder"},writeBlock:null}],total:1,limit:100,offset:0});
+    return fallback(input);
+  });
+  await act(async()=>root.render(<GameEditor http={http} gameId={id} active expired={state.expired} onExit={()=>{}} onLogout={async()=>{}} registerLeave={()=>()=>{}} onSelectScene={select}/>));
+  await act(async()=>{for(let index=0;index<6;index++)await Promise.resolve();});
+  await act(async()=>host.querySelector("summary")!.click());
+  await vi.waitFor(()=>expect(host.textContent).toContain("Escena del menú"));
+  await act(async()=>[...host.querySelectorAll("button")].find(button=>button.textContent?.includes("Escena del menú"))!.click());
+  expect(select).toHaveBeenCalledWith({campaignId:id,arcId,sceneId});
+  expect(fetcher.mock.calls.some(([url,init])=>String(url).includes("/opening/")&&init?.method==="POST")).toBe(false);
+});
+
 
 it("conflicto tras caducidad queda quieto y descartar libera el editor antes de recuperar contexto", async () => {
   vi.useFakeTimers();
@@ -174,4 +199,78 @@ it("conflicto tras caducidad queda quieto y descartar libera el editor antes de 
     expect(fresh).not.toBe(node); expect(fresh.value).toBe("inicial");
     node = fresh; node.value = "pendiente privado";
   }
+});
+
+it("una selección de URL incompleta no abre la última escena ni muestra una compuerta", async () => {
+  history.replaceState({}, "", `/partidas/${id}?campaignId=${id}`);
+  await render(true);
+  expect(host.textContent).toContain("La selección de escena de la URL no es válida");
+  expect([...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Continuar partida")).toBeUndefined();
+  expect(state.renders).not.toHaveBeenCalled();
+});
+
+it("valida la escena contextual y bloquea una compartida antes de montar el editor", async () => {
+  const arcId = "22222222-2222-4222-8222-222222222222", sceneId = "33333333-3333-4333-8333-333333333333";
+  history.replaceState({}, "", `/partidas/${id}?campaignId=${id}&arcId=${arcId}&sceneId=${sceneId}`);
+  const fallback = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async (input, init) => {
+    const path = String(input);
+    if (path.endsWith(`/campaigns/${id}`)) return reply({ ok: true, campaign: { id, name: "Campaña", description: "", coverAssetId: null, state: "active", systemRef: seed.ref, revision: 1, createdAt: at, updatedAt: at } });
+    if (path.endsWith(`/arcs/${arcId}`)) return reply({ ok: true, arc: { id: arcId, campaignId: id, name: "Arco", description: "", coverAssetId: null, revision: 1, createdAt: at, updatedAt: at, sceneCount: 1 } });
+    if (path.includes(`/arcs/${arcId}/scenes`)) return reply({ ok: true, items: [{ sceneId, arcId, campaignId: id, name: "Ruinas", revision: 1, coverRevision: 0, customCoverAssetId: null, mapCount: 0, map0ImagePath: null, map0AssetId: null, cover: { source: "placeholder" }, writeBlock: { code: "SCENE_SHARED_INACTIVE", campaignId: "44444444-4444-4444-8444-444444444444" } }], total: 1, limit: 100, offset: 0 });
+    return fallback(input, init);
+  });
+  await render(true); await act(async () => { for (let index = 0; index < 8; index++) await Promise.resolve(); });
+  expect(host.textContent).toContain("Esta escena está compartida con una campaña inactiva");
+  expect([...host.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Continuar partida")).toBeUndefined();
+  expect(state.renders).not.toHaveBeenCalled();
+});
+
+it("abre una escena válida sin una segunda confirmación y conserva la apertura mediante heartbeat", async () => {
+  const arcId = "22222222-2222-4222-8222-222222222222", sceneId = "33333333-3333-4333-8333-333333333333";
+  history.replaceState({}, "", `/partidas/${id}?campaignId=${id}&arcId=${arcId}&sceneId=${sceneId}`);
+  const fallback = fetcher.getMockImplementation()!;
+  fetcher.mockImplementation(async input => {
+    const path = String(input);
+    if(path.endsWith(`/campaigns/${id}`))return reply({ok:true,campaign:{id,name:"Campaña",description:"",coverAssetId:null,state:"active",systemRef:seed.ref,revision:1,createdAt:at,updatedAt:at}});
+    if(path.endsWith(`/arcs/${arcId}`))return reply({ok:true,arc:{id:arcId,campaignId:id,name:"Arco",description:"",coverAssetId:null,revision:1,createdAt:at,updatedAt:at,sceneCount:1}});
+    if(path.includes(`/arcs/${arcId}/scenes`))return reply({ok:true,items:[{sceneId,arcId,campaignId:id,name:"Ruinas",revision:1,coverRevision:0,customCoverAssetId:null,mapCount:0,map0ImagePath:null,map0AssetId:null,cover:{source:"placeholder"},writeBlock:null}],total:1,limit:100,offset:0});
+    return fallback(input);
+  });
+  await render(true);await vi.waitFor(()=>expect(state.renders).toHaveBeenCalled());
+  expect(fetcher.mock.calls.some(([input])=>String(input).endsWith("/opening/heartbeat"))).toBe(true);
+  expect([...host.querySelectorAll<HTMLButtonElement>("button")].find(button=>button.textContent==="Continuar partida")).toBeUndefined();
+});
+
+it("registra la restauración con el coordinador real antes de mostrar la escena contextual", async () => {
+  const sceneId = "33333333-3333-4333-8333-333333333333";
+  let finish!: (value: { readonly scene: ReturnType<typeof createDefaultScene>; readonly filePath: string }) => void;
+  const saved = new Promise<{ readonly scene: ReturnType<typeof createDefaultScene>; readonly filePath: string }>(resolve => { finish = resolve; });
+  const scene = createDefaultScene();
+  const drafts = new DraftCoordinator("a", location.origin, { enabled: async () => true, write: async () => {} }, {
+    capabilities: async () => null, list: async () => ({ drafts: [], total: 0 }),
+    create: async () => { throw new Error("No debe crear un borrador antes de recuperar la escena."); },
+    get: async () => { throw new Error("No debe consultar un borrador remoto antes de recuperar la escena."); },
+    put: async () => { throw new Error("No debe guardar un borrador antes de recuperar la escena."); },
+    remove: async () => { throw new Error("No debe borrar un borrador antes de recuperar la escena."); }
+  });
+  expect(drafts.getStatus().ready).toBe(false);
+  state.browser = {
+    client: {}, clear: state.clear, revalidate: state.revalidate,
+    drafts,
+    localDrafts: { list: vi.fn().mockResolvedValue([]) },
+    openSaved: vi.fn(() => saved),
+    draftContent: vi.fn((document: ReturnType<typeof createDefaultScene>, view: { readonly camera: { readonly x: number; readonly y: number; readonly zoom: number }; readonly sidebar: boolean; readonly aside: boolean; readonly selectedId: string | null }) => ({ scene: document, view, bindings: { monsters: {} } })),
+    draftContext: vi.fn(() => ({ gameId: id, writerId: "44444444-4444-4444-8444-444444444444", parentDraftId: null, sceneId, baseRevision: 0, systemRef: seed.ref, systemHash: configuration.hash }))
+  };
+  await act(async () => root.render(<LiveEditor http={http} gameId={id} active frozen={false} expired={state.expired} onLogout={async () => {}} opening={opening} loaded={{ game, configuration, version }} registerLeave={() => () => {}} url="" onInvitation={() => {}} onRotate={() => {}} onTerminal={() => {}} onDiscard={() => {}} onExit={() => {}} selection={{ campaignId: id, arcId: "22222222-2222-4222-8222-222222222222", sceneId }}/>));
+  await act(async () => { for (let index = 0; index < 6; index++) await Promise.resolve(); });
+  expect(host.textContent).toContain("Cargando la escena seleccionada…");
+  expect(drafts.getStatus().ready).toBe(true);
+  expect(state.renders).toHaveBeenCalled();
+  expect(host.querySelector<HTMLElement>(".service-workspace")?.hidden).toBe(true);
+  expect(host.querySelector<HTMLElement>(".service-workspace")?.hasAttribute("inert")).toBe(true);
+  await act(async () => { finish({ scene, filePath: `scene:${sceneId}` }); await Promise.resolve(); await Promise.resolve(); });
+  await vi.waitFor(() => expect(host.querySelector<HTMLElement>(".service-workspace")?.hidden).toBe(false));
+  drafts.dispose();
 });

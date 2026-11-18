@@ -69,11 +69,9 @@ export interface TtrpgApi extends DiceApi {
     { readonly ok: false; readonly error: string }
   >;
   loadSceneLinkTarget: (request: LoadSceneLinkTargetRequest) => Promise<SceneLinkNavigationResult>;
-  onRecentSceneOpen: (handler: (result: SceneOperationResult) => void) => () => void;
   listMonsterTemplates: () => Promise<MonsterTemplateOperationResult>;
   saveMonsterTemplate: (template: MonsterTemplate) => Promise<MonsterTemplateOperationResult>;
   deleteMonsterTemplate: (id: string) => Promise<MonsterTemplateOperationResult>;
-  onOpenMonsterTemplateManager: (handler: () => void) => () => void;
   searchMonsterLibrary: (query: MonsterLibrarySearchQuery) => Promise<MonsterLibrarySearchResult>;
   getMonsterLibraryEntry: (id: string) => Promise<MonsterLibraryGetResult>;
   saveMonsterLibraryEntry: (entry: MonsterLibrarySaveInput) => Promise<MonsterLibrarySaveResult>;

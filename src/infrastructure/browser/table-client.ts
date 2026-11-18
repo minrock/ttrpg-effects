@@ -1,15 +1,18 @@
 import { attentionFocusEventSchema, attentionFrame } from "../../domain/player/attention-focus";
 import { annotationStateSchema, type AnnotationState, type AnnotationView, type SharedAnnotationsClient } from "../../shared/contracts/shared-annotations";
-import { contextualEventSchema, contextualStateSchema } from "../../shared/contracts/moderation";
+import { contextualEventSchema, contextualStateSchema, serviceDiceContextualEventSchema, serviceDiceContextualStateSchema } from "../../shared/contracts/moderation";
 import { z } from "zod";
 import type { TtrpgApi } from "../../shared/api/ttrpg-api";
 import type { DiceContext, DiceEnvelope, DiceSessionState } from "../../domain/dice/dice";
 import { draftSchema } from "../../domain/dice/dice";
 import type { ServiceRole } from "../../shared/contracts/http-api";
-import { diceSessionSchema, envelopeSchema, highlightSchema, pointerSchema, presenceSchema, sizesSchema, tableEventSchema, tableStateSchema, type TableEvent, type TableState } from "../../shared/contracts/table";
+import { diceSessionSchema, envelopeSchema, highlightSchema, pointerSchema, presenceSchema, serviceDiceTableEventSchema, serviceDiceTableStateSchema, sizesSchema, tableEventSchema, tableStateSchema, type ServiceDiceTableEvent, type TableEvent, type TableState } from "../../shared/contracts/table";
+import { serviceDiceStateSchema, type ServiceDiceState } from "../../shared/contracts/service-dice";
 import { HttpTransport, ServiceError, result } from "./http";
+import { BrowserServiceDiceClient } from "./service-dice-client";
 
 const ok = z.literal(true);
+const SERVICE_DICE_NEGOTIATION_TIMEOUT_MS = 1_500;
 
 const diceReply = <T>(value: z.ZodType<T>) => z.object({ ok, value });
 type RealtimeKey = "focusPlayers" | "onAttentionFocus" | "openPlayerWindow" | "getPlayerWindowState" | "publishPlayerScene" | "publishPlayerCamera" | "commandPlayerCamera" | "reportPlayerCamera" | "publishPlayerPointer" | "publishPlayerInformationAreaHighlight" | "notifyPlayerContentReady" | "reportPlayerMapImageStatus" | "onPlayerScene" | "onPlayerCamera" | "onPlayerCameraCommand" | "onPlayerCameraReport" | "onPlayerPointer" | "onPlayerInformationAreaHighlight" | "onPlayerWindowClosed" | "onPlayerWindowReady" | "onPlayerMapImageStatus" | keyof import("../../shared/api/dice-api").DiceApi;
@@ -39,6 +42,8 @@ export class BrowserTableClient {
   private annotationView: AnnotationView = { supported: false, connected: false, state: null, snapshot: null, context: null, error: "" };
   private annotationGeneration = 0;
   private annotationListeners = new Set<() => void>();
+  private serviceDiceEnabled = false;
+  readonly serviceDice: BrowserServiceDiceClient | undefined;
   private refreshAnnotations(error = "") {
     this.annotationView = { supported: !!this.current?.annotations, connected: this.status.phase === "connected", state: this.current?.annotations ?? null, snapshot: this.current?.snapshot ?? null, context: this.current?.context ?? null, error };
     for (const listener of this.annotationListeners) listener();
@@ -72,8 +77,29 @@ export class BrowserTableClient {
       }
     }
   };
-  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) { if (contextual) { http.negotiateAnnotations(true); http.negotiateAreas(true); } http.negotiateFocus(true); }
-  private get reply() { return z.object({ ok, state: this.contextual ? contextualStateSchema.transform(value => { if (value.gameId !== this.contextual!.gameId || value.openingId !== this.contextual!.openingId || value.generation !== this.contextual!.generation || value.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); } return tableStateSchema.parse({ ...value, protocolVersion: 1 }); }) : tableStateSchema, playerUrl: z.string().optional() }); }
+  constructor(private readonly http: HttpTransport, private readonly contextual?: { gameId: string; openingId: string; generation: number; audience: ServiceRole; terminal: (reason: "access-ended" | "replaced" | "unavailable") => void; roster?: () => void }) {
+    if (contextual) {
+      http.negotiateAnnotations(true); http.negotiateAreas(true);
+      this.serviceDice = new BrowserServiceDiceClient(http, { enable: () => this.enableServiceDice() }, { openingId: contextual.openingId, generation: contextual.generation });
+    }
+    http.negotiateFocus(true);
+  }
+  private enableServiceDice() {
+    if (this.serviceDiceEnabled || !this.contextual || this.ended) return;
+    this.serviceDiceEnabled = true;
+    if (this.controller) { this.stop(); this.start(this.role); }
+  }
+  private get reply() {
+    const state: z.ZodType<TableState & { serviceDice?: ServiceDiceState }> = this.contextual
+      ? z.unknown().transform(value => {
+        const scoped = this.serviceDiceEnabled ? serviceDiceContextualStateSchema.parse(value) : contextualStateSchema.parse(value);
+        if (scoped.gameId !== this.contextual!.gameId || scoped.openingId !== this.contextual!.openingId || scoped.generation !== this.contextual!.generation || scoped.audience !== this.contextual!.audience) { this.terminal("access-ended"); throw new Error("Contexto de mesa inválido."); }
+        const base = tableStateSchema.parse({ ...scoped, protocolVersion: 1 });
+        return this.serviceDiceEnabled ? { ...base, serviceDice: serviceDiceContextualStateSchema.parse(value).serviceDice } : base;
+      })
+      : tableStateSchema;
+    return z.object({ ok, state, playerUrl: z.string().optional() });
+  }
   private sceneResourceId: string | undefined;
   setSceneResource(id: string | undefined) { this.sceneResourceId = id; }
   private ended = false;
@@ -82,7 +108,7 @@ export class BrowserTableClient {
 
   getStatus = () => this.status;
   subscribeStatus = (handler: () => void) => { this.statusHandlers.add(handler); return () => { this.statusHandlers.delete(handler); }; };
-  private setStatus(patch: Partial<TableConnectionStatus>) { if (patch.phase && patch.phase !== "connected" && this.status.phase === "connected") this.annotationGeneration++; this.status = { ...this.status, ...patch }; for (const handler of this.statusHandlers) handler(); this.refreshAnnotations(); }
+  private setStatus(patch: Partial<TableConnectionStatus>) { if (patch.phase && patch.phase !== "connected" && this.status.phase === "connected") this.annotationGeneration++; this.status = { ...this.status, ...patch }; this.serviceDice?.setConnected(this.status.phase === "connected", this.status.error); for (const handler of this.statusHandlers) handler(); this.refreshAnnotations(); }
   private emit(name: string, value?: unknown) { for (const handler of this.handlers.get(name) ?? []) handler(value); }
   private on<T>(name: string, handler: (value: T) => void) {
     const wrapped = (value: unknown) => handler(value as T);
@@ -90,7 +116,7 @@ export class BrowserTableClient {
     return () => { handlers.delete(wrapped); if (!handlers.size) this.handlers.delete(name); };
   }
   start(role: ServiceRole): () => void {
-    this.stop(); this.ended = false; if (this.contextual) this.http.resume(); this.role = this.contextual?.audience ?? role;
+    this.stop(); this.ended = false; if (this.contextual) this.http.resume(); this.serviceDice?.resume(); this.role = this.contextual?.audience ?? role;
     const generation = this.generation, session = this.http.sessionSignal;
     const connect = async (attempt: number): Promise<void> => {
       if (generation !== this.generation || session.aborted) return;
@@ -113,14 +139,17 @@ export class BrowserTableClient {
             const data = block.split("\n").filter(line => line.startsWith("data: ")).map(line => line.slice(6)).join("\n");
             if (!data) continue;
             const raw: unknown = JSON.parse(data);
-            let event: TableEvent;
+            let event: TableEvent | ServiceDiceTableEvent;
             if (this.contextual) {
-              const scoped = contextualEventSchema.parse(raw), context = this.contextual;
+              const scoped = (this.serviceDiceEnabled ? serviceDiceContextualEventSchema : contextualEventSchema).parse(raw), context = this.contextual;
               if (scoped.gameId !== context.gameId || scoped.openingId !== context.openingId || scoped.generation !== context.generation || scoped.audience !== context.audience) { this.terminal("access-ended"); return; }
               if (scoped.type === "terminal") { this.terminal(scoped.terminal ?? "access-ended"); return; }
               if (scoped.type === "roster") { context.roster?.(); continue; }
-              event = tableEventSchema.parse({ ...scoped, protocolVersion: 1 });
-            } else event = tableEventSchema.parse(raw);
+              const base = tableEventSchema.parse({ ...scoped, protocolVersion: 1, type: scoped.type === "service-dice" ? "heartbeat" : scoped.type, state: scoped.state ? { ...scoped.state, protocolVersion: 1 } : undefined });
+              event = this.serviceDiceEnabled && scoped.type === "bootstrap" && scoped.state
+                ? { ...base, state: { ...base.state!, serviceDice: serviceDiceContextualEventSchema.parse(raw).state!.serviceDice } } as ServiceDiceTableEvent
+                : scoped.type === "service-dice" ? { ...base, type: "service-dice", diceVersion: 1 } as ServiceDiceTableEvent : base;
+            } else event = (this.serviceDiceEnabled ? serviceDiceTableEventSchema : tableEventSchema).parse(raw);
             if (generation !== this.generation || session.aborted) return;
             this.accept(event); count = 0;
             const cursor = block.split("\n").find(line => line.startsWith("id: "))?.slice(4); if (cursor) this.cursor = cursor;
@@ -135,11 +164,19 @@ export class BrowserTableClient {
         this.retry = setTimeout(() => { void connect(count + 1); }, Math.min(30000, 500 * 2 ** Math.min(count, 6)));
       } finally { clearTimeout(this.watchdog); controller.abort(); session.removeEventListener("abort", abort); }
     };
-    void connect(0);
+    const begin = async () => {
+      // Si la vista de dados ya inició la negociación, decide primero la versión del
+      // protocolo. Así el primer SSE no puede registrar una conexión legacy que una
+      // apertura con diceVersion reemplace en la misma pestaña.
+      await this.serviceDice?.awaitTransportNegotiation(SERVICE_DICE_NEGOTIATION_TIMEOUT_MS);
+      if (generation !== this.generation || session.aborted) return;
+      void connect(0);
+    };
+    void begin();
     return () => this.stop();
   }
   stop() { this.generation++; clearTimeout(this.retry); clearTimeout(this.watchdog); this.controller?.abort(); this.controller = null; this.connectionId = undefined; this.setStatus({ phase: "disconnected" }); }
-  clear() { if (this.contextual) this.http.invalidate(); this.stop(); this.current = null; this.epoch = ""; this.sequence = -1; this.cursor = ""; this.applied.clear(); this.diceContext = null; this.chain = Promise.resolve(); this.setStatus({ phase: "disconnected", published: false, error: "", playerUrl: "", presence: undefined }); }
+  clear() { if (this.contextual) this.http.invalidate(); this.stop(); this.current = null; this.epoch = ""; this.sequence = -1; this.cursor = ""; this.applied.clear(); this.diceContext = null; this.chain = Promise.resolve(); this.serviceDice?.clear(); this.setStatus({ phase: "disconnected", published: false, error: "", playerUrl: "", presence: undefined }); }
   private timed(name: "pointer" | "highlight", value: TableState["pointer"] | TableState["highlight"], serverTime: number) {
     if (!value || value.expiresAt <= serverTime || this.applied.has(value.value.id)) return;
     this.applied.add(value.value.id); if (this.applied.size > 1000) this.applied.delete(this.applied.values().next().value!);
@@ -174,12 +211,13 @@ export class BrowserTableClient {
     }
     if (value.report) this.emit("report", value.report);
   }
-  private applyState(state: TableState, bootstrap = false) {
+  private applyState(state: TableState & { serviceDice?: ServiceDiceState }, bootstrap = false, transportSequence?: number) {
     if (this.current && state.epoch === this.current.epoch && state.revision < this.current.revision) return;
     const changed = this.current?.context !== state.context || this.current?.epoch !== state.epoch;
     const sceneChanged = changed || !this.current || state.revision > this.current.revision;
     if (!changed && this.current?.annotations && (!state.annotations || state.annotations.sequence < this.current.annotations.sequence)) state.annotations = this.current.annotations;
     this.current = state;
+    if (state.serviceDice) this.serviceDice?.apply(state.serviceDice, transportSequence, bootstrap);
     this.serverClock = { time: state.serverTime, received: performance.now() };
     if (state.connectionId) this.connectionId = state.connectionId;
     this.setStatus({ phase: "connected", published: !!state.snapshot, error: "" });
@@ -190,12 +228,12 @@ export class BrowserTableClient {
       this.timed("pointer", state.pointer, state.serverTime); this.timed("highlight", state.highlight, state.serverTime);
     }
   }
-  private accept(event: TableEvent) {
-    if (event.epoch !== this.epoch) { if (event.type !== "bootstrap") return; if (this.epoch) { this.diceOffset = this.lastDiceRevision + 1; this.sizeOffset = this.lastSizeRevision + 1; } this.epoch = event.epoch; this.sequence = -1; this.current = null; this.applied.clear(); }
+  private accept(event: TableEvent | ServiceDiceTableEvent) {
+    if (event.epoch !== this.epoch) { if (event.type !== "bootstrap") return; if (this.epoch) { this.diceOffset = this.lastDiceRevision + 1; this.sizeOffset = this.lastSizeRevision + 1; } this.epoch = event.epoch; this.sequence = -1; this.current = null; this.applied.clear(); this.serviceDice?.resetTransportOrder(); }
     if (event.sequence <= this.sequence) return;
     this.sequence = event.sequence;
-    if (event.type === "bootstrap" && event.state) { this.applyState(event.state, true); return; }
-    if (event.type === "scene") { this.applyState(tableStateSchema.parse(event.payload)); return; }
+    if (event.type === "bootstrap" && event.state) { this.applyState(event.state, true, event.sequence); return; }
+    if (event.type === "scene") { this.applyState((this.serviceDiceEnabled ? serviceDiceTableStateSchema : tableStateSchema).parse(event.payload), false, event.sequence); return; }
     if (!this.current || event.context !== this.current.context || event.revision < this.current.revision) return;
     switch (event.type) {
       case "annotations": this.applyAnnotations(annotationStateSchema.parse(event.payload)); break;
@@ -211,6 +249,7 @@ export class BrowserTableClient {
       case "dice": this.emit("dice", this.dice(envelopeSchema.parse(event.payload), event.serverTime)); break;
       case "sizes": this.emit("sizes", this.sizes(sizesSchema.parse(event.payload))); break;
       case "render-error": { const error = z.string().max(500).parse(event.payload); this.setStatus({ error }); this.emit("renderError", error); break; }
+      case "service-dice": this.serviceDice?.apply(serviceDiceStateSchema.parse(event.payload), event.sequence); break;
       case "pointer": this.timed("pointer", z.object({value:pointerSchema,startedAt:z.number(),expiresAt:z.number()}).parse(event.payload), event.serverTime); break;
       case "highlight": this.timed("highlight", z.object({value:highlightSchema,startedAt:z.number(),expiresAt:z.number()}).parse(event.payload), event.serverTime); break;
     }
@@ -220,12 +259,17 @@ export class BrowserTableClient {
     const next = this.chain.catch(() => {}).then(() => { if (signal.aborted) throw new Error("La sesión cambió."); return work(); });
     this.chain = next.catch(() => {}); return next;
   }
+  /** Las mutaciones que devuelven la mesa deben negociar su schema igual que el GET/SSE. */
+  private stateReplyPath(path: string): string {
+    return this.serviceDiceEnabled && (path === "/table/open" || path === "/table/scene") ? `${path}?diceVersion=1` : path;
+  }
   private async rpc<T>(path: string, payload: unknown, schema: z.ZodType<T>, captured?: { context: string | null; connectionId?: string; revision?: number }): Promise<T> {
     const body = { requestId: path === "/table/focus" ? (payload as { requestId: string }).requestId : crypto.randomUUID(), context: this.current?.context ?? null, connectionId: this.connectionId, revision: this.current?.revision, ...captured, payload };
     const startedAt = Date.now();
     // Un único reintento con el mismo ID, dentro de la ventana de cinco minutos.
-    try { return await this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
-    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || path === "/table/annotations" && this.status.phase !== "connected" || Date.now() - startedAt >= 300000) throw error; return this.http.json(path, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
+    const requestPath = this.stateReplyPath(path);
+    try { return await this.http.json(requestPath, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
+    catch (error) { if (!(error instanceof ServiceError) || error.code !== "NETWORK" || path === "/table/annotations" && this.status.phase !== "connected" || Date.now() - startedAt >= 300000) throw error; return this.http.json(requestPath, schema, "POST", this.contextual ? { openingId: this.contextual.openingId, generation: this.contextual.generation, command: body, ...(path === "/table/scene" && this.sceneResourceId ? { sceneResourceId: this.sceneResourceId } : {}) } : body); }
   }
   private mutation(action: string, payload: unknown) {
     const expectedContext = this.current?.context;

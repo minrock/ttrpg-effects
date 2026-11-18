@@ -10,6 +10,7 @@ interface NpcDetailModalProps {
   readonly onToggleVisibility: () => void;
   readonly onEdit: () => void;
   readonly onNotesChange: (notes: string) => void;
+  readonly editable?: boolean;
 }
 
 export function NpcDetailModal({
@@ -17,7 +18,8 @@ export function NpcDetailModal({
   onClose,
   onToggleVisibility,
   onEdit,
-  onNotesChange
+  onNotesChange,
+  editable = true
 }: NpcDetailModalProps): JSX.Element {
   const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -53,8 +55,8 @@ export function NpcDetailModal({
           <div style={labelStyle}>Notas</div>
           <RichTextPreview
             markdown={npc.notes}
-            mode="dm-editable"
-            onChange={onNotesChange}
+            mode={editable ? "dm-editable" : "readonly"}
+            onChange={editable ? onNotesChange : undefined}
             contentClassName="entity-notes-preview"
           />
         </div>
@@ -69,7 +71,7 @@ export function NpcDetailModal({
           {npc.visibleToPlayer ? "🚫 Ocultar de jugadores" : "👁 Mostrar a jugadores"}
         </button>
         <div style={{ flex: 1 }} />
-        <button onClick={onEdit} style={btnSecondary}>✏️ Editar</button>
+        {editable && <button onClick={onEdit} style={btnSecondary}>✏️ Editar</button>}
         <button onClick={onClose} style={btnSecondary}>Cerrar</button>
       </div>
     </ModalBackdrop>

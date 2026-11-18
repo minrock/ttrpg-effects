@@ -16,7 +16,7 @@ export const catalogDataSchema = z.strictObject({ records: z.number().int().nonn
 type CatalogEntry = z.infer<typeof catalogEntrySchema>;
 type LinkEntry = z.infer<typeof linkEntrySchema>;
 type CatalogData = z.infer<typeof catalogDataSchema>;
-export interface CatalogManifest { version: 1 | 2 | 3; catalog?: CatalogEntry[]; links?: LinkEntry[]; catalogData?: CatalogData }
+export interface CatalogManifest { version: 1 | 2 | 3 | 4 | 5; catalog?: CatalogEntry[]; links?: LinkEntry[]; catalogData?: CatalogData }
 export type CatalogRecord = { type: "version"; name: string; value: SystemVersion } | { type: "link"; value: LinkEntry };
 const headerSchema = z.strictObject({ type: z.literal("version"), name: z.string().trim().min(1).max(200), value: z.record(z.string(), z.unknown()), presentations: z.number().int().min(1).max(100) });
 const presentationSchema = z.strictObject({ type: z.literal("presentation"), value: z.unknown() });
@@ -72,9 +72,9 @@ export async function verifyCatalogFile(path: string, expected: CatalogData): Pr
   for await (const chunk of createReadStream(path)) { digest.update(chunk as Buffer); for (const byte of chunk as Buffer) if (byte === 10) records++; }
   if (records !== expected.records || digest.digest("hex") !== expected.sha256) throw new OwnedError("CORRUPT");
 }
-/** v1/v2 quedan explícitos; v3 conserva solo un descriptor fijo en el manifiesto. */
+/** v1/v2 quedan explícitos; v3/v4 conservan solo un descriptor fijo en el manifiesto. */
 export async function* catalogRecords(manifest: CatalogManifest, catalogPath: () => string): AsyncGenerator<CatalogRecord> {
-  if (manifest.version !== 3) {
+  if (manifest.version < 3) {
     if (manifest.catalogData !== undefined || manifest.version === 1 && (manifest.catalog !== undefined || manifest.links !== undefined) || manifest.version === 2 && (!manifest.catalog || !manifest.links)) throw new OwnedError("CORRUPT");
     const systems = new Set<string>();
     for (const system of manifest.catalog ?? seedCatalog()) {

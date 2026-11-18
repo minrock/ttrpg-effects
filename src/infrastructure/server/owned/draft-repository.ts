@@ -44,7 +44,7 @@ export function draftRepository(execute: Execute, owner: string, clock: CatalogC
   const writable = (gameId: string) => execute(async c => {
     const row = (await c.query("SELECT state,deleted_at FROM ttrpg_games WHERE owner_id=$1 AND id=$2", [owner,gameId])).rows[0];
     if (!row || row.deleted_at) throw new OwnedError("NOT_FOUND");
-    if (row.state !== "ready") throw new OwnedError("CONFLICT");
+    if (row.state !== "ready") throw new OwnedError("CAMPAIGN_INACTIVE");
   });
   const slotRows = async (c: SqlConnection, context: DraftHead["context"]) => {
     const rows=(await c.query("SELECT * FROM owned_drafts WHERE owner_id=$1 AND game_id=$2 ORDER BY updated_at DESC,id DESC",[owner,context.gameId])).rows;

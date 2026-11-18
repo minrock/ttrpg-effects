@@ -65,5 +65,16 @@ for(const kind of ['sqlite','postgres'] as const)describe(`Borradores reales ${k
     expect((await http(t.port,path,t.aCookie)).json.draft).toMatchObject({confirmedSequence:1,sequence:2});
     expect((await http(t.port,`/scenes/${saved.json.sceneId}`,t.aCookie)).json.resource).toMatchObject({name:'Cambio ajeno',revision:2});
   });
+  it('copia un borrador legado en el arco de su escena fuente cuando no recibe destino',async()=>{
+    const t=await ready(), path=`/drafts/${t.head.id}`;
+    const extra=(await http(t.port,`/campaigns/${t.context.gameId}/arcs`,t.aCookie,'POST',{name:'Secundario',description:''})).json.arc as {id:string};
+    const source=(await http(t.port,'/scenes',t.aCookie,'POST',{name:'Fuente',scene:createDefaultScene(),campaignId:t.context.gameId,arcId:extra.id})).json.resource as {id:string;revision:number};
+    const put={sequence:1,hash:await contentHash(t.content),content:t.content,sceneId:source.id,baseRevision:source.revision};
+    expect((await http(t.port,path,t.aCookie,'PUT',put,{'if-match':'0'})).status).toBe(200);
+    const confirmed=await http(t.port,path+'/confirm',t.aCookie,'POST',{name:'Copia contextual',mode:'copy',sceneRevision:0,targetGameId:t.context.gameId},{'if-match':'1'});
+    expect(confirmed.status).toBe(200);
+    const listed=await http(t.port,`/campaigns/${t.context.gameId}/arcs/${extra.id}/scenes`,t.aCookie);
+    expect((listed.json.items as Array<{sceneId:string}>).map(item=>item.sceneId)).toContain(confirmed.json.sceneId);
+  });
 
 });

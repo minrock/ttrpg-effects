@@ -37,15 +37,21 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Propiedad real ${k
     }
     const image = await http(port, "/assets", aCookie, "POST", png, { "content-type": "image/png" }); expect(image.status).toBe(201); const asset = image.json.asset as { id: string; reference: string };
     const scene = createDefaultScene(); const withImage = syncRuntimeFieldsFromActiveMap({ ...scene, maps: scene.maps.map(m => ({ ...m, map: { ...m.map, imagePath: asset.reference } })) });
-    const created = await http(port, "/scenes", aCookie, "POST", { name: "A", scene: withImage }); expect(created.status).toBe(201);
-    await identity.authorized(aCookie, "dm", async (_, tx) => { await tx.openings.start(game.id, 1); });
+    const created = await http(port, "/scenes", aCookie, "POST", { name: "A", scene: withImage, campaignId: game.id }); expect(created.status).toBe(201);
+    const opening = await identity.authorized(aCookie, "dm", async (_, tx) => tx.openings.start(game.id, 1));
+    expect((await http(port, `/games/${game.id}`, aCookie, "PATCH", { state: "archived" }, { "if-match": "1" })).json).toMatchObject({ error: { code: "CAMPAIGN_OPEN" } });
+    expect(await identity.authorized(aCookie, "dm", async (_, tx) => (await tx.openings.current(game.id))?.state)).toBe("open");
+    await identity.authorized(aCookie, "dm", async (_, tx) => tx.openings.close(game.id, opening.id, opening.generation, opening.revision));
     expect((await http(port, `/games/${game.id}`, aCookie, "PATCH", { state: "archived" }, { "if-match": "1" })).status).toBe(200);
     expect(await identity.authorized(aCookie, "dm", async (_, tx) => (await tx.openings.current(game.id))?.state)).toBe("closed");
+    const stale = await http(port, `/games/${game.id}`, aCookie, "PATCH", { name: "Pendiente" }, { "if-match": "1" });
+    expect(stale.status).toBe(409); expect(stale.json).toMatchObject({ error: { code: "REVISION_CONFLICT" } });
     for (const method of ["PATCH", "DELETE"]) {
-      const stale = await http(port, `/games/${game.id}`, aCookie, method, method === "PATCH" ? { name: "Pendiente" } : {}, { "if-match": "1" });
-      expect(stale.status).toBe(409); expect(stale.json).toMatchObject({ error: { code: "REVISION_CONFLICT", message: expect.stringContaining("Conserva tus cambios pendientes") } });
+      const inactive = await http(port, `/games/${game.id}`, aCookie, method, method === "PATCH" ? { name: "Pendiente" } : {}, { "if-match": "2" });
+      expect(inactive.status).toBe(409); expect(inactive.json).toMatchObject({ error: { code: "CAMPAIGN_INACTIVE" } });
     }
-    expect((await http(port, `/games/${game.id}`, aCookie, "DELETE", {}, { "if-match": "2" })).status).toBe(200);
+    expect((await http(port, `/games/${game.id}`, aCookie, "PATCH", { state: "ready" }, { "if-match": "2" })).status).toBe(200);
+    expect((await http(port, `/games/${game.id}`, aCookie, "DELETE", {}, { "if-match": "3" })).status).toBe(200);
     expect((await http(port, "/scenes", aCookie)).json.total).toBe(1); expect((await http(port, `/assets/${asset.id}`, aCookie)).bytes).toEqual(png);
     expect((await http(port, "/games", aCookie)).json.total).toBe(1);
     await identity.close(); const restarted = await open(config), retryPort = await listen(restarted);
@@ -54,7 +60,9 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Propiedad real ${k
   });
   it("matriz HTTP de escenas/assets/plantillas/bibliotecas y búsqueda literal Unicode", async () => {
     const { identity, aCookie, bCookie, adminCookie } = await accounts(await fixture(kind)), port = await listen(identity);
-    const scene = (await http(port, "/scenes/import", aCookie, "POST", { name: "Privada", scene: createDefaultScene() })).json.resource as SceneResource;
+    const ownCampaign = (await http(port, "/campaigns", aCookie, "POST", { name: "Privada", systemRef: GENERIC_SYSTEM })).json.campaign as { id: string };
+    const foreignCampaign = (await http(port, "/campaigns", bCookie, "POST", { name: "Ajena", systemRef: GENERIC_SYSTEM })).json.campaign as { id: string };
+    const scene = (await http(port, "/scenes/import", aCookie, "POST", { name: "Privada", scene: createDefaultScene(), campaignId: ownCampaign.id })).json.resource as SceneResource;
     const asset = (await http(port, "/assets", aCookie, "POST", png, { "content-type": "image/png" })).json.asset as { id: string; reference: string };
     for (const cookie of [aCookie,bCookie]) expect((await http(port,"/monster-templates/personal",cookie,"PUT",{ template })).status).toBe(409);
     expect((await http(port, `/monster-templates/${builtInMonsterTemplates[0].id}`, aCookie,"PUT",{template})).status).toBe(409);
@@ -78,7 +86,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Propiedad real ${k
       const resolve = await http(port, "/assets/resolve", cookie, "POST", { references: [asset.reference] });
       if (cookie === bCookie) expect(resolve.json).toMatchObject({ assets: [{ url: null }] }); else expect(resolve.status).toBe(status);
     }
-    const foreignImport = await http(port, "/scenes/import", bCookie, "POST", { name: "Solo documento", scene: { ...scene.scene, map: { ...scene.scene.map, imagePath: asset.reference } } }); expect(foreignImport.status).toBe(201);
+    const foreignImport = await http(port, "/scenes/import", bCookie, "POST", { name: "Solo documento", scene: { ...scene.scene, map: { ...scene.scene.map, imagePath: asset.reference } }, campaignId: foreignCampaign.id }); expect(foreignImport.status).toBe(201);
     expect((await http(port, `/assets/${asset.id}`, bCookie)).status).toBe(404);
     expect((await http(port, `/scenes/${scene.id}`, aCookie, "PUT", { name: "X", scene: scene.scene })).status).toBe(422);
   });

@@ -66,8 +66,10 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda
   });
   it("bootstrap se reconstruye tras publicación concurrente y el cliente real puede confirmar y reportar", async () => {
     const s = await setup(kind), start = await s.invitations.start(s.aCookie, s.a1.id, null, 1, randomUUID()), guest = await s.invitations.guests.admit(s.a1.id, { secret: invitationSecret(start), alias: "bootstrap" }, randomUUID(), null);
-    const entered = deferred(), release = deferred(), ready = deferred(), original = s.invitations.guests.authorized.bind(s.invitations.guests); let calls = 0;
-    vi.spyOn(s.invitations.guests, "authorized").mockImplementation(async (game, token, work) => { if (token === guest.token && ++calls === 3) { entered.resolve(); await release.promise; } return original(game, token, work); });
+    const entered = deferred(), release = deferred(), ready = deferred(), original = s.invitations.guests.authorized.bind(s.invitations.guests); let held = false;
+    // El stream puede reautorizar en más de un punto según la versión del transporte.
+    // Frenar su primera autorización del invitado fija la carrera sin depender de ese detalle interno.
+    vi.spyOn(s.invitations.guests, "authorized").mockImplementation(async (game, token, work) => { if (token === guest.token && !held) { held = true; entered.resolve(); await release.promise; } return original(game, token, work); });
     const client = contextualTableClient({ ...context(start), gameId: s.a1.id, audience: "player" }, () => {}, network(s.port, `ttrpg_guest=${guest.token}`)); cleanup.push(async () => client.clear());
     client.api.onPlayerScene(() => ready.resolve()); client.start("player"); await entered.promise;
     const asset = randomUUID(); await s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.assets.create(asset, "image/png", png));
@@ -88,5 +90,13 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda
     for (const path of ["table/state", "dice/session", "dice/sizes"]) { const result = await http(s.port, `/api/v1/dm/games/${s.a1.id}/${path}${query}`, s.aCookie); expect(result.status).toBe(409); expect(result.json.error).toMatchObject({ code: "OPENING_CHANGED" }); }
     client.start("dm"); await ended.promise; expect(client.getStatus().published).toBe(false); expect(terminal).toHaveBeenCalledExactlyOnceWith("access-ended");
     const freshReady = deferred(), fresh = contextualTableClient({ ...context(next), gameId: s.a1.id, audience: "dm" }, () => {}, network(s.port, s.aCookie)); cleanup.push(async () => fresh.clear()); fresh.subscribeStatus(() => { if (fresh.getStatus().phase === "connected") freshReady.resolve(); }); fresh.start("dm"); await freshReady.promise; expect(fresh.getStatus().phase).toBe("connected");
+  });
+  it("DM negociado publica con respuesta de dados de servicio sin extender la mutación", async () => {
+    const s = await setup(kind), start = await s.invitations.start(s.aCookie, s.a1.id, null, 1, randomUUID()), asset = randomUUID();
+    await s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.assets.create(asset, "image/png", png));
+    const client = contextualTableClient({ ...context(start), gameId: s.a1.id, audience: "dm" }, () => {}, network(s.port, s.aCookie)); cleanup.push(async () => client.clear());
+    const dice = client.serviceDice!; dice.getSnapshot(); await vi.waitFor(() => expect(dice.getSnapshot().supported).toBe(true));
+    expect(await client.api.publishPlayerScene(snapshot(asset))).toMatchObject({ ok: true });
+    const view = await client.api.getPlayerWindowState(); expect(view.snapshot?.mapImageUrl).toBeTruthy(); expect(dice.getSnapshot().state?.audience).toBe("dm");
   });
 });

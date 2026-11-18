@@ -4,6 +4,7 @@ import { sanitizePlayerWindowSnapshot } from "../../domain/player/player-window-
 import { contextSchema, draftSchema, requestSchema } from "../../domain/dice/dice";
 import type { DiceEnvelope, DiceSessionState } from "../../domain/dice/dice";
 import { diceSizeChangeSchema } from "../../domain/dice/size";
+import { serviceDiceStateSchema } from "./service-dice";
 
 const id = z.string().min(1).max(160);
 const finite = z.number().finite().min(-1e8).max(1e8);
@@ -49,3 +50,17 @@ export const tableStateSchema = z.object({ focusVersion: z.literal(1).optional()
 export type TableState = z.infer<typeof tableStateSchema>;
 export const tableEventSchema = z.object({ protocolVersion: z.literal(1), epoch: z.uuid(), context: z.uuid().nullable(), revision, serverTime: z.number(), sequence: revision, type: z.enum(["focus","annotations","bootstrap","scene","camera","camera-command","pointer","highlight","presence","image-status","dice","sizes","render-error","heartbeat"]), state: tableStateSchema.optional(), payload: z.unknown().optional() });
 export type TableEvent = z.infer<typeof tableEventSchema>;
+
+/** Solo aparece después de negociar C-61; el estado base no recibe campos nuevos por accidente. */
+export const serviceDiceTableStateSchema = tableStateSchema.extend({ diceVersion: z.literal(1), serviceDice: serviceDiceStateSchema }).strict();
+export type ServiceDiceTableState = z.infer<typeof serviceDiceTableStateSchema>;
+const serviceDiceTableEventBaseSchema = tableEventSchema.extend({
+  diceVersion: z.literal(1),
+  state: serviceDiceTableStateSchema.optional()
+}).strict();
+/** Los eventos heredados conservan su payload; solo el evento nuevo transporta ServiceDiceState. */
+export const serviceDiceTableEventSchema = z.union([
+  serviceDiceTableEventBaseSchema.extend({ type: z.literal("service-dice"), payload: serviceDiceStateSchema }).strict(),
+  serviceDiceTableEventBaseSchema.extend({ type: z.enum(tableEventSchema.shape.type.options), payload: z.unknown().optional() }).strict()
+]);
+export type ServiceDiceTableEvent = z.infer<typeof serviceDiceTableEventSchema>;

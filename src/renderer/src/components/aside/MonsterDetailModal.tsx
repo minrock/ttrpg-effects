@@ -15,6 +15,7 @@ interface MonsterDetailModalProps {
   readonly onClose: () => void;
   readonly onToggleVisibility: () => void;
   readonly onEdit: () => void;
+  readonly editable?: boolean;
 }
 
 export function MonsterDetailModal({
@@ -22,7 +23,8 @@ export function MonsterDetailModal({
   templates,
   onClose,
   onToggleVisibility,
-  onEdit
+  onEdit,
+  editable = true
 }: MonsterDetailModalProps): JSX.Element {
   const imagesApi = useTtrpgApi("images");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function MonsterDetailModal({
           {monster.visibleToPlayer ? "🚫 Ocultar de jugadores" : "👁 Mostrar a jugadores"}
         </button>
         <div style={{ flex: 1 }} />
-        <button onClick={onEdit} style={btnSecondary}>✏️ Editar</button>
+        {editable && <button onClick={onEdit} style={btnSecondary}>✏️ Editar</button>}
         <button onClick={onClose} style={btnSecondary}>Cerrar</button>
       </div>
     </ModalBackdrop>

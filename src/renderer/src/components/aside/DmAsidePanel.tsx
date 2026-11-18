@@ -40,6 +40,8 @@ import type { SceneLinkValidationStatus } from "../../../../domain/annotations/s
 import type { SceneObjectEntry } from "../../../../domain/sessions/scene-objects";
 import { SceneObjectsTree } from "./SceneObjectsTree";
 import { SceneMapsSection } from "./SceneMapsSection";
+import { ArcPreparationUseSection } from "./ArcPreparationUseSection";
+import type { CampaignSelection, ScenePreparationReservationDto } from "../../../../shared/contracts/campaigns";
 import "./interface-explorer.css";
 
 interface DmAsidePanelProps {
@@ -53,7 +55,6 @@ interface DmAsidePanelProps {
   readonly onReorderMaps: (mapIds: readonly string[]) => void;
   readonly onDeleteMap: (mapId: string) => void;
   readonly onAddMap: () => void;
-  readonly onImportSceneAsMap: () => void;
   readonly onReplaceMapImage: (mapId: string) => void;
   readonly isReplacingImage?: boolean;
   readonly onSelectObject: (entry: SceneObjectEntry) => void;
@@ -76,6 +77,9 @@ interface DmAsidePanelProps {
   readonly onStartSceneLink: () => void;
   readonly sceneLinkStatuses?: Readonly<Record<string, SceneLinkValidationStatus>>;
   readonly hidden?: boolean;
+  readonly campaignSelection?: CampaignSelection;
+  readonly onUsePrepared?: (reservation: ScenePreparationReservationDto) => void;
+  readonly preparationUnavailableMessage?: string;
 }
 
 type SectionKey = "maps" | "objects" | "annotations" | "monsters" | "npcs" | "playerCharacters" | "notes";
@@ -96,7 +100,6 @@ export function DmAsidePanel({
   onReorderMaps,
   onDeleteMap,
   onAddMap,
-  onImportSceneAsMap,
   onReplaceMapImage,
   isReplacingImage = false,
   onSelectObject,
@@ -118,7 +121,10 @@ export function DmAsidePanel({
   onStartInformationArea,
   onStartSceneLink,
   sceneLinkStatuses = {},
-  hidden
+  hidden,
+  campaignSelection,
+  onUsePrepared,
+  preparationUnavailableMessage
 }: DmAsidePanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<AsideTab>("scene");
   const panelId = useId();
@@ -241,7 +247,6 @@ export function DmAsidePanel({
               onReorder={onReorderMaps}
               onDelete={onDeleteMap}
               onAddMap={onAddMap}
-              onImportScene={onImportSceneAsMap}
               onReplaceMapImage={onReplaceMapImage}
               isReplacingImage={isReplacingImage}
             />
@@ -255,9 +260,11 @@ export function DmAsidePanel({
             badge={aside.monsters.length}
             onToggle={toggleSection}
           >
+            {(campaignSelection || preparationUnavailableMessage) && <ArcPreparationUseSection selection={campaignSelection} onUse={onUsePrepared} unavailableMessage={preparationUnavailableMessage}/>}
             <MonsterSection
               monsters={aside.monsters}
               templates={monsterTemplates}
+              preparationContext={!!campaignSelection || !!preparationUnavailableMessage}
               onAdd={handleAddMonster}
               onUpdate={handleUpdateMonster}
               onRemove={handleRemoveMonster}
@@ -267,6 +274,7 @@ export function DmAsidePanel({
           <AccordionSection title="NPCs" icon={UserRound} tone="npc" sectionKey="npcs" open={openSections.has("npcs")} badge={aside.npcs.length} onToggle={toggleSection}>
             <NpcSection
               npcs={aside.npcs}
+              preparationContext={!!campaignSelection || !!preparationUnavailableMessage}
               onAdd={handleAddNpc}
               onUpdate={handleUpdateNpc}
               onRemove={handleRemoveNpc}

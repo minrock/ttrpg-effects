@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "spec": "59-campanas-arcos-escenas",
+  "functionalRevision": "0.6",
+  "date": "2026-11-15",
+  "recordedAtUtc": "2026-11-15T16:20:59.917314+00:00",
+  "version": "3.30.0",
+  "status": "implemented-validated-and-incorporated-to-local-service-not-merged",
+  "branch": "feature/preparacion-npcs-monstruos",
+  "baseCommit": "6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598",
+  "isolatedWorkspace": "/private/tmp/ttrpg-preparation59-06-rnp3g6p8",
+  "rootProductChanged": true,
+  "sourceFiles": [
+    {
+      "path": "src/web/service.css",
+      "baseSha256": "38d7b89f0b8cb4a6444b0db5dbca856f12c60516f634fb611c7aa83249cad27d",
+      "resultSha256": "69a71632d6541850d53d84b168832c0259dd7c189f213a5ff20069938d0913d0"
+    },
+    {
+      "path": "src/server/arc-preparation-http.ts",
+      "baseSha256": "a828e0327dfe3192175f28df7d4c3c1c7bbb56dcdab90e7043218b07c74a590a",
+      "resultSha256": "a70dec0f9c0df4a8cac4d9c38d38c373facc3b17ae2bea317608bcd6285690c5"
+    },
+    {
+      "path": "src/infrastructure/browser/campaign-client.test.ts",
+      "baseSha256": "9de36eb122448670d2fb1fac4132ca5c2363be3aef2b4120b35f2304d838b531",
+      "resultSha256": "19e6464d077a91296f9d8a8817f67d5ece8bc7eb54ecf9a454bc0dc8784b4221"
+    },
+    {
+      "path": "src/infrastructure/browser/campaign-client.ts",
+      "baseSha256": "a6d005cc7e4fbc40b4d5bb35fcd7e2a64a57d233c9b26104492aa605d980c572",
+      "resultSha256": "d6ab79a713ffba5d185f6c5a893ec115a10b49bb5a8266a0d02d42177b3324b3"
+    },
+    {
+      "path": "src/infrastructure/server/database/migrations.ts",
+      "baseSha256": "1fd49c9423707961aa78959aa716cfda147aff738221d52fa2e33c3989231506",
+      "resultSha256": "11b11e064cfece08f92e1d4c68700388256a1cd5e6d5a485418833b0011b0132"
+    },
+    {
+      "path": "src/infrastructure/server/owned/campaigns.contract.ts",
+      "baseSha256": "9a844151eb4c51b305b39f388f51a04f70a3021fbfc78e1676134844a133ca71",
+      "resultSha256": "d3b3bd7c109c38309ed19841bb3b1ed16d38be8f699fea5f73e5094715fc9459"
+    },
+    {
+      "path": "src/infrastructure/server/owned/arc-preparation-repository.ts",
+      "baseSha256": "9a383d68fe07374eccc89947e785b9b6e50c0c86ab365c89fa1c0f776ba8173a",
+      "resultSha256": "f89f082baa787196fc67a012629049af630d140f79cf9077988c1b3897eb4385"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer.ts",
+      "baseSha256": "acf58ebd48eb1219d9e57ad490be47dfcdaa6e92ea2fbb9924ebc0e0b6dd6c51",
+      "resultSha256": "7dded86ba0249b008e391be8fe737cc1d08454230f91befadbdc8e3f7fbe8a81"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer.contract.ts",
+      "baseSha256": "529001acf936e1eb6e3888c59d88bdc8184d73ae2fdf41629479d2bbbe88ac01",
+      "resultSha256": "a65b3911840f7fc0b7602496ba2af5a909a0abdc84a8bf08cc0103f05070527c"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer-catalog.ts",
+      "baseSha256": "371747633409aa6b506d3ae3be5e3cac467164908eab6efeaee9548640ef3c6c",
+      "resultSha256": "6ec4a9f72bf56d36a671f891a57179f8b1b62243d0f7e3c9e6058e3b8d2cb53a"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer-fixture.ts",
+      "baseSha256": "4fd9ca4aca43a89b5f94e1952ca0d584ce5d2e27cbc793a192c30f11a1b67751",
+      "resultSha256": "dec7bc3253fb4f134ab41f64230e449121aef03c054f6669d7ade7a7e8e88093"
+    },
+    {
+      "path": "src/infrastructure/server/owned/revision-3.contract.ts",
+      "baseSha256": "ec87eac414ad73b2658b8f0dfd7863117491db48e71aa1a6607a848b2f8ca0df",
+      "resultSha256": "62d0bd2d88128368cf64a640800a89a33d312c5feb6c351e370cdee65b7738f0"
+    },
+    {
+      "path": "src/infrastructure/server/owned/arc-preparation.contract.ts",
+      "baseSha256": "9cf10ed13ea7310b44fa62d7e0bc7207696bd08370b82c08ad9091c01adccdda",
+      "resultSha256": "5ededd597798d716c44400fc121f82a0824a1457bfb0c14af80290c8f3061701"
+    },
+    {
+      "path": "src/application/services/arc-preparation.ts",
+      "baseSha256": "dcd034c708e2d0d8fa97288981533ce233d903a8f526f6c12b2ef285d45b42a7",
+      "resultSha256": "66069bf0bf54eaa30ff261d31c0628d8ef770cc1d8240517a08d54fdf7353737"
+    },
+    {
+      "path": "src/stories/compositions/content/CampaignPanel.stories.tsx",
+      "baseSha256": "1fa92539a14fe3178fd9d551bbb9efdd6ea0d0cf505c01b9e59964d7b9d70f43",
+      "resultSha256": "708d9460ca7fec5090fda823897d12c350488401ff8a01e8be2686a6b0245bf5"
+    },
+    {
+      "path": "src/stories/compositions/navigation-feedback/AdminShell.stories.tsx",
+      "baseSha256": "9f5c1fb85c9fcf700075aae1619ef335b50f68ea39b6b434d1b35ea55ef277d9",
+      "resultSha256": "b2e48e74eb43f13b3b0d4422e0b5e41b78896550e3c48df6f7c21fe52ded0868"
+    },
+    {
+      "path": "src/stories/compositions/navigation-feedback/AdminSidebar.stories.tsx",
+      "baseSha256": "95a7cfeb651ba9f578a7e47770d385e7a18a1a0909cf5c0acb682739ddcbfe1d",
+      "resultSha256": "8b12bb933f5a36457d15709760d748495c1758037f09b386264d80e4ad606f0f"
+    },
+    {
+      "path": "src/shared/contracts/campaigns.test.ts",
+      "baseSha256": "dbf5947d534feddd4483b24ad5faaa2fbec1cf2c252354fa0f0ec0394a88adfe",
+      "resultSha256": "9d3d584aae590042f1e8bde2316ea4049c47ebaa7f3a9b1d0426a81e7eaa5835"
+    },
+    {
+      "path": "src/shared/contracts/campaigns.ts",
+      "baseSha256": "affe8d0c9532d8ce2b5cb48de73806c3861bfe3d5f73c2a8df7b6f4240d99ef2",
+      "resultSha256": "91e7efe786520957d0c205e718050754ebe2c03c0ca9a8bfa7b4417fdc9a2aae"
+    },
+    {
+      "path": "src/web/campaigns/ArcPreparationPanel.tsx",
+      "baseSha256": "6256691439560817a01436f162937dca207f37c1c377c30105862d956dca6075",
+      "resultSha256": "a8c13ddaeb6725b1d00a2437f9f05612c77ce473972578db259f88beb75c7c5d"
+    },
+    {
+      "path": "src/web/campaigns/CampaignPanel.tsx",
+      "baseSha256": "bcf7339cfa0cc2422635814af7b73f4921f4e9a021b03df82e3364c143dcb501",
+      "resultSha256": "5c4806a8031db9cc5d89c391110934e5de7e896679cbcbdeee2bcb4b71efda7a"
+    },
+    {
+      "path": "src/web/campaigns/CampaignPanel.test.tsx",
+      "baseSha256": "df0b65c7c98ba885ef9172546689d9dfc1d00a015c53ac15fcc29111f24d8310",
+      "resultSha256": "e61bef48e33f0a8d289cd491c8abd05c173f294b2695aec953b0f85522215fae"
+    },
+    {
+      "path": "src/web/campaigns/CampaignCatalog.tsx",
+      "baseSha256": "04bc8142127dc165081f8bf293f768547be508d1de98837c8939a29a9356549a",
+      "resultSha256": "f5d67d26b9301da90c680a316ba3a558b250fc98b695190735847fd0eaa2a3ea"
+    },
+    {
+      "path": "src/web/campaigns/ArcPreparationPanel.test.tsx",
+      "baseSha256": "a341985e5213dd525222a4cbef54099de4226484b42cd807ac4049b475d6833b",
+      "resultSha256": "8a38f4d6779d3167b171021a69cd91e16c1ab499b0c4637ac63e72d5e947e9d5"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "baseSha256": "99b6d35761ea759a42d8fe093a9b108c667b09ec69cb500d2b85bd3c2c88dd68",
+      "resultSha256": "6f226a03f18ff43f3c72a0b3873c15bed3e38b2b789439cbe0a96e3815d608e5"
+    },
+    {
+      "path": "package.json",
+      "baseSha256": "46d18807f428c4ad120ad110c893fd81f9ff989a12267b358ff4115b1f0892d8",
+      "resultSha256": "4021db78c031d5df2da91e58eb423acd36716483a588b314a0005e5aa2ad3558"
+    },
+    {
+      "path": "src/stories/fixtures/preparation-fixtures.ts",
+      "baseSha256": null,
+      "resultSha256": "f79f2294bc325da3313da7655ab76fd70bd5d28202097d9501f08c303bd47b5c"
+    },
+    {
+      "path": "src/stories/compositions/content/ArcPreparationPanel.stories.tsx",
+      "baseSha256": null,
+      "resultSha256": "a2304a59255e2b0be8db0cca04baccf598e57d4bedf0fd2f938349a1bf3f35e8"
+    }
+  ],
+  "checks": {
+    "ownedDirected": {
+      "passed": 40,
+      "files": 4
+    },
+    "ownedFull": {
+      "status": "PASS",
+      "files": 8,
+      "passed": 82,
+      "durationSeconds": 467.88,
+      "command": "pnpm_config_verify_deps_before_run=warn pnpm test:owned; PostgreSQL TLS synthetic environment"
+    },
+    "database": {
+      "passed": 32
+    },
+    "contractAndClient": {
+      "passed": 14
+    },
+    "uiDirected": {
+      "passed": 19
+    },
+    "relatedRegression": {
+      "passed": 69
+    },
+    "builds": [
+      "api",
+      "web",
+      "Electron",
+      "Storybook"
+    ],
+    "static": [
+      "typecheck",
+      "lint",
+      "git diff --check (root documentation)"
+    ],
+    "migration": {
+      "migration": [
+        11,
+        "borrado-logico-preparacion-arcos",
+        "d2d5e1e27546bb61e9497b7387e1c0763e54a79ea9d8df410415113b3f4295f9"
+      ],
+      "countsPreserved": true,
+      "preparedValuesPreserved": true,
+      "reservationsPreserved": true,
+      "newColumn": "deleted_at"
+    }
+  },
+  "ui": {
+    "date": "2026-11-15",
+    "environment": "Datos sintéticos aislados; no operación sobre datos reales",
+    "checks": [
+      {
+        "environment": "Navegador/API sintética",
+        "check": "Entradas NPCs/Monstruos, filtro separado, alta NPC y edición persistida",
+        "result": "PASS"
+      },
+      {
+        "environment": "Navegador/API sintética",
+        "check": "Edición monstruo precarga nombre/notas/imagen/plantilla; Escape retorna trigger",
+        "result": "PASS"
+      },
+      {
+        "environment": "Navegador/API sintética",
+        "check": "Confirmación borrar, foco Cancelar, cancelar conserva registro",
+        "result": "PASS"
+      },
+      {
+        "environment": "Navegador390px",
+        "check": "Sin overflow, listado compacto, drawer cambia destino y enfoca H1",
+        "result": "PASS"
+      },
+      {
+        "environment": "Storybook960/959px",
+        "check": "Fila tres columnas pasa a layout compacto, scrollWidth igual viewport",
+        "result": "PASS"
+      },
+      {
+        "environment": "Storybook memoria",
+        "check": "Borrar última fila confirma, espera y muestra vacío con foco H1",
+        "result": "PASS"
+      },
+      {
+        "environment": "Electron servicio",
+        "check": "Cuenta sintética, edición precargada y guardado retorna foco trigger",
+        "result": "PASS"
+      },
+      {
+        "environment": "Electron servicio",
+        "check": "Campaña inactiva solo consulta sin alta/editar/borrar",
+        "result": "PASS"
+      },
+      {
+        "environment": "Electron servicio",
+        "check": "Entrada/salida editor, catálogo sin filtro contiene NPCs y Monstruo y copia de escena existente",
+        "result": "PASS"
+      },
+      {
+        "environment": "Storybook",
+        "check": "Variantes vacío, solo lectura con fila sin acciones, sin plantillas con alta deshabilitada y error sin falso vacío",
+        "result": "PASS"
+      },
+      {
+        "environment": "Chrome nativo 200 %",
+        "check": "Control Chrome confirma 200 %; listado refluje, drawer y formulario con scroll vertical; cancelación retorna CTA; zoom restaurado y pestaña sintética cerrada",
+        "result": "PASS"
+      }
+    ],
+    "limits": [
+      "No se certifica accesibilidad completa.",
+      "No se repite empaquetado DMG ni QA autónoma completa: no hay fuentes de editor/local modificadas.",
+      "Borrado persistente probado por contratos; flujo de confirmación final UI probado con memoria reiniciable de Storybook."
+    ],
+    "consoleErrorsObserved": []
+  },
+  "review": {
+    "date": "2026-11-15",
+    "scope": "Copia aislada; revisión de contrato, persistencia, autorización, backfill y transferencia por technical_lead",
+    "findings": [
+      {
+        "id": "R06-01",
+        "severity": "P2",
+        "issue": "Lector v4 descartaba deletedAt suministrado",
+        "resolution": "Rechaza campo presente antes de normalizar",
+        "status": "corregido y revisado por inspección"
+      },
+      {
+        "id": "R06-02",
+        "severity": "P2",
+        "issue": "verifyTransfer omitía comparar marca de borrado",
+        "resolution": "Compara deleted_at con deletedAt transferido y añade caso de corrupción",
+        "status": "corregido y revisado por inspección"
+      }
+    ],
+    "tests": "82 owned,32database,14contract/client PASS; TL performed inspection only",
+    "remainingReviewBlockers": []
+  },
+  "storybook": {
+    "stories": 67,
+    "docs": 32,
+    "families": 32,
+    "url": "http://127.0.0.1:6007/?path=/story/composiciones-campaignpanel--np-cs"
+  },
+  "evidenceFiles": {
+    ".local/validation/preparation59-06/delivery-manifest.json": "b949b4f3e29e09b1c45a4886b6361285e5d06ef1f55f73391a51a50575985ad2",
+    ".local/validation/preparation59-06/migration11-result.json": "69695a5dc2e0cd96031edc11c7cbaa4b0b6ca86a835e4754f2d3dda0f736832a",
+    ".local/validation/preparation59-06/ui-checks.json": "96c85679a1b2e12951a9057e00110e08621fbe728cc65def424280a99f7d37a3",
+    ".local/validation/preparation59-06/delivery.patch": "d6ad94b79f1d611f63a63fd07f07c8e1f0ddc7f93f07b3d36b02b5bf652b0b70",
+    ".local/validation/preparation59-06/review-tl.json": "5d82324ef25945739d9a891564ed9516095e6481d2eee6ca953f333100ce3b09",
+    ".local/validation/preparation59-06/screenshots/electron-solo-consulta.png": "a0babc1035f2ea67a55b00daf5f3258a80ed445d2cabd29854b16e1e8def0fbb",
+    ".local/validation/preparation59-06/screenshots/electron-editor-catalogo-completo.png": "73b0e92e6442d888899524bdcecd3ac256360de42b5eb2756f5b85f82ab36721",
+    ".local/validation/preparation59-06/screenshots/storybook-npcs.png": "f32a5f4d4ffc97b8e1852f0f1d4ec98af133e9bedceb04fbfdfe0eb1ba915592",
+    ".local/validation/preparation59-06/screenshots/chrome-200.png": "867c4b201b53c17fcf02c11afdd7d140f73a62a58f225b07d82686c9d0338ecb",
+    ".local/validation/preparation59-06/screenshots/chrome-form-200.png": "3a44fe558576ea111f3b7788b93862c6ff1acd7fd81b81e2a44012fd96a58c84",
+    ".local/validation/preparation59-06/screenshots/electron-npcs.png": "c5f097390df1644ef917ed6b77a129b8dd89a676cc44fd641e8b4461a4e114a2",
+    ".local/validation/preparation59-06/logs/t11-transfer-v4.log": "803dad8f9c95ed148fb0937eff3eb2ede762796823e74f70c3a8317df0c3ce5e",
+    ".local/validation/preparation59-06/logs/t12-typecheck-final.log": "a445ed378ed6e797487d6892e32de950732e50e989b30c4d9471c9f3e2527ac4",
+    ".local/validation/preparation59-06/logs/t11-owned-rerun2.log": "384e979deedcf63d25024bb6420d0f4eb85314b9bc20aa2e5a7411ad71d3e52b",
+    ".local/validation/preparation59-06/logs/build-web-final.log": "aaf1ed059957255a990446d3dd3c45f8976aea7765ec75bab22cb4cce46f0c6a",
+    ".local/validation/preparation59-06/logs/db-final.log": "bd42e7564dc3d8ca15b1a9f8f1752aed64531c4023503ff40ba191ca63f56c8a",
+    ".local/validation/preparation59-06/logs/t12-campaign-tests-final.log": "4201cdce37d118f42a0bee8948c9b551b57501240acce34f4c194e11d61465e6",
+    ".local/validation/preparation59-06/logs/lint-final.log": "e72b6fce528739458ceefcb076c9a0f9e74a885eb2f026d2fcc09e64102344c0",
+    ".local/validation/preparation59-06/logs/build-api-final.log": "a7713e68db8a23f0416a1ca81ca0d7e6960daf26a1598c5247c9b96e90cc26a0",
+    ".local/validation/preparation59-06/logs/contracts-client-final.log": "94a435d4fb398cf1c6dde7278379462f5ac2ece63b61132bf02452b5bb93ca97",
+    ".local/validation/preparation59-06/logs/build-electron.log": "b6c1108669d2d749bbff01c0c36a320d33d2f8229d7142d6ac8900054f6eaf83",
+    ".local/validation/preparation59-06/logs/regression-scoped.log": "86956c654ee1158cb26bf9228ee5016fe3f491d7d528a58a1c05db3abeaec6b9",
+    ".local/validation/preparation59-06/logs/build-storybook-final.log": "9c818391ae2feed49031e4189d6c86df1b6082281a6b1b79b64f979b1f9e180d",
+    ".local/validation/preparation59-06/logs/t11-test-owned-full.log": "8a76e53e21bec843b36722bac155976b23566843ecffb64a961c9ad9e504e062",
+    ".local/validation/preparation59-06/preparacion-npcs-monstruos-3.30.0.tar.gz": "8c24759d6b7707d573956f0d7b6f2e05ceab383498d0bbf8e5a5570313098dd1",
+    ".local/validation/preparation59-06/operational-apply.json": "f1562366f24d76d371142ce1c6a867a73818f1e094ec30d630c72fb691c12efd",
+    ".local/validation/preparation59-06/post-migration-metrics.json": "edbf723dcb7f523eb0ee1e73f32d6c46f9fc4ddd83b06efa172a72106d442258",
+    ".local/validation/preparation59-06/logs/t13-db-migrate.log": "c444c729bbba54163b3c29ba83efb9e246b50e4ff1b89c4a6d1819400053dd3a",
+    ".local/validation/preparation59-06/logs/t13-build-service.log": "d45ff328404cd401f5df1b668b3165a3a0c50386b7b7fcb0fc429ebb287f2000",
+    ".local/validation/preparation59-06/logs/t13-build-electron.log": "b5aef27c30194f874fe0b5c2d3318fe0729ee905afc8cac35d7291d508be88ca",
+    ".local/validation/preparation59-06/logs/t13-api-restart.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "integration": {
+    "rootSourceApplied": true,
+    "rootSourceHashesVerified": true,
+    "realDatabaseMigrated": true,
+    "realSchema": 11,
+    "isolatedSchema": 11,
+    "gitHistoryWritten": false,
+    "operationalPermission": "Q-0011 explicit human authorization received2026-11-15",
+    "operation": {
+      "backup": {
+        "directory": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/preparation59-06.vgSLUI3h",
+        "foreignKeyCheckRows": 0,
+        "mode": "0700",
+        "quickCheck": "ok",
+        "sourceSchemaVersion": 10,
+        "sourceTableCount": 31,
+        "verificationCopy": "verification-data"
+      },
+      "builds": {
+        "electron": "passed",
+        "service": "passed"
+      },
+      "dataComparison": {
+        "allPreservedProjectionsMatch": true,
+        "baselineMetrics": "/Users/minrock/Projects/ttrpg-effects/.local/service/backups/preparation59-06.vgSLUI3h/pre-migration-metrics.json",
+        "migrationMetadataTable": [
+          "ttrpg_control_migrations"
+        ],
+        "postMetrics": "/Users/minrock/Projects/ttrpg-effects/.local/validation/preparation59-06/post-migration-metrics.json",
+        "unchangedProjectionTables": 30
+      },
+      "incorporation": {
+        "deliveryManifest": "/Users/minrock/Projects/ttrpg-effects/.local/validation/preparation59-06/delivery-manifest.json",
+        "files": 28,
+        "manifestSha256": "b949b4f3e29e09b1c45a4886b6361285e5d06ef1f55f73391a51a50575985ad2",
+        "resultHashesVerified": true,
+        "sourceAndBaseHashesVerified": true
+      },
+      "logs": {
+        "buildElectron": "/Users/minrock/Projects/ttrpg-effects/.local/validation/preparation59-06/logs/t13-build-electron.log",
+        "buildService": "/Users/minrock/Projects/ttrpg-effects/.local/validation/preparation59-06/logs/t13-build-service.log",
+        "dbMigrate": "/Users/minrock/Projects/ttrpg-effects/.local/validation/preparation59-06/logs/t13-db-migrate.log"
+      },
+      "migration": {
+        "arcPreparationsDeletedAtNonNull": 0,
+        "command": "pnpm db:migrate (SQLite local data directory)",
+        "foreignKeyCheckRows": 0,
+        "integrityCheck": "ok",
+        "migrationVersions": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "quickCheck": "ok",
+        "schemaVersion": 11
+      },
+      "operation": "preparation59-06",
+      "restart": {
+        "bundleStatus": 200,
+        "healthChecks": 3,
+        "healthVersion": "3.30.0",
+        "htmlStatus": 200,
+        "port": 8787,
+        "processes": [
+          {
+            "pid": 23519,
+            "process": "23519  1747 node /opt/homebrew/bin/pnpm start:api"
+          },
+          {
+            "pid": 23534,
+            "process": "23534 23519 node scripts/watch-service.mjs"
+          },
+          {
+            "pid": 23845,
+            "process": "23845 23534 /usr/local/bin/node --env-file-if-exists=/Users/minrock/Projects/ttrpg-effects/.env /Users/minrock/Projects/ttrpg-effects/out/dev-service/api/index.mjs"
+          }
+        ],
+        "servedStatic": "out/dev-service/web",
+        "staticContentUnchanged": true
+      }
+    },
+    "productionUiSmoke": "Chrome separate tab renders protected login; no credentials entered or functional records changed. Full authenticated UI QA performed against synthetic service."
+  },
+  "limits": [
+    "No full accessibility certification",
+    "No autonomous Electron/GPU revalidation",
+    "Confirmed UI deletion uses resettable Storybook fixture; persistent delete exercised in synthetic SQLite/PostgreSQL contracts"
+  ],
+  "acceptanceCriteria": {
+    "CA-24": "verified: separate routes, server filtering before count/page, unfiltered editor compatibility and stale-context guards",
+    "CA-25": "verified: responsive rows, existing metadata, top CTA, accessible row actions, browser390/959/960/1440 and Chrome200%",
+    "CA-26": "verified: precargado/edit/create, confirmed revisioned delete, ACK/error409/focus, inactive read-only and persisted snapshot preservation",
+    "CA-27": "verified: schema10→11 compatibility, tombstones survive backfill/transfer, 82owned tests, real connected Electron regression and isolated stories"
+  },
+  "rootProductChangeReason": "Authorized incorporation of 28 validated files, Q-0011",
+  "cleanup": {
+    "syntheticApi8877": "stopped",
+    "syntheticPostgres65514": "stopped",
+    "storybook6007": "kept as preview",
+    "realApi8787": "running3.30.0",
+    "temporaryChromeQaTabs": "closed",
+    "browserZoom": "restored100%"
+  }
+}

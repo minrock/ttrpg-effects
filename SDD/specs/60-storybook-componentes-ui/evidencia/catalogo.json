@@ -1,0 +1,485 @@
+{
+  "date": "2026-11-14",
+  "version": "3.29.0",
+  "storybook": "10.6.7",
+  "stories": 54,
+  "autodocs": 29,
+  "controls": 12,
+  "compositions": 17,
+  "introduction": "fundamentos-introducción--catalogo",
+  "families": [
+    {
+      "title": "Controles/Button",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "MonsterTemplateFields / ReplaceMapImageModal",
+      "storyFile": "src/stories/controls/Button.stories.tsx",
+      "docsId": "controles-button--docs",
+      "stories": [
+        {
+          "id": "controles-button--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-button--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/Checkbox",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "FireProperties / LightningProperties / ReplaceMapImageModal",
+      "storyFile": "src/stories/controls/Checkbox.stories.tsx",
+      "docsId": "controles-checkbox--docs",
+      "stories": [
+        {
+          "id": "controles-checkbox--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-checkbox--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/ColorInput",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "FireProperties",
+      "storyFile": "src/stories/controls/ColorInput.stories.tsx",
+      "docsId": "controles-colorinput--docs",
+      "stories": [
+        {
+          "id": "controles-colorinput--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-colorinput--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/IconButton",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "FireTools / LightningTools / ReplaceMapImageModal",
+      "storyFile": "src/stories/controls/IconButton.stories.tsx",
+      "docsId": "controles-iconbutton--docs",
+      "stories": [
+        {
+          "id": "controles-iconbutton--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-iconbutton--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/NumberInput",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "FireProperties / LightningProperties",
+      "storyFile": "src/stories/controls/NumberInput.stories.tsx",
+      "docsId": "controles-numberinput--docs",
+      "stories": [
+        {
+          "id": "controles-numberinput--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-numberinput--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/PasswordInput",
+      "source": "src/web/AccountAccess.tsx",
+      "consumer": "AccountAccess / ChangePassword",
+      "storyFile": "src/stories/controls/PasswordInput.stories.tsx",
+      "docsId": "controles-passwordinput--docs",
+      "stories": [
+        {
+          "id": "controles-passwordinput--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-passwordinput--invalid",
+          "name": "Invalid"
+        }
+      ]
+    },
+    {
+      "title": "Controles/Radio",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "ReplaceMapImageModal",
+      "storyFile": "src/stories/controls/Radio.stories.tsx",
+      "docsId": "controles-radio--docs",
+      "stories": [
+        {
+          "id": "controles-radio--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-radio--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/Select",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "App",
+      "storyFile": "src/stories/controls/Select.stories.tsx",
+      "docsId": "controles-select--docs",
+      "stories": [
+        {
+          "id": "controles-select--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-select--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/SharedSwitch",
+      "source": "src/renderer/src/components/SharedSwitch.tsx",
+      "consumer": "CampaignPanel / MapAnnotationsSection / App",
+      "storyFile": "src/stories/controls/SharedSwitch.stories.tsx",
+      "docsId": "controles-sharedswitch--docs",
+      "stories": [
+        {
+          "id": "controles-sharedswitch--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-sharedswitch--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/Slider",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "FireProperties / LightningProperties",
+      "storyFile": "src/stories/controls/Slider.stories.tsx",
+      "docsId": "controles-slider--docs",
+      "stories": [
+        {
+          "id": "controles-slider--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-slider--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Controles/TextInput",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "App / MonsterTemplateFields",
+      "storyFile": "src/stories/controls/TextInput.stories.tsx",
+      "docsId": "controles-textinput--docs",
+      "stories": [
+        {
+          "id": "controles-textinput--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-textinput--invalid",
+          "name": "Invalid"
+        }
+      ]
+    },
+    {
+      "title": "Controles/Textarea",
+      "source": "src/renderer/src/components/ui/Controls.tsx",
+      "consumer": "MonsterTemplateFields",
+      "storyFile": "src/stories/controls/Textarea.stories.tsx",
+      "docsId": "controles-textarea--docs",
+      "stories": [
+        {
+          "id": "controles-textarea--default",
+          "name": "Default"
+        },
+        {
+          "id": "controles-textarea--disabled",
+          "name": "Disabled"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/CampaignPanel",
+      "source": "src/web/campaigns/CampaignPanel.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/content/CampaignPanel.stories.tsx",
+      "docsId": "composiciones-campaignpanel--docs",
+      "stories": [
+        {
+          "id": "composiciones-campaignpanel--normal",
+          "name": "Normal"
+        },
+        {
+          "id": "composiciones-campaignpanel--empty",
+          "name": "Empty"
+        },
+        {
+          "id": "composiciones-campaignpanel--failure",
+          "name": "Failure"
+        },
+        {
+          "id": "composiciones-campaignpanel--readonly",
+          "name": "Readonly"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/MapAnnotationsTree",
+      "source": "src/renderer/src/components/annotations/MapAnnotationsTree.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/content/MapAnnotationsTree.stories.tsx",
+      "docsId": "composiciones-mapannotationstree--docs",
+      "stories": [
+        {
+          "id": "composiciones-mapannotationstree--normal",
+          "name": "Normal"
+        },
+        {
+          "id": "composiciones-mapannotationstree--empty",
+          "name": "Empty"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/MonsterTemplateFields",
+      "source": "src/renderer/src/components/aside/MonsterTemplateFields.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/content/MonsterTemplateFields.stories.tsx",
+      "docsId": "composiciones-monstertemplatefields--docs",
+      "stories": [
+        {
+          "id": "composiciones-monstertemplatefields--editable",
+          "name": "Editable"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/RichTextPreview",
+      "source": "src/renderer/src/components/aside/RichTextPreview.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/content/RichTextPreview.stories.tsx",
+      "docsId": "composiciones-richtextpreview--docs",
+      "stories": [
+        {
+          "id": "composiciones-richtextpreview--editable",
+          "name": "Editable"
+        },
+        {
+          "id": "composiciones-richtextpreview--readonly",
+          "name": "Readonly"
+        },
+        {
+          "id": "composiciones-richtextpreview--empty",
+          "name": "Empty"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/SceneMapsSection",
+      "source": "src/renderer/src/components/aside/SceneMapsSection.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/content/SceneMapsSection.stories.tsx",
+      "docsId": "composiciones-scenemapssection--docs",
+      "stories": [
+        {
+          "id": "composiciones-scenemapssection--normal",
+          "name": "Normal"
+        },
+        {
+          "id": "composiciones-scenemapssection--empty",
+          "name": "Empty"
+        },
+        {
+          "id": "composiciones-scenemapssection--replacing-image",
+          "name": "Replacing Image"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/SceneObjectsTree",
+      "source": "src/renderer/src/components/aside/SceneObjectsTree.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/content/SceneObjectsTree.stories.tsx",
+      "docsId": "composiciones-sceneobjectstree--docs",
+      "stories": [
+        {
+          "id": "composiciones-sceneobjectstree--normal",
+          "name": "Normal"
+        },
+        {
+          "id": "composiciones-sceneobjectstree--empty",
+          "name": "Empty"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/FeedbackAlert",
+      "source": "src/renderer/src/components/aside/FeedbackAlert.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/navigation-feedback/FeedbackAlert.stories.tsx",
+      "docsId": "composiciones-feedbackalert--docs",
+      "stories": [
+        {
+          "id": "composiciones-feedbackalert--error",
+          "name": "Error"
+        },
+        {
+          "id": "composiciones-feedbackalert--exito",
+          "name": "Exito"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/HeaderDropdown",
+      "source": "src/web/HeaderDropdown.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/navigation-feedback/HeaderDropdown.stories.tsx",
+      "docsId": "composiciones-headerdropdown--docs",
+      "stories": [
+        {
+          "id": "composiciones-headerdropdown--interactivo",
+          "name": "Interactivo"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/RightSidebarTabs",
+      "source": "src/renderer/src/components/dice/RightSidebarTabs.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/navigation-feedback/RightSidebarTabs.stories.tsx",
+      "docsId": "composiciones-rightsidebartabs--docs",
+      "stories": [
+        {
+          "id": "composiciones-rightsidebartabs--interactiva",
+          "name": "Interactiva"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/ServiceDialog",
+      "source": "src/web/dialogs.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/navigation-feedback/ServiceDialog.stories.tsx",
+      "docsId": "composiciones-servicedialog--docs",
+      "stories": [
+        {
+          "id": "composiciones-servicedialog--confirmacion",
+          "name": "Confirmacion"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/DiceResultSummary",
+      "source": "src/renderer/src/components/dice/DiceResultSummary.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/workspace/DiceResultSummary.stories.tsx",
+      "docsId": "composiciones-diceresultsummary--docs",
+      "stories": [
+        {
+          "id": "composiciones-diceresultsummary--resultado",
+          "name": "Resultado"
+        },
+        {
+          "id": "composiciones-diceresultsummary--compacto",
+          "name": "Compacto"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/FireProperties",
+      "source": "src/renderer/src/components/FireProperties.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/workspace/FireProperties.stories.tsx",
+      "docsId": "composiciones-fireproperties--docs",
+      "stories": [
+        {
+          "id": "composiciones-fireproperties--editables",
+          "name": "Editables"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/LightningProperties",
+      "source": "src/renderer/src/components/LightningProperties.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/workspace/LightningProperties.stories.tsx",
+      "docsId": "composiciones-lightningproperties--docs",
+      "stories": [
+        {
+          "id": "composiciones-lightningproperties--editables",
+          "name": "Editables"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/SceneCounterBar",
+      "source": "src/renderer/src/components/counters/SceneCountersOverlay.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/workspace/SceneCounterBar.stories.tsx",
+      "docsId": "composiciones-scenecounterbar--docs",
+      "stories": [
+        {
+          "id": "composiciones-scenecounterbar--gestion-dm",
+          "name": "Gestion DM"
+        },
+        {
+          "id": "composiciones-scenecounterbar--vista-jugador",
+          "name": "Vista Jugador"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/WorkspaceHeader",
+      "source": "src/renderer/src/components/workspace/WorkspaceHeader.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/workspace/WorkspaceHeader.stories.tsx",
+      "docsId": "composiciones-workspaceheader--docs",
+      "stories": [
+        {
+          "id": "composiciones-workspaceheader--acciones",
+          "name": "Acciones"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/WorkspaceTools",
+      "source": "src/renderer/src/components/workspace/WorkspaceTools.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/compositions/workspace/WorkspaceTools.stories.tsx",
+      "docsId": "composiciones-workspacetools--docs",
+      "stories": [
+        {
+          "id": "composiciones-workspacetools--interactivas",
+          "name": "Interactivas"
+        }
+      ]
+    },
+    {
+      "title": "Composiciones/SidebarAccordion",
+      "source": "src/renderer/src/components/SidebarAccordion.tsx",
+      "consumer": null,
+      "storyFile": "src/stories/controls/SidebarAccordion.stories.tsx",
+      "docsId": "composiciones-sidebaraccordion--docs",
+      "stories": [
+        {
+          "id": "composiciones-sidebaraccordion--default",
+          "name": "Default"
+        }
+      ]
+    }
+  ]
+}

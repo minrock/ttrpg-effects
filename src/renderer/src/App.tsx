@@ -6,7 +6,7 @@ import { matchesPublishedDrawingFrame } from "../../domain/player/shared-drawing
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
 import type { ServiceWorkspace } from "../../web/workspace";
-import { useTtrpgApi } from "./client/ClientProvider";
+import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
 import {
   useCallback,
   useEffect,
@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type JSX,
   type ReactNode,
   type SetStateAction
@@ -22,13 +23,16 @@ import {
   resolveContextMenuPosition,
   type ContextMenuPosition
 } from "./context-menu-position";
-import { parseSceneJson } from "../../domain/sessions/scene-schema";
+import { sceneId } from "../../shared/contracts/service-references";
 import { useMapImageReplacement } from "./hooks/useMapImageReplacement";
 import { ReplaceMapImageModal } from "./components/aside/ReplaceMapImageModal";
 import { WorkspaceHeader } from "./components/workspace/WorkspaceHeader";
 import { WorkspaceTools } from "./components/workspace/WorkspaceTools";
+import type { DraftStatus } from "../../application/services/draft-coordinator";
 import { version as appVersion } from "../../../package.json";
-import * as Switch from "@radix-ui/react-switch";
+import { SharedSwitch } from "./components/SharedSwitch";
+import { SidebarAccordion } from "./components/SidebarAccordion";
+import { Select, TextInput } from "./components/ui/Controls";
 import {
   ArrowDown,
   ArrowLeft,
@@ -133,7 +137,6 @@ import {
   type MapImageState
 } from "../../domain/map/map-image";
 import { formatDistance, measureDistance, measurePathDistance } from "../../domain/measurement/measurement";
-import { hasSceneContent } from "../../domain/sessions/scene-content";
 import { createDefaultSceneMapDocument } from "../../domain/sessions/default-scene";
 import {
   addSceneMap,
@@ -213,7 +216,6 @@ import { listSceneObjects, removeSceneObject, type SceneObjectEntry } from "../.
 import { DmDarknessStatusBadge } from "./components/DmDarknessStatusBadge";
 import type { SceneAside } from "../../domain/sessions/scene-aside";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
-import { MonsterTemplateManagerModal } from "./components/aside/MonsterTemplateManagerModal";
 import {
   advanceTurn,
   createDefaultCombatTracker,
@@ -255,9 +257,10 @@ import {
 } from "./components/annotations/MapAnnotationModal";
 import { MapAnnotationsSection } from "./components/annotations/MapAnnotationsSection";
 import { SceneLinkModal } from "./components/annotations/SceneLinkModal";
-import { useDiceSession } from "./hooks/useDiceSession";
 import { DiceOverlay } from "./components/dice/DiceOverlay";
-import { DicePanel } from "./components/dice/DicePanel";
+import { ServiceDicePanel } from "./components/dice/ServiceDicePanel";
+import { DicePublicStatus } from "./components/dice/DicePublicStatus";
+import { useServiceDiceSession } from "./hooks/useServiceDiceSession";
 import { RightSidebarTabs } from "./components/dice/RightSidebarTabs";
 import {
   renameSceneLinkMarker,
@@ -287,10 +290,14 @@ interface NewTokenDraftState {
   readonly position: WorldPoint;
 }
 
-const SESSION_AUTOSAVE_DELAY_MS = 1000;
 const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
+const emptyDraftStatus: DraftStatus = { local: "Sin cambios pendientes", remote: "", confirmed: "", error: "", enabled: false, available: null };
+const subscribeToNothing = (): (() => void) => () => {};
+const getEmptyDraftStatus = (): DraftStatus => emptyDraftStatus;
 
 export function App({ service, tablePanel }: { readonly service?: ServiceWorkspace; readonly tablePanel?: ReactNode } = {}): JSX.Element {
+  const drafts = service?.browser.drafts;
+  const draftStatus = useSyncExternalStore(drafts?.subscribe ?? subscribeToNothing, drafts?.getStatus ?? getEmptyDraftStatus, getEmptyDraftStatus);
   const shared = useSharedAnnotations();
   const [serviceFocusReady, setServiceFocusReady] = useState(0);
   const [servicePublished, setServicePublished] = useState(false);
@@ -302,19 +309,10 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const scenesApi = useTtrpgApi("scenes");
   const imagesApi = useTtrpgApi("images");
   const playerApi = useTtrpgApi("player");
-  const nativeMenusApi = useTtrpgApi("nativeMenus");
   const librariesApi = useTtrpgApi("libraries");
   const [scene, setSceneState] = useState<SceneDocument>(() => {
-    if (service) { const empty=createEmptyScene(); return {...empty,settings:{...empty.settings,diagonalMode:service.defaultDiagonalMode??empty.settings.diagonalMode}}; }
-    try {
-      const snapshot = sessionStorage.getItem("ttrpg:session-scene");
-      if (snapshot !== null) {
-        return parseSceneJson(snapshot);
-      }
-    } catch {
-      sessionStorage.removeItem("ttrpg:session-scene");
-    }
-    return createEmptyScene();
+    const empty = createEmptyScene();
+    return service ? { ...empty, settings: { ...empty.settings, diagonalMode: service.defaultDiagonalMode ?? empty.settings.diagonalMode } } : empty;
   });
   const sceneRef = useRef(scene);
   const setScene = useCallback((nextScene: SetStateAction<SceneDocument>): void => {
@@ -334,12 +332,13 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const draftBaselineRef=useRef<{scene:SceneDocument;sceneAside:SceneAside}|null>(null);
   const sceneAsideRef=useRef(sceneAside);sceneAsideRef.current=sceneAside;
   const [monsterTemplates, setMonsterTemplates] = useState<readonly MonsterTemplate[]>([]);
-  const [isMonsterTemplateManagerOpen, setIsMonsterTemplateManagerOpen] = useState(false);
   const [isCombatSetupOpen, setIsCombatSetupOpen] = useState(false);
   const [isSceneCounterManagerOpen, setIsSceneCounterManagerOpen] = useState(false);
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+  const currentFilePathRef = useRef<string | null>(currentFilePath);
+  currentFilePathRef.current = currentFilePath;
   const [feedback, setFeedback] = useState("Escena default en memoria");
   const [warnings, setWarnings] = useState<readonly SceneWarning[]>([]);
   const [needsResave, setNeedsResave] = useState(false);
@@ -359,14 +358,43 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     useState<ArcanePointerCreatureSize>("medium");
   const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
   const [diceSessionId] = useState(() => crypto.randomUUID());
+  const activeDiceMap = scene.maps.find(map => map.id === scene.activeMapId);
   const diceContext = useMemo(() => ({
-    token: `${diceSessionId}:${arcanePointerResetKey}:${scene.activeMapId ?? "empty"}`,
-    sceneId: diceSessionId,
+    token: `${diceSessionId}:${scene.id}:${arcanePointerResetKey}:${scene.activeMapId ?? "empty"}`,
+    sceneId: scene.id,
     mapId: scene.activeMapId ?? "",
     sceneName: currentFilePath ? getFileBaseName(currentFilePath).slice(0, 200) : "Escena sin guardar",
-    mapName: (scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa").slice(0, 200)
-  }), [diceSessionId, arcanePointerResetKey, scene.activeMapId, scene.maps, currentFilePath]);
-  const diceSession = useDiceSession(diceContext);
+    mapName: (activeDiceMap?.name ?? "Sin mapa").slice(0, 200)
+  }), [diceSessionId, scene.id, arcanePointerResetKey, scene.activeMapId, activeDiceMap?.name, currentFilePath]);
+  const client = useTtrpgClient();
+  const serviceDice = useServiceDiceSession();
+  const preparationSelection = useMemo(() => {
+    const selection = service?.campaignSelection;
+    if (!selection || !currentFilePath) return undefined;
+    try { return { ...selection, sceneId: sceneId(currentFilePath) }; }
+    catch { return undefined; }
+  }, [currentFilePath, service?.campaignSelection]);
+  const preparationUnavailableMessage = service?.campaignSelection && !preparationSelection ? "Guarda o importa la escena antes de usar una ficha preparada." : undefined;
+  const hasServiceDice = client?.assetReferences === "service" && serviceDice.view.supported;
+  const serviceAuthor = (author: { readonly kind: "dm" } | { readonly kind: "player"; readonly publicId: string; readonly alias: string; readonly discriminator: number }) => ({ id: author.kind === "dm" ? "dm" : author.publicId, label: author.kind === "dm" ? "DM" : `${author.alias} · ${author.discriminator}`, kind: author.kind });
+  const privateServiceState = serviceDice.view.state?.audience === "dm" ? serviceDice.view.state.private : null;
+  const panelPresentation = serviceDice.role === "dm" && serviceDice.draft.visibility === "hidden" ? serviceDice.privatePresentation : serviceDice.publicPresentation;
+  const panelContextReady = serviceDice.view.connected && (serviceDice.role === "dm" && serviceDice.draft.visibility === "hidden" ? privateServiceState?.context !== null : serviceDice.view.state?.public.publishedContext !== null);
+  const presentedPublicId = serviceDice.publicPresentation?.rollId;
+  const presentedPrivateId = serviceDice.privatePresentation?.rollId;
+  const serviceDicePanel = hasServiceDice ? <ServiceDicePanel role={serviceDice.role} capabilities={{ chooseVisibility: serviceDice.role === "dm", showMapResult: serviceDice.role === "dm", clearHistory: serviceDice.role === "dm", closeAny: serviceDice.closeAny }} draft={serviceDice.draft} history={serviceDice.history.map(entry => ({ id: entry.id, author: serviceAuthor(entry.author), visibility: entry.visibility, createdAt: entry.createdAt, status: entry.status, result: entry.result, isPresented: entry.id === (entry.visibility === "public" ? presentedPublicId : presentedPrivateId) }))} historyOffset={serviceDice.historyPage?.offset} historyTotal={serviceDice.historyPage?.total} historyLimit={serviceDice.historyPage?.limit} onHistoryPageChange={offset => { void serviceDice.loadHistory(offset); }} occupancy={serviceDice.occupancy ? { ...serviceDice.occupancy, author: serviceAuthor(serviceDice.occupancy.author) } : null} presentation={panelPresentation ? { ...panelPresentation, author: serviceAuthor(panelPresentation.author), visibility: panelPresentation === serviceDice.privatePresentation ? "hidden" : "public" } : null} selfAuthorId={serviceDice.selfAuthorId} ready={panelContextReady} preparing={serviceDice.preparing} uncertain={serviceDice.uncertain} onRetry={() => { void serviceDice.retry(); }} error={serviceDice.error} mapResultVisible={serviceDice.mapResultVisible} pendingDismissId={serviceDice.pendingDismissId} dismissError={serviceDice.dismissError} soundEnabled={serviceDice.soundEnabled} onSoundEnabledChange={serviceDice.setSoundEnabled} size={serviceDice.size} onSizeChange={serviceDice.setSize} onDraftChange={serviceDice.setDraft} onRoll={mode => { void serviceDice.run(mode); }} onDismiss={id => { void serviceDice.dismiss(id); }} onClearHistory={() => { void serviceDice.clearHistory(); }} onMapResultVisibleChange={visible => { void serviceDice.setMapResultVisible(visible); }} /> : null;
+  const servicePrivateOverlay = hasServiceDice && serviceDice.privatePresentation?.context.token === diceContext.token && serviceDice.privatePresentation.context.sceneId === scene.id && serviceDice.privatePresentation.context.mapId === scene.activeMapId;
+  const servicePublicOverlay = hasServiceDice && !servicePrivateOverlay && serviceDice.publicPresentation !== null && serviceDice.view.state?.public.publishedContext?.token === serviceDice.publicPresentation.context.token && serviceDice.publicPresentation.context.sceneId === scene.id && serviceDice.publicPresentation.context.mapId === scene.activeMapId;
+  const serviceOverlayEnvelope = servicePrivateOverlay ? serviceDice.privateEnvelope : servicePublicOverlay ? serviceDice.publicEnvelope : { revision: -1, presentation: null };
+  const serviceOverlayFinalFrame = servicePrivateOverlay ? serviceDice.privateFinalFrame : servicePublicOverlay ? serviceDice.publicFinalFrame : null;
+  const privateContextKey = `${diceContext.token}:${diceContext.sceneId}:${diceContext.mapId}:${diceContext.sceneName}:${diceContext.mapName}`;
+  const lastPrivateContext = useRef<{ readonly key: string | null; readonly sender: unknown }>({ key: null, sender: null });
+  useEffect(() => {
+    if (!hasServiceDice || serviceDice.role !== "dm") { lastPrivateContext.current = { key: null, sender: null }; return; }
+    if (lastPrivateContext.current.key === privateContextKey && lastPrivateContext.current.sender === serviceDice.setPrivateContext) return;
+    lastPrivateContext.current = { key: privateContextKey, sender: serviceDice.setPrivateContext };
+    void serviceDice.setPrivateContext(diceContext);
+  }, [privateContextKey, hasServiceDice, serviceDice.role, serviceDice.setPrivateContext, diceContext]);
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
   const [showPlayerZoomIndicator, setShowPlayerZoomIndicator] = useState(false);
@@ -394,8 +422,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const [playerCameraSyncKey, setPlayerCameraSyncKey] = useState(0);
   const playerCameraSyncKeyRef = useRef(playerCameraSyncKey);
   playerCameraSyncKeyRef.current = playerCameraSyncKey;
-  const [isNewSceneDialogOpen, setIsNewSceneDialogOpen] = useState(false);
-  const [pendingRecentScene, setPendingRecentScene] = useState<SceneOperationResult | null>(null);
   const [newTokenDraft, setNewTokenDraft] = useState<NewTokenDraftState | null>(null);
   const [pathDraft, setPathDraft] = useState<PathDraftState>({
     points: [],
@@ -535,13 +561,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const previousDraftScene = useRef({scene,sceneAside,currentFilePath});
   useEffect(() => {
     const previous=previousDraftScene.current;previousDraftScene.current={scene,sceneAside,currentFilePath};
+    if(service?.sceneLoading)return;
     if(draftBaselineRef.current?.scene===scene&&draftBaselineRef.current.sceneAside===sceneAside)return;
     if(!service?.browser.drafts || previous.scene===scene&&previous.sceneAside===sceneAside&&previous.currentFilePath===currentFilePath)return;
     const drafts=service.browser.drafts;
     drafts.update(()=>draftSnapshotRef.current!());
     // Crear/eliminar una figura se respalda al terminar el cambio, sin esperar al cierre.
     if(previous.scene.shapes.length!==scene.shapes.length)void drafts.flushLocal().catch(()=>{});
-  }, [scene,sceneAside,currentFilePath,service?.browser]);
+  }, [scene,sceneAside,currentFilePath,service?.browser,service?.sceneLoading]);
   useEffect(()=>service?.browser.drafts?.onRestore(async (checkpoint,options)=>{
     const restored=await service.browser.restoreDraft(checkpoint);
     await runSceneOperation("cargada",async()=>restored,{recovery:!options?.confirmed});
@@ -556,21 +583,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     window.addEventListener("pagehide",flush);document.addEventListener("visibilitychange",flush);
     return()=>{window.removeEventListener("pagehide",flush);document.removeEventListener("visibilitychange",flush);};
   },[service?.browser]);
-
-  // Phase 2: Autosave scene to sessionStorage on every change (debounced).
-  // sessionStorage survives renderer reloads within the same Electron window session
-  // but is cleared automatically when the window is closed, preventing cross-session leakage.
-  useEffect(() => {
-    if (service) return;
-    const handle = setTimeout(() => {
-      try {
-        sessionStorage.setItem("ttrpg:session-scene", JSON.stringify(scene));
-      } catch {
-        // Storage full or unavailable — skip silently
-      }
-    }, SESSION_AUTOSAVE_DELAY_MS);
-    return () => clearTimeout(handle);
-  }, [scene, service]);
 
   const handleContextMenuRequest = useCallback((request: PixiContextMenuRequest) => {
     if (sceneRef.current.shapes.some(s => s.id === request.targetElementId && isContextualArea(s))) {
@@ -953,7 +965,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       return true;
     }
     if (scenesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback("La API del servicio no está disponible.");
       return false;
     }
 
@@ -1006,7 +1018,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       return null;
     }
     if (saved === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback("La API del servicio no está disponible.");
       return null;
     }
     if (!saved.ok) {
@@ -1024,7 +1036,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     targetScenePath?: string
   ): Promise<boolean> {
     if (scenesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback("La API del servicio no está disponible.");
       return false;
     }
 
@@ -1392,11 +1404,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     [scene.activeMapId, scene.map.imagePath, scene.map.position, scene.map.scale, mapImageUrl]
   );
 
-  const canCreateNewScene = useMemo(
-    () => hasSceneContent(scene, interaction.elements.length),
-    [scene, interaction.elements.length]
-  );
-
   const sceneWithAside = useMemo(() => syncActiveMapFromRuntimeFields({ ...scene, sceneAside }), [scene, sceneAside]);
   const playerSceneSnapshot = useMemo(() => createPlayerSceneSnapshot(sceneWithAside), [sceneWithAside]);
 
@@ -1417,7 +1424,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   );
 
   useEffect(() => {
-    if (service ? !servicePublished : !isPlayerWindowOpen) {
+    if (!servicePublished) {
       return undefined;
     }
 
@@ -1426,7 +1433,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     }, PLAYER_SCENE_PUBLISH_DELAY_MS);
 
     return () => window.clearTimeout(handle);
-  }, [isPlayerWindowOpen, servicePublished, playerWindowSnapshot, playerApi, service]);
+  }, [servicePublished, playerWindowSnapshot, playerApi]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1437,16 +1444,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     return () => { cancelled = true; closed?.(); ready?.(); };
   }, [playerApi]);
 
-  useEffect(() => {
-    void refreshMonsterTemplates();
-
-    const unsubscribe = nativeMenusApi?.onOpenMonsterTemplateManager(() => {
-      setIsMonsterTemplateManagerOpen(true);
-      void refreshMonsterTemplates();
-    });
-
-    return () => unsubscribe?.();
-  }, [nativeMenusApi, librariesApi]);
+  useEffect(() => { void refreshMonsterTemplates(); }, [librariesApi]);
 
   async function refreshMonsterTemplates(): Promise<void> {
     if (librariesApi === undefined) return;
@@ -1457,93 +1455,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       setFeedback(result.error);
     }
   }
-
-  async function handleSaveMonsterTemplate(template: MonsterTemplate): Promise<void> {
-    if (librariesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
-      return;
-    }
-    const result = await librariesApi.saveMonsterTemplate(template);
-    if (result.ok) {
-      setMonsterTemplates(result.templates);
-    } else {
-      setFeedback(result.error);
-    }
-  }
-
-  async function handleDeleteMonsterTemplate(id: string): Promise<void> {
-    if (librariesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
-      return;
-    }
-    const result = await librariesApi.deleteMonsterTemplate(id);
-    if (result.ok) {
-      setMonsterTemplates(result.templates);
-    } else {
-      setFeedback(result.error);
-    }
-  }
-
-  const resetToNewScene = useCallback((): void => {
-    resetMapImageSession();
-    const empty = createEmptyScene();
-    const defaultScene = service ? {...empty,settings:{...empty.settings,diagonalMode:service.defaultDiagonalMode??empty.settings.diagonalMode}} : empty;
-    if (!service) sessionStorage.removeItem("ttrpg:session-scene");
-    setScene(defaultScene);
-    setSceneAside(createDefaultSceneAside());
-    playerEntryPointRef.current = undefined;
-    playerCameraRef.current = normalizeCameraSnapshot({
-      center: { x: defaultScene.camera.x, y: defaultScene.camera.y },
-      zoom: defaultScene.camera.zoom
-    });
-    dmCameraRef.current = playerCameraRef.current;
-
-    setPlayerCameraSyncKey((current) => current + 1);
-    setMapImageUrl(null);
-    setTokenImageUrls({});
-    setCurrentFilePath(null);
-    setFeedback("Escena default en memoria");
-    setWarnings([]);
-    setInteraction(createInitialInteractionState());
-    setPathDraft({ points: [], hoverPoint: null });
-    setWaterDraft({ points: [], hoverPoint: null });
-    setMapAnnotationModal(null);
-    setIsSpaceDragActive(false);
-    setGridAdjustMode(false);
-    setArcanePointerResetKey((current) => current + 1);
-    setInformationAreaHighlightResetKey((current) => current + 1);
-    setIsSelectedPropertiesOpen(true);
-    setRightTab("properties");
-    nextShapeId.current = 1;
-    nextLightId.current = 1;
-    nextEffectId.current = 1;
-    nextTokenId.current = 1;
-    nextLabelId.current = 1;
-    nextRevealId.current = 1;
-    nextPinId.current = 1;
-    nextInformationAreaId.current = 1;
-    nextSceneLinkId.current = 1;
-    nextSceneCounterId.current = 1;
-    lastSavedSceneJsonRef.current = null;
-
-  }, [setGridAdjustMode, resetMapImageSession, service]);
-
-  const handleRequestNewScene = useCallback((): void => {
-    if (!canCreateNewScene) {
-      return;
-    }
-
-    setIsNewSceneDialogOpen(true);
-  }, [canCreateNewScene]);
-
-  const handleCancelNewScene = useCallback((): void => {
-    setIsNewSceneDialogOpen(false);
-  }, []);
-
-  const handleDiscardAndCreateNewScene = useCallback((): void => {
-    resetToNewScene();
-    setIsNewSceneDialogOpen(false);
-  }, [resetToNewScene]);
 
   const cancelPathDrawing = useCallback((): void => {
     setPathDraft({ points: [], hoverPoint: null });
@@ -1710,14 +1621,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
       if (event.key === "Escape") setIsPanToolActive(false);
 
-      if (isNewSceneDialogOpen) {
-        if (event.key === "Escape") {
-          event.preventDefault();
-          handleCancelNewScene();
-        }
-        return;
-      }
-
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
         setInteraction((current) =>
@@ -1828,11 +1731,9 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     cancelWaterDrawing,
     confirmPathDrawing,
     confirmWaterDrawing,
-    handleCancelNewScene,
     handleDeleteSelectedElement,
     interaction.activeTool,
     isGridAdjustMode,
-    isNewSceneDialogOpen,
     removeLastPathPoint,
     removeLastWaterPoint,
     setGridAdjustMode
@@ -1840,7 +1741,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
   async function saveCurrentScene(): Promise<SceneOperationResult> {
     if (scenesApi === undefined) {
-      return { ok: false, error: "La API de preload no esta disponible." };
+      return { ok: false, error: "La API del servicio no está disponible." };
     }
 
     return scenesApi.saveScene(service?.browser.drafts ? captureDraft().content.scene : createSceneSavePayload(sceneRef.current, sceneAside), {
@@ -1850,26 +1751,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
   async function handleSaveScene(): Promise<void> {
     await runSceneOperation("guardada", saveCurrentScene);
-  }
-
-  async function handleSaveAndCreateNewScene(): Promise<void> {
-    setIsBusy(true);
-    setWarnings([]);
-
-    try {
-      const result = await saveCurrentScene();
-
-      if (!result.ok) {
-        setFeedback(result.error);
-        return;
-      }
-
-      resetToNewScene();
-      setIsNewSceneDialogOpen(false);
-      setFeedback("Escena guardada. Nueva escena lista.");
-    } finally {
-      setIsBusy(false);
-    }
   }
 
   async function allowServiceLeave(): Promise<boolean> {
@@ -1886,32 +1767,12 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     return true;
   }
   useEffect(() => service?.registerLeave?.(allowServiceLeave));
-  async function handleServiceAction(action: "import" | "export" | "logout"): Promise<void> {
-    if (!service) return;
-    try {
-      if (action === "export") { await service.browser.exportFile(createSceneSavePayload(sceneRef.current, sceneAside), currentFilePath); setFeedback("Archivo exportado. Los assets permanecen en este servicio."); return; }
-      if (!await allowServiceLeave()) return;
-      if (action === "logout") await service.logout();
-      else await runSceneOperation("cargada", service.browser.importFile);
-    } catch (error) { setFeedback(error instanceof Error ? error.message : "No se pudo completar la operación."); }
-  }
   useEffect(() => {
     if (!service) return;
     const beforeUnload = (event: BeforeUnloadEvent) => { if ((hasCanvasWork(sceneRef.current) || JSON.stringify(sceneAside) !== JSON.stringify(createDefaultSceneAside())) && lastSavedSceneJsonRef.current !== JSON.stringify({ ...sceneRef.current, sceneAside })) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [service, sceneAside]);
-
-  async function handleLoadScene(): Promise<void> {
-    if (!await allowServiceLeave()) return;
-    await runSceneOperation("cargada", async () => {
-      if (scenesApi === undefined) {
-        return { ok: false, error: "La API de preload no esta disponible." };
-      }
-
-      return scenesApi.loadScene();
-    });
-  }
 
   function publishLoadedPlayerScene({
     scene: loadedScene,
@@ -1928,7 +1789,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     readonly camera: ViewportCameraSnapshot;
     readonly cameraSyncKey: number;
   }): void {
-    if (playerApi === undefined || (service ? !servicePublished : !isPlayerWindowOpenRef.current)) {
+    if (playerApi === undefined || !servicePublished) {
       return;
     }
 
@@ -2032,51 +1893,13 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     }
   }
 
-  useEffect(() => {
-    const unsubscribe = nativeMenusApi?.onRecentSceneOpen((result) => {
-      if (!result.ok) { setFeedback(result.error); return; }
-      const current = { ...sceneRef.current, sceneAside: sceneAsideRef.current };
-      const dirty = (hasCanvasWork(current) || JSON.stringify(current.sceneAside) !== JSON.stringify(createDefaultSceneAside()))
-        && lastSavedSceneJsonRef.current !== JSON.stringify(current);
-      if (dirty) setPendingRecentScene(result);
-      else void runSceneOperation("cargada", async () => result);
-    });
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, [runSceneOperation, nativeMenusApi]);
-
-  async function continueRecentScene(save:boolean):Promise<void> {
-    let next=pendingRecentScene;
-    if(!next||isBusy)return;
-    if(save){
-      setIsBusy(true);
-      const beforeScene=sceneRef.current,beforeAside=sceneAsideRef.current;
-      try {
-        const saved=await saveCurrentScene();
-        if(!saved.ok){setFeedback(saved.error);return;}
-        setCurrentFilePath(saved.filePath);
-        lastSavedSceneJsonRef.current=JSON.stringify(saved.scene);
-        if(beforeScene!==sceneRef.current||beforeAside!==sceneAsideRef.current){
-          setFeedback("La escena cambió durante el guardado. Revisa los cambios antes de abrir otra.");return;
-        }
-        // El menú nativo leyó el archivo antes de pedir confirmación; no recuperar su copia anterior.
-        if(next.ok&&saved.filePath===next.filePath)next=saved;
-      }catch(error){setFeedback(error instanceof Error?error.message:"No se pudo guardar la escena.");return;}
-      finally{setIsBusy(false);}
-    }
-    setPendingRecentScene(null);
-    await runSceneOperation("cargada",async()=>next!);
-  }
-
   async function handleAddSceneMap(): Promise<void> {
     setIsBusy(true);
     setWarnings([]);
 
     try {
       if (imagesApi === undefined) {
-        setFeedback("La API de preload no esta disponible.");
+        setFeedback("La API del servicio no está disponible.");
         return;
       }
 
@@ -2103,36 +1926,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
       setScene((current) => addSceneMap(current, mapDocument, true));
       setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
       setFeedback(`${mapDocument.name} agregado a la escena`);
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
-  async function handleImportSceneAsMap(): Promise<void> {
-    if (scenesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
-      return;
-    }
-
-    setIsBusy(true);
-    setWarnings([]);
-
-    try {
-      const previousFilePath = currentFilePath;
-      const result = await scenesApi.importSceneAsMap(createSceneSavePayload(sceneRef.current, sceneAside));
-      if (!result.ok) {
-        setFeedback(result.error);
-        return;
-      }
-
-      setScene(result.scene);
-      setSceneAside(result.scene.sceneAside);
-      setMapImageUrl(result.mapImageUrl ?? null);
-      setTokenImageUrls(result.tokenImageUrls ?? {});
-      setCurrentFilePath(previousFilePath);
-      setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
-      syncSceneEntityCounters(result.scene);
-      setFeedback("Mapa importado a la escena");
     } finally {
       setIsBusy(false);
     }
@@ -2717,7 +2510,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
 
   async function handleOpenPlayerWindow(): Promise<void> {
     if (playerApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback("La API del servicio no está disponible.");
       return;
     }
 
@@ -2727,19 +2520,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     });
 
     if (!result.ok) {
-      setFeedback(result.error ?? "No se pudo abrir la ventana de jugador.");
+      setFeedback(result.error ?? "No se pudo publicar la escena para jugadores.");
       return;
     }
 
-    if (service) {
-      setServicePublished(true);
-      const state = await playerApi.getPlayerWindowState();
-      isPlayerWindowOpenRef.current = state.isOpen; setIsPlayerWindowOpen(state.isOpen);
-      setFeedback("Proyección publicada. Abre Mesa compartida para copiar el enlace del jugador.");
-    } else {
-      isPlayerWindowOpenRef.current = true; setIsPlayerWindowOpen(true);
-      setFeedback("Ventana de jugador lista.");
-    }
+    setServicePublished(true);
+    const state = await playerApi.getPlayerWindowState();
+    isPlayerWindowOpenRef.current = state.isOpen; setIsPlayerWindowOpen(state.isOpen);
+    setFeedback("Proyección publicada. Abre Mesa compartida para copiar el enlace del jugador.");
 
   }
 
@@ -2888,7 +2676,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     }
 
     if (imagesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
+      setFeedback("La API del servicio no está disponible.");
       return;
     }
 
@@ -3380,22 +3168,17 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     });
   }
 
-  const canFocusPlayers = !!playerApi?.focusPlayers && !isBusy && (service ? serviceFocusReady > 0 : isPlayerWindowOpen);
+  const canFocusPlayers = !!playerApi?.focusPlayers && !isBusy && serviceFocusReady > 0;
   return (
     <main className={`app-shell vtt-interface${service?.headerTarget ? " app-shell--shared-header" : ""}`} aria-label="TTRPG Effects">
       <WorkspaceHeader
         portalTarget={service?.headerTarget}
         enabled={service?.headerEnabled}
         sceneName={currentFilePath ? service?.browser.name(currentFilePath) ?? getFileBaseName(currentFilePath) : "Escena sin guardar"}
-        serviceActions={service ? { onImport: () => void handleServiceAction("import"), onExport: () => void handleServiceAction("export"), onLogout: () => void handleServiceAction("logout"), onTemplates: undefined } : undefined}
-        mapName={scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa"}
         busy={isBusy}
-        canCreate={canCreateNewScene}
         battleActive={scene.combatTracker.active}
         explorerVisible={isAsidePanelVisible}
         inspectorVisible={isSidebarVisible}
-        onNew={handleRequestNewScene}
-        onLoad={() => void handleLoadScene()}
         onSave={() => handleSaveScene()}
         onPlayer={() => void handleOpenPlayerWindow()}
         onBattle={() => setIsCombatSetupOpen(true)}
@@ -3435,6 +3218,17 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
         </div>
       )}
       <aside className="scene-status" aria-label="Estado de escena">
+        {drafts&&<details className={`scene-status__draft${draftStatus.error?" is-error":""}`}>
+          <summary aria-label={`Estado del guardado. En este dispositivo: ${draftStatus.local}. Servidor: ${draftStatus.remote}. ${draftStatus.confirmed}${draftStatus.error?`. Error: ${draftStatus.error}`:""}`}>
+            {draftStatus.error?"Respaldo requiere atención":draftStatus.local==="Sin cambios pendientes"?"Respaldo local":draftStatus.local}
+          </summary>
+          <div className="scene-status__draft-details">
+            <span>En este dispositivo: {draftStatus.local}</span>
+            <span>Servidor: {draftStatus.remote}</span>
+            <span>{draftStatus.confirmed}</span>
+            {draftStatus.error&&<strong role="alert">{draftStatus.error}</strong>}
+          </div>
+        </details>}
         <span className="scene-status__primary">{feedback}</span>
         {mapReplacement.busyMapId !== null && mapReplacement.draft === null && <span role="status">Preparando imagen...</span>}
         {mapReplacement.playerError !== null && <span role="alert">{mapReplacement.playerError} <button type="button" onClick={() => void mapReplacement.retryPlayer()}>Reintentar imagen del jugador</button></span>}
@@ -3491,7 +3285,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           onReorderMaps={handleReorderSceneMaps}
           onDeleteMap={handleDeleteSceneMap}
           onAddMap={() => void handleAddSceneMap()}
-          onImportSceneAsMap={() => void handleImportSceneAsMap()}
           onReplaceMapImage={(mapId) => void mapReplacement.begin(mapId)}
           isReplacingImage={isBusy || mapReplacement.busyMapId !== null}
           onSelectObject={handleSelectSceneObject}
@@ -3513,6 +3306,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           onStartInformationArea={handleStartInformationArea}
           onStartSceneLink={handleStartSceneLink}
           sceneLinkStatuses={sceneLinkStatuses}
+          campaignSelection={preparationSelection}
+          preparationUnavailableMessage={preparationUnavailableMessage}
+          onUsePrepared={preparationSelection ? reservation => {
+            const current = currentFilePathRef.current;
+            try { if (!current || sceneId(current) !== reservation.sceneId) { setFeedback("La escena cambió mientras se reservaba la ficha preparada. Vuelve a intentarlo."); return; } }
+            catch { setFeedback("La escena cambió mientras se reservaba la ficha preparada. Vuelve a intentarlo."); return; }
+            const materialized = service!.browser.materializePreparation(sceneRef.current, reservation); setScene(materialized.scene); setSceneAside(materialized.scene.sceneAside); setFeedback(materialized.inserted ? "Ficha preparada añadida a esta escena." : "La ficha preparada ya estaba en esta escena.");
+          } : undefined}
           hidden={!isAsidePanelVisible}
         />
         <button
@@ -3625,7 +3426,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           showCompass={mapState !== null}
           overlay={
             <>
-          <DiceOverlay envelope={diceSession.state.envelope} size={diceSession.diceSizes.sizes.dm} onDismiss={diceSession.dismiss} />
+          <DiceOverlay envelope={hasServiceDice ? serviceOverlayEnvelope : { revision: -1, presentation: null }} finalFrame={hasServiceDice ? serviceOverlayFinalFrame : null} size={serviceDice.size} onDismiss={hasServiceDice ? serviceDice.dismiss : undefined} reportRenderStatus={false} />
               <div className="workspace-camera-dock" aria-label="Camaras">
                 <div className="workspace-dm-camera" aria-label="Camara DM">
                   <Camera size={14} aria-hidden="true" /><span>DM</span>
@@ -3646,11 +3447,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 viewRole="dm"
                 onAdjust={handleAdjustSceneCounter}
                 onSetPlayerVisibility={handleSetSceneCounterPlayerVisibility}
-                onManage={() => setIsSceneCounterManagerOpen(true)}
               />
             </>
           }
         />
+        {hasServiceDice && <DicePublicStatus activity={serviceDice.publicPresentation ? { rollId: serviceDice.publicPresentation.rollId, author: serviceAuthor(serviceDice.publicPresentation.author), phase: "settled", settledAt: serviceDice.publicPresentation.settledAt, result: serviceDice.publicPresentation.result } : serviceDice.occupancy ? { rollId: serviceDice.occupancy.rollId, author: serviceAuthor(serviceDice.occupancy.author), phase: serviceDice.occupancy.phase, result: null } : null} selfAuthorId={serviceDice.selfAuthorId} closeAny={serviceDice.closeAny} connected={serviceDice.view.connected} pendingDismissId={serviceDice.pendingDismissId} dismissError={serviceDice.dismissError} onDismiss={id => { void serviceDice.dismiss(id); }} />}
         <CombatTurnBar
           tracker={scene.combatTracker}
           viewRole="dm"
@@ -3666,7 +3467,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
             {shared.api && <SharedDrawingPanel api={shared.api} view={shared.view} aligned={sharedAligned}/>}
           </div>}
           <div id="right-panel-dice" role="tabpanel" aria-labelledby="right-tab-dice" hidden={rightTab !== "dice"}>
-            <DicePanel controller={diceSession} />
+            {hasServiceDice ? serviceDicePanel : <p className="dice-status" role="status">Esta mesa usa una versión de dados incompatible. Actualiza el servicio o el cliente para lanzar tiradas.</p>}
           </div>
           <div className="right-properties-content" id="right-panel-properties" role="tabpanel" aria-labelledby="right-tab-properties" hidden={rightTab !== "properties"}>
           <div className="control-sidebar-header">Capas</div>
@@ -4084,15 +3885,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 <div className="selected-properties-content" aria-label="Propiedades de texto">
                   <label>
                     Texto
-                    <input
-                      type="text"
+                    <TextInput
                       value={selectedLabel.text}
                       onChange={(event) => updateSelectedLabel({ text: event.currentTarget.value })}
                     />
                   </label>
                   <label>
                     Fuente
-                    <select
+                    <Select
                       value={selectedLabel.fontFamily}
                       onChange={(event) => updateSelectedLabel({ fontFamily: event.currentTarget.value })}
                     >
@@ -4101,7 +3901,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                           {getFontLabel(font)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   <label>
                     Color
@@ -4256,14 +4056,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 <span>Ajustar grilla</span>
                 <small>Shortcut Cmd/Ctrl + G</small>
               </div>
-              <Switch.Root
-                className="switch-root"
+              <SharedSwitch
                 checked={isGridAdjustMode}
                 onCheckedChange={setGridAdjustMode}
-                aria-label="Activar modo ajustar grilla"
-              >
-                <Switch.Thumb className="switch-thumb" />
-              </Switch.Root>
+                ariaLabel="Activar modo ajustar grilla"
+              />
             </div>
             {isGridAdjustMode && (
               <small>Arrastra la esquina superior izquierda para alinear la grilla con el mapa; la inferior derecha para ajustar el tamaño de la celda. La alineación se guarda en la escena.</small>
@@ -4648,14 +4445,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
               <>
                 <div className="switch-control">
                   <span>Pintar mascara</span>
-                  <Switch.Root
-                    className="switch-root"
+                  <SharedSwitch
                     checked={isDaytimeMaskPaintMode}
                     onCheckedChange={setIsDaytimeMaskPaintMode}
-                    aria-label="Activar pincel de hora del dia"
-                  >
-                    <Switch.Thumb className="switch-thumb" />
-                  </Switch.Root>
+                    ariaLabel="Activar pincel de hora del dia"
+                  />
                 </div>
                 <label>
                   Pincel
@@ -4809,50 +4603,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           {isSidebarVisible ? <ChevronRight aria-hidden="true" /> : <ChevronLeft aria-hidden="true" />}
         </button>
       </div>
-      {pendingRecentScene && <div className="modal-backdrop" onClick={()=>{if(!isBusy)setPendingRecentScene(null);}}>
-        <section className="confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="recent-scene-title"
-          onClick={event=>event.stopPropagation()} onKeyDown={event=>{event.stopPropagation();if(event.key==="Escape"&&!isBusy)setPendingRecentScene(null);}}>
-          <h2 id="recent-scene-title">Abrir escena reciente</h2>
-          <p>Hay cambios sin guardar. Guarda la escena actual o descártalos antes de abrir la seleccionada.</p>
-          <div className="modal-actions">
-            <button type="button" autoFocus disabled={isBusy} onClick={()=>setPendingRecentScene(null)}>Cancelar</button>
-            <button type="button" disabled={isBusy} onClick={()=>void continueRecentScene(false)}>Descartar y abrir</button>
-            <button type="button" disabled={isBusy} onClick={()=>void continueRecentScene(true)}>Guardar y abrir</button>
-          </div>
-        </section>
-      </div>}
-      {isNewSceneDialogOpen ? (
-        <div className="modal-backdrop" onClick={handleCancelNewScene}>
-          <section
-            className="confirmation-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-scene-dialog-title"
-            onClick={(event) => {
-              event.stopPropagation();
-            }}
-          >
-            <div>
-              <h2 id="new-scene-dialog-title">Crear nueva escena</h2>
-              <p>
-                La escena actual tiene contenido. Puedes guardarla antes de limpiar el mapa, luces,
-                efectos, niebla y selecciones.
-              </p>
-            </div>
-            <div className="modal-actions">
-              <button type="button" onClick={handleCancelNewScene} disabled={isBusy} autoFocus>
-                Cancelar
-              </button>
-              <button type="button" className="is-danger" onClick={handleDiscardAndCreateNewScene} disabled={isBusy}>
-                Descartar cambios
-              </button>
-              <button type="button" className="is-primary" onClick={handleSaveAndCreateNewScene} disabled={isBusy}>
-                Guardar y crear nueva
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
       {newTokenDraft !== null ? (
         <div className="modal-backdrop" onClick={handleCancelNewToken}>
           <section
@@ -5047,14 +4797,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           </menu>
         </div>
       ) : null}
-      {isMonsterTemplateManagerOpen ? (
-        <MonsterTemplateManagerModal
-          templates={monsterTemplates}
-          onSave={handleSaveMonsterTemplate}
-          onDelete={handleDeleteMonsterTemplate}
-          onClose={() => setIsMonsterTemplateManagerOpen(false)}
-        />
-      ) : null}
       {isCombatSetupOpen ? (
         <CombatSetupModal
           aside={sceneAside}
@@ -5247,52 +4989,4 @@ function getSceneLinkStatusText(
   if (status?.state === "broken") return status.message;
   if (status?.state === "valid") return "Conexion valida";
   return connected ? "Validando" : "Sin enlazar";
-}
-
-interface SidebarAccordionProps {
-  readonly id: string;
-  readonly icon: ReactNode;
-  readonly title: string;
-  readonly isOpen: boolean;
-  readonly onToggle: () => void;
-  readonly children: ReactNode;
-}
-
-function SidebarAccordion({
-  id,
-  icon,
-  title,
-  isOpen,
-  onToggle,
-  children
-}: SidebarAccordionProps): JSX.Element {
-  return (
-    <section
-      className={`sidebar-accordion${isOpen ? " is-open" : ""}`}
-      data-panel={id}
-      aria-labelledby={`${id}-header`}
-    >
-      <button
-        id={`${id}-header`}
-        className="sidebar-accordion-header"
-        type="button"
-        aria-expanded={isOpen}
-        aria-controls={id}
-        onClick={onToggle}
-      >
-        <span className="sidebar-accordion-icon" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="sidebar-accordion-title">{title}</span>
-        <span className="sidebar-accordion-chevron" aria-hidden="true">
-          {isOpen ? "−" : "+"}
-        </span>
-      </button>
-      {isOpen ? (
-        <div id={id} className="sidebar-accordion-content">
-          {children}
-        </div>
-      ) : null}
-    </section>
-  );
 }

@@ -1,0 +1,48 @@
+.shared-switch {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 40px;
+  height: 22px;
+  min-height: 22px;
+  box-sizing: border-box;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #50565d;
+  border-radius: 999px;
+  background: #0f141a;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.shared-switch[data-state="checked"] {
+  border-color: #8ed5b6;
+  background: #8ed5b6;
+}
+
+.shared-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.shared-switch:focus-visible {
+  outline: 2px solid #8ed5b6;
+  outline-offset: 2px;
+}
+
+.shared-switch__thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #a0a7af;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 28%);
+  transform: translateX(2px);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.shared-switch[data-state="checked"] .shared-switch__thumb {
+  background: #8ed5b6;
+  transform: translateX(20px);
+}

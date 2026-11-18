@@ -85,7 +85,7 @@ for (const kind of ["sqlite","postgres"] as const) describe(`Sistemas retenidos 
     await expect(a.identity.authorized(a.aCookie,"dm",(_,tx)=>tx.links.link(generic.id,"monsters",m.id))).rejects.toMatchObject({code:"INCOMPATIBLE"});
     const scene=createDefaultScene(); const embedded={id:"monster-1",name:"Uno",templateId,imagePath:null,visibleToPlayer:true,notes:"Nota"};
     const document={...scene,sceneAside:{...scene.sceneAside,monsters:[embedded]}};
-    const saved=await a.identity.authorized(a.aCookie,"dm",async(_,tx)=>{const s=await new OwnedSceneService(tx,Date.now).save("Escena",document,undefined,0,{monsters:{[embedded.id]:binding.root!}}); await tx.links.link(game.id,"scenes",s.id); await tx.openings.start(game.id,1); return s;});
+    const saved=await a.identity.authorized(a.aCookie,"dm",async(_,tx)=>{const arc=await tx.campaigns.resolveSceneArc(game.id), created=await tx.campaigns.createScene(game.id,arc.id,{name:"Escena",scene:document,bindings:{monsters:{[embedded.id]:binding.root!}}},"systems-contract"), stored=await tx.resources.get("scenes",created.sceneId); if(!stored)throw Error("Falta escena contextual."); await tx.openings.start(game.id,1); return {id:created.sceneId,scene:stored.value.scene,bindings:stored.bindings!};});
     await a.identity.authorized(a.adminCookie,"admin",(_,tx)=>tx.systems.availability(DND_SYSTEM,"disabled",1));
     expect(await a.identity.authorized(a.aCookie,"dm",(_,tx)=>tx.operation(operationId,"create-monster",m,()=>tx.resources.put("monsters",m,0,binding)))).toMatchObject({revision:1});
     await a.identity.authorized(a.aCookie,"dm",async(_,tx)=>{expect(await tx.resources.put("monsters",{...m,name:"Editado"},1)).toMatchObject({revision:2,bindings:binding}); await tx.links.link(game.id,"monsters",m.id); await tx.openings.start(game.id,1);});
@@ -103,6 +103,15 @@ for (const kind of ["sqlite","postgres"] as const) describe(`Sistemas retenidos 
     const bundle=join(directory(),"owned"); await exportOwned(config,bundle); const dest=await fixture(kind), b=await accounts(dest); await importTransfer(dest,bundle,{ownerMap:{[a.a.id]:b.a.id}}); await verifyTransfer(dest,bundle,{ownerMap:{[a.a.id]:b.a.id}});
     expect((await b.identity.authorized(b.aCookie,"dm",(_,tx)=>tx.systems.get(DND_SYSTEM))).availability).toBe("disabled");
     await b.identity.authorized(b.aCookie,"dm",(_,tx)=>tx.resources.put("monsters",{...m,name:"Restaurado"},2));
+  });
+  it("publicar una escena huérfana no le asigna el arco inicial",async()=>{
+    const config=await fixture(kind), a=await accounts(config), registry=new GameRuntimeRegistry(Date.now,randomUUID);
+    const {game,orphan}=await a.identity.authorized(a.aCookie,"dm",async(_,tx)=>{const game=await tx.games.create(a.a.id,"Campaña",GENERIC_SYSTEM), orphan=await new OwnedSceneService(tx,Date.now).save("Huérfana",createDefaultScene()); await tx.openings.start(game.id,1); return {game,orphan};});
+    const context=await a.identity.authorized(a.aCookie,"dm",(_,tx)=>registry.context(tx,a.a.id,game.id));
+    const snapshot={scene:orphan.scene,camera:{center:{x:0,y:0},zoom:1},mapImageUrl:null,tokenImageUrls:{},showDmFogOverlay:false};
+    await expect(a.identity.authorized(a.aCookie,"dm",(_,tx)=>registry.publish(tx,context,snapshot,orphan.id))).rejects.toMatchObject({code:"CONFLICT"});
+    await a.identity.close();
+    await raw(config,async c=>{expect(Number((await c.query("SELECT COUNT(*) AS total FROM arc_scenes WHERE owner_id=$1 AND scene_id=$2",[a.a.id,orphan.id])).rows[0].total)).toBe(0);expect(Number((await c.query("SELECT COUNT(*) AS total FROM game_resources WHERE owner_id=$1 AND kind='scenes' AND resource_id=$2",[a.a.id,orphan.id])).rows[0].total)).toBe(0);});
   });
   it("invariantes de unidad: ambos órdenes, rechazos capturados, argumentos mutados y dos conexiones",async()=>{
     const config=await fixture(kind), a=await accounts(config), second=await open(config), unit=await identityDatabase(config); cleanup.push(()=>unit.close());

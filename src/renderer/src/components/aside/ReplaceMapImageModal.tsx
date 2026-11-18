@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { MapImageReplacementPolicy } from "../../../../domain/map/map-image-replacement";
 import type { MapImageDimensions } from "../../../../domain/map/map-image";
 import type { ReplacementDraft } from "../../hooks/useMapImageReplacement";
+import { Button, Checkbox, IconButton, Radio } from "../ui/Controls";
 
 interface Props {
   readonly draft: ReplacementDraft;
@@ -44,7 +45,7 @@ export function ReplaceMapImageModal({ draft, error, onConfirm, onCancel }: Prop
       <section ref={dialog} className="map-image-replacement" role="dialog" aria-modal="true" aria-labelledby="replace-map-title">
         <header>
           <div><h2 id="replace-map-title">Actualizar imagen</h2><p>{draft.mapName}</p></div>
-          <button type="button" className="map-image-replacement__close" aria-label="Cancelar actualizacion" title="Cancelar" onClick={onCancel}><X aria-hidden="true" /></button>
+          <IconButton type="button" className="map-image-replacement__close" aria-label="Cancelar actualizacion" title="Cancelar" onClick={onCancel}><X aria-hidden="true" /></IconButton>
         </header>
         <div className="map-image-replacement__previews">
           <ImagePreview label="Actual" url={draft.previousUrl} path={draft.previous.imagePath} size={draft.previous.imageSize} />
@@ -52,15 +53,15 @@ export function ReplaceMapImageModal({ draft, error, onConfirm, onCancel }: Prop
         </div>
         <fieldset>
           <legend>Tamano del mapa</legend>
-          <label><input type="radio" name="image-size-policy" checked={policy === "preserve-world-size"} disabled={draft.preserveError !== null} onChange={() => { setPolicy("preserve-world-size"); setAcknowledged(false); }} />Conservar tamano actual</label>
-          <label><input type="radio" name="image-size-policy" checked={policy === "keep-scale"} onChange={() => { setPolicy("keep-scale"); setAcknowledged(false); }} />Mantener escala actual ({Number((draft.previous.scale * 100).toFixed(2))}%)</label>
+          <label><Radio name="image-size-policy" checked={policy === "preserve-world-size"} disabled={draft.preserveError !== null} onChange={() => { setPolicy("preserve-world-size"); setAcknowledged(false); }} />Conservar tamano actual</label>
+          <label><Radio name="image-size-policy" checked={policy === "keep-scale"} onChange={() => { setPolicy("keep-scale"); setAcknowledged(false); }} />Mantener escala actual ({Number((draft.previous.scale * 100).toFixed(2))}%)</label>
         </fieldset>
         {draft.preserveError !== null && <p className="map-image-replacement__warning" role="status">{draft.preserveError}</p>}
-        {needsAcknowledgement && <label className="map-image-replacement__acknowledge"><input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.currentTarget.checked)} />Acepto que el fondo cambie de tamano y pueda quedar desalineado con los marcadores.</label>}
+        {needsAcknowledgement && <label className="map-image-replacement__acknowledge"><Checkbox checked={acknowledged} onChange={(event) => setAcknowledged(event.currentTarget.checked)} />Acepto que el fondo cambie de tamano y pueda quedar desalineado con los marcadores.</label>}
         {error !== null && <p role="alert" className="map-image-replacement__warning">{error}</p>}
         <footer>
-          <button type="button" onClick={onCancel}>Cancelar</button>
-          <button type="button" className="map-image-replacement__apply" disabled={needsAcknowledgement && !acknowledged} onClick={() => onConfirm(policy)}><ImageUp aria-hidden="true" />Actualizar imagen</button>
+          <Button type="button" onClick={onCancel}>Cancelar</Button>
+          <Button type="button" className="map-image-replacement__apply" disabled={needsAcknowledgement && !acknowledged} onClick={() => onConfirm(policy)}><ImageUp aria-hidden="true" />Actualizar imagen</Button>
         </footer>
       </section>
     </div>, portalTarget

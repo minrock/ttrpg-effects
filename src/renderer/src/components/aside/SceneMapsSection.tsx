@@ -11,7 +11,6 @@ interface SceneMapsSectionProps {
   readonly onReorder: (mapIds: readonly string[]) => void;
   readonly onDelete: (mapId: string) => void;
   readonly onAddMap: () => void;
-  readonly onImportScene: () => void;
   readonly onReplaceMapImage: (mapId: string) => void;
   readonly isReplacingImage?: boolean;
 }
@@ -24,7 +23,6 @@ export function SceneMapsSection({
   onReorder,
   onDelete,
   onAddMap,
-  onImportScene,
   onReplaceMapImage,
   isReplacingImage = false
 }: SceneMapsSectionProps): JSX.Element {
@@ -54,10 +52,6 @@ export function SceneMapsSection({
         <button type="button" onClick={onAddMap}>
           <Plus aria-hidden="true" />
           Agregar mapa
-        </button>
-        <button type="button" onClick={onImportScene}>
-          <Map aria-hidden="true" />
-          Agregar a escena
         </button>
       </div>
       {maps.length === 0 ? (

@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-15",
+  "revision": "0.7",
+  "version": "3.30.1",
+  "task": "T-14",
+  "criteria": [
+    "CA-28"
+  ],
+  "status": "validated locally; not merged",
+  "branch": "fix/breadcrumbs-administracion",
+  "files": [
+    "src/web/campaigns/CampaignPanel.tsx",
+    "src/web/campaigns/CampaignPanel.test.tsx",
+    "src/web/service.css",
+    "package.json",
+    "CHANGELOG.md"
+  ],
+  "checks": [
+    {
+      "command": "pnpm vitest run src/web/campaigns/CampaignPanel.test.tsx src/web/campaigns/CampaignCatalog.test.tsx --exclude '**/.local/**'",
+      "result": "17 passed in 2 files",
+      "log": ".local/validation/breadcrumbs59-07/tests-directed-excluded-local.log"
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "passed",
+      "log": ".local/validation/breadcrumbs59-07/typecheck.log"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "passed final",
+      "log": ".local/validation/breadcrumbs59-07/lint-final.log"
+    },
+    {
+      "command": "pnpm build:web",
+      "result": "passed final; existing dependency use-client/chunk warnings",
+      "log": ".local/validation/breadcrumbs59-07/build-web-final.log"
+    }
+  ],
+  "visual": {
+    "environment": "Local Storybook6006, synthetic data; shared administration component",
+    "routes": [
+      "campaigns",
+      "arcs",
+      "scenes",
+      "npcs",
+      "monsters",
+      "scene-details"
+    ],
+    "widths": [
+      390,
+      1440
+    ],
+    "result": "Single current SPAN per breadcrumb, not tabbable or underlined; ancestor buttons retain navigation, underline, transparent background, 0px border/padding, no shadow/native appearance. Long label wraps without horizontal overflow. Visible keyboard outline2px; Tab skips current; Enter and click navigate.",
+    "measurements": ".local/validation/breadcrumbs59-07/medidas.json",
+    "screenshots": [
+      ".local/validation/breadcrumbs59-07/final.png",
+      ".local/validation/breadcrumbs59-07/estrecho.png"
+    ],
+    "console": "No observed application errors; existing Storybook manager PopoverProvider warning."
+  },
+  "limits": [
+    "No API/DB/editor changes or real-data mutations. API8787 was not listening when checked after user approval; no service start/stop performed for this UI task.",
+    "No new Electron/native zoom QA or backend suite; historical evidence is preserved and not counted as new.",
+    "Storybook story unchanged; no new static Storybook build needed.",
+    "No git add, commit, push, merge or DMG."
+  ]
+}

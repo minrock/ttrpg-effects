@@ -1,9 +1,11 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "pixi.js/unsafe-eval";
-import type { TtrpgApi } from "../../../preload/ttrpg-api";
+import { createClient } from "../../../shared/api/client";
+import type { TtrpgApi } from "../../../shared/api/ttrpg-api";
 import { createPlayerSceneSnapshot } from "../../../domain/player/player-window";
 import { PlayerApp } from "../PlayerApp";
+import { ClientProvider } from "../client/ClientProvider";
 import { createLabScene } from "./fixture";
 import mapUrl from "../../../../assets/lab/cloister-map.png";
 import "../styles.css";
@@ -27,5 +29,12 @@ const api = {
   reportPlayerCamera: async () => ({ ok: true as const }),
   reportPlayerMapImageStatus: async () => undefined
 } satisfies Partial<TtrpgApi>;
-Object.defineProperty(window, "ttrpg", { configurable: true, value: api });
-createRoot(document.getElementById("root")!).render(<StrictMode><PlayerApp /></StrictMode>);
+const client = createClient(api as unknown as TtrpgApi, {
+  scenes: false,
+  images: true,
+  libraries: false,
+  templateAdministration: false,
+  player: true,
+  dice: false
+}, "service");
+createRoot(document.getElementById("root")!).render(<StrictMode><ClientProvider client={client}><PlayerApp /></ClientProvider></StrictMode>);

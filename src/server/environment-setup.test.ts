@@ -35,25 +35,12 @@ it("prepara claves persistentes y permisos privados sin sobrescribir configuraci
   for(const directory of [".local",".local/service/data",".local/service/logs",".local/service/backups"])expect(statSync(join(root,directory)).mode&0o777).toBe(0o700);
   const custom = original.replace("TTRPG_PORT=8787", "TTRPG_PORT=8989");
   writeFileSync(join(root, ".env"), custom);
-  writeFileSync(join(root, ".env.electron"), "TTRPG_ELECTRON_MODE=local\n");
+  writeFileSync(join(root, ".env.electron"), "perfil histórico que setup no toca\n");
   expect(run().status).toBe(0);
   expect(readFileSync(join(root, ".env"), "utf8")).toBe(custom);
-  expect(readFileSync(join(root, ".env.electron"), "utf8")).toBe("TTRPG_ELECTRON_MODE=local\n");
+  expect(readFileSync(join(root, ".env.electron"), "utf8")).toBe("perfil histórico que setup no toca\n");
   expect(statSync(join(root, ".env")).mode & 0o777).toBe(0o600);
-  expect(statSync(join(root, ".env.electron")).mode & 0o777).toBe(0o600);
   expect(statSync(data).mode & 0o777).toBe(0o700);
-});
-
-it("carga el archivo del cliente sin secretos API y respeta variables explícitas del proceso", () => {
-  const { root, run } = fixture();
-  expect(run().status).toBe(0);
-  const env: NodeJS.ProcessEnv = { ...process.env, TTRPG_ELECTRON_MODE: "local" };
-  delete env.TTRPG_DM_KEY; delete env.TTRPG_PLAYER_KEY; delete env.TTRPG_SERVICE_URL;
-  const result = spawnSync(process.execPath, ["--env-file=.env.electron", "-e",
-    'console.log(JSON.stringify({mode:process.env.TTRPG_ELECTRON_MODE,url:process.env.TTRPG_SERVICE_URL,dm:process.env.TTRPG_DM_KEY,player:process.env.TTRPG_PLAYER_KEY}))'],
-  { cwd: root, env, encoding: "utf8" });
-  expect(result.status).toBe(0);
-  expect(JSON.parse(result.stdout)).toEqual({ mode: "local", url: "http://127.0.0.1:8787" });
 });
 
 it("rechaza enlaces simbólicos de configuración sin modificar el destino", () => {
@@ -75,5 +62,5 @@ it("configuración PostgreSQL existente no crea directorio SQLite ni cambia URL 
   expect(result.stdout + result.stderr).not.toContain("synthetic-secret");
   expect(result.stderr).toContain("Configuración anterior incompleta");
   expect(result.stdout).not.toMatch(/start:api|start:service|claves de acceso/);
-  expect(readFileSync(join(root, ".env.electron"), "utf8")).not.toContain("DATABASE");
+  expect(() => statSync(join(root, ".env.electron"))).toThrow();
 });

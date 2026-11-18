@@ -9,7 +9,6 @@ import type { MapViewport, MapViewportHandle } from "./components/MapViewport";
 import { App } from "./App";
 import { DraftRecovery } from "../../web/DraftRecovery";
 import { sceneServiceFixture, cleanupSceneService } from "../../infrastructure/browser/scene-save.fixture";
-import { createSceneToken } from "../../domain/tokens/tokens";
 import { PlayerApp } from "./PlayerApp";
 import { TableSession } from "../../application/services/table-session";
 import { randomUUID } from "node:crypto";
@@ -18,16 +17,16 @@ import { systemSeeds } from "../../domain/systems/system-catalog";
 import { IndexedDbDraftStore } from "../../infrastructure/browser/drafts/indexeddb-store";
 import { BrowserTableClient } from "../../infrastructure/browser/table-client";
 import type { TableEvent } from "../../shared/contracts/table";
-import { parseSceneJson } from "../../domain/sessions/scene-schema";
-import { connectInternalSceneLink } from "../../domain/annotations/internal-scene-links";
-import { createReciprocalSceneLinkMarkers } from "../../domain/annotations/scene-navigation-links";
 import { DialogBroker, DialogHost } from "../../web/dialogs";
 import { createBrowserClient } from "../../infrastructure/browser/browser-client";
 import { HttpTransport } from "../../infrastructure/browser/http";
 import { ClientProvider } from "./client/ClientProvider";
 import { createClient } from "../../shared/api/client";
 import type { TtrpgApi } from "../../shared/api/ttrpg-api";
-import type { MapInformationArea } from "../../domain/annotations/map-annotations";
+import type { SceneDocument } from "../../domain/sessions/scene-document";
+import { parseSceneJson } from "../../domain/sessions/scene-schema";
+import { connectInternalSceneLink } from "../../domain/annotations/internal-scene-links";
+import { createReciprocalSceneLinkMarkers } from "../../domain/annotations/scene-navigation-links";
 
 type ViewportProps = ComponentProps<typeof MapViewport>;
 const viewport = vi.hoisted(() => ({
@@ -82,16 +81,7 @@ describe("App production workspace", () => {
       unobserve = vi.fn();
       disconnect = vi.fn();
     });
-    Reflect.deleteProperty(window, "ttrpg");
-    sessionStorage.clear();
     viewport.props = null;
-    const map = createDefaultSceneMap({ id: "workspace-map", name: "Workspace fixture" });
-    const scene = createSceneWithMap({
-      ...map,
-      camera: { x: 10, y: 20, zoom: 1 },
-      settings: { ...map.settings, snapToGrid: false }
-    });
-    sessionStorage.setItem("ttrpg:session-scene", JSON.stringify(scene));
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -100,8 +90,6 @@ describe("App production workspace", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     host.remove();
-    sessionStorage.clear();
-    Reflect.deleteProperty(window, "ttrpg");
     vi.clearAllTimers();
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -110,9 +98,11 @@ describe("App production workspace", () => {
 
   async function render(width = 1440): Promise<void> {
     vi.stubGlobal("innerWidth", width);
-    await act(async () => root.render(<App />));
-    expect(window.ttrpg).toBeUndefined();
-    expect(host.textContent).toContain("Workspace fixture");
+    const client = createClient({} as unknown as TtrpgApi, {
+      scenes: false, images: false, libraries: false, player: false, dice: false
+    });
+    await act(async () => root.render(<ClientProvider client={client}><App /></ClientProvider>));
+    expect(host.textContent).toContain("Escena sin guardar");
   }
 
   function props(): ViewportProps {
@@ -157,15 +147,27 @@ describe("App production workspace", () => {
     }));
   }
 
-  it.each(["absent", "no-player"] as const)("deletes local areas with %s client by Delete, Backspace and tree button", async (mode) => {
-    const area: MapInformationArea = { id: "local-area", kind: "information-area", areaType: "terrain", name: "Local area", description: "", cells: [{ x: 0, y: 0, size: 100 }], locked: false };
-    const client = mode === "absent" ? null : createClient({} as TtrpgApi, { scenes: false, images: false, libraries: false, player: false, dice: false, nativeMenus: false });
-    for (const action of ["Delete", "Backspace", "button"]) {
-      await act(async () => root.render(null));
-      const map = createDefaultSceneMap({ id: "area-map", name: "Area map" });
-      const scene = createSceneWithMap({ ...map, mapAnnotations: { ...map.mapAnnotations, areas: [area] } });
-      sessionStorage.setItem("ttrpg:session-scene", JSON.stringify(scene));
-      await act(async () => root.render(<ClientProvider client={client}><App /></ClientProvider>));
+  async function mountRestoredServiceScene(value: SceneDocument, apiOverrides: Partial<TtrpgApi> = {}) {
+    vi.useRealTimers();
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    const seed = systemSeeds[0], at = new Date().toISOString();
+    const http = new HttpTransport(vi.fn(async () => new Response(JSON.stringify({ ok: false, error: { code: "NOT_FOUND", message: "Sin servidor de borradores" } }), { status: 404, headers: { "content-type": "application/json" } })));
+    http.bindAccount("dm-test");
+    const owned = { gameId: randomUUID(), configuration: { ref: seed.ref, definition: seed.definition, hash: "a".repeat(64), availability: "enabled" as const }, version: { ...seed.ref, state: "published" as const, createdAt: at, publishedAt: at, revision: 1, availability: "enabled" as const, definition: seed.definition, hash: "a".repeat(64), templates: {} }, table: new BrowserTableClient(http) };
+    const browser = createBrowserClient(http, { selectScene: async () => null, sceneName: async () => null }, undefined, owned);
+    const client = createClient({ ...browser.client.api, ...apiOverrides }, browser.client.capabilities, "service");
+    await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => "discard", logout: async () => {} }} /></ClientProvider>));
+    await act(async () => {});
+    const content = browser.draftContent(value, { camera: { x: 0, y: 0, zoom: 1 }, sidebar: true, aside: true, selectedId: null });
+    await act(async () => browser.drafts!.restore({ schemaVersion: 1, localDraftId: randomUUID(), ownerId: "dm-test", origin: location.origin, instanceId: null, context: browser.draftContext(null), content, remote: null, pending: null, sequence: 1, hash: "", confirmedHash: null, createKey: randomUUID(), updatedAt: at }));
+    return browser;
+  }
+
+  it.each(["Delete", "Backspace", "button"] as const)("deletes a service-restored area by %s", async (action) => {
+    const area = { id: "local-area", kind: "information-area" as const, areaType: "terrain" as const, name: "Local area", description: "", cells: [{ x: 0, y: 0, size: 100 }], locked: false };
+    const map = createDefaultSceneMap({ id: "area-map", name: "Area map", mapAnnotations: { pins: [], areas: [area], sceneLinks: [] } });
+    const browser = await mountRestoredServiceScene(createSceneWithMap(map));
+    try {
       expect(props().mapAnnotations.areas).toHaveLength(1);
       await act(async () => props().onElementSelect(area.id));
       if (action === "button") {
@@ -174,22 +176,146 @@ describe("App production workspace", () => {
         if (!host.querySelector('[aria-label="Eliminar Local area"]')) await click(annotations!);
         await click(button("Eliminar Local area"));
       } else {
-        await act(async () => host.querySelector("[data-testid=workspace-canvas]")!.dispatchEvent(new KeyboardEvent("keydown", { key: action, bubbles: true })));
+        await act(async () => element('[data-testid="workspace-canvas"]').dispatchEvent(new KeyboardEvent("keydown", { key: action, bubbles: true })));
       }
       expect(props().mapAnnotations.areas).toHaveLength(0);
       expect(props().selectedElementId).toBeNull();
-      expect(host.textContent).not.toContain("La proyeccion no esta disponible");
-    }
+    } finally { browser.clear(); }
   });
 
-  it("preserves the lock when deleting a local area without a client", async () => {
-    const map = createDefaultSceneMap({ id: "locked-map", name: "Locked" });
-    sessionStorage.setItem("ttrpg:session-scene", JSON.stringify(createSceneWithMap({ ...map, mapAnnotations: { ...map.mapAnnotations, areas: [{ id: "locked", kind: "information-area", areaType: "terrain", name: "Locked area", description: "", cells: [{ x: 0, y: 0, size: 100 }], locked: true }] } })));
-    await act(async () => root.render(<ClientProvider client={null}><App /></ClientProvider>));
-    await act(async () => props().onElementSelect("locked"));
-    await act(async () => host.querySelector("[data-testid=workspace-canvas]")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true })));
-    expect(props().mapAnnotations.areas).toHaveLength(1);
+  it("preserves a locked service-restored area when deleting", async () => {
+    const area = { id: "locked", kind: "information-area" as const, areaType: "terrain" as const, name: "Locked area", description: "", cells: [{ x: 0, y: 0, size: 100 }], locked: true };
+    const map = createDefaultSceneMap({ id: "locked-map", name: "Locked", mapAnnotations: { pins: [], areas: [area], sceneLinks: [] } });
+    const browser = await mountRestoredServiceScene(createSceneWithMap(map));
+    try {
+      await act(async () => props().onElementSelect(area.id));
+      await act(async () => element('[data-testid="workspace-canvas"]').dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true })));
+      expect(props().mapAnnotations.areas).toHaveLength(1);
+    } finally { browser.clear(); }
   });
+
+  it("focuses the DM center without sending zoom and surfaces recoverable errors", async () => {
+    const scene = createSceneWithMap(createDefaultSceneMap({ id: "focus-map", name: "Focus fixture" }));
+    const browser = await mountRestoredServiceScene(scene);
+    try {
+      const table = browser.table as unknown as { status: { phase: "connected"; published: boolean; error: string; playerUrl: string; presence: { focusReady: number } }; statusHandlers: Set<() => void> };
+      await act(async () => {
+        table.status = { phase: "connected", published: true, error: "", playerUrl: "", presence: { focusReady: 1 } };
+        for (const handler of table.statusHandlers) handler();
+      });
+      const focus = vi.fn<NonNullable<TtrpgApi["focusPlayers"]>>(async () => ({ ok: true, delivered: 2, incompatible: 1, notReady: 0 }));
+      const snapshot = { scene, mapImageUrl: null, tokenImageUrls: {}, camera: { center: { x: 0, y: 0 }, zoom: 1 }, cameraSyncKey: 1, mapNavigationKey: 1, showDmFogOverlay: false };
+      const client = createClient({ ...browser.client.api, focusPlayers: focus, getPlayerWindowState: async () => ({ snapshot, camera: null, cameraCommand: null, isOpen: true }) }, browser.client.capabilities, "service");
+      await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => "discard", logout: async () => {} }} /></ClientProvider>));
+      const center = { x: 345.67, y: -89.12 }; await navigate({ center, zoom: 2 });
+      expect(button("Enfocar el centro de mi vista").disabled).toBe(false);
+      await act(async () => { button("Enfocar el centro de mi vista").click(); await Promise.resolve(); await Promise.resolve(); });
+      expect(focus).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ position: center, sceneId: scene.id }));
+      expect(focus.mock.calls[0][0]).not.toHaveProperty("zoom");
+      expect(host.textContent).toContain("2 ventana(s). 1 incompatibles");
+      expect(viewport.handle.setCameraSnapshot).not.toHaveBeenCalled();
+      focus.mockRejectedValueOnce(new Error("Conexión interrumpida"));
+      await act(async () => { button("Enfocar el centro de mi vista").click(); await Promise.resolve(); await Promise.resolve(); }); expect(host.textContent).toContain("Conexión interrumpida");
+    } finally { browser.clear(); }
+  });
+
+  it.each([false, true])("connects a remote scene from the web service selector and preserves state on failure (repair=%s)", async broken => {
+    const source = "scene:01010101-0101-4101-8101-010101010101";
+    const target = "scene:02020202-0202-4202-8202-020202020202";
+    const marker = { id: "a", kind: "scene-link" as const, name: "Puerta A", position: { x: 0, y: 0 }, locked: false, connection: null };
+    const peer = { ...marker, id: "b", name: "Puerta B" };
+    const old = broken ? createReciprocalSceneLinkMarkers(marker, source, peer, "scene:03030303-0303-4303-8303-030303030303", "old")[0] : marker;
+    const scene = createSceneWithMap(createDefaultSceneMap({ id: "source-map", name: "Origen", mapAnnotations: { pins: [], areas: [], sceneLinks: [old] } }));
+    const connected = createReciprocalSceneLinkMarkers(old, source, peer, target, "new")[0];
+    const select = vi.fn(async () => ({ ok: true as const, filePath: target }));
+    const connect = vi.fn()
+      .mockResolvedValueOnce({ ok: false, error: "Falló la conexión" })
+      .mockResolvedValueOnce({ ok: true, mapAnnotations: { ...scene.mapAnnotations, sceneLinks: [connected] } });
+    const browser = await mountRestoredServiceScene(scene, {
+      saveScene: async payload => ({ ok: true, scene: parseSceneJson(JSON.stringify(payload)), filePath: source, warnings: [] }),
+      selectSceneLinkTargetFile: select,
+      listSceneLinkCandidates: async () => ({ ok: true, candidate: { filePath: target, markers: [{ ...peer, available: true }] } }),
+      connectSceneLink: connect,
+      validateSceneLinks: async () => ({ ok: true, statuses: { a: broken ? { state: "broken", reason: "file-missing", message: "Ausente" } : { state: "unlinked" } } })
+    });
+    try {
+      await click(button("Mapa"));
+      await click(button("Editar Puerta A"));
+      expect(host.textContent).toContain("Otra escena guardada");
+      await click(button("Elegir escena del servicio"));
+      expect(select).toHaveBeenCalledOnce();
+      expect(element<HTMLSelectElement>('[aria-label="Marcador de la escena"]').value).toBe("b");
+      await click(button("Conectar con esta escena"));
+      expect(host.textContent).toContain("Falló la conexión");
+      expect(props().mapAnnotations.sceneLinks[0].connection).toEqual(old.connection);
+      await click(button("Conectar con esta escena"));
+      expect(connect).toHaveBeenLastCalledWith({ sourceScenePath: source, sourceMarkerId: "a", targetScenePath: target, targetMarkerId: "b" });
+      expect(props().mapAnnotations.sceneLinks[0].connection?.peer.scenePath).toBe(target);
+      expect(host.querySelector(".scene-link-modal")).toBeNull();
+    } finally { browser.clear(); }
+  });
+
+  it.each(["remote", "internal"] as const)("requires disconnecting before changing a %s link and preserves state after failure", async kind => {
+    const source = "scene:01010101-0101-4101-8101-010101010101";
+    const target = "scene:02020202-0202-4202-8202-020202020202";
+    const marker = { id: "a", kind: "scene-link" as const, name: "Puerta A", position: { x: 0, y: 0 }, locked: false, connection: null };
+    const peer = { ...marker, id: "b", name: "Puerta B" };
+    const mapA = createDefaultSceneMap({ id: "map-a", name: "Origen", mapAnnotations: { pins: [], areas: [], sceneLinks: [marker] } });
+    const mapC = createDefaultSceneMap({ id: "map-c", name: "Interno", mapAnnotations: { pins: [], areas: [], sceneLinks: [{ ...marker, id: "c", name: "Puerta C" }] } });
+    const free = syncRuntimeFieldsFromActiveMap({ ...createSceneWithMap(mapA), maps: [mapA, mapC] });
+    const original = kind === "internal"
+      ? connectInternalSceneLink(free, { sourceMapId: "map-a", sourceMarkerId: "a", targetMapId: "map-c", targetMarkerId: "c", scenePath: source, connectionId: "old" })
+      : syncRuntimeFieldsFromActiveMap({ ...free, maps: [{ ...mapA, mapAnnotations: { ...mapA.mapAnnotations, sceneLinks: [createReciprocalSceneLinkMarkers(marker, source, peer, target, "old")[0]] } }, mapC] });
+    let failSave = kind === "internal";
+    const save = vi.fn<TtrpgApi["saveSceneToPath"]>(async payload => failSave
+      ? { ok: false, error: "Guardado fallido" }
+      : { ok: true, scene: parseSceneJson(JSON.stringify(payload)), filePath: source, warnings: [] });
+    const disconnect = vi.fn<TtrpgApi["disconnectSceneLink"]>()
+      .mockResolvedValueOnce({ ok: false, error: "Desconexión fallida" })
+      .mockResolvedValueOnce({ ok: true, mapAnnotations: free.mapAnnotations });
+    const connect = vi.fn<TtrpgApi["connectSceneLink"]>(async () => ({ ok: true, mapAnnotations: { ...free.mapAnnotations, sceneLinks: [createReciprocalSceneLinkMarkers(marker, source, peer, target, "new")[0]] } }));
+    const browser = await mountRestoredServiceScene(original, {
+      saveScene: async payload => ({ ok: true, scene: parseSceneJson(JSON.stringify(payload)), filePath: source, warnings: [] }),
+      saveSceneToPath: save,
+      selectSceneLinkTargetFile: async () => ({ ok: true, filePath: target }),
+      listSceneLinkCandidates: async () => ({ ok: true, candidate: { filePath: target, markers: [{ ...peer, available: true }] } }),
+      connectSceneLink: connect,
+      disconnectSceneLink: disconnect,
+      validateSceneLinks: async () => ({ ok: true, statuses: { a: { state: "valid" } } })
+    });
+    try {
+      await click(button("Mapa"));
+      const open = async () => {
+        await click(button("Editar Puerta A"));
+        if (kind === "internal") await click(button("Elegir escena del servicio"));
+      };
+      const switchKind = async () => click(button(kind === "remote" ? "Conectar habitaciones" : "Conectar con esta escena"));
+      await open();
+      await switchKind();
+      expect(element('[role="alert"]', element(".scene-link-modal")).textContent).toContain("Usa Desligar");
+      expect(save).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+      expect(disconnect).not.toHaveBeenCalled();
+      expect(props().mapAnnotations.sceneLinks[0].connection).toEqual(original.mapAnnotations.sceneLinks[0].connection);
+      await click(button("Desligar"));
+      expect(element('[role="alert"]', element(".scene-link-modal")).textContent).toContain("No se pudo desligar");
+      expect(props().mapAnnotations.sceneLinks[0].connection).toEqual(original.mapAnnotations.sceneLinks[0].connection);
+      await switchKind();
+      expect(connect).not.toHaveBeenCalled();
+      failSave = false;
+      await click(button("Desligar"));
+      expect(props().mapAnnotations.sceneLinks[0].connection).toBeNull();
+      if (kind === "internal") {
+        const payload = save.mock.calls.at(-1)![0];
+        expect(payload.maps.every(map => map.mapAnnotations.sceneLinks.every(item => item.connection === null))).toBe(true);
+      }
+      await open();
+      await switchKind();
+      expect(host.querySelector(".scene-link-modal")).toBeNull();
+      expect(props().mapAnnotations.sceneLinks[0].connection?.peer).toMatchObject(kind === "remote" ? { mapId: "map-c", markerId: "c" } : { scenePath: target, markerId: "b" });
+    } finally { browser.clear(); }
+  });
+
 
   it("creates rail shapes at the current camera center and context shapes at the clicked world point", async () => {
     await render();
@@ -199,14 +325,14 @@ describe("App production workspace", () => {
     await rail("Areas");
     await option("Area circular");
     expect(props().shapes).toHaveLength(1);
-    expect(props().shapes[0]).toMatchObject({ type: "circle", points: [center] });
+    expect(props().shapes[0]).toMatchObject({ type: "circle", points: [{ x: 200, y: -100 }] });
     expect(props().selectedElementId).toBe(props().shapes[0].id);
 
     await contextAt(clicked);
     await click(button("C\u00edrculo", element(".context-menu")));
     expect(props().shapes).toHaveLength(2);
-    expect(props().shapes[1]).toMatchObject({ type: "circle", points: [clicked] });
-    expect(props().shapes[0].points[0]).toEqual(center);
+    expect(props().shapes[1]).toMatchObject({ type: "circle", points: [{ x: -400, y: 100 }] });
+    expect(props().shapes[0].points[0]).toEqual({ x: 200, y: -100 });
     expect(props().selectedElementId).toBe(props().shapes[1].id);
     expect(host.querySelector(".context-menu")).toBeNull();
   });
@@ -314,43 +440,7 @@ describe("App production workspace", () => {
     expect(viewport.unmount).not.toHaveBeenCalled();
   });
 
-  it("keeps the real dice panel and sound preference mounted when changing tabs and hiding the inspector", async () => {
-    await render();
-    await click(button("Abrir dados"));
-    const panel = element(".dice-panel");
-    const sound = element<HTMLInputElement>(".dice-sound-control input", panel);
-    expect(sound.checked).toBe(true);
-    await click(sound);
-    expect(sound.checked).toBe(false);
-    await click(element("#right-tab-properties"));
-    await click(button("Alternar inspector"));
-    expect(element(".control-sidebar").hidden).toBe(true);
-    await click(button("Abrir dados"));
-    expect(element(".control-sidebar").hidden).toBe(false);
-    expect(element("#right-panel-dice").hidden).toBe(false);
-    expect(element(".dice-panel")).toBe(panel);
-    expect(element<HTMLInputElement>(".dice-sound-control input").checked).toBe(false);
-    expect(viewport.mount).toHaveBeenCalledOnce();
-    expect(viewport.unmount).not.toHaveBeenCalled();
-  });
 
-  it("enfoca el centro DM sin zoom remoto y comunica errores recuperables", async () => {
-    const scene = JSON.parse(sessionStorage.getItem("ttrpg:session-scene")!) as ReturnType<typeof createSceneWithMap>;
-    const snapshot = { scene, mapImageUrl: null, tokenImageUrls: {}, camera: { center: { x: 0, y: 0 }, zoom: 1 }, cameraSyncKey: 0, mapNavigationKey: 0, showDmFogOverlay: false };
-    const focus = vi.fn<NonNullable<TtrpgApi["focusPlayers"]>>(async () => ({ ok: true, delivered: 2, incompatible: 1, notReady: 0 }));
-    const api = { focusPlayers: focus, getPlayerWindowState: async () => ({ snapshot, camera: null, cameraCommand: null, isOpen: true }),
-      publishPlayerScene: async () => ({ ok: true }), onPlayerMapImageStatus: () => () => {}, onPlayerWindowReady: () => () => {}, onPlayerWindowClosed: () => () => {} } as unknown as TtrpgApi;
-    const client = createClient(api, { scenes: false, images: false, libraries: false, player: true, dice: false, nativeMenus: false });
-    await act(async () => root.render(<ClientProvider client={client}><App /></ClientProvider>));
-    const center = { x: 345.67, y: -89.12 }; await navigate({ center, zoom: 2 });
-    await click(button("Enfocar el centro de mi vista"));
-    expect(focus).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ position: center, sceneId: scene.id }));
-    expect(focus.mock.calls[0][0]).not.toHaveProperty("zoom");
-    expect(host.textContent).toContain("2 ventana(s). 1 incompatibles");
-    expect(viewport.handle.setCameraSnapshot).not.toHaveBeenCalled();
-    focus.mockRejectedValueOnce(new Error("Conexión interrumpida"));
-    await click(button("Enfocar el centro de mi vista")); expect(host.textContent).toContain("Conexión interrumpida");
-  });
 
   it("routes DM zoom to the viewport handle while Player controls remain unavailable without preload", async () => {
     await render();
@@ -374,7 +464,6 @@ describe("App production workspace", () => {
     expect(viewport.handle.clearPlayerCameraControlState).toHaveBeenCalledTimes(playerClears);
     expect(host.querySelector('[aria-label="Acercar camara de jugador"]')).toBeNull();
     expect(host.querySelector('[aria-label="Alejar camara de jugador"]')).toBeNull();
-    expect(window.ttrpg).toBeUndefined();
   });
 
   it("starts narrow viewports with closed drawers and opens only one at a time", async () => {
@@ -403,8 +492,7 @@ describe("App production workspace", () => {
     expect(viewport.mount).toHaveBeenCalledOnce();
     expect(viewport.unmount).not.toHaveBeenCalled();
   });
-  it("publica en Electron servicio por acción explícita y no por la mera presencia de un jugador", async () => {
-    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36");
+  it("publica por acción web explícita y no por la mera presencia de un jugador", async () => {
     const browser = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
     const publish = vi.fn(async () => ({ ok: true }));
     const open = vi.fn(async () => ({ ok: true }));
@@ -414,167 +502,31 @@ describe("App production workspace", () => {
     await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => null, logout: async () => {} }}/></ClientProvider>));
     await act(async () => vi.advanceTimersByTime(1000));
     expect(publish).not.toHaveBeenCalled();
-    await click(button("Publicar vista de jugador"));
+    await click(button("Publicar escena para jugadores"));
     expect(open).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({
+      scene: expect.any(Object),
+      camera: expect.objectContaining({ center: expect.any(Object), zoom: expect.any(Number) })
+    }));
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(publish).toHaveBeenCalledOnce();
     expect(host.textContent).toContain("Proyección publicada");
     await click(button("Abrir dados"));
     expect(element('[role="tab"][aria-selected="true"]#right-tab-dice')).toBeTruthy();
   });
-  it.each(["Cancelar", "Descartar y abrir", "Guardar y abrir"])("recientes protege los cambios: %s",async(choice)=>{
-    const original=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Origen",shapes:[{id:"circle-1",type:"circle",points:[{x:0,y:0}],radius:20}]}));
-    const target=createSceneWithMap(createDefaultSceneMap({id:"b",name:"Destino"}));
-    sessionStorage.setItem("ttrpg:session-scene",JSON.stringify(original));
-    let receive!:(result:Awaited<ReturnType<TtrpgApi["loadScene"]>>)=>void;
-    const save=vi.fn(async()=>({ok:true as const,scene:original,filePath:"/original.ttrpgscene",warnings:[]}));
-    const client=createClient({onOpenMonsterTemplateManager:()=>()=>{},onRecentSceneOpen:(cb:typeof receive)=>{receive=cb;return()=>{};},saveScene:save} as unknown as TtrpgApi,{scenes:true,images:false,libraries:false,player:false,dice:false,nativeMenus:true});
-    await act(async()=>root.render(<ClientProvider client={client}><App/></ClientProvider>));
-    await act(async()=>receive({ok:true,scene:target,filePath:"/target.ttrpgscene",warnings:[]}));
-    expect(props().shapes).toHaveLength(1);expect(host.textContent).toContain("Abrir escena reciente");
-    await click(button(choice));
-    expect(props().shapes).toHaveLength(choice==="Cancelar"?1:0);
-    expect(save).toHaveBeenCalledTimes(choice==="Guardar y abrir"?1:0);
-  });
-
-  it("recientes conserva cambios si guardar falla o se cancela y no carga una copia obsoleta del mismo archivo",async()=>{
-    const original=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Origen",shapes:[{id:"circle-1",type:"circle",points:[{x:0,y:0}],radius:20}]}));
-    sessionStorage.setItem("ttrpg:session-scene",JSON.stringify(original));
-    let receive!:(result:Awaited<ReturnType<TtrpgApi["loadScene"]>>)=>void;
-    const save=vi.fn().mockResolvedValueOnce({ok:false,error:"Guardado cancelado"}).mockResolvedValueOnce({ok:false,error:"Sin espacio"}).mockResolvedValue({ok:true,scene:original,filePath:"/same.ttrpgscene",warnings:[]});
-    const client=createClient({onOpenMonsterTemplateManager:()=>()=>{},onRecentSceneOpen:(cb:typeof receive)=>{receive=cb;return()=>{};},saveScene:save} as unknown as TtrpgApi,{scenes:true,images:false,libraries:false,player:false,dice:false,nativeMenus:true});
-    await act(async()=>root.render(<ClientProvider client={client}><App/></ClientProvider>));
-    await act(async()=>receive({ok:true,scene:createSceneWithMap(createDefaultSceneMap()),filePath:"/same.ttrpgscene",warnings:[]}));
-    for(const message of ["Guardado cancelado","Sin espacio"]){await click(button("Guardar y abrir"));expect(props().shapes).toHaveLength(1);expect(host.textContent).toContain(message);expect(host.textContent).toContain("Abrir escena reciente");}
-    await click(button("Guardar y abrir"));expect(props().shapes).toHaveLength(1);expect(host.textContent).not.toContain("Abrir escena reciente");
-  });
-
-  it("eliminar un mapa invalida el enlace en memoria aunque el archivo aún lo conserve",async()=>{
-    const marker={id:"a",kind:"scene-link" as const,name:"Puerta",position:{x:0,y:0},locked:false,connection:null};
-    const a=createDefaultSceneMap({id:"a",name:"Origen",mapAnnotations:{pins:[],areas:[],sceneLinks:[marker]}});
-    const b=createDefaultSceneMap({id:"b",name:"Destino",mapAnnotations:{pins:[],areas:[],sceneLinks:[{...marker,id:"b"}]}});
-    const scene=connectInternalSceneLink(syncRuntimeFieldsFromActiveMap({...createSceneWithMap(a),maps:[a,b]}),{sourceMapId:"a",sourceMarkerId:"a",targetMapId:"b",targetMarkerId:"b",scenePath:"/scene.ttrpgscene",connectionId:"linked"});
-    sessionStorage.setItem("ttrpg:session-scene",JSON.stringify(scene));vi.spyOn(window,"confirm").mockReturnValue(true);
-    await act(async()=>root.render(<App/>));
-    await click(button("Eliminar Destino"));await act(async()=>props().onMapAnnotationPreview("a"));
-    expect(host.textContent).toContain("Conexion rota");expect(host.textContent).not.toContain("Mapa interno conectado");expect(button("Ir al mapa").disabled).toBe(true);
-  });
-
-  it("reparar la imagen retira solo su aviso de ausencia y conserva los otros avisos",async()=>{
-    const scene=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Ausente",map:{imagePath:"/missing.png",position:{x:0,y:0},scale:1,imageSize:{width:400,height:200}}}));
-    const client=createClient({loadScene:async()=>({ok:true,scene,filePath:"/scene.ttrpgscene",warnings:[{code:"map-image-missing",path:"/missing.png",message:"Imagen ausente"},{code:"scene-link-unresolved",path:"/other",message:"Enlace pendiente"}]}),resolveMapUrl:async()=>null,
-      selectReplacementMapImage:async()=>({status:"ready",imagePath:"/new.png",imageUrl:"map-asset:///new.png"})
-    } as unknown as TtrpgApi,{scenes:true,images:true,libraries:false,player:false,dice:false,nativeMenus:false});
-    await act(async()=>root.render(<ClientProvider client={client}><App/></ClientProvider>));
-    await click(element('[aria-label="Menu de escena"]'));await click(button("Cargar escena"));expect(host.textContent).toContain("Imagen ausente");
-    await click(button("Actualizar imagen de Ausente"));await click(button("Actualizar imagen",document.body));
-    expect(props().map?.imagePath).toBe("/new.png");expect(host.textContent).not.toContain("Imagen ausente");expect(host.textContent).toContain("Enlace pendiente");
-  });
-
-  it("recuperar una escena con imagen ausente no repite la resolución indefinidamente", async () => {
-    const scene = parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
-    const token = createSceneToken({ id: "missing-token", name: "Ausente", type: "npc", imagePath: "missing.png", position: { x: 0, y: 0 }, size: "medium", tokens: [] });
-    sessionStorage.setItem("ttrpg:session-scene", JSON.stringify({ ...scene, maps: scene.maps.map(map => ({ ...map, tokens: [token] })), tokens: [token] }));
-    // El límite evita colgar la suite con la regresión original.
-    const resolveTokenUrl = vi.fn((): Promise<string | null> => resolveTokenUrl.mock.calls.length <= 5 ? Promise.resolve(null) : new Promise(() => {}));
-    const restored = parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
-    const loadScene = async () => ({ ok: true as const, scene: restored, filePath: "restored.ttrpgscene", tokenImageUrls: {}, warnings: [] });
-    const client = createClient({ resolveTokenUrl, loadScene } as unknown as TtrpgApi, { scenes: true, images: true, libraries: false, player: false, dice: false, nativeMenus: false });
-    await act(async () => root.render(<ClientProvider client={client}><App /></ClientProvider>));
-    await act(async () => vi.advanceTimersByTime(1000));
-    expect(resolveTokenUrl).toHaveBeenCalledOnce();
-    expect(props().tokens).toHaveLength(1);
-    // Cargar dos veces el mismo archivo permite un reintento explícito.
-    await click(element('[aria-label="Menu de escena"]')); await click(button("Cargar escena"));
-    expect(resolveTokenUrl).toHaveBeenCalledTimes(2);
-    resolveTokenUrl.mockResolvedValue("url:reparada");
-    await click(element('[aria-label="Menu de escena"]')); await click(button("Cargar escena"));
-    expect(resolveTokenUrl).toHaveBeenCalledTimes(3);
-    expect(props().tokens[0].imageUrl).toBe("url:reparada");
-  });
-
-  it("protege cambios web ante guardar fallido/cancelar y no usa el autosave local", async () => {
-    const scene=JSON.parse(sessionStorage.getItem("ttrpg:session-scene")!);
-    const storage=vi.spyOn(Storage.prototype,"setItem");
-    const browser=createBrowserClient(new HttpTransport(vi.fn()),{selectScene:async()=>null,sceneName:async()=>null});
-    const load=vi.fn(async()=>({ok:true as const,scene,filePath:"scene:01010101-0101-4101-8101-010101010101",mapImageUrl:undefined,tokenImageUrls:{},warnings:[]}));
-    const save=vi.fn(async()=>({ok:false as const,error:"Servicio desconectado"}));
-    const client=createClient({...browser.client.api,loadScene:load,saveScene:save},browser.client.capabilities);
-    const leave=vi.fn<()=>Promise<string|null>>();const logout=vi.fn(async()=>{});
-    await act(async()=>root.render(<ClientProvider client={client}><App service={{browser,confirmLeave:leave,logout}}/></ClientProvider>));
-    expect(host.textContent).not.toContain("Workspace fixture");
-    await click(element('[aria-label="Menu de escena"]'));await click(button("Cargar escena"));
-    expect(host.textContent).toContain("Workspace fixture");
-    await rail("Areas");await option("Area conica");
-    leave.mockResolvedValueOnce("save");await click(element('[aria-label="Menu de escena"]'));await click(button("Cerrar sesión"));
-    expect(save).toHaveBeenCalledOnce();expect(logout).not.toHaveBeenCalled();expect(host.textContent).toContain("Servicio desconectado");expect(props().shapes).toHaveLength(1);
-    leave.mockResolvedValueOnce(null);await click(element('[aria-label="Menu de escena"]'));await click(button("Cerrar sesión"));expect(logout).not.toHaveBeenCalled();
-    leave.mockResolvedValueOnce("discard");await click(element('[aria-label="Menu de escena"]'));await click(button("Cerrar sesión"));expect(logout).toHaveBeenCalledOnce();expect(storage).not.toHaveBeenCalled();
-  });
-
-  it.each([false,true])("conecta desde App con selector remoto y conserva estado ante fallo (reparación=%s)",async broken=>{
-    const base=parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
-    const source="scene:01010101-0101-4101-8101-010101010101",target="scene:02020202-0202-4202-8202-020202020202";
-    const marker={id:"a",kind:"scene-link" as const,name:"Puerta A",position:{x:0,y:0},locked:false,connection:null};
-    const peer={...marker,id:"b",name:"Puerta B"};
-    const old=broken?createReciprocalSceneLinkMarkers(marker,source,peer,"/anterior.ttrpgscene","old")[0]:marker;
-    const scene={...base,mapAnnotations:{...base.mapAnnotations,sceneLinks:[old]}};
-    const connected=createReciprocalSceneLinkMarkers(old,source,peer,target,"new")[0];
-    const browser=createBrowserClient(new HttpTransport(vi.fn()),{selectScene:async()=>null,sceneName:async()=>null});
-    const load=vi.fn(async()=>({ok:true as const,scene,filePath:source,warnings:[]}));
-    const select=vi.fn(async()=>({ok:true as const,filePath:target}));
-    const connect=vi.fn().mockResolvedValueOnce({ok:false,error:"Falló la conexión"}).mockResolvedValueOnce({ok:true,mapAnnotations:{...scene.mapAnnotations,sceneLinks:[connected]}});
-    const save=vi.fn(async()=>({ok:true as const,scene,filePath:source,warnings:[]}));
-    const client=createClient({...browser.client.api,loadScene:load,saveSceneToPath:save,selectSceneLinkTargetFile:select,listSceneLinkCandidates:async()=>({ok:true,candidate:{filePath:target,markers:[{...peer,available:true}]}}),connectSceneLink:connect,validateSceneLinks:async()=>({ok:true,statuses:{a:broken?{state:"broken",reason:"file-missing",message:"Ausente"}:{state:"unlinked"}}})},browser.client.capabilities);
-    await act(async()=>root.render(<ClientProvider client={client}><App service={{browser,confirmLeave:async()=>null,logout:async()=>{}}}/></ClientProvider>));
-    await click(element('[aria-label="Menu de escena"]'));await click(button("Cargar escena"));
-    await act(async()=>props().onMapAnnotationPreview("a"));expect(host.textContent).toContain("Otra escena guardada");
-    await click(button("Elegir escena del servicio"));expect(select).toHaveBeenCalledOnce();expect(element<HTMLSelectElement>('[aria-label="Marcador de la escena"]').value).toBe("b");
-    await click(button("Conectar con esta escena"));expect(host.textContent).toContain("Falló la conexión");expect(props().mapAnnotations.sceneLinks[0].connection).toEqual(old.connection);
-    await click(button("Conectar con esta escena"));expect(connect).toHaveBeenLastCalledWith({sourceScenePath:source,sourceMarkerId:"a",targetScenePath:target,targetMarkerId:"b"});expect(props().mapAnnotations.sceneLinks[0].connection?.peer.scenePath).toBe(target);expect(host.querySelector('.scene-link-modal')).toBeNull();
-  });
-  it.each(["remote", "internal"] as const)("exige Desligar antes de cambiar %s y conserva estado si falla", async (kind) => {
-    const source = "scene:01010101-0101-4101-8101-010101010101";
-    const target = "scene:02020202-0202-4202-8202-020202020202";
-    const marker = { id: "a", kind: "scene-link" as const, name: "Puerta A", position: { x: 0, y: 0 }, locked: false, connection: null };
-    const peer = { ...marker, id: "b", name: "Puerta B" };
-    const mapA = createDefaultSceneMap({ id: "map-a", name: "Origen", mapAnnotations: { pins: [], areas: [], sceneLinks: [marker] } });
-    const mapC = createDefaultSceneMap({ id: "map-c", name: "Interno", mapAnnotations: { pins: [], areas: [], sceneLinks: [{ ...marker, id: "c", name: "Puerta C" }] } });
-    const free = syncRuntimeFieldsFromActiveMap({ ...createSceneWithMap(mapA), maps: [mapA, mapC] });
-    const original = kind === "internal"
-      ? connectInternalSceneLink(free, { sourceMapId: "map-a", sourceMarkerId: "a", targetMapId: "map-c", targetMarkerId: "c", scenePath: source, connectionId: "old" })
-      : syncRuntimeFieldsFromActiveMap({ ...free, maps: [{ ...mapA, mapAnnotations: { ...mapA.mapAnnotations, sceneLinks: [createReciprocalSceneLinkMarkers(marker, source, peer, target, "old")[0]] } }, mapC] });
+  it("conserva el error de publicación sin activar la sincronización", async () => {
     const browser = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
-    let failSave = kind === "internal";
-    const save = vi.fn<TtrpgApi["saveSceneToPath"]>(async (payload) => failSave ? { ok: false, error: "Guardado fallido" } : { ok: true, scene: parseSceneJson(JSON.stringify(payload)), filePath: source, warnings: [] });
-    const disconnect = vi.fn<TtrpgApi["disconnectSceneLink"]>().mockResolvedValueOnce({ ok: false, error: "Desconexión fallida" }).mockResolvedValueOnce({ ok: true, mapAnnotations: free.mapAnnotations });
-    const connect = vi.fn<TtrpgApi["connectSceneLink"]>(async () => ({ ok: true, mapAnnotations: { ...free.mapAnnotations, sceneLinks: [createReciprocalSceneLinkMarkers(marker, source, peer, target, "new")[0]] } }));
-    const client = createClient({ ...browser.client.api,
-      loadScene: async () => ({ ok: true, scene: original, filePath: source, warnings: [] }), saveSceneToPath: save,
-      selectSceneLinkTargetFile: async () => ({ ok: true, filePath: target }),
-      listSceneLinkCandidates: async () => ({ ok: true, candidate: { filePath: target, markers: [{ ...peer, available: true }] } }),
-      connectSceneLink: connect, disconnectSceneLink: disconnect, validateSceneLinks: async () => ({ ok: true, statuses: { a: { state: "valid" } } })
-    }, browser.client.capabilities);
-    await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => null, logout: async () => {} }} /></ClientProvider>));
-    await click(element('[aria-label="Menu de escena"]')); await click(button("Cargar escena"));
-    await click(button("Mapa"));
-    const open = async () => { await click(button("Editar Puerta A")); if (kind === "internal") await click(button("Elegir escena del servicio")); };
-    const switchKind = async () => click(button(kind === "remote" ? "Conectar habitaciones" : "Conectar con esta escena"));
-    await open(); await switchKind();
-    expect(element('[role="alert"]', element('.scene-link-modal')).textContent).toContain("Usa Desligar");
-    expect(save).not.toHaveBeenCalled(); expect(connect).not.toHaveBeenCalled(); expect(disconnect).not.toHaveBeenCalled();
-    expect(props().mapAnnotations.sceneLinks[0].connection).toEqual(original.mapAnnotations.sceneLinks[0].connection);
-    await click(button("Desligar"));
-    expect(element('[role="alert"]', element('.scene-link-modal')).textContent).toContain("No se pudo desligar");
-    expect(props().mapAnnotations.sceneLinks[0].connection).toEqual(original.mapAnnotations.sceneLinks[0].connection);
-    await switchKind(); expect(connect).not.toHaveBeenCalled();
-    failSave = false;
-    await click(button("Desligar")); expect(props().mapAnnotations.sceneLinks[0].connection).toBeNull();
-    if (kind === "internal") {
-      const payload = save.mock.calls.at(-1)![0];
-      expect(payload.maps.every(map => map.mapAnnotations.sceneLinks.every(item => item.connection === null))).toBe(true);
-    }
-    await open(); await switchKind();
-    expect(host.querySelector('.scene-link-modal')).toBeNull();
-    expect(props().mapAnnotations.sceneLinks[0].connection?.peer).toMatchObject(kind === "remote" ? { mapId: "map-c", markerId: "c" } : { scenePath: target, markerId: "b" });
+    const publish = vi.fn(async () => ({ ok: true }));
+    const open = vi.fn(async () => ({ ok: false, error: "No se pudo publicar" }));
+    const client = createClient({ ...browser.client.api, openPlayerWindow: open, publishPlayerScene: publish,
+      getPlayerWindowState: async () => ({ snapshot: null, camera: null, cameraCommand: null, isOpen: false }),
+      commandPlayerCamera: async () => ({ ok: true }) }, browser.client.capabilities, "service");
+    await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => null, logout: async () => {} }}/></ClientProvider>));
+    await click(button("Publicar escena para jugadores"));
+    await act(async () => { await Promise.resolve(); vi.runAllTimers(); });
+    expect(open).toHaveBeenCalledOnce();
+    expect(publish).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("No se pudo publicar");
   });
 
   it("Guardar escena, cerrar y reabrir usa servidor; una figura sin guardar sí ofrece recuperación",async()=>{
@@ -602,8 +554,8 @@ describe("App production workspace", () => {
       expect(entries[0].sceneHash).not.toBe(entries[0].confirmedSceneHash);
       await act(async()=>root.render(null));await reopened.drafts!.stop();
       const pending=fixture.create();await mount(pending);
-      await settled(()=>expect(host.textContent).toContain("¿Cómo quieres continuar?"));
-      await click(button("Recuperar estado local",element("dialog")));await settled(()=>expect(props().shapes).toHaveLength(2));
+      await settled(()=>expect(host.textContent).toContain("Cambios sin guardar"));
+      await click(button("Recuperar borrador",element("dialog")));await settled(()=>expect(props().shapes).toHaveLength(2));
       const saved=await pending.openSaved(`scene:${await pending.latestSavedScene()}`);expect(saved.scene.shapes).toHaveLength(1);
       await act(async()=>root.render(null));
     }finally{await cleanupSceneService();}
@@ -635,13 +587,6 @@ describe("App production workspace", () => {
     expect(props().shapes).toHaveLength(1);expect(props().shapes[0].type).toBe("circle");next.clear();
   });
 
-  it("restaura foco al menú real después de cancelar el selector de servicio",async()=>{
-    HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};
-    const broker=new DialogBroker();const browser=createBrowserClient(new HttpTransport(vi.fn(async()=>new Response(JSON.stringify({ok:true,scenes:[],total:0}),{headers:{"content-type":"application/json"}}))),broker);
-    await act(async()=>root.render(<><ClientProvider client={browser.client}><App service={{browser,confirmLeave:broker.leave,logout:async()=>{}}}/></ClientProvider><DialogHost broker={broker} browser={browser}/></>));
-    const summary=element('[aria-label="Menu de escena"]');await click(summary);await click(button("Cargar escena"));
-    expect(host.querySelector('dialog')).not.toBeNull();await click(button("Cancelar"));await act(async()=>vi.runAllTimers());expect(document.activeElement).toBe(summary);
-  });
 
   it("devuelve foco al botón superior al cancelar y confirmar un nombre con busy",async()=>{
     HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};

@@ -1,10 +1,10 @@
 # TTRPG Effects
 
-Herramienta para preparar y proyectar mesas TTRPG: Electron autónomo y servicio privado API + frontend para navegador o Electron conectado.
+Herramienta web para preparar y proyectar mesas TTRPG: interfaz React/Pixi en navegador y servicio privado Node.js con API HTTP/SSE. La retirada de Electron está definida en [SDD62](SDD/specs/62-servicio-solo-web/spec.md).
 
 ## Especificaciones SDD
 
-La planificación y documentación vigente se reúnen en [SDD](SDD/README.md): [estado actual](SDD/estado-actual.md), [arquitectura y datos](SDD/arquitectura.md), specs de escritorio/servidor y [flujo para nuevas especificaciones](SDD/flujo.md). Los criterios y la evidencia histórica de cada entrega están enlazados desde SDD.
+La planificación y documentación vigente se reúnen en [SDD](SDD/README.md): [estado actual](SDD/estado-actual.md), [arquitectura y datos](SDD/arquitectura.md), specs del servicio y antecedentes históricos y [flujo para nuevas especificaciones](SDD/flujo.md). Los criterios y la evidencia histórica de cada entrega están enlazados desde SDD.
 
 ## Interfaz de mesa
 
@@ -20,11 +20,11 @@ Usa [el flujo SDD](SDD/flujo.md) para definir alcance, plan y validación. La or
 
 ## Arquitectura de clientes
 
-El [contrato común y mapa de paridad](SDD/guias/client-architecture.md) documenta la composición por raíz React y las capacidades de cada cliente. Electron conserva el modo local y puede conectarse al mismo servicio privado HTTP/SSE que el navegador, con roles DM y jugador. La [guía operativa](SDD/guias/service-operations.md) explica cómo ejecutar ambos modos y el servicio.
+El [contrato de cliente web](SDD/guias/client-architecture.md) documenta la composición por raíz React y sus capacidades. Administradores, DMs y jugadores usan el navegador y los clientes HTTP/SSE correspondientes. La [guía operativa](SDD/guias/service-operations.md) explica configuración, arranque, respaldo e instalaciones independientes.
 
 ## Requisitos
 
-- Node.js compatible con el toolchain actual.
+- Node.js 24 para construir y operar el servicio; los jugadores solo necesitan un navegador compatible.
 - `pnpm`.
 
 ## Desarrollo local
@@ -35,7 +35,7 @@ Instalar dependencias:
 pnpm install
 ```
 
-Abrir la app en modo desarrollo:
+Después de [preparar el servicio](#preparar-el-servicio), iniciar API y frontend en modo desarrollo:
 
 ```bash
 pnpm dev
@@ -50,9 +50,27 @@ pnpm test
 pnpm build
 ```
 
-## Bootstrap actual
+## Catálogo de componentes
 
-El bootstrap inicial crea una ventana Electron segura con `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` y un preload pequeno expuesto mediante `contextBridge`.
+Storybook documenta controles y composiciones de interfaz sin arrancar la API ni el renderer del mapa. Inícialo de forma local en `http://127.0.0.1:6006`:
+
+```bash
+pnpm storybook
+```
+
+Para construir el catálogo estático y verificar que las historias no incorporen motores, entradas de aplicación ni código privilegiado:
+
+```bash
+pnpm build-storybook
+```
+
+Las historias viven en `src/stories/`; el inventario y los límites de cada componente están en [SDD 60](SDD/specs/60-storybook-componentes-ui/).
+
+Para añadir una historia, usa un título estable bajo `Controles/` o `Composiciones/`, indica la ruta y el consumidor de producción en la documentación CSF y conserva estado local reiniciable. Elige `parameters.uiContext` entre `neutral`, `editor`, `service` y `workspace` según el árbol CSS que requiera el componente. No importes entradas de aplicación, módulos privilegiados, API, Pixi, Three ni datos locales: el chequeo previo y el build rechazan esos grafos. Revisa teclado, foco, etiqueta accesible y texto largo en los viewports de 390 y 1440 px; el addon a11y ayuda a detectar problemas, pero no sustituye esa revisión.
+
+## Entradas del producto
+
+`src/server/index.ts` compone la API y sirve el frontend. `src/web/main.tsx` monta acceso, administración y mesa. El editor y PlayerApp se conservan en `src/renderer/src` como componentes web; no existe bridge nativo ni acceso directo a Node desde React.
 
 ## Motor visual
 
@@ -106,7 +124,7 @@ La oscuridad global y la niebla se pueden activar/desactivar y ajustar desde el 
 - `Pintar fuego` permite pintar cuadrados de grilla con un pincel circular.
 - Al seleccionar una luz o fuego aparece un panel compacto para ajustar visibilidad, color, opacidad, intensidad, radio o escala segun corresponda.
 - Al seleccionar fuego circular se puede alternar entre circulo cerrado y circulo abierto tipo aro.
-- Guardar y cargar escena conserva luces y fuego en el archivo `.ttrpgscene`.
+- Guardar y cargar escena conserva luces y fuego en el documento de escena; el formato portable `.ttrpgscene` también los representa.
 
 ## Niebla de guerra y vision
 
@@ -123,33 +141,31 @@ La niebla de guerra es independiente de la oscuridad ambiental.
 - Las luces visibles y el fuego que emite luz aportan vision actual mientras existan.
 - Las paredes/obstaculos quedan guardables en el modelo para una futura linea de vision automatica, pero todavia no recortan la vision.
 
-## Escenas locales
+## Escenas y recuperación
 
-La UI incluye acciones para guardar y cargar escenas locales con extension `.ttrpgscene`.
+Las campañas contienen arcos y cada arco sus propias escenas. El editor gestiona los mapas de la escena; Guardar confirma la versión en el servicio. Los borradores IndexedDB y remotos protegen trabajo pendiente con recuperación contextual al entrar en la escena.
 
-- `Guardar escena` abre un dialogo nativo y escribe un JSON versionado.
-- `Cargar escena` abre un dialogo nativo, valida el JSON y muestra errores recuperables.
-- Si la escena referencia una imagen local que no existe, la app muestra un warning y conserva el resto de la escena.
+El formato portable `.ttrpgscene` mantiene v2 y lectura/migración de v1. Los recursos del servidor se identifican por IDs autorizados; conservar un lector de referencias antiguas no concede acceso a rutas arbitrarias del servidor. Las bases, perfiles e instaladores de versiones desktop anteriores no se eliminan ni migran automáticamente.
 
-## Dados del DM
+## Dados del DM y de jugadores
 
-La pestana `Dados` del panel derecho permite preparar tiradas 3D sobre el mapa, abiertas para ambas ventanas u ocultas solo para el DM.
+La pestana `Dados` del panel derecho permite preparar tiradas 3D sobre el mapa, públicas para la mesa u ocultas solo para el DM. Los jugadores disponen del mismo compositor con tiradas siempre públicas.
 
 - Composicion por cantidades o formulas por tipo de dano, con colores representativos, modificadores y subtotales independientes.
 - Chequeo d20 exclusivo: normal, ventaja o desventaja, con su propio modificador. Un 20 natural conservado muestra rayos y un aviso de critico segun la privacidad de la tirada.
 - Resina, mate o metal, paleta ampliada y fuerza configurable. d% usa dos d10 emparejados.
-- Dados y resumen permanecen hasta cerrar con la X del DM; el resumen numerico publico es opcional. Las caras siguen visibles en una tirada abierta aunque se oculte el resumen.
-- Historial privado durante la sesion, sin guardar dados ni logs en `.ttrpgscene`. Cerrar la aplicacion borra el historial.
+- Una tirada pública bloquea Lanzar hasta que su autor o el DM la cierre. El DM puede ocultar el resumen numérico sobre el mapa, pero el historial público conserva valores y totales.
+- El jugador ve el historial público y el DM las tiradas públicas y privadas. El historial es efímero y acotado; no entra en `.ttrpgscene` y se pierde al reiniciar el runtime.
 
-Detalle funcional y tecnico en [spec 37](SDD/specs/37-dm-dice-rolls/spec.md) y su [plan](SDD/specs/37-dm-dice-rolls/plan.md). El motor y las texturas se empaquetan localmente, sin CDN. La atribucion de la geometria adaptada se incluye en `Resources/licenses/dice-box-threejs` del instalador.
+Detalle funcional vigente en [SDD61](SDD/specs/61-dados-jugadores/spec.md), con antecedentes en [SDD37](SDD/specs/37-dm-dice-rolls/spec.md). Motor y texturas se sirven con la aplicación, sin CDN. Las licencias de geometría y audio permanecen en `src/render/three/dice/vendor` y `assets/dice/audio`; sus copias se incluyen en `src/renderer/public/licenses` y en el build web bajo `out/web/licenses`.
 
 ## Laboratorios de interfaz
 
-Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en memoria y `/player-lab.html` monta Player View con un adaptador local. En este ultimo, `?north=90`, `180` o `270` permite comprobar herramientas con el mapa rotado. Son entradas de desarrollo, sin persistencia ni inclusion en el instalador.
+Durante desarrollo, `/ui-lab.html` ofrece la propuesta de interfaz con datos en memoria y `/player-lab.html` monta Player View con un cliente sintético explícito. En este ultimo, `?north=90`, `180` o `270` permite comprobar herramientas con el mapa rotado. Son entradas de desarrollo, sin persistencia ni inclusión en el build productivo.
 
 ## Servicio privado API
 
-`pnpm start:api` vigila API y frontend web durante el desarrollo y ejecuta la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. Navegador y Electron servicio comparten frontend; Electron local sigue sin servidor. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
+`pnpm start:api` vigila API y frontend web durante el desarrollo y ejecuta la API independiente en Node.js24 con cuentas administrador/DM, recursos privados y partidas con sistema/version explícitos. DM y jugadores comparten la interfaz web con clientes y permisos propios. Consulta [API](SDD/guias/private-api.md), [interfaz](SDD/guias/browser-client.md) y [operación/respaldo](SDD/guias/service-operations.md).
 
 ## Preparar el servicio
 
@@ -164,20 +180,26 @@ pnpm identity:provision-dm
 pnpm start:api
 ```
 
-Para desarrollar basta `pnpm start:api` (o `pnpm dev:api`): compila una vez y mantiene dos compiladores incrementales de Vite. Cambiar código de API reinicia el servidor después de cerrar la instancia anterior; cambiar frontend actualiza los archivos y solo requiere recargar Chrome. Los cambios de `.env` reinician la API y vuelven a cargar la configuración; el entorno explícito prevalece. Los artefactos temporales están en `out/dev-service/`, separados del build normal. No ejecuta typecheck en cada cambio: usa `pnpm typecheck` antes de cerrar el trabajo.
+Para desarrollar basta `pnpm dev` (alias de `pnpm start:api`; también disponible como `pnpm dev:api`): compila una vez y mantiene dos compiladores incrementales de Vite. Cambiar código de API reinicia el servidor después de cerrar la instancia anterior; cambiar frontend actualiza los archivos y solo requiere recargar Chrome. Los cambios de `.env` reinician la API y vuelven a cargar la configuración; el entorno explícito prevalece. Los artefactos temporales están en `out/dev-service/`, separados del build normal. No ejecuta typecheck en cada cambio: usa `pnpm typecheck` antes de cerrar el trabajo.
 
-Para ejecutar un build estable sin vigilancia: `pnpm build:service && pnpm start:api:built`. Detén la instancia anterior antes de iniciar cualquiera de los modos. Si cambias la configuración de Vite o dependencias, reinicia el supervisor. Ctrl+C cierra los compiladores y libera las conexiones del servidor.
+Para ejecutar un build estable sin vigilancia: `pnpm build && pnpm start`. Se conservan `build:service`, `build:api`, `build:web` y `start:api:built` para operaciones independientes. Detén la instancia anterior antes de iniciar cualquiera de los modos. Si cambias la configuración de Vite o dependencias, reinicia el supervisor. Ctrl+C cierra los compiladores y libera las conexiones del servidor.
 
-Los comandos de identidad son TTY y nunca aceptan contraseñas en argumentos. No se crean cuentas al arrancar. Setup conserva configuración existente y genera configuración nueva privada en `.env`, `.env.electron` y `.local/service/{data,backups,logs}`; los datos quedan ignorados porGit. Un entorno legado incompleto exige actualización explícita. No hay claves DM/jugador globales ni autorregistro.
+Los comandos de identidad son TTY y nunca aceptan contraseñas en argumentos. No se crean cuentas al arrancar. Setup conserva configuración existente y genera configuración nueva privada en `.env` y `.local/service/{data,backups,logs}`; los datos quedan ignorados porGit. Un entorno legado incompleto exige actualización explícita. No hay claves DM/jugador globales ni autorregistro.
 
 `pnpm createsuperuser` solicita correo, nombre y contraseña desde una terminal local. Puedes elegir y confirmar una contraseña definitiva o pulsar Enter para generar una temporal que se muestra una vez y requiere cambio posterior. Ejecútalo con la API detenida si usas SQLite. También puedes usar `node scripts/createsuperuser.mjs`; `--help` muestra la preparación necesaria. Permite crear varios administradores con correos distintos. Ejecuta `pnpm db:migrate` antes del primer uso de esta versión. Si una cuenta ya existe y necesitas recuperar su acceso, usa `pnpm identity:recover-admin` con el servicio detenido. El script no abre un puerto ni se sirve al navegador; usa la provisión transaccional de identidad.
 
-Para Electron servicio, compila con `pnpm build` y ejecuta `pnpm start:service`; `.env.electron` solo contiene modo/origen, sin secretos ni DB. Para local usa `pnpm dev` sin modo service. PostgreSQL conTLS verificado es obligatorio en producción; SQLite sigue disponible localmente. [Persistencia y migraciones](SDD/guias/database.md).
+PostgreSQL con TLS verificado es obligatorio en producción; SQLite sigue disponible para el servicio local. Electron y sus comandos de empaquetado ya no forman parte del producto. [Persistencia y migraciones](SDD/guias/database.md).
 
 La cabecera del servicio reúne navegación (☰), partida, escena, herramientas del editor y perfil en una sola fila compacta. En pantallas estrechas, las herramientas se agrupan bajo el botón de tres puntos. Abre el nombre de la partida para volver al catálogo, cerrar o reabrir; abre el perfil para cambiar contraseña o cerrar sesión. Los desplegables admiten Tab y Escape, y las acciones conservan sus confirmaciones.
 
 ## Cuentas, sistemas, partidas e invitaciones (3.13.0)
 
-[Identidad](SDD/guias/identity.md): múltiples administradores locales, provisiónDM, cambio de contraseñas temporales, disable/reset/revocación. [Datos privados y catálogo](SDD/guias/owned-data.md): dos propietarios aislados, versiones publicadas retenidas, CAS/bindings y transferencia explícita sin tocar el perfilElectron. [Invitaciones](SDD/guias/invitations.md): alias, cookie por partida, continuidad/reapertura deliberada. [Moderación](SDD/guias/moderation.md): participantes identificados por alias+discriminador, expulsión atómica con nuevo enlace y supervivientes estables.
+[Identidad](SDD/guias/identity.md): múltiples administradores locales, provisiónDM, cambio de contraseñas temporales, disable/reset/revocación. [Datos privados y catálogo](SDD/guias/owned-data.md): dos propietarios aislados, versiones publicadas retenidas, CAS/bindings y transferencia explícita sin adoptar automáticamente perfiles desktop históricos. [Invitaciones](SDD/guias/invitations.md): alias, cookie por partida, continuidad/reapertura deliberada. [Moderación](SDD/guias/moderation.md): participantes identificados por alias+discriminador, expulsión atómica con nuevo enlace y supervivientes estables.
 
-Los gates de DB/identidad/datos/invitaciones/moderación requieren PostgreSQL temporal real conTLS. El gate de moderación incluye composición final compilada y respaldo/restauración integral de ambos motores. Las pantallas se verifican también con navegador/Electron reales; evidencia y límites en [SDD 51](SDD/specs/51-experiencia-servicio/aceptacion-historica.md). `.ttrpgscene` conserva v2 y lectura/migraciónv1.
+Los gates de DB/identidad/datos/invitaciones/moderación requieren PostgreSQL temporal real conTLS. El gate de moderación incluye composición final compilada y respaldo/restauración integral de ambos motores. Las pantallas se verifican en navegador; las pruebas históricas de Electron se conservan como antecedentes en [SDD51](SDD/specs/51-experiencia-servicio/aceptacion-historica.md). `.ttrpgscene` conserva v2 y lectura/migraciónv1.
+
+## Operar diferentes instalaciones
+
+Los mismos builds `out/api` y `out/web` pueden desplegarse en instalaciones independientes con base/directorio de datos, secreto y host/origen propios. Configura HTTPS, Host/Origin exactos y streaming SSE sin buffering en el proxy. Las cookies no se aíslan por puerto: usa hosts distintos para instalaciones independientes.
+
+Se conserva un único proceso API por base. Las mesas y conexiones viven en memoria; no se soportan réplicas concurrentes sobre la misma base ni se incorpora Django/Redis en esta retirada. Los detalles y límites están en la [guía operativa](SDD/guias/service-operations.md).

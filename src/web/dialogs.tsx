@@ -2,7 +2,6 @@ import { restoreDialogFocus } from "../renderer/src/client/dialog-focus";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { BrowserClient, BrowserDialogs } from "../infrastructure/browser/browser-client";
 import { sceneReference } from "../shared/contracts/service-references";
-import type { SceneSummary } from "../shared/contracts/http-api";
 export type DialogRequest = {kind:"scene"|"name"|"leave"|"discard";initial?:string;resolve:(value:string|null)=>void};
 export class DialogBroker implements BrowserDialogs {
   current:DialogRequest|null=null;
@@ -25,7 +24,7 @@ export function ServiceDialog({title,onCancel,children}:{title:string;onCancel:(
   </dialog>;
 }
 export function ScenePicker({browser,finish}:{browser:BrowserClient;finish:(value:string|null)=>void}) {
-  const [entries,setEntries]=useState<readonly SceneSummary[]>([]),[selected,setSelected]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(true),[retry,setRetry]=useState(0),[page,setPage]=useState(0),[total,setTotal]=useState(0);
+  const [entries,setEntries]=useState<readonly {readonly id:string;readonly name:string}[]>([]),[selected,setSelected]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(true),[retry,setRetry]=useState(0),[page,setPage]=useState(0),[total,setTotal]=useState(0);
   useEffect(()=>{let live=true;setBusy(true);setError("");setSelected("");void browser.listScenes(page*50).then(reply=>{if(live){setEntries(reply.scenes);setTotal(reply.total);}}).catch(error=>{if(live)setError(error.message);}).finally(()=>{if(live)setBusy(false);});return()=>{live=false;};},[browser,page,retry]);
   return <ServiceDialog title="Escenas guardadas en el servicio" onCancel={()=>finish(null)}>
     {busy?<p role="status">Cargando escenas…</p>:error?<p role="alert">{error} <button onClick={()=>setRetry(n=>n+1)}>Reintentar</button></p>:entries.length===0?<p>No hay escenas guardadas. Agrega un mapa y guarda tu primera escena.</p>:<label>Escena<select aria-label="Escena guardada" size={Math.min(entries.length+1,8)} value={selected} onChange={e=>setSelected(e.target.value)}><option value="" disabled>Selecciona una escena</option>{entries.map(entry=><option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>}

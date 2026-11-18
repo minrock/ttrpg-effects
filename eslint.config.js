@@ -3,12 +3,12 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: [".local/**", "dist", "out", "node_modules", "index.js", "src/render/three/dice/vendor/**/*.js"]
+    ignores: [".local/**", "dist", "out", "storybook-static", "node_modules", "index.js", "src/render/three/dice/vendor/**/*.js"]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}", "electron.vite.config.ts"],
+    files: ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,
