@@ -36,7 +36,7 @@ export type DraftPut = z.infer<typeof draftPutSchema>;
 export type DraftHead = z.infer<typeof draftHeadSchema>;
 export type DraftReply = z.infer<typeof draftReplySchema>;
 export const draftConfirmationSchema = z.strictObject({hash:z.string().regex(/^[a-f0-9]{64}$/),key:z.uuid(),revision:z.number().int().positive(),sequence:z.number().int().positive(),draftId:z.uuid(),
-  payload:z.strictObject({name:z.string().min(1).max(200),mode:z.enum(["update","copy"]),sceneRevision:z.number().int().nonnegative(),targetGameId:z.uuid()})});
+  payload:z.strictObject({name:z.string().min(1).max(200),mode:z.enum(["update","copy"]),sceneRevision:z.number().int().nonnegative(),targetGameId:z.uuid(),targetArcId:z.uuid().optional()})});
 export type DraftConfirmation=z.infer<typeof draftConfirmationSchema>;
 export interface DraftCheckpoint {
   schemaVersion: 1; localDraftId: string; ownerId: string; origin: string; instanceId: string | null;

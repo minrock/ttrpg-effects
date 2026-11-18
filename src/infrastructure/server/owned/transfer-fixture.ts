@@ -31,14 +31,43 @@ export async function legacyFixture() {
   return { source, scenes, imageId, orphanId, template, monster, npc, character };
 }
 
+/** Fixture del lector v3: conserva su catálogo segmentado y omite la jerarquía que v3 no conocía. */
+export async function streamVersion3(bundle: string): Promise<void> {
+  const path = join(bundle, "manifest.json"), manifest = JSON.parse(readFileSync(path, "utf8")) as CatalogManifest;
+  if (manifest.version !== 4 && manifest.version !== 5) throw new Error("La fixture v3 requiere una exportación v4 o v5.");
+  const records = readFileSync(join(bundle, "records.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line)).filter((record: { type: string }) => ["resource", "asset", "game"].includes(record.type));
+  const body = records.map(record => JSON.stringify(record)).join("\n") + (records.length ? "\n" : "");
+  const counts = records.reduce<Record<string, number>>((result, record: { type: string; kind?: string }) => { const kind = record.type === "resource" ? record.kind! : record.type; result[kind] = (result[kind] ?? 0) + 1; return result; }, {});
+  writeFileSync(join(bundle, "records.jsonl"), body);
+  writeFileSync(path, JSON.stringify({ ...manifest, version: 3, records: records.length, counts, sha256: createHash("sha256").update(body).digest("hex") }));
+}
 /** Fixture del formato anterior: catálogo y enlaces embebidos en manifest v2. */
 export async function inlineVersion2(bundle: string): Promise<void> {
-  const path = join(bundle, "manifest.json"), manifest = JSON.parse(readFileSync(path, "utf8")) as CatalogManifest;
+  const path = join(bundle, "manifest.json");
+  const source = JSON.parse(readFileSync(path, "utf8")) as CatalogManifest;
+  if (source.version === 4 || source.version === 5) await streamVersion3(bundle);
+  else if (source.version !== 3) throw new Error("La fixture v2 requiere una exportación v3, v4 o v5.");
+  const manifest = JSON.parse(readFileSync(path, "utf8")) as CatalogManifest;
   const catalog: NonNullable<CatalogManifest["catalog"]> = [], links: NonNullable<CatalogManifest["links"]> = [];
   for await (const entry of catalogRecords(manifest, () => join(bundle, "catalog.jsonl"))) {
     if (entry.type === "link") links.push(entry.value);
     else { let system = catalog.find(s => s.systemId === entry.value.systemId); if (!system) { system = { systemId: entry.value.systemId, name: entry.name, versions: [] }; catalog.push(system); } system.versions.push(entry.value); }
   }
   writeFileSync(path, JSON.stringify({ ...manifest, version: 2, catalog, links, catalogData: undefined }));
-  if (manifest.version === 3) unlinkSync(join(bundle, "catalog.jsonl"));
+  unlinkSync(join(bundle, "catalog.jsonl"));
+}
+
+/** Fixture auténtica del lector v1: no llevaba bindings ni systemRef en partidas. */
+export async function inlineVersion1(bundle: string): Promise<void> {
+  await inlineVersion2(bundle);
+  const path = join(bundle, "manifest.json"), manifest = JSON.parse(readFileSync(path, "utf8")) as CatalogManifest;
+  const records = readFileSync(join(bundle, "records.jsonl"), "utf8").trim().split("\n").filter(Boolean).map(line => {
+    const record = JSON.parse(line) as { type: string; bindings?: unknown; value?: Record<string, unknown> };
+    if (record.type === "resource") delete record.bindings;
+    if (record.type === "game") delete record.value?.systemRef;
+    return record;
+  });
+  const body = records.map(record => JSON.stringify(record)).join("\n") + (records.length ? "\n" : "");
+  writeFileSync(path, JSON.stringify({ ...manifest, version: 1, catalog: undefined, links: undefined, catalogData: undefined, records: records.length, counts: records.reduce<Record<string, number>>((result, record: { type: string; kind?: string }) => { const kind = record.type === "resource" ? record.kind! : record.type; result[kind] = (result[kind] ?? 0) + 1; return result; }, {}), sha256: createHash("sha256").update(body).digest("hex") }));
+  writeFileSync(join(bundle, "records.jsonl"), body);
 }

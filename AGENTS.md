@@ -28,6 +28,7 @@ pnpm test
 No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 
 ## Way of Working
+- Al finalizar cada tarea, cerrar todos los servidores iniciados o reiniciados por el agente, incluidos API, watchers, Vite, Storybook, Kanban y bases de datos de prueba. Registrar sus procesos, detenerlos ordenadamente junto con sus hijos y comprobar que liberaron sus puertos. No detener servicios ajenos que ya estaban ejecutándose.
 - Siempre que vayas a comenzar con un spec/feature nueva inicia creando una rama feature/.*
 - Siempre que vayas a comenzar a trabajar con un bug inicia creando una rama fix/.*
 - Siempre espera a la orden de mergear para llevar los cambios a main.
@@ -40,7 +41,7 @@ El punto de entrada de planificación es `SDD/README.md`. Lee `SDD/estado-actual
 
 ## Organización del trabajo
 
-La planificación y la evidencia se mantienen en SDD. La fábrica anterior fue retirada; no se presupone una skill, tablero, roles de agentes ni ciclos obligatorios. La organización agéntica futura se definirá por separado. Reutiliza el contrato SDD y respeta las autorizaciones de Git de este archivo.
+La planificación y la evidencia se mantienen en SDD. La fábrica anterior fue retirada. Las entradas son `$factory` en `.agents/skills/factory/SKILL.md` para especificar y `$build` en `.agents/skills/build/SKILL.md` para aceptar una spec existente, planificarla, implementarla y validarla dentro del alcance solicitado. En ambos casos el hilo principal asume el rol `pm` de `.codex/agents/pm.toml`; no se crea ni reanuda un subagente PM. Ese hilo coordina TL, UI/UX y builders y es el único despachador de builders y escritor operativo del Kanban mediante `kanban-local`. Toda pregunta del PM usa User Ask; mantiene el turno abierto hasta recibir todas las respuestas, salvo cancelación/pausa explícita del usuario. No sustituye la herramienta por preguntas en texto. Consulta `.codex/README.md`. No se recuperan los roles ni las rondas obligatorias de la fábrica anterior. Las tareas ordinarias conservan su flujo habitual. Reutiliza el contrato SDD y respeta las autorizaciones de Git de este archivo.
 
 ## Versionado y changelog
 

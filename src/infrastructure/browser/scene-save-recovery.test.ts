@@ -59,7 +59,7 @@ it("veinte ramas pendientes conservan sus datos y devuelven cuota explícita, no
  const content=browser.draftContent(createDefaultScene(),{camera:{x:0,y:0,zoom:1},sidebar:true,aside:true,selectedId:null});
  const context=browser.draftContext(null);
  for(let n=0;n<20;n++){
-  const saved=await f.http.request('/scenes',z.object({resource:z.object({id:z.string()})}),{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":randomUUID()},body:JSON.stringify({name:`Escena ${n}`,scene:content.scene,bindings:content.bindings})});
+  const saved=await f.http.request('/scenes',z.object({resource:z.object({id:z.string()})}),{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":randomUUID()},body:JSON.stringify({name:`Escena ${n}`,scene:content.scene,bindings:content.bindings,campaignId:f.gameId})});
   await browser.drafts!.remote.create({...context,writerId:randomUUID(),sceneId:saved.resource.id,baseRevision:1},randomUUID());
  }
  await expect(browser.drafts!.remote.create({...context,writerId:randomUUID(),sceneId:null,gameId:context.gameId},randomUUID())).rejects.toMatchObject({status:409,code:"DRAFT_BRANCH_LIMIT"});

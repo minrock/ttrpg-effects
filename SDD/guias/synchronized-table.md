@@ -96,3 +96,20 @@ El jugador empieza con zoom local desbloqueado. Publicar, reconectar o promover 
 En el DM, **Foco** permite elegir un punto; Escape o clic derecho cancela. **Centro** enfoca el centro de su propia vista, también accesible por teclado. El menú contextual ofrece **Enfocar aquí a los jugadores**. El servidor exige coincidencia con la publicación y jugadores compatibles/listos; informa las ventanas excluidas. Cada jugador conserva su zoom y puede navegar inmediatamente después. Un aro de 1,5 segundos señala el punto.
 
 Negociar `focusVersion=1` en estado/SSE, separado de `annotationsVersion=1`. Enviar `POST /api/v1/dm/games/:gameId/table/focus` con el sobre contextual vigente y request `{requestId, sceneId, frame, position}`. No acepta zoom ni destinatarios. El evento `focus` lleva ID del servidor y caducidad máxima de cinco segundos. Límite de body 4 KiB, dos focos/segundo con ráfaga de cuatro. Se conserva idempotencia cinco minutos sin retener un último foco reproducible.
+
+
+## Dados de jugadores — SDD 61
+
+Entrega local 3.32.0 validada: [contrato C-61](../specs/61-dados-jugadores/plan.md) y [evidencia](../specs/61-dados-jugadores/validacion.md). La nueva capacidad es independiente del protocolo de dados local y no amplía preload/IPC.
+
+El cliente contextual negocia `GET /dice/capabilities` antes de usar `/dice/v1/*` y de solicitar `diceVersion=1` en las lecturas/stream. Los GET de estado, historial y operación se vinculan a partida/apertura/generación; los POST llevan `{openingId, generation, command}` y un `requestId` propio por acción. El servidor deriva actor y rol de la autoridad autenticada. Una clave repetida con contenido distinto se rechaza; ante respuesta incierta el cliente consulta el recibo, conserva la simulación y reintenta la misma operación sin volver a tirar.
+
+`ServiceDiceSession` mantiene una reserva/presentación pública y una oculta DM independientes. La pública ocupa la mesa desde begin hasta cierre; no existe cola automática. La selección de cada participante se conserva mientras espera. Solo el autor completa o falla su reserva; autor y DM pueden cerrar por ID. La reserva vence a los 20 segundos y el tick del runtime la libera sin necesitar una nueva petición. El resumen sobre el mapa de una tirada DM puede ocultarse; su resultado público permanece completo en el historial. Las tiradas de jugadores siempre muestran sus valores.
+
+La proyección de jugador incluye únicamente estado e historial públicos. Las mutaciones ocultas no modifican su secuencia ni su cuota de recibos. Cada canal retiene hasta 500 entradas; el DM ve hasta 1000 combinadas. Páginas de 10 por defecto, máximo 50, con revisión para evitar mezclar páginas de historias distintas. El historial no contiene trayectorias. Tras asentarse se conserva únicamente la pose final para reconectar sin repetir animación o audio. Limpiar historial no cierra dados en pantalla.
+
+Una nueva publicación retira la presentación anterior y conserva el historial de esa apertura. Navegar por una escena privada DM no cancela una pública. Salir o revocar cancela reservas pendientes de ese participante; no retira resultados ya aceptados. Cerrar/reabrir/expirar la apertura o descartar su runtime libera estado, recibos y logs. No se escriben tiradas en SQL ni en `.ttrpgscene`.
+
+Las rutas de dados anteriores de la tabla superior describen el protocolo histórico. En el servicio con C-61 las mutaciones legacy requieren actualizar cliente (426), mientras las capacidades no soportadas mantienen la vista base de mesa disponible. Electron autónomo conserva su sesión y proyección local anteriores.
+
+La apertura inicial de SSE espera la decisión de capacidades de dados como máximo 1,5 s. Si no responde, se cancela esa consulta y continúa la mesa base; una respuesta tardía no altera una sesión nueva. Sin negociación, bootstrap conserva sobre contextual v2 con estado interno v1; sólo la extensión negociada usa estado contextual v2.

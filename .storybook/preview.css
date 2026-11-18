@@ -1,0 +1,37 @@
+html,
+body {
+  min-height: 100%;
+  overflow: auto;
+}
+
+#storybook-root { min-height: 100%; }
+
+.storybook-context {
+  min-height: 280px;
+  padding: 24px;
+  color: #e6ebf2;
+  background: #0b0e13;
+  box-sizing: border-box;
+}
+
+.storybook-canvas { min-width: 0; }
+
+.storybook-context--editor,
+.storybook-context--workspace { padding: 0; }
+
+.storybook-context--editor .vtt-interface,
+.storybook-context--workspace .vtt-interface { display: block; height: auto; min-height: 280px; }
+
+.storybook-context--editor .control-sidebar { position: relative; inset: auto; display: block; width: min(100%, 360px); height: auto; min-height: 0; padding: 12px; box-sizing: border-box; }
+.storybook-context--workspace .app-workspace { display: block; min-height: 0; }
+.storybook-context--service { padding: 0; background: #191b1e; }
+.storybook-context--service .service-page { min-height: 280px; height: auto; overflow: visible; }
+.storybook-context--administration { min-height: 100dvh; padding: 0; background: #191f23; }
+.storybook-portal-target { position: relative; z-index: 10; }
+
+.storybook-introduction { display: grid; gap: 20px; max-width: 860px; padding: 28px; border: 1px solid #2b3542; border-radius: 12px; background: #12161d; }
+.storybook-introduction h1,.storybook-introduction h2,.storybook-introduction p,.storybook-introduction ul { margin: 0; }
+.storybook-introduction ul { display: grid; gap: 8px; padding-left: 20px; }
+.storybook-introduction code { color: #8ed5b6; }
+.storybook-introduction nav { display: flex; flex-wrap: wrap; gap: 12px; }
+.storybook-introduction a { color: #8ed5b6; }

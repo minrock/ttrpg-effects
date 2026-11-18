@@ -1,4 +1,4 @@
-import { useTtrpgApi } from "../client/ClientProvider";
+import { useTtrpgApi, useTtrpgClient } from "../client/ClientProvider";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { defaultDiceDraft, DICE_PROTOCOL_VERSION, draftSchema, expandDice, requestSchema, type D20Mode, type DiceContext, type DiceDraft, type DiceEnvelope, type DiceReply, type DiceSessionState } from "../../../domain/dice/dice";
 import type { DiceApi } from "../../../shared/api/dice-api";
@@ -18,7 +18,10 @@ function unwrapSession(reply: DiceReply<DiceSessionState>): DiceSessionState {
 function requireDiceApi(api: DiceApi | undefined): DiceApi { if (!api?.beginDiceRoll) throw new Error("Mesa de dados no disponible."); return api; }
 
 export function useDiceSession(context: DiceContext) {
-  const diceApi = useTtrpgApi("dice");
+  const client = useTtrpgClient();
+  const localDiceApi = useTtrpgApi("dice");
+  // El servicio usa el controller HTTP/SSE C-61; nunca emite mutaciones legacy en paralelo.
+  const diceApi = client?.assetReferences === "service" ? undefined : localDiceApi;
   const diceSizes = useDiceSizes();
   const [state, setState] = useState<DiceSessionState>(emptyState);
   const [draft, setDraft] = useState(defaultDiceDraft);

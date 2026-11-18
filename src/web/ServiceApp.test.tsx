@@ -6,9 +6,10 @@ import { ServiceApp } from "./ServiceApp";
 import { DialogBroker, DialogHost } from "./dialogs";
 import { createBrowserClient } from "../infrastructure/browser/browser-client";
 import { HttpTransport } from "../infrastructure/browser/http";
+import type { CampaignSelection } from "../shared/contracts/campaigns";
 const leave=vi.hoisted(()=>({allow:true,calls:0,wait:undefined as undefined|(()=>Promise<boolean>)}));
-vi.mock("./GameEditor",()=>({GameEditor:({expired,registerLeave}:{expired:()=>void;registerLeave:(fn:()=>Promise<boolean>)=>()=>void})=>{useEffect(()=>registerLeave(async()=>{leave.calls++;return leave.wait?leave.wait():leave.allow;}),[registerLeave]);return <div>VTT privado<input aria-label="Borrador" defaultValue="secreto"/><button onClick={expired}>Simular expiración</button><div data-portal>Portal protegido</div></div>;}}));
-vi.mock("./GameCatalog",()=>({GameCatalog:({onOpen}:{onOpen:(id:string)=>void})=> <div>Catálogo privado<button onClick={()=>onOpen("01010101-0101-4101-8101-010101010101")}>Abrir fixture</button></div>}));
+vi.mock("./GameEditor",()=>({GameEditor:({expired,registerLeave,onExit,onExitAfterLeave,onSelectScene,gameId}:{expired:()=>void;registerLeave:(fn:()=>Promise<boolean>)=>()=>void;onExit:()=>void;onExitAfterLeave?:()=>void;onSelectScene?: (selection: CampaignSelection)=>Promise<boolean>;gameId:string})=>{useEffect(()=>registerLeave(async()=>{leave.calls++;return leave.wait?leave.wait():leave.allow;}),[registerLeave]);return <div>VTT privado<input aria-label="Borrador" defaultValue="secreto"/><button onClick={expired}>Simular expiración</button><button onClick={onExit}>Salida normal</button><button onClick={onExitAfterLeave}>Salida confirmada</button><button onClick={()=>void onSelectScene?.({campaignId:gameId,arcId:"22222222-2222-4222-8222-222222222222",sceneId:"33333333-3333-4333-8333-333333333333"})}>Cambiar escena fixture</button><div data-portal>Portal protegido</div></div>;}}));
+vi.mock("./campaigns/CampaignCatalog",()=>({CampaignCatalog:({onLegacyOpen,onSelectScene}:{onLegacyOpen:(id:string)=>void;onSelectScene:(selection:CampaignSelection)=>void})=> <div>Catálogo privado<button onClick={()=>onLegacyOpen("01010101-0101-4101-8101-010101010101")}>Abrir fixture</button><button onClick={()=>onSelectScene({campaignId:"01010101-0101-4101-8101-010101010101",arcId:"22222222-2222-4222-8222-222222222222",sceneId:"33333333-3333-4333-8333-333333333333"})}>Abrir selección de catálogo</button></div>}));
 
 vi.mock("./AdminSystems",()=>({AdminSystems:()=> <div>Sistemas administrados</div>}));
 vi.mock("./GuestEntry",()=>({GuestEntry:()=> <div>Entrada invitada separada</div>}));
@@ -35,6 +36,16 @@ it("expiración oculta canvas y portales; mismo ID recupera; email igual con otr
 });
 it("invitado usa ruta reservada y no consulta identidad; view=player no autoriza",async()=>{history.replaceState(null,"","/jugar/01010101-0101-4101-8101-010101010101");const f=vi.fn();vi.stubGlobal("fetch",f);await render();expect(host.textContent).toContain("Entrada invitada separada");expect(f).not.toHaveBeenCalled();});
 it("administrador tiene pantalla separada sin capacidades de mapa",async()=>{vi.stubGlobal("fetch",vi.fn(async()=>response(session({role:"admin"}))));await render();expect(host.textContent).toContain("Cuentas DM");expect(host.textContent).not.toContain("VTT privado");await click("Sistemas");expect(host.textContent).toContain("Sistemas administrados");});
+it("una URL de editor no entrega el editor a un administrador",async()=>{history.replaceState(null,"","/partidas/01010101-0101-4101-8101-010101010101");vi.stubGlobal("fetch",vi.fn(async()=>response(session({role:"admin"}))));await render();expect(host.textContent).toContain("Cuentas DM");expect(host.textContent).not.toContain("VTT privado");expect(host.querySelector(".admin-shell")).toBeTruthy();});
+it("una expiración con drawer abierto desmonta la navegación privada",async()=>{
+ let expireAccounts!:(value:Response)=>void;
+ vi.stubGlobal("matchMedia",vi.fn(() => ({ matches:false,media:"(min-width: 960px)",onchange:null,addEventListener:()=>{},removeEventListener:()=>{},addListener:()=>{},removeListener:()=>{},dispatchEvent:()=>true }) as MediaQueryList));
+ vi.stubGlobal("fetch",vi.fn((url:string)=>url.endsWith("/identity/session")?Promise.resolve(response(session({role:"admin"}))):url.includes("offset=0")?new Promise<Response>(resolve=>{expireAccounts=resolve;}):Promise.resolve(response({ok:true,accounts:[],total:0}))));
+ await render(); await act(async()=>{for(let index=0;index<6;index++)await Promise.resolve();});
+ const trigger=host.querySelector<HTMLButtonElement>('[aria-label="Mostrar navegación"]');expect(trigger).toBeTruthy();await act(async()=>trigger!.click());
+ expect(host.querySelector('[role="dialog"]')).toBeTruthy(); expireAccounts(fail()); await act(async()=>{for(let index=0;index<8;index++)await Promise.resolve();});
+ expect(host.querySelector('[role="dialog"]')).toBeNull();expect(host.querySelector('.account-guard')?.hasAttribute("hidden")).toBe(true);expect(document.activeElement?.closest(".admin-sidebar")).toBeNull();
+});
 it("diálogo pendiente guarda/descarta/cancela y Escape devuelve foco",async()=>{const broker=new DialogBroker(),browser=createBrowserClient(new HttpTransport(vi.fn()),broker);await act(async()=>root.render(<><button>Disparador</button><DialogHost broker={broker} browser={browser}/></>));const trigger=host.querySelector("button")!;trigger.focus();for(const [label,value] of [["Guardar y continuar","save"],["Descartar","discard"],["Cancelar",null]] as const){let choice!:Promise<string|null>;await act(async()=>{choice=broker.leave();});await click(label);expect(await choice).toBe(value);}let choice!:Promise<string|null>;await act(async()=>{choice=broker.leave();});await act(async()=>host.querySelector("dialog")!.dispatchEvent(new Event("cancel",{cancelable:true})));expect(await choice).toBeNull();expect(document.activeElement).toBe(trigger);});
 
 it("reset obligatorio del mismo ID conserva borrador oculto hasta nueva autenticación",async()=>{
@@ -50,10 +61,40 @@ it("invitación desde recuperación conserva nodo al cancelar, valida URL y desc
  await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});expect(host.textContent).not.toContain("Recuperar sesión");expect(host.querySelector<HTMLInputElement>('[aria-label="Borrador"]')?.value).toBe("secreto");
 });
 it("Atrás/Adelante conserva entradas y restaura posición al cancelar",async()=>{
- vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();await click("Abrir fixture");await click("Partidas");const length=history.length;
+ vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();await click("Abrir fixture");await click("Campañas");const length=history.length;
  await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toMatch(/^\/partidas\//);expect(host.textContent).toContain("VTT privado");
  leave.allow=false;const node=host.querySelector('[aria-label="Borrador"]');await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toMatch(/^\/partidas\//);expect(host.querySelector('[aria-label="Borrador"]')).toBe(node);expect(history.length).toBe(length);
  leave.allow=true;await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toBe("/");await act(async()=>{history.forward();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toMatch(/^\/partidas\//);await act(async()=>{history.forward();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toBe("/partidas");expect(history.length).toBe(length);
+});
+it("el cierre ya confirmado no vuelve a pedir el guard del editor",async()=>{
+ history.replaceState(null,"","/partidas/01010101-0101-4101-8101-010101010101");vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();
+ leave.allow=false;await click("Salida normal");expect(location.pathname).toMatch(/^\/partidas\//);expect(leave.calls).toBe(1);
+ await click("Salida confirmada");expect(location.pathname).toBe("/partidas");expect(host.textContent).toContain("Catálogo privado");expect(leave.calls).toBe(1);
+});
+it("la selección contextual usa una sola guarda y sólo confirma la URL si cuenta y editor siguen vigentes",async()=>{
+ const gameId="01010101-0101-4101-8101-010101010101";
+ history.replaceState(null,"",`/partidas/${gameId}?campaignId=${gameId}&arcId=11111111-1111-4111-8111-111111111111&sceneId=12121212-1212-4212-8212-121212121212`);
+ vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();
+ leave.allow=false;await click("Cambiar escena fixture");expect(location.search).toContain("arcId=11111111-1111-4111-8111-111111111111");
+ leave.allow=true;await click("Cambiar escena fixture");await vi.waitFor(()=>expect(location.search).toContain("arcId=22222222-2222-4222-8222-222222222222"));
+ expect(leave.calls).toBe(2);
+});
+it("una expiración durante la guarda pendiente no confirma el cambio de escena",async()=>{
+ const gameId="01010101-0101-4101-8101-010101010101";
+ history.replaceState(null,"",`/partidas/${gameId}?campaignId=${gameId}&arcId=11111111-1111-4111-8111-111111111111&sceneId=12121212-1212-4212-8212-121212121212`);
+ vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();
+ let resolve!: (accepted:boolean)=>void;leave.wait=()=>new Promise(done=>{resolve=done;});
+ await click("Cambiar escena fixture");await click("Simular expiración");await act(async()=>resolve(true));
+ await act(async()=>{for(let index=0;index<4;index++)await Promise.resolve();});
+ expect(location.search).toContain("arcId=11111111-1111-4111-8111-111111111111");
+ expect(host.querySelector("[data-portal]")?.closest("[hidden][inert]")).not.toBeNull();
+});
+it("el catálogo puede reabrir la selección conservada al volver del editor",async()=>{
+ const gameId="01010101-0101-4101-8101-010101010101",arcId="22222222-2222-4222-8222-222222222222",sceneId="33333333-3333-4333-8333-333333333333";
+ history.replaceState(null,"",`/partidas?campaignId=${gameId}&arcId=${arcId}&sceneId=${sceneId}`);
+ vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();await click("Abrir selección de catálogo");
+ await vi.waitFor(()=>expect(location.pathname).toBe(`/partidas/${gameId}`));
+ expect(location.search).toContain(`sceneId=${sceneId}`);
 });
 it("401 en listado administrativo desmonta datos y contraseña temporal",async()=>{
  const f=vi.fn(async(url:string)=>url.endsWith("/identity/session")?response(session({role:"admin"})):url.includes("offset=0")?response({ok:true,accounts:[account],total:21}):fail());vi.stubGlobal("fetch",f);await render();expect(host.textContent).toContain(account.email);await fill('input[type="password"]',"temporal sintética");await click("Siguiente");expect(host.textContent).toContain("Recuperar sesión");expect(host.textContent).not.toContain(account.email);expect(host.querySelector<HTMLInputElement>('input[type="password"]')?.value).toBe("");expect(host.querySelector('.account-guard')?.hasAttribute("hidden")).toBe(true);
@@ -64,7 +105,7 @@ it("cambio de cookie comunicado desde otra pestaña oculta borrador y exige iden
 });
 
 it("dos Atrás durante decisión pendiente conservan URL, borrador y Adelante al cancelar",async()=>{
- vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();await click("Abrir fixture");await click("Partidas");await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});
+ vi.stubGlobal("fetch",vi.fn(async()=>response(session())));await render();await click("Abrir fixture");await click("Campañas");await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});
  const retainedPath=location.pathname,node=host.querySelector('[aria-label="Borrador"]'),length=history.length;let resolve!:(accepted:boolean)=>void;leave.wait=()=>new Promise(r=>{resolve=r;});
  await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});await act(async()=>{history.back();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toBe(retainedPath);expect(host.querySelector('[aria-label="Borrador"]')).toBe(node);
  await act(async()=>{resolve(false);});leave.wait=undefined;expect(history.length).toBe(length);await act(async()=>{history.forward();await new Promise(r=>setTimeout(r,50));});expect(location.pathname).toBe("/partidas");expect(history.length).toBe(length);

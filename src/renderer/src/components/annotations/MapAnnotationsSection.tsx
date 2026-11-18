@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import * as Switch from "@radix-ui/react-switch";
+import { SharedSwitch } from "../SharedSwitch";
 
 interface MapAnnotationsSectionProps {
   readonly visible: boolean;
@@ -14,9 +14,7 @@ export function MapAnnotationsSection({
     <div className="annotations-section">
       <div className="sidebar-switch-row">
         <span>Mostrar anotaciones</span>
-        <Switch.Root className="switch-root" checked={visible} onCheckedChange={onVisibleChange}>
-          <Switch.Thumb className="switch-thumb" />
-        </Switch.Root>
+        <SharedSwitch checked={visible} onCheckedChange={onVisibleChange} ariaLabel="Mostrar anotaciones" />
       </div>
     </div>
   );

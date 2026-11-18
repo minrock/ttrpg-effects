@@ -51,7 +51,7 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
   const Container = props.portalTarget ? "div" : "header";
   const content = <Container className="workspace-header">
     {!props.portalTarget && <div className="workspace-brand"><img src={logoUrl} alt="" /><strong>TTRPG <span>Effects</span></strong></div>}
-    <details className="workspace-scene-menu" ref={menu} onKeyDown={event => {
+    {isElectron ? <details className="workspace-scene-menu" ref={menu} onKeyDown={event => {
       if (event.key === "Escape") {
         event.preventDefault(); event.stopPropagation();
         if (menu.current) { menu.current.open = false; menu.current.querySelector("summary")?.focus(); }
@@ -72,7 +72,7 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
           {!props.portalTarget && <button disabled={props.busy} onClick={() => run(props.serviceActions!.onLogout)}>Cerrar sesión</button>}
         </>}
       </div>
-    </details>
+    </details> : <div className="workspace-scene-name"><span title={props.sceneName}>{props.sceneName}</span></div>}
     <div className="workspace-tools-menu" ref={tools} onKeyDown={event => {
       if (event.key === "Escape" && toolsOpen) {
         event.preventDefault(); event.stopPropagation(); setToolsOpen(false); tools.current?.querySelector<HTMLButtonElement>(".workspace-tools-trigger")?.focus();
@@ -91,7 +91,7 @@ export function WorkspaceHeader(props: WorkspaceHeaderProps): JSX.Element {
       <span className="workspace-header-separator" />
       <button type="button" className="workspace-icon" title="Explorador" aria-label="Alternar explorador" aria-pressed={props.explorerVisible} onClick={props.onExplorer}><PanelLeft size={17} /></button>
       <button type="button" className="workspace-icon" title="Inspector" aria-label="Alternar inspector" aria-pressed={props.inspectorVisible} onClick={props.onInspector}><PanelRight size={17} /></button>
-      {isElectron && <button type="button" className="workspace-present" title={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} aria-label={props.serviceActions ? "Publicar vista de jugador" : "Abrir ventana de jugador"} disabled={props.busy} onClick={props.onPlayer}><Monitor size={16} /><span>Jugador</span></button>}
+      <button type="button" className="workspace-present" title={props.serviceActions ? "Publicar escena para jugadores" : "Abrir ventana de jugador"} aria-label={props.serviceActions ? "Publicar escena para jugadores" : "Abrir ventana de jugador"} disabled={props.busy} onClick={props.onPlayer}><Monitor size={16} /><span>Jugador</span></button>
     </div>
     </div>
   </Container>;

@@ -1,5 +1,4 @@
 import { postgresPool } from "../database/driver";
-import { defaultDiceDraft } from "../../../domain/dice/dice";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { request } from "node:http";
@@ -7,6 +6,8 @@ import { setup, cleanup, context, invitationSecret, http, deferred, stream, png,
 import { systemSeeds } from "../../../domain/systems/system-catalog";
 import { ownedGames } from "../../../application/services/owned-games";
 afterEach(async () => { vi.restoreAllMocks(); for (const action of cleanup.splice(0).reverse()) await action(); });
+const serviceSelection = { groups: [{ id: "f", damageType: "fire", dice: { d6: 1 }, modifier: 0 }], includeD20: false, d20Modifier: 0, appearance: { color: "ruby", material: "resin" }, force: 1, d20: null };
+const serviceSimulation = (value: number) => ({ values: [{ id: "f:d6:0", value }], replay: { frameCount: 2, stepMs: 1000 / 30, durationMs: 1000 / 30, frames: [0, 0, 1, 0, 0, 0, 1, 0, 0, .5, 0, 0, 0, 1] } });
 for (const kind of ["sqlite", "postgres"] as const) describe(`Carreras010 ${kind}`, () => {
   it("body lento no retiene lock; kick gana y los callbacks HTTP/SSE tardíos no entregan datos", async () => {
     const s = await setup(kind), start = await s.invitations.start(s.aCookie, s.a1.id, null, 1, randomUUID()), guest = await s.invitations.guests.admit(s.a1.id, { secret: invitationSecret(start), alias: "lento" }, randomUUID(), null);
@@ -42,6 +43,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Carreras010 ${kind
     await s.identity.administer(s.adminCookie, s.a.id, "disable"); await st.until(() => st.ended);
     await s.identity.administer(s.adminCookie, s.a.id, "enable"); expect((await http(s.port, `/api/v1/games/${s.a1.id}/table/state`, `ttrpg_guest=${live.token}`)).status).toBe(401);
     const bstart = await s.invitations.start(s.bCookie, s.b1.id, null, 1, randomUUID()), b = await s.invitations.guests.admit(s.b1.id, { secret: invitationSecret(bstart), alias: "b" }, randomUUID(), null), bs = stream(s.port, s.b1.id, `ttrpg_guest=${b.token}`); await bs.until(() => bs.events.length > 0);
+    await s.invitations.end(s.bCookie, s.b1.id, context(bstart), 1, randomUUID());
     await s.identity.authorized(s.bCookie, "dm", (actor, tx) => ownedGames(actor.account.id, tx).update(s.b1.id, { state: "archived" }, 1)); await bs.until(() => bs.ended);
   });
   it("join que obtiene el lock antes de kick sobrevive; enlace viejo después no admite", async () => {
@@ -67,21 +69,33 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Carreras010 ${kind
     const guests = await Promise.all(games.map((game, i) => s.invitations.guests.admit(game.id, { alias: "jugador", secret: invitationSecret(starts[i]) }, randomUUID(), null)));
     const streams = guests.map((guest, i) => stream(s.port, games[i].id, `ttrpg_guest=${guest.token}`)); await Promise.all(streams.map(st => st.until(() => st.events.length > 0)));
     const command = (i: number, family: string, action: string, payload: unknown, requestId = randomUUID()) => http(s.port, `/api/v1/dm/games/${games[i].id}/${family}/${action}`, cookies[i], "POST", { ...context(starts[i]), command: { requestId, context: mapContexts[i] ?? null, payload } });
+    const service = (i: number, action: string, command: Record<string, unknown>, requestId = randomUUID()) => http(s.port, `/api/v1/dm/games/${games[i].id}/dice/v1/${action}`, cookies[i], "POST", { ...context(starts[i]), command: { requestId, ...command } });
+    const serviceState = (i: number) => http(s.port, `/api/v1/dm/games/${games[i].id}/dice/v1/state?openingId=${starts[i].opening!.id}&generation=${starts[i].opening!.generation}`, cookies[i]);
     const reused = randomUUID(), diceRequest = randomUUID();
     for (let i = 0; i < 3; i++) {
       const published = await command(i, "table", "scene", snapshot(assets[i === 2 ? 1 : 0]), reused); expect(published.status).toBe(200); mapContexts[i] = (published.json.state as { context: string }).context;
       expect((await command(i, "table", "camera", { center: { x: i * 100, y: i * 20 }, zoom: i + 1 })).status).toBe(409);
-      expect((await command(i, "dice", "context", { token: mapContexts[i], sceneId: "scene", mapId: "map", sceneName: `PRIVADO_DADOS_${i}`, mapName: `PRIVADO_DADOS_${i}` })).status).toBe(200);
-      const begun = await command(i, "dice", "begin", { requestId: reused, contextToken: mapContexts[i], draft: { ...defaultDiceDraft(), visibility: i === 0 ? "hidden" : "open", groups: [{ id: "f", damageType: "fire", dice: { d6: 1 } }] }, d20: null }, diceRequest);
+      expect((await command(i, "dice", "context", { token: mapContexts[i], sceneId: "scene", mapId: "map", sceneName: `PRIVADO_DADOS_${i}`, mapName: `PRIVADO_DADOS_${i}` })).status).toBe(426);
+      const current = await serviceState(i); expect(current.status).toBe(200);
+      const publicToken = (current.json.state as { public: { publishedContext: { token: string } } }).public.publishedContext.token;
+      const contextToken = i === 0 ? `privado-${i}` : publicToken;
+      if (i === 0) expect((await service(i, "private-context", { context: { token: contextToken, sceneId: "scene", mapId: "map", sceneName: `PRIVADO_DADOS_${i}`, mapName: `PRIVADO_DADOS_${i}` } })).status).toBe(200);
+      const begun = await service(i, "begin", { contextToken, visibility: i === 0 ? "hidden" : "public", selection: serviceSelection }, diceRequest);
       expect(begun.status).toBe(200);
-      expect((await command(i, "dice", "complete", { rollId: (begun.json.value as { rollId: string }).rollId, simulation: { values: [{ id: "f:d6:0", value: i + 2 }], replay: { frameCount: 2, stepMs: 1000 / 30, durationMs: 1000 / 30, frames: [0, 0, 1, 0, 0, 0, 1, 0, 0, .5, 0, 0, 0, 1] } } })).status).toBe(200);
+      expect((await service(i, "complete", { rollId: begun.json.rollId as string, simulation: serviceSimulation(i + 2) })).status).toBe(200);
     }
-    const states = await Promise.all(games.map((g, i) => http(s.port, `/api/v1/games/${g.id}/table/state`, `ttrpg_guest=${guests[i].token}`)));
+    const states = await Promise.all(games.map((g, i) => http(s.port, `/api/v1/games/${g.id}/table/state?openingId=${starts[i].opening!.id}&generation=${starts[i].opening!.generation}&diceVersion=1`, `ttrpg_guest=${guests[i].token}`)));
     for (const result of states) { expect(result.json.state).toMatchObject({ cameraCommand: null }); expect(result.bytes.toString()).not.toContain("PRIVADO"); }
-    expect((states[0].json.state as { dice: { presentation: unknown } }).dice.presentation).toBeNull(); expect((states[1].json.state as { dice: { presentation: unknown } }).dice.presentation).not.toBeNull();
+    expect((states[0].json.state as { serviceDice: { public: { presentation: unknown } } }).serviceDice.public.presentation).toBeNull();
+    expect((states[1].json.state as { serviceDice: { public: { presentation: unknown } } }).serviceDice.public.presentation).not.toBeNull();
     const survivor = await s.invitations.guests.admit(s.a2.id, { alias: "superviviente", secret: invitationSecret(starts[1]) }, randomUUID(), null), survivorStream = stream(s.port, s.a2.id, `ttrpg_guest=${survivor.token}`); await survivorStream.until(() => survivorStream.events.length > 0);
     await s.service.kick(s.aCookie, s.a2.id, guests[1].guest.participantId, { ...context(starts[1]), expectedInvitationVersion: 1 }, 1, randomUUID());
-    const after = await http(s.port, `/api/v1/games/${s.a2.id}/table/state`, `ttrpg_guest=${survivor.token}`); expect((after.json.state as { camera: unknown }).camera).toEqual((states[1].json.state as { camera: unknown }).camera); expect((after.json.state as { dice: unknown }).dice).toEqual((states[1].json.state as { dice: unknown }).dice);
+    const after = await http(s.port, `/api/v1/games/${s.a2.id}/table/state?openingId=${starts[1].opening!.id}&generation=${starts[1].opening!.generation}&diceVersion=1`, `ttrpg_guest=${survivor.token}`); expect((after.json.state as { camera: unknown }).camera).toEqual((states[1].json.state as { camera: unknown }).camera);
+    const previousDice = (states[1].json.state as { serviceDice: { audience: "player"; public: { selfPublicId: string } } }).serviceDice, survivorDice = (after.json.state as { serviceDice: { audience: "player"; public: { selfPublicId: string } } }).serviceDice;
+    expect(survivorDice.audience).toBe("player"); expect(survivorDice.public.selfPublicId).toBe(survivor.guest.participantId); expect(survivorDice.public.selfPublicId).not.toBe(previousDice.public.selfPublicId);
+    const publicProjection = (value: { selfPublicId: string }) => Object.fromEntries(Object.entries(value).filter(([key]) => key !== "selfPublicId"));
+    const previousPublic = publicProjection(previousDice.public), survivorPublic = publicProjection(survivorDice.public);
+    expect(survivorPublic).toEqual(previousPublic);
     await s.invitations.start(s.aCookie, s.a1.id, { id: starts[0].opening!.id, generation: 1, revision: 1 }, 1, randomUUID(), true);
     expect((await command(0, "table", "camera", { center: { x: 999, y: 999 }, zoom: 1 })).status).toBe(409);
     expect(streams[2].ended).toBe(false); expect(survivorStream.ended).toBe(false);

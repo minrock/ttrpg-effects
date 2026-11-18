@@ -1,10 +1,12 @@
 # SDD — Especificaciones de TTRPG Effects
 
-Este es el punto de entrada para planificar por especificaciones. Reúne el producto de escritorio y la evolución a servicio privado API + frontend. Corte documental: **2026-11-12**, versión **3.27.2** integrada en `main`: vigilancia de API, recuperación única, controles de cabecera y slider de niebla. Fuente de versión: `package.json`; [estado vigente](estado-actual.md).
+Este es el punto de entrada para planificar por especificaciones. La entrega **3.34.0** consolida campañas/arcos/escenas (SDD59 hasta revisión 0.10), Storybook (SDD60), dados de jugadores (SDD61) y correcciones de interfaz, publicación y recuperación. El usuario autorizó commit y push de la rama `feature/escenas-propias-por-arco` el **2026-11-17**; la integración en `main` sigue pendiente. El corte integrado anterior es **3.27.2**. Fuente de versión: `package.json`; [estado vigente](estado-actual.md) y [validación del cierre](validaciones/2026-11-17-cierre-3.34.0.md). Las evidencias anteriores conservan su fecha y alcance.
 
 1. Lee [estado actual y decisiones](estado-actual.md) para conocer qué existe y qué sigue pendiente.
 2. Consulta [arquitectura y datos](arquitectura.md) y la [operación local](guias/service-operations.md) para preparar una propuesta compatible.
 3. Usa [el flujo SDD](flujo.md) y las plantillas de [spec](specs/templates/spec-template.md) y [plan](specs/templates/plan-template.md) para la siguiente entrega.
+
+La planificación técnica puede desglosarse con las plantillas de [plan](specs/templates/plan-template.md) y [tareas](specs/templates/tareas-template.md): `plan.md` y `tareas.md` junto a la spec, con dependencias, propiedad de archivos y paralelismo propuesto. El TL devuelve esos artefactos al hilo principal en rol PM para decidir y orquestar; no despacha constructores. En el flujo de agentes del proyecto, [Factory](../.agents/skills/factory/SKILL.md) prepara la spec y [Build](../.agents/skills/build/SKILL.md) parte de ella para aceptar su alcance, planificar y construir. El [contrato del equipo](../.codex/README.md) define PM en el hilo principal y consultas mediante User Ask; SDD sigue siendo utilizable fuera de ese flujo.
 
 ## Organización y autoridad
 
@@ -14,7 +16,7 @@ SDD/
   estado-actual.md          Base vigente, decisiones y límites
   arquitectura.md           Clientes, servidor, persistencia y datos
   flujo.md                  Planificación → implementación → evidencia
-  specs/00-… a 58-…/        spec.md + plan.md por alcance
+  specs/00-… a 61-…/        spec.md; plan.md + tareas.md al planificar construcción
   specs/templates/          Plantillas de planificación
   guias/                    Contratos detallados y operación
   retirada-factory.md       Conservación de criterios y trazabilidad de la organización retirada
@@ -27,6 +29,8 @@ Las rutas antiguas `specs/` y `docs/` conservan enlaces de compatibilidad. La f�
 ## Escritorio y alcance retirado: specs 00–40
 
 El [catálogo histórico completo](catalogo-historico.md) enlaza las 40 specs y sus planes originales: motor, mapas, grilla, efectos, entidades, Player View, dados, interfaz y fábrica. La spec 40 está retirada; las demás conservan el estado registrado en cada documento; esta reorganización no certifica nuevamente sus pruebas. El salto de numeración 20 → 22 se conserva.
+
+Ajuste local posterior: [SDD33 FIX-01](specs/33-floating-dm-counters/validacion-fix-01.md), retirada del acceso flotante duplicado de contadores, validado en3.32.2 el2026-11-17; sin merge.
 
 ## Servicio y cambios posteriores: specs 41–54
 
@@ -47,7 +51,7 @@ Los identificadores de spec SDD son independientes de los antiguos trabajos de e
 | [51-experiencia-servicio: Experiencia de cuentas, partidas y operación local](specs/51-experiencia-servicio/spec.md) | [011-experiencia-autenticacion](specs/51-experiencia-servicio/aceptacion-historica.md) | Integrado; ver evolución |
 | [52-build-reproducible: Construcción reproducible](specs/52-build-reproducible/spec.md) | [012-build-reproducible](specs/52-build-reproducible/aceptacion-historica.md) | Integrado; ver evolución |
 | [53-administracion-local: Administradores locales y política de contraseñas](specs/53-administracion-local/spec.md) | Cambios locales posteriores | Integrado; commit c4e8831 |
-| [54-cabecera-unificada: Cabecera compacta compartida](specs/54-cabecera-unificada/spec.md) | Cambios locales posteriores | Integrado; commit c4e8831 |
+| [54-cabecera-unificada: Cabecera compacta compartida](specs/54-cabecera-unificada/spec.md) | Base integrada; corrección local 3.31.1 | Base c4e8831; Jugador en Chrome validado, sin merge ([evidencia](specs/54-cabecera-unificada/validacion-fix-01.md)) |
 
 El registro histórico conserva los 12 trabajos integrados; las specs 41–52 consolidan su comportamiento final, incluidas sustituciones posteriores. Las specs 53–54 documentan los cambios posteriores registrados en el commit `c4e8831`, incluidos en el cierre autorizado de esta entrega; no se les atribuye una revisión de fábrica. [Registro de consolidación y límites de validación](consolidacion.md).
 
@@ -58,9 +62,15 @@ El registro histórico conserva los 12 trabajos integrados; las specs 41–52 co
 | [55 — Mediciones y áreas compartidas con autor visible](specs/55-mediciones-compartidas/spec.md) | Integrada en main, 3.19.1 (`90dc50e`); validación PostgreSQL/visual pendiente | [Plan](specs/55-mediciones-compartidas/plan.md) · [Evidencia](specs/55-mediciones-compartidas/validacion.md) |
 | [56 — Cámaras libres y foco de atención](specs/56-camaras-libres-foco-atencion/spec.md) | Integrada en main, 3.20.0 (`3d35876`); cámaras libres y foco puntual | [Plan](specs/56-camaras-libres-foco-atencion/plan.md) |
 | [57 — Áreas contextuales: color, patrones, bloqueo y copia](specs/57-areas-contextuales/spec.md) | Integrada en main, 3.21.0 (`62c351a`); ver validación | [Plan](specs/57-areas-contextuales/plan.md) · [Evidencia](specs/57-areas-contextuales/validacion.md) |
-| [58 — Borradores recuperables y autoguardado del servicio](specs/58-borradores-recuperables/spec.md) | Implementada en rama; validación nativa de rendimiento pendiente | [Plan](specs/58-borradores-recuperables/plan.md) |
+| [58 — Borradores recuperables y autoguardado del servicio](specs/58-borradores-recuperables/spec.md) | Base integrada; FIX-01 validado localmente en 3.31.2, sin merge; límites históricos de rendimiento conservados | [Plan](specs/58-borradores-recuperables/plan.md) · [Evidencia FIX-01](specs/58-borradores-recuperables/validacion-fix-01.md) |
+| [59 — Campañas, arcos y escenas](specs/59-campanas-arcos-escenas/spec.md) | Base 0.2 y ajustes 0.3–0.5 validados; ampliación0.6 incorporada al servicio local3.30.0; breadcrumbs0.7 y ajustes de cabecera validados hasta3.30.3; navegación de escenas0.8 validada localmente en3.31.0; selector de plantillas0.9 validado localmente en3.32.1; revisión0.10 validada e incorporada al servicio local3.33.0 con migración12 y respaldo; sin merge | [Plan](specs/59-campanas-arcos-escenas/plan.md) · [Tareas](specs/59-campanas-arcos-escenas/tareas.md) · [Evidencia](specs/59-campanas-arcos-escenas/validacion.md) |
+
+| [60 — Storybook de componentes UI](specs/60-storybook-componentes-ui/spec.md) | Implementada y validada localmente en 3.29.0; pendiente de integración | [Plan](specs/60-storybook-componentes-ui/plan.md) · [Inventario](specs/60-storybook-componentes-ui/inventario.md) · [Validación](specs/60-storybook-componentes-ui/validacion.md) |
+| [61 — Dados de jugadores e historial público](specs/61-dados-jugadores/spec.md) | Revisión 0.1 implementada y validada localmente en 3.32.0; sin merge | [Plan](specs/61-dados-jugadores/plan.md) · [Tareas](specs/61-dados-jugadores/tareas.md) · [Validación](specs/61-dados-jugadores/validacion.md) |
 
 ## Guías técnicas y operativas
+
+El [catálogo UI/UX](guias/ui-ux/catalogo.md) registra patrones de interacción, componentes reutilizables y acuerdos de diseño, distinguiendo propuestas de implementaciones verificadas.
 
 | Tema | Documento |
 | --- | --- |
@@ -78,7 +88,7 @@ El registro histórico conserva los 12 trabajos integrados; las specs 41–52 co
 
 ## Siguiente planificación
 
-La siguiente numeración disponible es **59** tras reservar la spec 58; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 59: …» y después autorizar su implementación. La organización de agentes no está predeterminada.
+La siguiente numeración disponible es **62** tras reservar la spec 61; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 62: …» y después autorizar su implementación. La organización de agentes no está predeterminada.
 
 ## Procedencia de las entregas
 

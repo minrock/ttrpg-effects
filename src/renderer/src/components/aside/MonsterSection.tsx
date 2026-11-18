@@ -13,6 +13,7 @@ interface MonsterSectionProps {
   readonly onUpdate: (m: SceneMonster) => void;
   readonly onRemove: (id: string) => void;
   readonly onToggleVisibility: (id: string) => void;
+  readonly preparationContext?: boolean;
 }
 
 export function MonsterSection({
@@ -21,7 +22,8 @@ export function MonsterSection({
   onAdd,
   onUpdate,
   onRemove,
-  onToggleVisibility
+  onToggleVisibility,
+  preparationContext = false
 }: MonsterSectionProps): JSX.Element {
   const client = useTtrpgClient();
   const forMonster = (m: SceneMonster) => client?.presentations?.forMonster(m.id,m.templateId ?? null,templates) ?? templates;
@@ -71,9 +73,9 @@ export function MonsterSection({
         />
       ))}
 
-      <button onClick={() => setIsLibraryOpen(true)} style={addBtnStyle}>
+      {!preparationContext && <button onClick={() => setIsLibraryOpen(true)} style={addBtnStyle}>
         + Agregar monstruo
-      </button>
+      </button>}
 
       {/* Detail modal */}
       {syncedDetail !== null && (
@@ -83,11 +85,12 @@ export function MonsterSection({
           onClose={closeDetail}
           onToggleVisibility={() => onToggleVisibility(syncedDetail.id)}
           onEdit={() => handleEditFromDetail(syncedDetail)}
+          editable={!preparationContext}
         />
       )}
 
       {/* Edit modal */}
-      {editingMonster !== null && (
+      {!preparationContext && editingMonster !== null && (
         <MonsterModal
           initial={editingMonster === "new" ? null : editingMonster}
           existingIds={existingIds}
@@ -97,7 +100,7 @@ export function MonsterSection({
         />
       )}
 
-      {isLibraryOpen ? (
+      {!preparationContext && isLibraryOpen ? (
         <MonsterLibraryModal
           templates={templates}
           existingIds={existingIds}

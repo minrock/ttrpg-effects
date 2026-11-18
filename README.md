@@ -50,6 +50,24 @@ pnpm test
 pnpm build
 ```
 
+## Catálogo de componentes
+
+Storybook documenta controles y composiciones de interfaz sin arrancar la API, Electron ni el renderer del mapa. Inícialo de forma local en `http://127.0.0.1:6006`:
+
+```bash
+pnpm storybook
+```
+
+Para construir el catálogo estático y verificar que las historias no incorporen motores, entradas de aplicación ni código privilegiado:
+
+```bash
+pnpm build-storybook
+```
+
+Las historias viven en `src/stories/`; el inventario y los límites de cada componente están en [SDD 60](SDD/specs/60-storybook-componentes-ui/).
+
+Para añadir una historia, usa un título estable bajo `Controles/` o `Composiciones/`, indica la ruta y el consumidor de producción en la documentación CSF y conserva estado local reiniciable. Elige `parameters.uiContext` entre `neutral`, `editor`, `service` y `workspace` según el árbol CSS que requiera el componente. No importes entradas de aplicación, Electron, API, Pixi, Three ni datos locales: el chequeo previo y el build rechazan esos grafos. Revisa teclado, foco, etiqueta accesible y texto largo en los viewports de 390 y 1440 px; el addon a11y ayuda a detectar problemas, pero no sustituye esa revisión.
+
 ## Bootstrap actual
 
 El bootstrap inicial crea una ventana Electron segura con `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` y un preload pequeno expuesto mediante `contextBridge`.

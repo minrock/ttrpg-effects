@@ -8,9 +8,11 @@ import type { SceneResource } from "../../shared/contracts/http-api";
 import type { MonsterTemplate } from "../../domain/monster-templates/monster-template";
 import type { MonsterLibraryEntry } from "../../domain/monster-library/monster-library";
 import type { NpcLibraryEntry, PlayerCharacterLibraryEntry } from "../../domain/entity-library/entity-library";
-export type OwnedCode = "FORBIDDEN" | "VALIDATION" | "NOT_FOUND" | "CONFLICT" | "OPERATION_CONTENT_CONFLICT" | "OPERATION_BUDGET" | "RESULT_TOO_LARGE" | "DRAFT_BRANCH_LIMIT" | "DRAFT_STORAGE_LIMIT" | "TEMPLATE_REFERENCED" | "CORRUPT" | "UNAVAILABLE";
+import type { CampaignRepository } from "./campaigns";
+import type { ArcPreparationRepository } from "./arc-preparation";
+export type OwnedCode = "FORBIDDEN" | "VALIDATION" | "NOT_FOUND" | "CONFLICT" | "CAMPAIGN_INACTIVE" | "CAMPAIGN_OPEN" | "SCENE_SHARED_INACTIVE" | "OPERATION_CONTENT_CONFLICT" | "OPERATION_BUDGET" | "RESULT_TOO_LARGE" | "DRAFT_BRANCH_LIMIT" | "DRAFT_STORAGE_LIMIT" | "TEMPLATE_REFERENCED" | "CORRUPT" | "UNAVAILABLE";
 export class OwnedError extends Error {
-  constructor(readonly code: OwnedCode, readonly retryAt?: string) { super(({ DRAFT_BRANCH_LIMIT: "Se alcanzó el límite de borradores con cambios pendientes. Guarda o descarta una copia pendiente antes de abrir otra; tus datos se conservan.", DRAFT_STORAGE_LIMIT: "El almacenamiento de borradores de tu cuenta está lleno. Exporta o descarta copias que ya no necesites; tus datos se conservan.", FORBIDDEN: "Esta operación requiere una cuenta DM.", OPERATION_CONTENT_CONFLICT: "La clave de operación ya tiene otro contenido. Usa una clave nueva para una operación distinta.", OPERATION_BUDGET: "La operación no se confirmó: se agotó el presupuesto temporal. Espera hasta la fecha indicada y reintenta; recargar no libera espacio.", RESULT_TOO_LARGE: "La operación no se confirmó: su resultado excede el límite. Reduce el contenido antes de reintentar.", TEMPLATE_REFERENCED: "La plantilla está referenciada por un monstruo. Cambia o retira esa referencia antes de eliminarla.", VALIDATION: "Los datos o la revisión no son válidos.", NOT_FOUND: "No se encontró el recurso.", CONFLICT: "El recurso cambió o la operación ya tiene otro contenido. Recarga antes de reintentar.", CORRUPT: "Los datos guardados están dañados o son incompatibles.", UNAVAILABLE: "No se pudo completar la operación de almacenamiento." })[code]); }
+  constructor(readonly code: OwnedCode, readonly retryAt?: string, readonly campaignId?: string) { super(({ DRAFT_BRANCH_LIMIT: "Se alcanzó el límite de borradores con cambios pendientes. Guarda o descarta una copia pendiente antes de abrir otra; tus datos se conservan.", DRAFT_STORAGE_LIMIT: "El almacenamiento de borradores de tu cuenta está lleno. Exporta o descarta copias que ya no necesites; tus datos se conservan.", FORBIDDEN: "Esta operación requiere una cuenta DM.", CAMPAIGN_INACTIVE: "La campaña está inactiva. Reactívala antes de editar o jugar.", CAMPAIGN_OPEN: "Cierra explícitamente la apertura vigente antes de desactivar la campaña.", SCENE_SHARED_INACTIVE: "Esta escena está vinculada a una campaña inactiva. Reactiva esa campaña para editarla.", OPERATION_CONTENT_CONFLICT: "La clave de operación ya tiene otro contenido. Usa una clave nueva para una operación distinta.", OPERATION_BUDGET: "La operación no se confirmó: se agotó el presupuesto temporal. Espera hasta la fecha indicada y reintenta; recargar no libera espacio.", RESULT_TOO_LARGE: "La operación no se confirmó: su resultado excede el límite. Reduce el contenido antes de reintentar.", TEMPLATE_REFERENCED: "La plantilla está referenciada por un monstruo. Cambia o retira esa referencia antes de eliminarla.", VALIDATION: "Los datos o la revisión no son válidos.", NOT_FOUND: "No se encontró el recurso.", CONFLICT: "El recurso cambió o la operación ya tiene otro contenido. Recarga antes de reintentar.", CORRUPT: "Los datos guardados están dañados o son incompatibles.", UNAVAILABLE: "No se pudo completar la operación de almacenamiento." })[code]); }
 }
 export interface ResourceBodies {
   scenes: Omit<SceneResource, "missingImages">;
@@ -48,6 +50,8 @@ export interface CommitEffects {
   afterCommit(apply: () => void, uncertain: () => void): void;
 }
 export interface OwnedTransaction extends CatalogTransaction {
+  readonly campaigns: CampaignRepository;
+  readonly arcPreparation: ArcPreparationRepository;
   readonly drafts: DraftRepository;
   readonly systems: SystemCatalog;
   readonly links: ResourceGameLinks;

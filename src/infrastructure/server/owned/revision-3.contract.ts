@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { randomUUID, createHash } from "node:crypto";
-import { readFileSync, writeFileSync, statSync, symlinkSync, unlinkSync } from "node:fs";
+import { chmodSync, cpSync, readFileSync, writeFileSync, statSync, symlinkSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { OwnedError } from "../../../application/services/owned-store";
 import { GENERIC_SYSTEM, systemSeeds, type ResourceBindings } from "../../../domain/systems/system-catalog";
 import { createMonsterLibraryEntry } from "../../../domain/monster-library/monster-library";
 import { identityDatabase } from "../identity/database";
-import { accounts, cleanup, directory, fixture } from "./fixtures";
+import { accounts, cleanup, directory, fixture, raw } from "./fixtures";
 import { exportOwned, importTransfer, inspectTransfer, verifyTransfer } from "./transfer";
-import { inlineVersion2 } from "./transfer-fixture";
+import { inlineVersion1, inlineVersion2, streamVersion3 } from "./transfer-fixture";
 import { definitionHash } from "./system-data";
 afterEach(async () => { for (const action of cleanup.splice(0).reverse()) await action(); });
 for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda 3 ${kind}`, () => {
@@ -40,9 +40,12 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda
     const game = await auth.identity.authorized(auth.aCookie, "dm", async (_, tx) => { await tx.resources.put("monsters", monster, 0, bindings); const g = await tx.games.create(auth.a.id, "Propia", ref); await tx.links.link(g.id, "monsters", monster.id); return g; });
     for (const disabled of [false, true]) {
       if (disabled) await auth.identity.authorized(auth.adminCookie, "admin", (_, tx) => tx.systems.availability(ref, "disabled", 2));
-      const bundle = join(directory(), "paquete"); expect((await exportOwned(config, bundle)).version).toBe(3);
+      const bundle = join(directory(), "paquete"); expect((await exportOwned(config, bundle)).version).toBe(5);
+      const v3 = join(directory(), "paquete-v3"); cpSync(bundle, v3, { recursive: true }); chmodSync(v3, 0o700); await streamVersion3(v3); expect((await inspectTransfer(v3)).version).toBe(3);
+      const v3Target = await fixture(kind), v3Restored = await accounts(v3Target), v3Options = { ownerMap: { [auth.a.id]: v3Restored.a.id } };
+      await importTransfer(v3Target, v3, v3Options); await verifyTransfer(v3Target, v3, v3Options);
       if (!disabled) await inlineVersion2(bundle);
-      expect((await inspectTransfer(bundle)).version).toBe(disabled ? 3 : 2);
+      expect((await inspectTransfer(bundle)).version).toBe(disabled ? 5 : 2);
       const target = await fixture(kind), restored = await accounts(target), options = { ownerMap: { [auth.a.id]: restored.a.id } };
       await importTransfer(target, bundle, options); await verifyTransfer(target, bundle, options);
       await restored.identity.authorized(restored.aCookie, "dm", async (_, tx) => {
@@ -51,6 +54,16 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda
         await tx.links.validate(game.id, "monsters", monster.id);
       });
     }
+  });
+  it("lector v1 auténtico reconstruye bindings y sistema genérico antes del backfill", async () => {
+    const config = await fixture(kind), auth = await accounts(config), monster = createMonsterLibraryEntry({ name: "Lector v1", system: "Genérico", templateId: "generic-markdown", contentMarkdown: "# V1" }, { id: randomUUID(), now: new Date() });
+    const binding: ResourceBindings = { root: { scope: "catalog", ...GENERIC_SYSTEM, templateId: "generic-markdown" }, monsters: {} };
+    const game = await auth.identity.authorized(auth.aCookie, "dm", async (_, tx) => { await tx.resources.put("monsters", monster, 0, binding); const value = await tx.games.create(auth.a.id, "Partida v1", GENERIC_SYSTEM); await tx.links.link(value.id, "monsters", monster.id); return value; });
+    const bundle = join(directory(), "paquete-v1"); await exportOwned(config, bundle); await inlineVersion1(bundle); expect((await inspectTransfer(bundle)).version).toBe(1);
+    const target = await fixture(kind), restored = await accounts(target), options = { ownerMap: { [auth.a.id]: restored.a.id } };
+    await importTransfer(target, bundle, options); await verifyTransfer(target, bundle, options);
+    await restored.identity.close();
+    expect((await raw(target, c => c.query("SELECT system_id,system_version FROM ttrpg_games WHERE owner_id=$1 AND id=$2", [restored.a.id, game.id]))).rows[0]).toEqual({ system_id: "generic", system_version: 1 });
   });
   it("catálogo segmentado supera 1 MiB y 10 MiB por versión; verifica límites, hashes y rollback", async () => {
     const config = await fixture(kind), auth = await accounts(config), ref = { systemId: "extenso", version: 1 };
@@ -63,7 +76,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda
     });
     await auth.identity.authorized(auth.aCookie, "dm", (_, tx) => tx.games.create(auth.a.id, "Validación tardía", GENERIC_SYSTEM));
     const bundle = join(directory(), "grande"), manifest = await exportOwned(config, bundle);
-    expect(manifest.version).toBe(3); expect(statSync(join(bundle, "manifest.json")).size).toBeLessThan(1024 * 1024);
+    expect(manifest.version).toBe(5); expect(statSync(join(bundle, "manifest.json")).size).toBeLessThan(1024 * 1024);
     expect(manifest.catalogData!.bytes).toBeGreaterThan(10 * 1024 * 1024);
     for (const line of readFileSync(join(bundle, "catalog.jsonl"), "utf8").trim().split("\n")) expect(Buffer.byteLength(line)).toBeLessThan(10 * 1024 * 1024);
     const path = join(bundle, "catalog.jsonl"), original = readFileSync(path);

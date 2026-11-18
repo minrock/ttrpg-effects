@@ -11,6 +11,7 @@ interface NpcSectionProps {
   readonly onUpdate: (n: SceneNpc) => void;
   readonly onRemove: (id: string) => void;
   readonly onToggleVisibility: (id: string) => void;
+  readonly preparationContext?: boolean;
 }
 
 export function NpcSection({
@@ -18,7 +19,8 @@ export function NpcSection({
   onAdd,
   onUpdate,
   onRemove,
-  onToggleVisibility
+  onToggleVisibility,
+  preparationContext = false
 }: NpcSectionProps): JSX.Element {
   const [detailNpc, setDetailNpc] = useState<SceneNpc | null>(null);
   const [editingNpc, setEditingNpc] = useState<SceneNpc | null | "new">(null);
@@ -66,9 +68,9 @@ export function NpcSection({
         />
       ))}
 
-      <button onClick={() => setIsLibraryOpen(true)} style={addBtnStyle}>
+      {!preparationContext && <button onClick={() => setIsLibraryOpen(true)} style={addBtnStyle}>
         + Agregar NPC
-      </button>
+      </button>}
 
       {/* Detail modal */}
       {syncedDetail !== null && (
@@ -78,11 +80,12 @@ export function NpcSection({
           onToggleVisibility={() => onToggleVisibility(syncedDetail.id)}
           onEdit={() => handleEditFromDetail(syncedDetail)}
           onNotesChange={(notes) => onUpdate({ ...syncedDetail, notes })}
+          editable={!preparationContext}
         />
       )}
 
       {/* Edit modal */}
-      {editingNpc !== null && (
+      {!preparationContext && editingNpc !== null && (
         <NpcModal
           initial={editingNpc === "new" ? null : editingNpc}
           existingIds={existingIds}
@@ -91,7 +94,7 @@ export function NpcSection({
         />
       )}
 
-      {isLibraryOpen ? (
+      {!preparationContext && isLibraryOpen ? (
         <NpcLibraryModal
           existingIds={existingIds}
           onAddNpc={(npc) => {

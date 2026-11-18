@@ -1,0 +1,115 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { randomUUID } from "node:crypto";
+import { cleanup, context, http, invitationSecret, png, setup, stream } from "./fixtures";
+import { serviceDiceContextualEventSchema } from "../../../shared/contracts/moderation";
+
+afterEach(async () => { for (const action of cleanup.splice(0).reverse()) await action(); });
+const selection = { groups: [{ id: "fire", damageType: "fire", dice: { d6: 1 }, modifier: 3 }], includeD20: false, d20Modifier: 0, appearance: { color: "ruby", material: "resin" }, force: 1, d20: null };
+const simulation = { values: [{ id: "fire:d6:0", value: 4 }], replay: { frameCount: 2, stepMs: 1000 / 30, durationMs: 1000 / 30, frames: [0, 0, 1, 0, 0, 0, 1, 0, 0, .5, 0, 0, 0, 1] } };
+for (const kind of ["sqlite", "postgres"] as const) describe(`Dados de servicio HTTP ${kind}`, () => {
+  it("deriva autor del scope, protege complete ajeno y proyecta estado público", async () => {
+    const s = await setup(kind), start = await s.invitations.start(s.aCookie, s.a1.id, null, 1, randomUUID());
+    const [ana, bruno] = await Promise.all(["igual", "igual"].map(alias => s.invitations.guests.admit(s.a1.id, { secret: invitationSecret(start), alias }, randomUUID(), null)));
+    const asset = randomUUID(); await s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.assets.create(asset, "image/png", png));
+    const scene = (await import("./fixtures")).snapshot(asset);
+    expect((await http(s.port, `/api/v1/dm/games/${s.a1.id}/table/scene`, s.aCookie, "POST", { ...context(start), command: { requestId: randomUUID(), context: null, payload: scene } })).status).toBe(200);
+    const base = `/api/v1/games/${s.a1.id}/dice`;
+    const negotiated = stream(s.port, s.a1.id, `ttrpg_guest=${ana.token}`, false, undefined, `?openingId=${start.opening!.id}&generation=${start.opening!.generation}&diceVersion=1`);
+    await negotiated.until(() => negotiated.events.some(event => event.type === "bootstrap"));
+    expect(serviceDiceContextualEventSchema.parse(negotiated.events[0])).toMatchObject({ diceVersion: 1, state: { serviceDice: { audience: "player" } } });
+    expect((await http(s.port, `${base}/capabilities?openingId=${start.opening!.id}&generation=${start.opening!.generation}`, `ttrpg_guest=${ana.token}`)).status).toBe(200);
+    expect((await http(s.port, `/api/v1/dm/games/${s.a1.id}/dice/v1/state?openingId=${start.opening!.id}&generation=${start.opening!.generation}`, s.bCookie)).status).toBe(404);
+    const state = await http(s.port, `${base}/v1/state?openingId=${start.opening!.id}&generation=${start.opening!.generation}`, `ttrpg_guest=${ana.token}`);
+    expect(state.status).toBe(200); expect(JSON.stringify(state.json)).not.toContain("account"); expect(JSON.stringify(state.json)).not.toContain("PRIVADO");
+    const token = (state.json.state as { public: { publishedContext: { token: string } } }).public.publishedContext.token, anaRequest = randomUUID(), brunoRequest = randomUUID();
+    const [anaBegin, brunoBegin] = await Promise.all([
+      http(s.port, `${base}/v1/begin`, `ttrpg_guest=${ana.token}`, "POST", { ...context(start), command: { requestId: anaRequest, contextToken: token, visibility: "public", selection } }),
+      http(s.port, `${base}/v1/begin`, `ttrpg_guest=${bruno.token}`, "POST", { ...context(start), command: { requestId: brunoRequest, contextToken: token, visibility: "public", selection } })
+    ]);
+    expect([anaBegin.status, brunoBegin.status].sort()).toEqual([200, 409]);
+    const winner = anaBegin.status === 200 ? { reply: anaBegin, token: ana.token, requestId: anaRequest, loser: bruno.token } : { reply: brunoBegin, token: bruno.token, requestId: brunoRequest, loser: ana.token };
+    expect((await http(s.port, `${base}/v1/begin`, `ttrpg_guest=${winner.token}`, "POST", { ...context(start), command: { requestId: winner.requestId, contextToken: token, visibility: "public", selection } })).json).toMatchObject({ outcome: "already-applied" });
+    const rollId = String(winner.reply.json.rollId), completeRequest = randomUUID();
+    expect((await http(s.port, `${base}/v1/complete`, `ttrpg_guest=${winner.loser}`, "POST", { ...context(start), command: { requestId: randomUUID(), rollId, simulation } })).status).toBe(403);
+    expect((await http(s.port, `${base}/v1/complete`, `ttrpg_guest=${winner.token}`, "POST", { ...context(start), command: { requestId: completeRequest, rollId, simulation } })).status).toBe(200);
+    expect((await http(s.port, `${base}/v1/complete`, `ttrpg_guest=${winner.token}`, "POST", { ...context(start), command: { requestId: completeRequest, rollId, simulation } })).json).toMatchObject({ outcome: "already-applied" });
+    const replay = await http(s.port, `${base}/v1/operations/${winner.requestId}?openingId=${start.opening!.id}&generation=${start.opening!.generation}`, `ttrpg_guest=${winner.token}`);
+    expect(replay.status).toBe(200); expect(replay.json.operation).toMatchObject({ requestId: winner.requestId });
+    const privateRequest = randomUUID(), dmBase = `/api/v1/dm/games/${s.a1.id}/dice`, privateBody = { ...context(start), command: { requestId: privateRequest, context: { token: "dm-private", sceneId: "draft", mapId: "draft-map", sceneName: "Privado", mapName: "Privado" } } };
+    const privateFirst = await http(s.port, `${dmBase}/v1/private-context`, s.aCookie, "POST", privateBody);
+    const privateRetry = await http(s.port, `${dmBase}/v1/private-context`, s.aCookie, "POST", privateBody);
+    expect(privateFirst.status).toBe(200); expect(privateRetry.json).toMatchObject({ outcome: "already-applied", requestId: privateRequest });
+    expect((await http(s.port, `${dmBase}/v1/private-context`, s.aCookie, "POST", { ...privateBody, command: { ...privateBody.command, context: { ...privateBody.command.context, token: "other" } } })).status).toBe(409);
+    expect((await http(s.port, `${base}/begin`, `ttrpg_guest=${ana.token}`, "POST", { ...context(start), command: { requestId: randomUUID(), context: null, payload: {} } })).status).toBe(426);
+  });
+
+  it("aísla hidden de jugador, conserva historial y aplica cierres por autoridad", async () => {
+    const s = await setup(kind), start = await s.invitations.start(s.aCookie, s.a1.id, null, 1, randomUUID());
+    const [ana, bruno] = await Promise.all(["Ana", "Bruno"].map(alias => s.invitations.guests.admit(s.a1.id, { secret: invitationSecret(start), alias }, randomUUID(), null)));
+    const asset = randomUUID(); await s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.assets.create(asset, "image/png", png));
+    const scene = (await import("./fixtures")).snapshot(asset), opening = context(start), base = `/api/v1/games/${s.a1.id}/dice`, dmBase = `/api/v1/dm/games/${s.a1.id}/dice`;
+    expect((await http(s.port, `/api/v1/dm/games/${s.a1.id}/table/scene`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), context: null, payload: scene } })).status).toBe(200);
+    const initial = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`);
+    const token = (initial.json.state as { public: { publishedContext: { token: string } } }).public.publishedContext.token;
+    const privateSet = await http(s.port, `${dmBase}/v1/private-context`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), context: { token: "DM_SECRETO", sceneId: "draft", mapId: "draft-map", sceneName: "DM_SECRETO", mapName: "DM_SECRETO" } } });
+    expect(privateSet.status).toBe(200);
+    const openStream = stream(s.port, s.a1.id, `ttrpg_guest=${ana.token}`, false, undefined, `?openingId=${opening.openingId}&generation=${opening.generation}&diceVersion=1`);
+    await openStream.until(() => openStream.events.some(event => event.type === "bootstrap"));
+    const hidden = await http(s.port, `${dmBase}/v1/begin`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), contextToken: "DM_SECRETO", visibility: "hidden", selection } });
+    expect(hidden.status).toBe(200);
+    const publicBegin = await http(s.port, `${base}/v1/begin`, `ttrpg_guest=${ana.token}`, "POST", { ...opening, command: { requestId: randomUUID(), contextToken: token, visibility: "public", selection } });
+    expect(publicBegin.status).toBe(200);
+    await openStream.until(() => openStream.events.some(event => (event as { type: string; payload?: { public?: { occupancy?: { rollId?: string } } } }).type === "service-dice" && (event as { payload?: { public?: { occupancy?: { rollId?: string } } } }).payload?.public?.occupancy?.rollId === publicBegin.json.rollId));
+    const diceEventsBeforeHidden = openStream.events.filter(event => (event as { type: string }).type === "service-dice").length;
+    const beforeHiddenComplete = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`);
+    const sequence = (beforeHiddenComplete.json.state as { public: { sequence: number } }).public.sequence;
+    expect((await http(s.port, `${dmBase}/v1/complete`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), rollId: hidden.json.rollId, simulation } })).status).toBe(200);
+    const negotiated = stream(s.port, s.a1.id, `ttrpg_guest=${ana.token}`, false, undefined, `?openingId=${opening.openingId}&generation=${opening.generation}&diceVersion=1`);
+    await negotiated.until(() => negotiated.events.some(event => event.type === "bootstrap"));
+    const afterHidden = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`);
+    expect((afterHidden.json.state as { public: { sequence: number } }).public.sequence).toBe(sequence);
+    expect(openStream.events.filter(event => (event as { type: string }).type === "service-dice")).toHaveLength(diceEventsBeforeHidden);
+    expect(JSON.stringify([afterHidden.json, openStream.bytes, negotiated.bytes])).not.toContain("DM_SECRETO");
+    const playerHistory = await http(s.port, `${base}/v1/history?openingId=${opening.openingId}&generation=${opening.generation}&offset=0&limit=10`, `ttrpg_guest=${ana.token}`);
+    const dmHistory = await http(s.port, `${dmBase}/v1/history?openingId=${opening.openingId}&generation=${opening.generation}&offset=0&limit=10`, s.aCookie);
+    expect(JSON.stringify(playerHistory.json)).not.toContain("hidden"); expect(JSON.stringify(dmHistory.json)).toContain("hidden");
+    expect((await http(s.port, `${base}/v1/dismiss`, `ttrpg_guest=${bruno.token}`, "POST", { ...opening, command: { requestId: randomUUID(), rollId: publicBegin.json.rollId } })).status).toBe(403);
+    const dmClose = await http(s.port, `${dmBase}/v1/dismiss`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), rollId: publicBegin.json.rollId } });
+    expect(dmClose.status).toBe(200);
+    expect((await http(s.port, `${dmBase}/v1/dismiss`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), rollId: publicBegin.json.rollId } })).json).toMatchObject({ outcome: "obsolete" });
+    expect((await http(s.port, `${base}/v1/begin`, `ttrpg_guest=${ana.token}`, "POST", { ...opening, command: { requestId: randomUUID(), contextToken: token, visibility: "public", selection } })).status).toBe(200);
+  });
+
+  it("resume DM oculto no borra el log público y revoke cancela preparación", async () => {
+    const s = await setup(kind), start = await s.invitations.start(s.aCookie, s.a1.id, null, 1, randomUUID()), ana = await s.invitations.guests.admit(s.a1.id, { secret: invitationSecret(start), alias: "Ana" }, randomUUID(), null);
+    const asset = randomUUID(); await s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.assets.create(asset, "image/png", png));
+    const scene = (await import("./fixtures")).snapshot(asset), opening = context(start), base = `/api/v1/games/${s.a1.id}/dice`, dmBase = `/api/v1/dm/games/${s.a1.id}/dice`;
+    await http(s.port, `/api/v1/dm/games/${s.a1.id}/table/scene`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), context: null, payload: scene } });
+    const state = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`), token = (state.json.state as { public: { publishedContext: { token: string } } }).public.publishedContext.token;
+    const dmRoll = await http(s.port, `${dmBase}/v1/begin`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), contextToken: token, visibility: "public", selection } });
+    expect((await http(s.port, `${dmBase}/v1/visibility`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), rollId: dmRoll.json.rollId, visible: false } })).status).toBe(200);
+    expect((await http(s.port, `${dmBase}/v1/complete`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), rollId: dmRoll.json.rollId, simulation } })).status).toBe(200);
+    const playerState = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`);
+    const playerLog = await http(s.port, `${base}/v1/history?openingId=${opening.openingId}&generation=${opening.generation}&offset=0&limit=10`, `ttrpg_guest=${ana.token}`);
+    expect((playerState.json.state as { public: { presentation: { result: unknown } } }).public.presentation.result).toBeNull();
+    expect(JSON.stringify(playerLog.json)).toContain("poolTotal");
+    expect((await http(s.port, `${base}/v1/history?openingId=${opening.openingId}&generation=${opening.generation}&offset=1&limit=10&revision=999`, `ttrpg_guest=${ana.token}`)).status).toBe(409);
+    expect((await http(s.port, `${dmBase}/v1/dismiss`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), rollId: dmRoll.json.rollId } })).status).toBe(200);
+    const pending = await http(s.port, `${base}/v1/begin`, `ttrpg_guest=${ana.token}`, "POST", { ...opening, command: { requestId: randomUUID(), contextToken: token, visibility: "public", selection } });
+    expect(pending.status).toBe(200);
+    expect((await http(s.port, `/api/v1/dm/games/${s.a1.id}/table/scene`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), context: null, payload: null } })).status).toBe(200);
+    const withdrawn = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`);
+    expect((withdrawn.json.state as { public: { presentation: unknown } }).public.presentation).toBeNull();
+    expect(JSON.stringify((await http(s.port, `${base}/v1/history?openingId=${opening.openingId}&generation=${opening.generation}&offset=0&limit=10`, `ttrpg_guest=${ana.token}`)).json)).toContain("poolTotal");
+    expect((await http(s.port, `${base}/v1/complete`, `ttrpg_guest=${ana.token}`, "POST", { ...opening, command: { requestId: randomUUID(), rollId: pending.json.rollId, simulation } })).status).toBe(409);
+    expect((await http(s.port, `/api/v1/dm/games/${s.a1.id}/table/scene`, s.aCookie, "POST", { ...opening, command: { requestId: randomUUID(), context: null, payload: scene } })).status).toBe(200);
+    const republished = await http(s.port, `${base}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, `ttrpg_guest=${ana.token}`);
+    const republishedToken = (republished.json.state as { public: { publishedContext: { token: string } } }).public.publishedContext.token;
+    const revokePending = await http(s.port, `${base}/v1/begin`, `ttrpg_guest=${ana.token}`, "POST", { ...opening, command: { requestId: randomUUID(), contextToken: republishedToken, visibility: "public", selection } });
+    expect(revokePending.status).toBe(200);
+    expect((await s.service.kick(s.aCookie, s.a1.id, ana.guest.participantId, { ...opening, expectedInvitationVersion: 1 }, 1, randomUUID())).outcome).toBe("revoked");
+    const stateAfterRevoke = await http(s.port, `${dmBase}/v1/state?openingId=${opening.openingId}&generation=${opening.generation}`, s.aCookie);
+    expect((stateAfterRevoke.json.state as { public: { occupancy: unknown } }).public.occupancy).toBeNull();
+    expect((await http(s.port, `${base}/v1/complete`, `ttrpg_guest=${ana.token}`, "POST", { ...opening, command: { requestId: randomUUID(), rollId: revokePending.json.rollId, simulation } })).status).toBe(401);
+  });
+});

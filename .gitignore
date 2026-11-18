@@ -20,6 +20,7 @@ dist-electron/
 # ── Vite / electron-vite cache ────────────────────────────────────────────────
 .vite/
 **/.vite/
+storybook-static/
 
 # ── TypeScript ────────────────────────────────────────────────────────────────
 *.tsbuildinfo
@@ -66,3 +67,6 @@ tmp/
 
 # Datos, provisión y respaldos privados del servicio
 /.local/
+
+# Kanban agéntico privado: skill, templates y herramientas locales
+/.agents/skills/kanban-local/

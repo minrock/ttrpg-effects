@@ -18,6 +18,7 @@ export class DiceOverlayRenderer {
   private meshes: DiceMesh[] = [];
   private labels: HTMLSpanElement[] = [];
   private presentation: DicePresentation | null = null;
+  private finalFrame: readonly number[] | null = null;
   private frame = 0;
   private readonly observer: ResizeObserver;
   private appearanceKey = "";
@@ -58,12 +59,13 @@ export class DiceOverlayRenderer {
     this.resize();
   }
 
-  present(value: DicePresentation | null): void {
+  present(value: DicePresentation | null, finalFrame: readonly number[] | null = null): void {
     cancelAnimationFrame(this.frame);
-    if (value?.rollId !== this.presentation?.rollId || value === null) {
+    const staticFrameChanged = finalFrame !== this.finalFrame;
+    if (value?.rollId !== this.presentation?.rollId || value === null || staticFrameChanged) {
       this.critical?.clear();
       this.clearMeshes();
-      if (value?.replay) {
+      if (value && (value.replay || finalFrame)) {
         const key = JSON.stringify(value.appearance);
         if (key !== this.appearanceKey) { this.clearTextures(); this.appearanceKey = key; }
         this.meshes = value.dice.map(die => {
@@ -90,12 +92,18 @@ export class DiceOverlayRenderer {
           const sphere = mesh.geometry.boundingSphere!;
           return (sphere.radius + sphere.center.length()) * SCALE;
         });
-        this.rollingBounds = diceReplayBounds(value.replay, radii, false);
-        this.settledBounds = diceReplayBounds(value.replay, radii, true);
+        if (value.replay) {
+          this.rollingBounds = diceReplayBounds(value.replay, radii, false);
+          this.settledBounds = diceReplayBounds(value.replay, radii, true);
+        } else if (finalFrame?.length === this.meshes.length * 7) {
+          const settled = { frames: finalFrame, frameCount: 1, stepMs: 1, durationMs: 0 };
+          this.settledBounds = diceReplayBounds(settled, radii, true);
+        }
       }
     }
     this.presentation = value;
-    this.host.hidden = !value?.replay;
+    this.finalFrame = finalFrame;
+    this.host.hidden = !value || (!value.replay && !finalFrame);
     this.draw();
   }
 
@@ -132,28 +140,31 @@ export class DiceOverlayRenderer {
   }
 
   private draw = (): void => {
-    if (this.disposed || document.hidden || !this.presentation?.replay || this.host.clientWidth < 1 || this.host.clientHeight < 1) return;
-    const { replay, startedAt } = this.presentation;
+    const presentation = this.presentation;
+    if (this.disposed || document.hidden || !presentation || (!presentation.replay && !this.finalFrame) || this.host.clientWidth < 1 || this.host.clientHeight < 1) return;
+    const { replay, startedAt } = presentation;
+    const staticFrame = replay === null;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const elapsed = reduced ? replay.durationMs : Math.max(0, Date.now() - startedAt);
-    const frame = Math.min(replay.frameCount - 1, elapsed / replay.stepMs), a = Math.floor(frame), b = Math.min(a + 1, replay.frameCount - 1), mix = frame - a;
+    const duration = replay?.durationMs ?? 0, frameCount = replay?.frameCount ?? 1, stepMs = replay?.stepMs ?? 1;
+    const elapsed = staticFrame ? 0 : reduced ? duration : Math.max(0, Date.now() - startedAt);
+    const frame = staticFrame ? 0 : Math.min(frameCount - 1, elapsed / stepMs), a = Math.floor(frame), b = staticFrame ? 0 : Math.min(a + 1, frameCount - 1), mix = staticFrame ? 0 : frame - a;
     for (let i = 0; i < this.meshes.length; i++) {
-      const first = (a * this.meshes.length + i) * 7, second = (b * this.meshes.length + i) * 7, data = replay.frames, mesh = this.meshes[i];
+      const first = (a * this.meshes.length + i) * 7, second = (b * this.meshes.length + i) * 7, data = staticFrame ? this.finalFrame! : replay!.frames, mesh = this.meshes[i];
       mesh.position.set(data[first] + (data[second] - data[first]) * mix, data[first + 1] + (data[second + 1] - data[first + 1]) * mix, data[first + 2] + (data[second + 2] - data[first + 2]) * mix);
       mesh.quaternion.fromArray(data, first + 3);
       this.nextQuaternion.fromArray(data, second + 3);
       mesh.quaternion.slerp(this.nextQuaternion, mix);
     }
     try {
-      this.fitCamera(elapsed >= replay.durationMs);
+      this.fitCamera(staticFrame || elapsed >= duration);
       this.renderer.render(this.scene, this.camera);
       this.host.dataset.diceCount = String(this.meshes.length);
-      this.host.dataset.rollId = this.presentation.rollId;
-      this.host.dataset.motion = elapsed < replay.durationMs ? "rolling" : "settled";
-      this.positionLabels(elapsed >= replay.durationMs);
-      this.positionCritical(reduced);
+      this.host.dataset.rollId = presentation.rollId;
+      this.host.dataset.motion = !staticFrame && elapsed < duration ? "rolling" : "settled";
+      this.positionLabels(staticFrame || elapsed >= duration);
+      if (staticFrame) this.critical?.clear(); else this.positionCritical(reduced);
     } catch { this.onError(); return; }
-    if (elapsed < replay.durationMs) this.frame = requestAnimationFrame(this.draw);
+    if (!staticFrame && elapsed < duration) this.frame = requestAnimationFrame(this.draw);
   };
 
   private positionLabels(settled: boolean): void {
@@ -196,7 +207,7 @@ export class DiceOverlayRenderer {
     this.critical.present(value, this.screenBounds(mesh), reduced);
   }
 
-  private clearMeshes(): void { for (const mesh of this.meshes) { this.scene.remove(mesh); mesh.material.forEach(mat => mat.dispose()); } this.meshes = []; this.labels.forEach(label => label.remove()); this.labels = []; this.fitKey = ""; this.rollingBounds = null; this.settledBounds = null; }
+  private clearMeshes(): void { for (const mesh of this.meshes) { this.scene.remove(mesh); mesh.material.forEach(mat => mat.dispose()); } this.meshes = []; this.labels.forEach(label => label.remove()); this.labels = []; this.fitKey = ""; this.rollingBounds = null; this.settledBounds = null; this.finalFrame = null; }
   private clearTextures(): void { for (const entry of Object.values(this.factory.materials_cache)) { entry.composite.dispose(); entry.bump?.dispose(); } this.factory.materials_cache = {}; }
   dispose(): void {
     this.disposed = true; cancelAnimationFrame(this.frame); this.observer.disconnect();

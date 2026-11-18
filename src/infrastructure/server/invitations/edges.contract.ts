@@ -53,6 +53,7 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Bordes009 ${kind}`
     expect(guest.guest.systemRef).toEqual(GENERIC_SYSTEM); expect(newer.systemRef).toEqual(next);
     expect((await s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.links.resolve(s.a1.id))).hash).toBe(before.hash);
     await expect(s.identity.authorized(s.aCookie, "dm", (_, tx) => tx.games.create(s.a.id, "nuevo prohibido", GENERIC_SYSTEM))).rejects.toMatchObject({ code: "DISABLED" });
+    await s.service.end(s.aCookie, s.a1.id, context(old), 1, randomUUID());
     await s.identity.authorized(s.aCookie, "dm", (_, tx) => ownedGames(s.a.id, tx).delete(s.a1.id, 1));
     await expect(s.service.guests.authorized(s.a1.id, guest.token!, async g => g)).rejects.toMatchObject({ code: "GUEST_UNAUTHORIZED" });
   });

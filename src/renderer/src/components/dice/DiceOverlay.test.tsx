@@ -46,6 +46,13 @@ describe("persistent dice results", () => {
     expect(render.present).toHaveBeenLastCalledWith(null);
     expect(host.querySelector(".dice-overlay-summary")).toBeNull();
   });
+  it("presents a compact final frame without scheduling a replay", async () => {
+    envelope = { ...envelope, presentation: { ...envelope.presentation!, replay: null } };
+    const frame = [0, 0, 0, 0, 0, 0, 1];
+    await act(async () => root.render(<DiceOverlay envelope={envelope} finalFrame={frame} reportRenderStatus={false} />));
+    expect(render.present).toHaveBeenCalledWith(envelope.presentation, frame);
+    expect(host.querySelector(".dice-overlay.is-visible")).not.toBeNull();
+  });
   it("resizes settled dice without a new presentation or restarting the celebration clock", async () => {
     await act(async () => root.render(<DiceOverlay envelope={envelope} size={1} />));
     await act(async () => vi.advanceTimersByTime(1010));

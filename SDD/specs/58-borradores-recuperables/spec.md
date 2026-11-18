@@ -173,3 +173,20 @@ Se detectaron 20 ramas remotas, de las cuales 7 estaban confirmadas, con una gen
 - Guardar escena mantiene su documento canónico separado; el aviso local solo corresponde a cambios sin confirmar. No hay selector de versiones anteriores.
 - Una confirmación incierta de una edición antigua no puede reconocerse con la cabeza de otra edición: se exige el recibo exacto o coincidencia de secuencia y hash.
 - Aceptación: 23 ciclos guardar/salir/reabrir de la misma escena dejan una escena guardada, un respaldo remoto con una versión y un índice local. Una escritura CAS atrasada se rechaza sin modificar el último estado.
+
+## FIX-01 — recuperación ante conflicto de apertura (2026-11-15)
+
+El usuario informa HTTP 409 en `POST /dm/games/:id/opening/heartbeat` al recuperar un borrador. La revisión del cliente identifica que el error de apertura se presenta como conflicto del documento y que recuperar vuelve a contactar la misma apertura sin resolver su vigencia. La condición concreta del servidor puede ser caducidad, cierre o cambio de generación; el mensaje `METHOD_NOT_ALLOWED` observado por separado corresponde a un método distinto y no acredita el cuerpo del POST fallido.
+
+La corrección distingue el conflicto de la escena del conflicto de apertura, conserva el mensaje y mantiene protegido el borrador. Una restauración de contenido no renueva por sí misma la autoridad de la partida. Ante conflicto de apertura, se consulta su estado vigente y se ofrece una acción explícita compatible: continuar una apertura válida o iniciar una nueva cuando corresponda. Crear una nueva apertura comunica el cambio de invitación antes de ejecutar; nunca publica la escena automáticamente ni revive un lease vencido. Un error de lectura no autoriza iniciar a ciegas.
+
+Se conserva el documento antes de cualquier transición que desmonte el editor. Si no puede garantizarse esa conservación, se mantiene el contenido en memoria y se informa el fallo, con exportación disponible. Las respuestas tardías de una cuenta, escena o generación anterior no reactivan el editor. El conflicto canónico sigue usando la recuperación como copia existente, sin alterar su revisión ni sobrescribir la escena original.
+
+| Criterio | Resultado verificable |
+| --- | --- |
+| FIX-01-CA-01 | Con borradores habilitados, el 409 de heartbeat muestra su causa y no repite indefinidamente la apertura rechazada al recuperar o cargar una escena. |
+| FIX-01-CA-02 | Continuar/iniciar se basa en una consulta vigente y una acción explícita; conserva el contenido, valida autoridad y no publica ni sustituye silenciosamente otra apertura. |
+| FIX-01-CA-03 | Caducidad, cierre, cambio de generación, error de lectura, fallo de respaldo y revocación durante la transición tienen salida segura; conflicto de escena y reintentos de red mantienen su comportamiento. |
+| FIX-01-CA-04 | Pruebas dirigidas y comprobación en navegador/Electron servicio, versión patch y evidencia documentada; sin cambios en persistencia ni migraciones de datos reales. |
+
+Estado: implementada y validada localmente en **3.31.2**, rama `fix/recuperacion-borrador-409`, sin integración Git. [Evidencia FIX-01](validacion-fix-01.md): 70 pruebas dirigidas, lint/typecheck, builds y recuperación real en navegador Chromium y Electron servicio con datos sintéticos. La revisión adicional de Chrome a 390 px quedó sin completar por bloqueo del Mac; no se certifica ese recorrido. No sustituye la evidencia histórica de esta spec.

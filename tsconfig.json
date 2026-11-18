@@ -20,6 +20,8 @@
   "include": [
     "electron.vite.config.ts",
     "eslint.config.js",
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx"
   ]

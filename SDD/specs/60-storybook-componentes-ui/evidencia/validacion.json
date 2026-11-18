@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-14",
+  "version": "3.29.0",
+  "branch": "feature/spec-60-storybook-componentes-ui",
+  "baseHead": "6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598",
+  "integration": "local-uncommitted",
+  "commands": [
+    {
+      "command": "pnpm typecheck",
+      "exitCode": 0,
+      "log": "typecheck-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "command": "pnpm lint",
+      "exitCode": 0,
+      "log": "lint-final.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1"
+    },
+    {
+      "command": "pnpm build-storybook",
+      "exitCode": 0,
+      "log": "build-storybook-final.log",
+      "sha256": "7c60a952b47b82518542dd595318ecbecc6d38d08e445eface599bfd95e34dc5"
+    },
+    {
+      "command": "pnpm build:web",
+      "exitCode": 0,
+      "log": "build-web.log",
+      "sha256": "a3ee7625fb1fd959582235be74e32af70bb6771ff9519a37c8cd442b80145e8e"
+    },
+    {
+      "command": "pnpm build",
+      "exitCode": 0,
+      "log": "build-electron.log",
+      "sha256": "d04f269c43b3db59f8678e3c105ab0a44646fb83017fefc4c3f7298692750c47"
+    },
+    {
+      "command": "pnpm test [5 archivos dirigidos] --maxWorkers 4 --exclude .local/**",
+      "exitCode": 0,
+      "log": "regression-scoped.log",
+      "sha256": "a8902fc07a4a0d93f6ba8f51de9edc7b0cf4661dc863e18acf3f034e638e7486"
+    }
+  ],
+  "tests": {
+    "files": 5,
+    "passed": 64
+  },
+  "stories": {
+    "mounted": 54,
+    "playPassed": 6,
+    "autodocs": 29
+  },
+  "sourceHashes": {
+    ".storybook/manager.ts": "476a0fac592578e0ac2bbb008a3b8dbd02da85a5934da02992a538083116c68f",
+    ".storybook/main.ts": "c04dbf5eda72d013e6245b10f4f87730440c1aabcc908173efca1e93dfa16c61",
+    ".storybook/preview.tsx": "14c50458d57e0605daf8c7f4e6ff3454cb26cab9e25dc65429498560bc671909",
+    ".storybook/preview.css": "b85a53afc94ea8757785143a24b702454d414984b2d2717e641659ae353714dd",
+    "src/stories/introduction/Introduction.stories.tsx": "eb0e18422f131ebc37267f0eb7464c0866a0bd3c7eb5fcc768d3aca78ce92411",
+    "src/stories/controls/SidebarAccordion.stories.tsx": "cb46dcdfcd39d3dd1032ad288cc3c951c5a9d5675cfe4e229ae4b0aac2b15a57",
+    "src/stories/controls/Button.stories.tsx": "e34cc0f05be36c11c0e490fa23007e88510d5fd33d0ccb1724a50d54efe25834",
+    "src/stories/controls/TextInput.stories.tsx": "d12e65c2b27b45e2383bd1b9f0526d742cfc43590a1726902e649a44d18e5202",
+    "src/stories/controls/Checkbox.stories.tsx": "d3ac8ed3151991205e0c93e7bb3001703fe41c5e4c1da5afd91c4718f00c0d8c",
+    "src/stories/controls/NumberInput.stories.tsx": "d707646d5de11f4933b2e9b381e49c91422b91bbc60aed8e3db462e9808c17d3",
+    "src/stories/controls/PasswordInput.stories.tsx": "8936532b4ae47285ff0635c73b9adaa6255a12df365d27c927c491978b0916c2",
+    "src/stories/controls/ColorInput.stories.tsx": "57b0201b29ccfc75fa5d50f527322c676de74b0427bca7f8802530d9c4e3fde6",
+    "src/stories/controls/Select.stories.tsx": "501a4f055b0ba32663a5b1123fa41ebcadf8c9b6373abf557eab578a3eefbfda",
+    "src/stories/controls/IconButton.stories.tsx": "2def097d732616981e8c537e88c6dfb3db490a7c80411433baa44f8c472b76d1",
+    "src/stories/controls/Textarea.stories.tsx": "d39ad3bc85ea583d78eb772c705f41fa4b0b9b2dadcab895e6fb66d15b57b6b2",
+    "src/stories/controls/Radio.stories.tsx": "ad8a3335f05b772823987bfb748869b7a89ab8b83f0b062fa7d7ad8ea9f873f3",
+    "src/stories/controls/SharedSwitch.stories.tsx": "5b9c197f486149ce65b5fb773070781324adb11cb5aa5d68aaae9c49114ec090",
+    "src/stories/controls/Slider.stories.tsx": "1e99de9a56a16211691235187f7242308d6feb5e8ae7f2418da2d0624642e875",
+    "src/stories/fixtures/composition-fixtures.ts": "0f3772519e5a953ab4e681538eb38e5ea3db0ed4245632b6fc20ba6f91992365",
+    "src/stories/compositions/workspace/fixtures.ts": "b3d482cf027ce4c0e9730fed99656f0af6385a71966d348ca01fccc664ad7251",
+    "src/stories/compositions/workspace/WorkspaceHeader.stories.tsx": "e7bc0789c88e395516dc78a9f377105f79abc2bb976d05b98d300bf8329fdbf3",
+    "src/stories/compositions/workspace/LightningProperties.stories.tsx": "42f039625060bb69f2f77dcb78cd0b57a3f078781339ba6fc6e4d71b30619483",
+    "src/stories/compositions/workspace/SceneCounterBar.stories.tsx": "5ad725850ffeae12525a58fbd4353f2e10977c7288bf4314fb690ac9bef28640",
+    "src/stories/compositions/workspace/DiceResultSummary.stories.tsx": "63f767e59b8f8b4828729baccef333da5bf3b528c86077c00ff85c6fc5acc318",
+    "src/stories/compositions/workspace/FireProperties.stories.tsx": "eae0eba0addcc7b48a48aa0c5322f04743dbf553b9676f2c1d9a4436e586a349",
+    "src/stories/compositions/workspace/WorkspaceTools.stories.tsx": "6d43019c41055b2b65af0596d943236d4b6c008265a8aaecc0e0fd2d2935cfac",
+    "src/stories/compositions/content/SceneObjectsTree.stories.tsx": "7f7e7393a9dfffa0f9b3ef6d2d7afc3bd76303e3dbea0a3e842655157b552cdf",
+    "src/stories/compositions/content/MonsterTemplateFields.stories.tsx": "4fa726ce28877c17f283925ee42cef7ef8ad77b135df18a4b7981d2a099de45d",
+    "src/stories/compositions/content/RichTextPreview.stories.tsx": "056bfb6988d70510bdf0ba11c6200da04013d82284d5bf2b2ff1855981504eb4",
+    "src/stories/compositions/content/CampaignPanel.stories.tsx": "706b462279944f3fe20190015cf7fc3dfdf79931c9908f10c9a69b228543f59d",
+    "src/stories/compositions/content/SceneMapsSection.stories.tsx": "31c44beb4b1888b3b42feeb45615548591beb32b8b4631fb4faaa94be400a72e",
+    "src/stories/compositions/content/MapAnnotationsTree.stories.tsx": "303e0e90fb7ca6c0c7deb8fa75c73f595b38e702c67188a5356b1bfb7bc95a0e",
+    "src/stories/compositions/navigation-feedback/ServiceDialog.stories.tsx": "fd87151a7c728aca1d9600e32b924e4d7ef9b74c5a6621c052a7ed2d98bd7e77",
+    "src/stories/compositions/navigation-feedback/HeaderDropdown.stories.tsx": "f689b71513ff1f911a3b4b7207c37be012b89be61e42e23260445e4d20550ce0",
+    "src/stories/compositions/navigation-feedback/FeedbackAlert.stories.tsx": "4800c375e976c0a8f3e7d4bc88c0d65ab278c62b10f1733c72c647c74478c43f",
+    "src/stories/compositions/navigation-feedback/RightSidebarTabs.stories.tsx": "fcea4bb4c00c844f49e5e752429b2499418786d6dacaad57cb5849f6b0640fdb",
+    "src/renderer/src/components/ui/Controls.tsx": "1e66c0077327c204eefa09ff382c0d5f55807408e4cdd4db78c33c46c4b86b4b"
+  }
+}

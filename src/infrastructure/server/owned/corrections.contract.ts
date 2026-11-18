@@ -88,9 +88,13 @@ for (const kind of ["sqlite", "postgres"] as const) describe(`Correcciones ronda
     const started = new Promise<void>(resolve => { entered = resolve; }), resume = new Promise<void>(resolve => { release = resolve; });
     const publishing = identity.authorized(auth.aCookie, "dm", async (_, tx) => { await registry.publish(tx, context, null); tx.effects.afterCommit(() => { order.push("publicado"); }, () => {}); entered(); await resume; });
     await started;
-    const archiving = other.authorized(auth.aCookie, "dm", async (_, tx) => { await ownedGames(auth.a.id, tx).update(context.gameId, { state: "archived" }, 1); order.push("archivado"); expect(registry.state(context)?.snapshot).toBeNull(); });
-    release(); await Promise.all([publishing, archiving]);
-    expect(order).toEqual(["publicado", "archivado"]);
+    release(); await publishing;
+    const opening = await other.authorized(auth.aCookie, "dm", (_, tx) => tx.openings.current(context.gameId));
+    expect(opening?.state).toBe("open");
+    await other.authorized(auth.aCookie, "dm", (_, tx) => tx.openings.close(context.gameId, opening!.id, opening!.generation, opening!.revision));
+    order.push("cerrado");
+    await other.authorized(auth.aCookie, "dm", async (_, tx) => { await ownedGames(auth.a.id, tx).update(context.gameId, { state: "archived" }, 1); order.push("archivado"); expect(registry.state(context)?.snapshot).toBeNull(); });
+    expect(order).toEqual(["publicado", "cerrado", "archivado"]);
     await expect(identity.authorized(auth.aCookie, "dm", (_, tx) => registry.publish(tx, context, snapshot()))).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(registry.state(context)?.snapshot).toBeNull(); registry.clear();
   });

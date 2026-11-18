@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build"
+  short_description: "Planifica y construye una spec con este hilo como PM"
+  default_prompt: "Usa $build con SDD [número o ruta] para aceptar su alcance, preparar el plan e implementarlo con este hilo como PM."

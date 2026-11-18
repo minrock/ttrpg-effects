@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "spec": "59-campanas-arcos-escenas",
+  "functionalRevision": "0.4",
+  "date": "2026-11-14",
+  "recordedAtUtc": "2026-11-14T16:26:46.479796+00:00",
+  "version": "3.28.2",
+  "status": "implemented-and-validated-locally-not-integrated",
+  "baseCommit": "6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598",
+  "branch": "feature/spec-59-campanas-arcos-escenas",
+  "historicalEvidence": [
+    "evidencia.json (0.2; not rerun)",
+    "evidencia-ui-0.3.json (0.3; not rerun)"
+  ],
+  "acceptanceCriteria": {
+    "CA-16": "verified: one column below 960px, exactly two at/above 960px even with a single card; campaigns/arcs/scenes without overflow",
+    "CA-17": "verified: centered icon/text actions with 8px gap, icon-only actions centered and named",
+    "CA-18": "verified: shared switch geometry and palette in campaign/editor, thumb contained, keyboard/focus and confirmation/cancel retained"
+  },
+  "gates": [
+    {
+      "command": "pnpm exec vitest run src/web/campaigns/CampaignPanel.test.tsx src/web/campaigns/CampaignCatalog.test.tsx src/renderer/src/components/annotations/MapAnnotationsSection.test.tsx src/renderer/src/App.workspace.test.tsx --exclude '.local/**' --reporter=dot",
+      "passed": 47,
+      "failed": 0,
+      "files": 4,
+      "log": ".local/validation/ui59-04/logs/ui59-04-targeted.log",
+      "note": "Behavior tests precede final CSS-only cascade/palette changes; final builds and UI QA include those changes."
+    },
+    {
+      "command": "pnpm lint",
+      "result": "passed",
+      "log": ".local/validation/ui59-04/logs/ui59-04-final-lint.log"
+    },
+    {
+      "command": "pnpm build:web (includes pnpm typecheck)",
+      "result": "passed",
+      "log": ".local/validation/ui59-04/logs/ui59-04-palette-build-web.log"
+    },
+    {
+      "command": "pnpm build (includes pnpm typecheck)",
+      "result": "passed",
+      "log": ".local/validation/ui59-04/logs/ui59-04-palette-build-electron.log"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "manual": {
+    "viewports": [
+      390,
+      959,
+      960,
+      1440
+    ],
+    "gridMeasurements": ".local/validation/ui59-04/grid-measurements.json",
+    "buttonMeasurements": ".local/validation/ui59-04/button-measurements.json",
+    "switchMeasurements": ".local/validation/ui59-04/switch-measurements.json",
+    "switchKeyboard": "Tab/Shift+Tab focus outline 2px; Space opens confirmation; cancel keeps active/inactive state",
+    "zoom": "Chrome real 200%, catalog and switch; reset to normal and test tab closed",
+    "electronService": "Final campaign form switch against synthetic 8877",
+    "electronStandalone": "3.28.2 startup and Adjust grid toggle on/off, returned off",
+    "review": "TL found cascade collision, builder corrected exclusions; final review without blockers. Shared palette corrected after visual comparison."
+  },
+  "environment": {
+    "syntheticApiPort": 8877,
+    "backendMetadata": "3.27.2 reused validated bundle/schema10, no backend changes",
+    "webElectronVersion": "3.28.2",
+    "isolatedRoot": "/private/tmp/ttrpg-sdd59-validation-avgyi1z3",
+    "operational8787": "untouched",
+    "cleanup": "Owned Electron processes closed, synthetic API stopped, temporary tabs closed, viewport and zoom reset"
+  },
+  "limitations": [
+    "No full suite/backend rerun for this visual delta.",
+    "Existing React act and bundler warnings remain; gates passed.",
+    "No commit, push, merge, deployment or DMG."
+  ],
+  "sources": [
+    {
+      "path": "src/web/service.css",
+      "sha256": "b1371dd4712677b2cb8d2eaf5d723a23e4e03bc32b7c346d1f6a7012dd50716e",
+      "bytes": 19002
+    },
+    {
+      "path": "src/web/campaigns/CampaignPanel.tsx",
+      "sha256": "b5f474c0708648f2d915393e71f14753c1b9fb881a67a5fade91455c295c3493",
+      "bytes": 33628
+    },
+    {
+      "path": "src/web/campaigns/CampaignPanel.test.tsx",
+      "sha256": "2a587d69fc3e03e3fb8bacb41c15d5a010a0ea1f6ed5858fa7f1a1395d68a40d",
+      "bytes": 10090
+    },
+    {
+      "path": "src/renderer/src/components/SharedSwitch.tsx",
+      "sha256": "bc3626cb96b5e062d04dfc2b0f951585e44d625eef2d5643c213bc129fab7143",
+      "bytes": 620
+    },
+    {
+      "path": "src/renderer/src/components/SharedSwitch.css",
+      "sha256": "7a427a1393959651136a67fc02a66a2ce11a059fea2f9cacc105f9fea45223f6",
+      "bytes": 993
+    },
+    {
+      "path": "src/renderer/src/App.tsx",
+      "sha256": "a2b42335d414e59a1a0ff7d70626dd0df86c762c0fe83eb47dfaed9b59a328eb",
+      "bytes": 214269
+    },
+    {
+      "path": "src/renderer/src/components/annotations/MapAnnotationsSection.tsx",
+      "sha256": "be73cabcc25f13243f0f0d16092262ea4a99d0646f592427210cac1f7166ce6d",
+      "bytes": 602
+    },
+    {
+      "path": "src/renderer/src/styles.css",
+      "sha256": "1e8fdf823dd1719106dce6aea7f2eb16eb33545fec8390ee0dfa31deabd563a8",
+      "bytes": 114310
+    },
+    {
+      "path": "src/renderer/src/components/workspace/workspace.css",
+      "sha256": "4a0be8360d3251b38e06b95c88948a5ee86e3776a13fe382e3633e16e779cfd4",
+      "bytes": 17430
+    },
+    {
+      "path": "package.json",
+      "sha256": "76260ef5ad68daf2255a7e4977da3f1f8a7c4a1b6e69763d6bcd8bf5d5ed12a4",
+      "bytes": 5504
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "9f4a921b166300ab981377dae952f263c3c6191617ab62df838581a10b958c1e",
+      "bytes": 55329
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".local/validation/ui59-04/arc-single-1440.png",
+      "sha256": "498ae9ed7c1c158853d5ae2da1fd55f6f2fab08d60cb96170283d191d0225c06",
+      "bytes": 31277
+    },
+    {
+      "path": ".local/validation/ui59-04/campaign-switch-off-focus.png",
+      "sha256": "73d932829f02defdf02cb7d3cd0f662c0c0890bd29559f887524ede5f38d3094",
+      "bytes": 24629
+    },
+    {
+      "path": ".local/validation/ui59-04/campaign-switch.png",
+      "sha256": "3dd4321130afb4f063068e035fa2a8cc1ce3f6d977a61604ad087be4481aca18",
+      "bytes": 42476
+    },
+    {
+      "path": ".local/validation/ui59-04/campaigns-1440.png",
+      "sha256": "ea09e8bfffff255b1150c5d11175555ada7336ef4db3401825c4c3e088c5993b",
+      "bytes": 54802
+    },
+    {
+      "path": ".local/validation/ui59-04/chrome-campaigns-200.png",
+      "sha256": "7e611fc55b05fc4b5bed0d7bdd5c4fd14d44eb672fe67f1f67624702c2ba55b5",
+      "bytes": 381087
+    },
+    {
+      "path": ".local/validation/ui59-04/chrome-switch-200.png",
+      "sha256": "05dac37066d72f593d7a0d8974e163681c9c6a9bf83c3b4fc0d49f76b317ffcf",
+      "bytes": 371141
+    },
+    {
+      "path": ".local/validation/ui59-04/editor-switch.png",
+      "sha256": "613364b769b6630ae19ff624394d26b53240f2f53ca31807cd472beea17eb558",
+      "bytes": 100539
+    },
+    {
+      "path": ".local/validation/ui59-04/electron-standalone.png",
+      "sha256": "ac3c2a0ab312b1d2f1c9dfa143063080541e9cb30e9504e17939791d21dbc9e2",
+      "bytes": 451099
+    },
+    {
+      "path": ".local/validation/ui59-04/electron-switch.png",
+      "sha256": "a127d72687ed5453e42c76b071485da578aa4a2af01aa326638373a0997d7649",
+      "bytes": 240053
+    },
+    {
+      "path": ".local/validation/ui59-04/scenes-390.png",
+      "sha256": "f15510f688a6b5559e6a13191a0ed3606b58fbaa0907d31e614b46865af5c4ba",
+      "bytes": 5587
+    },
+    {
+      "path": ".local/validation/ui59-04/button-measurements.json",
+      "sha256": "ad7f43b04c54760358d1abdb929dae4b63f3a9738b1c633b16b0c71415a812bd",
+      "bytes": 812
+    },
+    {
+      "path": ".local/validation/ui59-04/grid-measurements.json",
+      "sha256": "1ecd5a3d5bc7dfeb52e83007f6a6272ba3c634efa39195e0eeb85d89799abbb0",
+      "bytes": 6199
+    },
+    {
+      "path": ".local/validation/ui59-04/switch-measurements.json",
+      "sha256": "f43cc6d829801fa75a0c99ce4f88cfe907b019458b17caef5b9b59b24e93425d",
+      "bytes": 2504
+    }
+  ],
+  "logs": [
+    {
+      "path": ".local/validation/ui59-04/logs/ui59-04-targeted.log",
+      "sha256": "3186a7e28661d0f5e881273d1094b21b3db649cd4bd42a10701635b1c715e4a4",
+      "bytes": 25998
+    },
+    {
+      "path": ".local/validation/ui59-04/logs/ui59-04-final-lint.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "bytes": 11
+    },
+    {
+      "path": ".local/validation/ui59-04/logs/ui59-04-palette-build-web.log",
+      "sha256": "c8bc46d3712e1500abea9e72dd91aa92c0a8295bfbc3ff3609e651767b02918e",
+      "bytes": 3595
+    },
+    {
+      "path": ".local/validation/ui59-04/logs/ui59-04-palette-build-electron.log",
+      "sha256": "739330d76732d92bb145cdf1c771b7a4513a268ca4ad7216ef2d0ddfc36e8d70",
+      "bytes": 3561
+    },
+    {
+      "path": ".local/validation/ui59-04/logs/electron-service.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".local/validation/ui59-04/logs/electron-standalone.log",
+      "sha256": "e6109dad8220f0b722f1dc069016eab43a03ee530da46af331cab0c027ce324a",
+      "bytes": 173
+    }
+  ]
+}

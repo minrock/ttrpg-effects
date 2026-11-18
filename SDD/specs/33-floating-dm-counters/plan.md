@@ -249,3 +249,36 @@ Modificar `src/renderer/src/styles.css`:
 - [ ] Smoke manual realizado en Electron, incluyendo multi-mapa y Player View.
 - [ ] Sin accesos directos del renderer a Node.js, Electron internals, filesystem o SQLite.
 - [ ] Sin dependencias nuevas no justificadas.
+
+## Ajuste: retirada del acceso flotante de gestión — 2026-11-17
+
+**Fuente:** delta fechado de [spec](spec.md#retirada-del-acceso-flotante-de-gestión--2026-11-17), FIX01-CA01–03. **Estado:** plan completo para revisión y despacho del PM, condicionado al permiso de rama. No sustituye el plan ni la evidencia histórica de la funcionalidad.
+
+Base inspeccionada: `fix/selector-plantillas-autocompletado`, HEAD `6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598`, producto 3.32.1. `App.tsx` y `styles.css` ya contienen cambios locales; la historia `SceneCounterBar.stories.tsx` es local no rastreada. Conservarlos. La rama de trabajo propuesta por PM es `fix/retirar-control-flotante-contadores`; este documento no concede permiso Git.
+
+### Decisión y recorrido preservado
+
+La petición del usuario decide retirar el botón duplicado `Settings2` «Administrar contadores de escena». PM confirma que no queda interacción nueva que consultar a UX. El acceso vigente de cabecera `WorkspaceHeader.onCounters` → `App.setIsSceneCounterManagerOpen(true)` → `SceneCounterManagerModal` permanece, tanto en fila amplia como en Herramientas compactas de SDD54. No se retiran los contadores ni sus barras.
+
+Un único cambio frontend compartido cubre navegador, Electron conectado y Electron autónomo: `App.tsx` usa el mismo overlay; `PlayerApp.tsx` lo consume en modo lectura y no necesita cambios. Dominio, snapshot público, guardado, IPC, HTTP, SSE y almacenamiento no cambian. No interviene PixiJS ni se alteran permisos o capacidades.
+
+### Implementación propuesta
+
+Una tarea [FIX-01](tareas.md#fix-01--retirar-el-acceso-flotante-duplicado-de-contadores), con un único frontend builder propietario:
+
+1. En `SceneCountersOverlay.tsx`, retirar import `Settings2`, prop/desestructuración `onManage` y el botón. Mantener el hook antes de retornos condicionales y devolver `null` cuando `counters.length === 0` para ambos roles.
+2. Retirar únicamente el prop `onManage` del consumidor en `App.tsx` y de `SceneCounterBar.stories.tsx`. Conservar callback de cabecera, estado y modal, además de ajuste/publicación de barras.
+3. En `styles.css`, quitar la regla exclusiva `.scene-counters-overlay__manage` y ese selector de los grupos compartidos normal/hover/focus. Mantener las reglas de `.scene-counter-bar__actions button`, coordenadas, opacidad, transiciones, publicación y estilos de jugador.
+4. Registrar patch y changelog al completar, coordinados por PM; si la base sigue siendo 3.32.1, corresponde 3.32.2. No modificar dependencias.
+
+### Validación proporcional y trazabilidad
+
+| Criterio | Verificación prevista | Límite |
+| --- | --- | --- |
+| FIX01-CA01 | Inspección de DOM/render real sin contadores: no botón ni región vacía; historia de barras DM sin acceso de gestión flotante | No requiere prueba nueva que replique JSX |
+| FIX01-CA02 | Cabecera amplia/compacta conserva Contadores y abre gestor; historia GestiónDM ajusta/publica barras; VistaJugador sigue sin botones editables | QA sintética no implica guardar datos reales ni comprobar de nuevo toda sincronización |
+| FIX01-CA03 | `pnpm typecheck`, ESLint de archivos TSX afectados, `git diff --check`; consumidores e historia compilan sin `onManage`; patch/changelog y evidencia del PM | Builds de distribución, migraciones y suites de DB fuera de alcance |
+
+Para regresión de la cabecera puede reutilizarse, sin escribir pruebas nuevas, `pnpm vitest run --exclude '**/.local/**' src/renderer/src/components/workspace/WorkspaceChrome.test.tsx`. La validación visual usa componentes reales en Storybook o instancia ya disponible, con cero y varios contadores, foco y viewport amplio/compacto. Registrar por separado cualquier smoke Electron realmente ejecutado; compartir componente no equivale a certificar plataforma nativa. No arrancar otra API sobre los datos operativos.
+
+No hay tareas paralelas de producto ni cambios de contrato. PM conserva spec/estado/evidencia y despacha al builder una vez preparada la rama; el builder entrega su delta y resultados. El riesgo principal es borrar estilos agrupados de botones de las barras o eliminar por error el acceso único de cabecera, mitigado por limpieza selectiva y revisión visual del recorrido conservado.

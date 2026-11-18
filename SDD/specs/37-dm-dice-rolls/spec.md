@@ -1,5 +1,7 @@
 # Spec 37 - Tiradas 3D abiertas y ocultas del DM
 
+> **Ampliación implementada localmente — SDD 61 / 3.32.0 (2026-11-15):** [Dados de jugadores e historial público](../61-dados-jugadores/spec.md) habilita lanzamientos de invitados en servicio, autoría/cierre, espera manual e historial público con valores, incluidas las tiradas cerradas. El control DM de resultado afecta sólo al resumen sobre el mapa. [Evidencia y límites](../61-dados-jugadores/validacion.md). El contrato histórico de esta spec y el modo autónomo se conservan.
+
 ## Estado
 
 Implementado y aceptado por el usuario el 2026-10-24 para cierre en la version minor 2.8.0. Verificacion de entrega en el plan.

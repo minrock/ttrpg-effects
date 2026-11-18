@@ -1,0 +1,234 @@
+{
+  "date": "2026-11-14",
+  "mechanism": "Storybook Interactions mounted story status through browser UI; only six stories define play assertions",
+  "checks": [
+    {
+      "id": "fundamentos-introducción--catalogo",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-button--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-button--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-checkbox--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-checkbox--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-colorinput--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-colorinput--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-iconbutton--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-iconbutton--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-numberinput--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-numberinput--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-passwordinput--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-passwordinput--invalid",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-radio--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-radio--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-select--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-select--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-sharedswitch--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-sharedswitch--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-slider--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-slider--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-textinput--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-textinput--invalid",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-textarea--default",
+      "status": "Pass"
+    },
+    {
+      "id": "controles-textarea--disabled",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-campaignpanel--normal",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-campaignpanel--empty",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-campaignpanel--failure",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-campaignpanel--readonly",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-mapannotationstree--normal",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-mapannotationstree--empty",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-monstertemplatefields--editable",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-richtextpreview--editable",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-richtextpreview--readonly",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-richtextpreview--empty",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-scenemapssection--normal",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-scenemapssection--empty",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-scenemapssection--replacing-image",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-sceneobjectstree--normal",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-sceneobjectstree--empty",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-feedbackalert--error",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-feedbackalert--exito",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-headerdropdown--interactivo",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-rightsidebartabs--interactiva",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-servicedialog--confirmacion",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-diceresultsummary--resultado",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-diceresultsummary--compacto",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-fireproperties--editables",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-lightningproperties--editables",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-scenecounterbar--gestion-dm",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-scenecounterbar--vista-jugador",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-workspaceheader--acciones",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-workspacetools--interactivas",
+      "status": "Pass"
+    },
+    {
+      "id": "composiciones-sidebaraccordion--default",
+      "status": "Pass"
+    }
+  ],
+  "finalRecheck": {
+    "storyId": "composiciones-mapannotationstree--normal",
+    "result": "PASS",
+    "checks": [
+      "buscar Agua",
+      "seleccionar Agua profunda",
+      "bloquear cambia botón a Desbloquear",
+      "borrado deshabilitado con bloqueo",
+      "desbloquear",
+      "eliminar área actualiza lista y anuncia resultado"
+    ]
+  }
+}

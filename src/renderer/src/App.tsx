@@ -6,7 +6,7 @@ import { matchesPublishedDrawingFrame } from "../../domain/player/shared-drawing
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
 import type { ServiceWorkspace } from "../../web/workspace";
-import { useTtrpgApi } from "./client/ClientProvider";
+import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
 import {
   useCallback,
   useEffect,
@@ -14,6 +14,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type JSX,
   type ReactNode,
   type SetStateAction
@@ -23,12 +24,16 @@ import {
   type ContextMenuPosition
 } from "./context-menu-position";
 import { parseSceneJson } from "../../domain/sessions/scene-schema";
+import { sceneId } from "../../shared/contracts/service-references";
 import { useMapImageReplacement } from "./hooks/useMapImageReplacement";
 import { ReplaceMapImageModal } from "./components/aside/ReplaceMapImageModal";
 import { WorkspaceHeader } from "./components/workspace/WorkspaceHeader";
 import { WorkspaceTools } from "./components/workspace/WorkspaceTools";
+import type { DraftStatus } from "../../application/services/draft-coordinator";
 import { version as appVersion } from "../../../package.json";
-import * as Switch from "@radix-ui/react-switch";
+import { SharedSwitch } from "./components/SharedSwitch";
+import { SidebarAccordion } from "./components/SidebarAccordion";
+import { Select, TextInput } from "./components/ui/Controls";
 import {
   ArrowDown,
   ArrowLeft,
@@ -258,6 +263,9 @@ import { SceneLinkModal } from "./components/annotations/SceneLinkModal";
 import { useDiceSession } from "./hooks/useDiceSession";
 import { DiceOverlay } from "./components/dice/DiceOverlay";
 import { DicePanel } from "./components/dice/DicePanel";
+import { ServiceDicePanel } from "./components/dice/ServiceDicePanel";
+import { DicePublicStatus } from "./components/dice/DicePublicStatus";
+import { useServiceDiceSession } from "./hooks/useServiceDiceSession";
 import { RightSidebarTabs } from "./components/dice/RightSidebarTabs";
 import {
   renameSceneLinkMarker,
@@ -289,8 +297,13 @@ interface NewTokenDraftState {
 
 const SESSION_AUTOSAVE_DELAY_MS = 1000;
 const PLAYER_SCENE_PUBLISH_DELAY_MS = 250;
+const emptyDraftStatus: DraftStatus = { local: "Sin cambios pendientes", remote: "", confirmed: "", error: "", enabled: false, available: null };
+const subscribeToNothing = (): (() => void) => () => {};
+const getEmptyDraftStatus = (): DraftStatus => emptyDraftStatus;
 
 export function App({ service, tablePanel }: { readonly service?: ServiceWorkspace; readonly tablePanel?: ReactNode } = {}): JSX.Element {
+  const drafts = service?.browser.drafts;
+  const draftStatus = useSyncExternalStore(drafts?.subscribe ?? subscribeToNothing, drafts?.getStatus ?? getEmptyDraftStatus, getEmptyDraftStatus);
   const shared = useSharedAnnotations();
   const [serviceFocusReady, setServiceFocusReady] = useState(0);
   const [servicePublished, setServicePublished] = useState(false);
@@ -340,6 +353,8 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const [mapImageUrl, setMapImageUrl] = useState<string | null>(null);
   const [tokenImageUrls, setTokenImageUrls] = useState<Readonly<Record<string, string>>>({});
   const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
+  const currentFilePathRef = useRef<string | null>(currentFilePath);
+  currentFilePathRef.current = currentFilePath;
   const [feedback, setFeedback] = useState("Escena default en memoria");
   const [warnings, setWarnings] = useState<readonly SceneWarning[]>([]);
   const [needsResave, setNeedsResave] = useState(false);
@@ -359,14 +374,45 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     useState<ArcanePointerCreatureSize>("medium");
   const [arcanePointerResetKey, setArcanePointerResetKey] = useState(0);
   const [diceSessionId] = useState(() => crypto.randomUUID());
+  const activeDiceMap = scene.maps.find(map => map.id === scene.activeMapId);
   const diceContext = useMemo(() => ({
-    token: `${diceSessionId}:${arcanePointerResetKey}:${scene.activeMapId ?? "empty"}`,
-    sceneId: diceSessionId,
+    token: `${diceSessionId}:${scene.id}:${arcanePointerResetKey}:${scene.activeMapId ?? "empty"}`,
+    sceneId: scene.id,
     mapId: scene.activeMapId ?? "",
     sceneName: currentFilePath ? getFileBaseName(currentFilePath).slice(0, 200) : "Escena sin guardar",
-    mapName: (scene.maps.find(map => map.id === scene.activeMapId)?.name ?? "Sin mapa").slice(0, 200)
-  }), [diceSessionId, arcanePointerResetKey, scene.activeMapId, scene.maps, currentFilePath]);
+    mapName: (activeDiceMap?.name ?? "Sin mapa").slice(0, 200)
+  }), [diceSessionId, scene.id, arcanePointerResetKey, scene.activeMapId, activeDiceMap?.name, currentFilePath]);
   const diceSession = useDiceSession(diceContext);
+  const client = useTtrpgClient();
+  const serviceDice = useServiceDiceSession();
+  const preparationSelection = useMemo(() => {
+    const selection = service?.campaignSelection;
+    if (!selection || !currentFilePath) return undefined;
+    try { return { ...selection, sceneId: sceneId(currentFilePath) }; }
+    catch { return undefined; }
+  }, [currentFilePath, service?.campaignSelection]);
+  const preparationUnavailableMessage = service?.campaignSelection && !preparationSelection ? "Guarda o importa la escena antes de usar una ficha preparada." : undefined;
+  const usesServiceDiceTransport = client?.assetReferences === "service";
+  const hasServiceDice = usesServiceDiceTransport && serviceDice.view.supported;
+  const serviceAuthor = (author: { readonly kind: "dm" } | { readonly kind: "player"; readonly publicId: string; readonly alias: string; readonly discriminator: number }) => ({ id: author.kind === "dm" ? "dm" : author.publicId, label: author.kind === "dm" ? "DM" : `${author.alias} · ${author.discriminator}`, kind: author.kind });
+  const privateServiceState = serviceDice.view.state?.audience === "dm" ? serviceDice.view.state.private : null;
+  const panelPresentation = serviceDice.role === "dm" && serviceDice.draft.visibility === "hidden" ? serviceDice.privatePresentation : serviceDice.publicPresentation;
+  const panelContextReady = serviceDice.view.connected && (serviceDice.role === "dm" && serviceDice.draft.visibility === "hidden" ? privateServiceState?.context !== null : serviceDice.view.state?.public.publishedContext !== null);
+  const presentedPublicId = serviceDice.publicPresentation?.rollId;
+  const presentedPrivateId = serviceDice.privatePresentation?.rollId;
+  const serviceDicePanel = hasServiceDice ? <ServiceDicePanel role={serviceDice.role} capabilities={{ chooseVisibility: serviceDice.role === "dm", showMapResult: serviceDice.role === "dm", clearHistory: serviceDice.role === "dm", closeAny: serviceDice.closeAny }} draft={serviceDice.draft} history={serviceDice.history.map(entry => ({ id: entry.id, author: serviceAuthor(entry.author), visibility: entry.visibility, createdAt: entry.createdAt, status: entry.status, result: entry.result, isPresented: entry.id === (entry.visibility === "public" ? presentedPublicId : presentedPrivateId) }))} historyOffset={serviceDice.historyPage?.offset} historyTotal={serviceDice.historyPage?.total} historyLimit={serviceDice.historyPage?.limit} onHistoryPageChange={offset => { void serviceDice.loadHistory(offset); }} occupancy={serviceDice.occupancy ? { ...serviceDice.occupancy, author: serviceAuthor(serviceDice.occupancy.author) } : null} presentation={panelPresentation ? { ...panelPresentation, author: serviceAuthor(panelPresentation.author), visibility: panelPresentation === serviceDice.privatePresentation ? "hidden" : "public" } : null} selfAuthorId={serviceDice.selfAuthorId} ready={panelContextReady} preparing={serviceDice.preparing} uncertain={serviceDice.uncertain} onRetry={() => { void serviceDice.retry(); }} error={serviceDice.error} mapResultVisible={serviceDice.mapResultVisible} pendingDismissId={serviceDice.pendingDismissId} dismissError={serviceDice.dismissError} soundEnabled={serviceDice.soundEnabled} onSoundEnabledChange={serviceDice.setSoundEnabled} size={serviceDice.size} onSizeChange={serviceDice.setSize} onDraftChange={serviceDice.setDraft} onRoll={mode => { void serviceDice.run(mode); }} onDismiss={id => { void serviceDice.dismiss(id); }} onClearHistory={() => { void serviceDice.clearHistory(); }} onMapResultVisibleChange={visible => { void serviceDice.setMapResultVisible(visible); }} /> : null;
+  const servicePrivateOverlay = hasServiceDice && serviceDice.privatePresentation?.context.token === diceContext.token && serviceDice.privatePresentation.context.sceneId === scene.id && serviceDice.privatePresentation.context.mapId === scene.activeMapId;
+  const servicePublicOverlay = hasServiceDice && !servicePrivateOverlay && serviceDice.publicPresentation !== null && serviceDice.view.state?.public.publishedContext?.token === serviceDice.publicPresentation.context.token && serviceDice.publicPresentation.context.sceneId === scene.id && serviceDice.publicPresentation.context.mapId === scene.activeMapId;
+  const serviceOverlayEnvelope = servicePrivateOverlay ? serviceDice.privateEnvelope : servicePublicOverlay ? serviceDice.publicEnvelope : { revision: -1, presentation: null };
+  const serviceOverlayFinalFrame = servicePrivateOverlay ? serviceDice.privateFinalFrame : servicePublicOverlay ? serviceDice.publicFinalFrame : null;
+  const privateContextKey = `${diceContext.token}:${diceContext.sceneId}:${diceContext.mapId}:${diceContext.sceneName}:${diceContext.mapName}`;
+  const lastPrivateContext = useRef<{ readonly key: string | null; readonly sender: unknown }>({ key: null, sender: null });
+  useEffect(() => {
+    if (!hasServiceDice || serviceDice.role !== "dm") { lastPrivateContext.current = { key: null, sender: null }; return; }
+    if (lastPrivateContext.current.key === privateContextKey && lastPrivateContext.current.sender === serviceDice.setPrivateContext) return;
+    lastPrivateContext.current = { key: privateContextKey, sender: serviceDice.setPrivateContext };
+    void serviceDice.setPrivateContext(diceContext);
+  }, [privateContextKey, hasServiceDice, serviceDice.role, serviceDice.setPrivateContext, diceContext]);
   const [informationAreaHighlightResetKey, setInformationAreaHighlightResetKey] = useState(0);
   const [showDmFogOverlay, setShowDmFogOverlay] = useState(false);
   const [showPlayerZoomIndicator, setShowPlayerZoomIndicator] = useState(false);
@@ -535,13 +581,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
   const previousDraftScene = useRef({scene,sceneAside,currentFilePath});
   useEffect(() => {
     const previous=previousDraftScene.current;previousDraftScene.current={scene,sceneAside,currentFilePath};
+    if(service?.sceneLoading)return;
     if(draftBaselineRef.current?.scene===scene&&draftBaselineRef.current.sceneAside===sceneAside)return;
     if(!service?.browser.drafts || previous.scene===scene&&previous.sceneAside===sceneAside&&previous.currentFilePath===currentFilePath)return;
     const drafts=service.browser.drafts;
     drafts.update(()=>draftSnapshotRef.current!());
     // Crear/eliminar una figura se respalda al terminar el cambio, sin esperar al cierre.
     if(previous.scene.shapes.length!==scene.shapes.length)void drafts.flushLocal().catch(()=>{});
-  }, [scene,sceneAside,currentFilePath,service?.browser]);
+  }, [scene,sceneAside,currentFilePath,service?.browser,service?.sceneLoading]);
   useEffect(()=>service?.browser.drafts?.onRestore(async (checkpoint,options)=>{
     const restored=await service.browser.restoreDraft(checkpoint);
     await runSceneOperation("cargada",async()=>restored,{recovery:!options?.confirmed});
@@ -2108,36 +2155,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
     }
   }
 
-  async function handleImportSceneAsMap(): Promise<void> {
-    if (scenesApi === undefined) {
-      setFeedback("La API de preload no esta disponible.");
-      return;
-    }
-
-    setIsBusy(true);
-    setWarnings([]);
-
-    try {
-      const previousFilePath = currentFilePath;
-      const result = await scenesApi.importSceneAsMap(createSceneSavePayload(sceneRef.current, sceneAside));
-      if (!result.ok) {
-        setFeedback(result.error);
-        return;
-      }
-
-      setScene(result.scene);
-      setSceneAside(result.scene.sceneAside);
-      setMapImageUrl(result.mapImageUrl ?? null);
-      setTokenImageUrls(result.tokenImageUrls ?? {});
-      setCurrentFilePath(previousFilePath);
-      setInteraction((current) => selectElement(setActiveTool(current, "select"), null));
-      syncSceneEntityCounters(result.scene);
-      setFeedback("Mapa importado a la escena");
-    } finally {
-      setIsBusy(false);
-    }
-  }
-
   function handleSelectSceneMap(mapId: string): void {
     try {
       const targetMap = sceneRef.current.maps.find((map) => map.id === mapId);
@@ -3435,6 +3452,17 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
         </div>
       )}
       <aside className="scene-status" aria-label="Estado de escena">
+        {drafts&&<details className={`scene-status__draft${draftStatus.error?" is-error":""}`}>
+          <summary aria-label={`Estado del guardado. En este dispositivo: ${draftStatus.local}. Servidor: ${draftStatus.remote}. ${draftStatus.confirmed}${draftStatus.error?`. Error: ${draftStatus.error}`:""}`}>
+            {draftStatus.error?"Respaldo requiere atención":draftStatus.local==="Sin cambios pendientes"?"Respaldo local":draftStatus.local}
+          </summary>
+          <div className="scene-status__draft-details">
+            <span>En este dispositivo: {draftStatus.local}</span>
+            <span>Servidor: {draftStatus.remote}</span>
+            <span>{draftStatus.confirmed}</span>
+            {draftStatus.error&&<strong role="alert">{draftStatus.error}</strong>}
+          </div>
+        </details>}
         <span className="scene-status__primary">{feedback}</span>
         {mapReplacement.busyMapId !== null && mapReplacement.draft === null && <span role="status">Preparando imagen...</span>}
         {mapReplacement.playerError !== null && <span role="alert">{mapReplacement.playerError} <button type="button" onClick={() => void mapReplacement.retryPlayer()}>Reintentar imagen del jugador</button></span>}
@@ -3491,7 +3519,6 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           onReorderMaps={handleReorderSceneMaps}
           onDeleteMap={handleDeleteSceneMap}
           onAddMap={() => void handleAddSceneMap()}
-          onImportSceneAsMap={() => void handleImportSceneAsMap()}
           onReplaceMapImage={(mapId) => void mapReplacement.begin(mapId)}
           isReplacingImage={isBusy || mapReplacement.busyMapId !== null}
           onSelectObject={handleSelectSceneObject}
@@ -3513,6 +3540,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           onStartInformationArea={handleStartInformationArea}
           onStartSceneLink={handleStartSceneLink}
           sceneLinkStatuses={sceneLinkStatuses}
+          campaignSelection={preparationSelection}
+          preparationUnavailableMessage={preparationUnavailableMessage}
+          onUsePrepared={preparationSelection ? reservation => {
+            const current = currentFilePathRef.current;
+            try { if (!current || sceneId(current) !== reservation.sceneId) { setFeedback("La escena cambió mientras se reservaba la ficha preparada. Vuelve a intentarlo."); return; } }
+            catch { setFeedback("La escena cambió mientras se reservaba la ficha preparada. Vuelve a intentarlo."); return; }
+            const materialized = service!.browser.materializePreparation(sceneRef.current, reservation); setScene(materialized.scene); setSceneAside(materialized.scene.sceneAside); setFeedback(materialized.inserted ? "Ficha preparada añadida a esta escena." : "La ficha preparada ya estaba en esta escena.");
+          } : undefined}
           hidden={!isAsidePanelVisible}
         />
         <button
@@ -3625,7 +3660,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
           showCompass={mapState !== null}
           overlay={
             <>
-          <DiceOverlay envelope={diceSession.state.envelope} size={diceSession.diceSizes.sizes.dm} onDismiss={diceSession.dismiss} />
+          <DiceOverlay envelope={hasServiceDice ? serviceOverlayEnvelope : usesServiceDiceTransport ? { revision: -1, presentation: null } : diceSession.state.envelope} finalFrame={hasServiceDice ? serviceOverlayFinalFrame : null} size={hasServiceDice ? serviceDice.size : diceSession.diceSizes.sizes.dm} onDismiss={hasServiceDice ? serviceDice.dismiss : usesServiceDiceTransport ? undefined : diceSession.dismiss} reportRenderStatus={!usesServiceDiceTransport} />
               <div className="workspace-camera-dock" aria-label="Camaras">
                 <div className="workspace-dm-camera" aria-label="Camara DM">
                   <Camera size={14} aria-hidden="true" /><span>DM</span>
@@ -3646,11 +3681,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 viewRole="dm"
                 onAdjust={handleAdjustSceneCounter}
                 onSetPlayerVisibility={handleSetSceneCounterPlayerVisibility}
-                onManage={() => setIsSceneCounterManagerOpen(true)}
               />
             </>
           }
         />
+        {hasServiceDice && <DicePublicStatus activity={serviceDice.publicPresentation ? { rollId: serviceDice.publicPresentation.rollId, author: serviceAuthor(serviceDice.publicPresentation.author), phase: "settled", settledAt: serviceDice.publicPresentation.settledAt, result: serviceDice.publicPresentation.result } : serviceDice.occupancy ? { rollId: serviceDice.occupancy.rollId, author: serviceAuthor(serviceDice.occupancy.author), phase: serviceDice.occupancy.phase, result: null } : null} selfAuthorId={serviceDice.selfAuthorId} closeAny={serviceDice.closeAny} connected={serviceDice.view.connected} pendingDismissId={serviceDice.pendingDismissId} dismissError={serviceDice.dismissError} onDismiss={id => { void serviceDice.dismiss(id); }} />}
         <CombatTurnBar
           tracker={scene.combatTracker}
           viewRole="dm"
@@ -3666,7 +3701,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
             {shared.api && <SharedDrawingPanel api={shared.api} view={shared.view} aligned={sharedAligned}/>}
           </div>}
           <div id="right-panel-dice" role="tabpanel" aria-labelledby="right-tab-dice" hidden={rightTab !== "dice"}>
-            <DicePanel controller={diceSession} />
+            {hasServiceDice ? serviceDicePanel : usesServiceDiceTransport ? <p className="dice-status" role="status">Esta mesa usa una versión de dados incompatible. Actualiza el servicio o el cliente para lanzar tiradas.</p> : <DicePanel controller={diceSession} />}
           </div>
           <div className="right-properties-content" id="right-panel-properties" role="tabpanel" aria-labelledby="right-tab-properties" hidden={rightTab !== "properties"}>
           <div className="control-sidebar-header">Capas</div>
@@ -4084,15 +4119,14 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 <div className="selected-properties-content" aria-label="Propiedades de texto">
                   <label>
                     Texto
-                    <input
-                      type="text"
+                    <TextInput
                       value={selectedLabel.text}
                       onChange={(event) => updateSelectedLabel({ text: event.currentTarget.value })}
                     />
                   </label>
                   <label>
                     Fuente
-                    <select
+                    <Select
                       value={selectedLabel.fontFamily}
                       onChange={(event) => updateSelectedLabel({ fontFamily: event.currentTarget.value })}
                     >
@@ -4101,7 +4135,7 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                           {getFontLabel(font)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </label>
                   <label>
                     Color
@@ -4256,14 +4290,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
                 <span>Ajustar grilla</span>
                 <small>Shortcut Cmd/Ctrl + G</small>
               </div>
-              <Switch.Root
-                className="switch-root"
+              <SharedSwitch
                 checked={isGridAdjustMode}
                 onCheckedChange={setGridAdjustMode}
-                aria-label="Activar modo ajustar grilla"
-              >
-                <Switch.Thumb className="switch-thumb" />
-              </Switch.Root>
+                ariaLabel="Activar modo ajustar grilla"
+              />
             </div>
             {isGridAdjustMode && (
               <small>Arrastra la esquina superior izquierda para alinear la grilla con el mapa; la inferior derecha para ajustar el tamaño de la celda. La alineación se guarda en la escena.</small>
@@ -4648,14 +4679,11 @@ export function App({ service, tablePanel }: { readonly service?: ServiceWorkspa
               <>
                 <div className="switch-control">
                   <span>Pintar mascara</span>
-                  <Switch.Root
-                    className="switch-root"
+                  <SharedSwitch
                     checked={isDaytimeMaskPaintMode}
                     onCheckedChange={setIsDaytimeMaskPaintMode}
-                    aria-label="Activar pincel de hora del dia"
-                  >
-                    <Switch.Thumb className="switch-thumb" />
-                  </Switch.Root>
+                    ariaLabel="Activar pincel de hora del dia"
+                  />
                 </div>
                 <label>
                   Pincel
@@ -5247,52 +5275,4 @@ function getSceneLinkStatusText(
   if (status?.state === "broken") return status.message;
   if (status?.state === "valid") return "Conexion valida";
   return connected ? "Validando" : "Sin enlazar";
-}
-
-interface SidebarAccordionProps {
-  readonly id: string;
-  readonly icon: ReactNode;
-  readonly title: string;
-  readonly isOpen: boolean;
-  readonly onToggle: () => void;
-  readonly children: ReactNode;
-}
-
-function SidebarAccordion({
-  id,
-  icon,
-  title,
-  isOpen,
-  onToggle,
-  children
-}: SidebarAccordionProps): JSX.Element {
-  return (
-    <section
-      className={`sidebar-accordion${isOpen ? " is-open" : ""}`}
-      data-panel={id}
-      aria-labelledby={`${id}-header`}
-    >
-      <button
-        id={`${id}-header`}
-        className="sidebar-accordion-header"
-        type="button"
-        aria-expanded={isOpen}
-        aria-controls={id}
-        onClick={onToggle}
-      >
-        <span className="sidebar-accordion-icon" aria-hidden="true">
-          {icon}
-        </span>
-        <span className="sidebar-accordion-title">{title}</span>
-        <span className="sidebar-accordion-chevron" aria-hidden="true">
-          {isOpen ? "−" : "+"}
-        </span>
-      </button>
-      {isOpen ? (
-        <div id={id} className="sidebar-accordion-content">
-          {children}
-        </div>
-      ) : null}
-    </section>
-  );
 }

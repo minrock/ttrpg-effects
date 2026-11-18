@@ -62,7 +62,7 @@ function createProps(): Props {
     selectedElementId: "fire", activeAnnotationTool: "information-area",
     sceneLinkStatuses: { link: { state: "broken", reason: "file-missing", message: "No existe" } },
     onBackgroundColorChange: vi.fn(), onSelectMap: vi.fn(), onRenameMap: vi.fn(), onReorderMaps: vi.fn(),
-    onDeleteMap: vi.fn(), onAddMap: vi.fn(), onImportSceneAsMap: vi.fn(), onReplaceMapImage: vi.fn(),
+    onDeleteMap: vi.fn(), onAddMap: vi.fn(), onReplaceMapImage: vi.fn(),
     onSelectObject: vi.fn(), onLocateObject: vi.fn(), onDeleteObject: vi.fn(), onChange: vi.fn(),
     onSelectAnnotation: vi.fn(), onDeleteInformationArea: vi.fn(), onGoToAnnotation: vi.fn(),
     onEditAnnotation: vi.fn(), onToggleAnnotationLock: vi.fn(), onHighlightInformationArea: vi.fn(),
@@ -249,15 +249,13 @@ describe("DmAsidePanel explorer", () => {
     expect(section("Mapas").getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("forwards every map action and replacement busy state to the real map list", () => {
+  it("forwards map actions and replacement busy state to the real map list", () => {
     click(button("Agregar mapa"));
-    click(button("Agregar a escena"));
     click(query('[aria-label="Seleccionar Cripta"]'));
     change(input("Nombre de Cripta"), "Cripta norte");
     click(query('[aria-label="Actualizar imagen de Cripta"]'));
     click(query('[aria-label="Eliminar Cripta"]'));
     expect(props.onAddMap).toHaveBeenCalledOnce();
-    expect(props.onImportSceneAsMap).toHaveBeenCalledOnce();
     expect(props.onSelectMap).toHaveBeenCalledExactlyOnceWith("crypt");
     expect(props.onRenameMap).toHaveBeenCalledExactlyOnceWith("crypt", "Cripta norte");
     expect(props.onReplaceMapImage).toHaveBeenCalledExactlyOnceWith("crypt");
@@ -389,5 +387,14 @@ describe("DmAsidePanel explorer", () => {
     for (const property of ["width", "min-width", "max-width", "position", "inset", "left", "right", "top", "bottom"]) {
       expect(panelRule.style.getPropertyValue(property)).toBe("");
     }
+  });
+
+  it("marca las secciones de fichas como contextuales solo al abrir una escena de campaña", () => {
+  render({ campaignSelection: { campaignId: "11111111-1111-4111-8111-111111111111", arcId: "22222222-2222-4222-8222-222222222222", sceneId: "33333333-3333-4333-8333-333333333333" }, onUsePrepared: vi.fn() });
+  expect(vi.mocked(MonsterSection).mock.lastCall![0].preparationContext).toBe(true);
+  expect(vi.mocked(NpcSection).mock.lastCall![0].preparationContext).toBe(true);
+  render({ campaignSelection: undefined, onUsePrepared: undefined });
+  expect(vi.mocked(MonsterSection).mock.lastCall![0].preparationContext).toBe(false);
+  expect(vi.mocked(NpcSection).mock.lastCall![0].preparationContext).toBe(false);
   });
 });

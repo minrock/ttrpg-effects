@@ -2,8 +2,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 /** Desplegable nativo: Tab conserva su orden y Escape devuelve el foco al disparador. */
-export function HeaderDropdown({ label, children, align = "left", className = "", title }: {
-  label: ReactNode; children: ReactNode; align?: "left" | "right"; className?: string; title: string;
+export function HeaderDropdown({ label, children, align = "left", className = "", title, onOpenChange }: {
+  label: ReactNode; children: ReactNode; align?: "left" | "right"; className?: string; title: string; onOpenChange?: (open: boolean) => void;
 }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
@@ -14,7 +14,7 @@ export function HeaderDropdown({ label, children, align = "left", className = ""
     document.addEventListener("focusin", dismiss);
     return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("focusin", dismiss); };
   }, []);
-  return <details ref={ref} className={`header-dropdown ${className}`} onKeyDown={event => {
+  return <details ref={ref} className={`header-dropdown ${className}`} onToggle={() => onOpenChange?.(!!ref.current?.open)} onKeyDown={event => {
     event.stopPropagation();
     if (event.key === "Escape" && ref.current?.open) {
       event.preventDefault(); ref.current.open = false; ref.current.querySelector("summary")?.focus();
@@ -23,7 +23,7 @@ export function HeaderDropdown({ label, children, align = "left", className = ""
     <summary aria-label={title} title={title}>{label}<ChevronDown size={13} aria-hidden="true" className="header-chevron"/></summary>
     <div className={`header-dropdown-panel header-dropdown-panel--${align}`} onClickCapture={event => {
       const button = event.target instanceof Element ? event.target.closest("button") : null;
-      if (button && !button.disabled && ref.current) {
+      if (button && !button.disabled && !button.dataset.dropdownKeepOpen && ref.current) {
         ref.current.open = false;
         ref.current.querySelector("summary")?.focus();
       }

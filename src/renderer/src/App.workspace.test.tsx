@@ -138,6 +138,10 @@ describe("App production workspace", () => {
     await act(async () => target.click());
   }
 
+  function useElectronSceneMenu(): void {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36");
+  }
+
   async function rail(label: string): Promise<void> {
     await click(button(label, element('[aria-label="Herramientas del mapa"]')));
   }
@@ -403,8 +407,11 @@ describe("App production workspace", () => {
     expect(viewport.mount).toHaveBeenCalledOnce();
     expect(viewport.unmount).not.toHaveBeenCalled();
   });
-  it("publica en Electron servicio por acción explícita y no por la mera presencia de un jugador", async () => {
-    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36");
+  it.each([
+    ["Chrome", "Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36"],
+    ["Electron servicio", "Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36"]
+  ])("publica en %s por acción explícita y no por la mera presencia de un jugador", async (_client, userAgent) => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(userAgent);
     const browser = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
     const publish = vi.fn(async () => ({ ok: true }));
     const open = vi.fn(async () => ({ ok: true }));
@@ -414,11 +421,32 @@ describe("App production workspace", () => {
     await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => null, logout: async () => {} }}/></ClientProvider>));
     await act(async () => vi.advanceTimersByTime(1000));
     expect(publish).not.toHaveBeenCalled();
-    await click(button("Publicar vista de jugador"));
+    await click(button("Publicar escena para jugadores"));
     expect(open).toHaveBeenCalledOnce();
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({
+      scene: expect.any(Object),
+      camera: expect.objectContaining({ center: expect.any(Object), zoom: expect.any(Number) })
+    }));
+    await act(async () => vi.advanceTimersByTime(1000));
+    expect(publish).toHaveBeenCalledOnce();
     expect(host.textContent).toContain("Proyección publicada");
     await click(button("Abrir dados"));
     expect(element('[role="tab"][aria-selected="true"]#right-tab-dice')).toBeTruthy();
+  });
+  it("conserva el error de publicación de Chrome sin activar la sincronización", async () => {
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36");
+    const browser = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
+    const publish = vi.fn(async () => ({ ok: true }));
+    const open = vi.fn(async () => ({ ok: false, error: "No se pudo publicar" }));
+    const client = createClient({ ...browser.client.api, openPlayerWindow: open, publishPlayerScene: publish,
+      getPlayerWindowState: async () => ({ snapshot: null, camera: null, cameraCommand: null, isOpen: false }),
+      commandPlayerCamera: async () => ({ ok: true }) }, browser.client.capabilities, "service");
+    await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => null, logout: async () => {} }}/></ClientProvider>));
+    await click(button("Publicar escena para jugadores"));
+    await act(async () => { await Promise.resolve(); vi.runAllTimers(); });
+    expect(open).toHaveBeenCalledOnce();
+    expect(publish).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("No se pudo publicar");
   });
   it.each(["Cancelar", "Descartar y abrir", "Guardar y abrir"])("recientes protege los cambios: %s",async(choice)=>{
     const original=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Origen",shapes:[{id:"circle-1",type:"circle",points:[{x:0,y:0}],radius:20}]}));
@@ -459,6 +487,7 @@ describe("App production workspace", () => {
   });
 
   it("reparar la imagen retira solo su aviso de ausencia y conserva los otros avisos",async()=>{
+    useElectronSceneMenu();
     const scene=createSceneWithMap(createDefaultSceneMap({id:"a",name:"Ausente",map:{imagePath:"/missing.png",position:{x:0,y:0},scale:1,imageSize:{width:400,height:200}}}));
     const client=createClient({loadScene:async()=>({ok:true,scene,filePath:"/scene.ttrpgscene",warnings:[{code:"map-image-missing",path:"/missing.png",message:"Imagen ausente"},{code:"scene-link-unresolved",path:"/other",message:"Enlace pendiente"}]}),resolveMapUrl:async()=>null,
       selectReplacementMapImage:async()=>({status:"ready",imagePath:"/new.png",imageUrl:"map-asset:///new.png"})
@@ -470,6 +499,7 @@ describe("App production workspace", () => {
   });
 
   it("recuperar una escena con imagen ausente no repite la resolución indefinidamente", async () => {
+    useElectronSceneMenu();
     const scene = parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
     const token = createSceneToken({ id: "missing-token", name: "Ausente", type: "npc", imagePath: "missing.png", position: { x: 0, y: 0 }, size: "medium", tokens: [] });
     sessionStorage.setItem("ttrpg:session-scene", JSON.stringify({ ...scene, maps: scene.maps.map(map => ({ ...map, tokens: [token] })), tokens: [token] }));
@@ -491,7 +521,8 @@ describe("App production workspace", () => {
     expect(props().tokens[0].imageUrl).toBe("url:reparada");
   });
 
-  it("protege cambios web ante guardar fallido/cancelar y no usa el autosave local", async () => {
+  it("protege cambios del servicio en Electron ante guardar fallido/cancelar y no usa el autosave local", async () => {
+    useElectronSceneMenu();
     const scene=JSON.parse(sessionStorage.getItem("ttrpg:session-scene")!);
     const storage=vi.spyOn(Storage.prototype,"setItem");
     const browser=createBrowserClient(new HttpTransport(vi.fn()),{selectScene:async()=>null,sceneName:async()=>null});
@@ -510,7 +541,54 @@ describe("App production workspace", () => {
     leave.mockResolvedValueOnce("discard");await click(element('[aria-label="Menu de escena"]'));await click(button("Cerrar sesión"));expect(logout).toHaveBeenCalledOnce();expect(storage).not.toHaveBeenCalled();
   });
 
+  it("importar una copia reserva la ficha en la nueva escena y nunca en la original", async () => {
+    useElectronSceneMenu();
+    const originalSceneId = "01010101-0101-4101-8101-010101010101";
+    const importedSceneId = "02020202-0202-4202-8202-020202020202";
+    const campaignId = "11111111-1111-4111-8111-111111111111", arcId = "22222222-2222-4222-8222-222222222222", preparedId = "33333333-3333-4333-8333-333333333333";
+    const imported = createSceneWithMap(createDefaultSceneMap({ id: "importado", name: "Importado" }));
+    const raw = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
+    const reservation = { sceneId: importedSceneId, preparedId, entityId: "npc-importado", snapshot: { version: 2 as const, kind: "npc" as const, name: "Vigía", imagePath: null, notes: "" }, binding: null };
+    const reserve = vi.fn(async () => reservation), materializePreparation = vi.fn(() => ({ scene: imported, inserted: true }));
+    const browser = { ...raw, importFile: vi.fn(async () => ({ ok: true as const, scene: imported, filePath: `scene:${importedSceneId}`, mapImageUrls: {}, tokenImageUrls: {}, warnings: [] })), materializePreparation } as unknown as typeof raw;
+    const prepared = { id: preparedId, arcId, kind: "npc" as const, name: "Vigía", imagePath: null, notes: "", revision: 1, createdAt: "2026-11-17T00:00:00.000Z", updatedAt: "2026-11-17T00:00:00.000Z", provenance: null };
+    const client = createClient(raw.client.api, { ...raw.client.capabilities, libraries: false }, "service", undefined, undefined, { list: vi.fn(async () => ({ items: [prepared], total: 1, limit: 100, offset: 0 })), snapshot: vi.fn(), reserve });
+    await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => "discard", logout: async () => {}, campaignSelection: { campaignId, arcId, sceneId: originalSceneId } }}/></ClientProvider>));
+    expect(host.textContent).toContain("Guarda o importa la escena antes de usar una ficha preparada.");
+    await click(element('[aria-label="Menu de escena"]')); await click(button("Importar archivo .ttrpgscene"));
+    await act(async () => { for (let index = 0; index < 4; index++) await Promise.resolve(); });
+    await click(button("Usar en esta escena"));
+    expect(reserve).toHaveBeenCalledWith({ campaignId, arcId, sceneId: importedSceneId }, preparedId, expect.any(String));
+    expect(reserve).not.toHaveBeenCalledWith(expect.objectContaining({ sceneId: originalSceneId }), expect.anything(), expect.anything());
+    expect(materializePreparation).toHaveBeenCalledWith(expect.anything(), reservation);
+  });
+
+  it("no materializa una reserva antigua si se importa otra escena mientras espera la respuesta", async () => {
+    useElectronSceneMenu();
+    const firstSceneId = "01010101-0101-4101-8101-010101010101", secondSceneId = "02020202-0202-4202-8202-020202020202";
+    const campaignId = "11111111-1111-4111-8111-111111111111", arcId = "22222222-2222-4222-8222-222222222222", preparedId = "33333333-3333-4333-8333-333333333333";
+    const first = createSceneWithMap(createDefaultSceneMap({ id: "primera", name: "Primera" })), second = createSceneWithMap(createDefaultSceneMap({ id: "segunda", name: "Segunda" }));
+    type Reservation = { sceneId: string; preparedId: string; entityId: string; snapshot: { version: 2; kind: "npc"; name: string; imagePath: null; notes: string }; binding: null };
+    let release!: (value: Reservation) => void;
+    const reserve = vi.fn(() => new Promise<Reservation>(resolve => { release = resolve; }));
+    const raw = createBrowserClient(new HttpTransport(vi.fn()), { selectScene: async () => null, sceneName: async () => null });
+    const materializePreparation = vi.fn(() => ({ scene: second, inserted: true }));
+    const browser = { ...raw, importFile: vi.fn().mockResolvedValueOnce({ ok: true as const, scene: first, filePath: `scene:${firstSceneId}`, mapImageUrls: {}, tokenImageUrls: {}, warnings: [] }).mockResolvedValueOnce({ ok: true as const, scene: second, filePath: `scene:${secondSceneId}`, mapImageUrls: {}, tokenImageUrls: {}, warnings: [] }), materializePreparation } as unknown as typeof raw;
+    const prepared = { id: preparedId, arcId, kind: "npc" as const, name: "Vigía", imagePath: null, notes: "", revision: 1, createdAt: "2026-11-17T00:00:00.000Z", updatedAt: "2026-11-17T00:00:00.000Z", provenance: null };
+    const client = createClient(raw.client.api, { ...raw.client.capabilities, libraries: false }, "service", undefined, undefined, { list: vi.fn(async () => ({ items: [prepared], total: 1, limit: 100, offset: 0 })), snapshot: vi.fn(), reserve });
+    await act(async () => root.render(<ClientProvider client={client}><App service={{ browser, confirmLeave: async () => "discard", logout: async () => {}, campaignSelection: { campaignId, arcId, sceneId: firstSceneId } }}/></ClientProvider>));
+    await click(element('[aria-label="Menu de escena"]')); await click(button("Importar archivo .ttrpgscene"));
+    await act(async () => { for (let index = 0; index < 4; index++) await Promise.resolve(); });
+    await click(button("Usar en esta escena")); await vi.waitFor(() => expect(reserve).toHaveBeenCalledOnce());
+    await click(element('[aria-label="Menu de escena"]')); await click(button("Importar archivo .ttrpgscene"));
+    await act(async () => { for (let index = 0; index < 4; index++) await Promise.resolve(); });
+    await act(async () => release({ sceneId: firstSceneId, preparedId, entityId: "npc-antiguo", snapshot: { version: 2, kind: "npc", name: "Vigía", imagePath: null, notes: "" }, binding: null }));
+    expect(materializePreparation).not.toHaveBeenCalled();
+    expect(host.textContent).toContain("La escena cambió mientras se reservaba la ficha preparada.");
+  });
+
   it.each([false,true])("conecta desde App con selector remoto y conserva estado ante fallo (reparación=%s)",async broken=>{
+    useElectronSceneMenu();
     const base=parseSceneJson(sessionStorage.getItem("ttrpg:session-scene")!);
     const source="scene:01010101-0101-4101-8101-010101010101",target="scene:02020202-0202-4202-8202-020202020202";
     const marker={id:"a",kind:"scene-link" as const,name:"Puerta A",position:{x:0,y:0},locked:false,connection:null};
@@ -532,6 +610,7 @@ describe("App production workspace", () => {
     await click(button("Conectar con esta escena"));expect(connect).toHaveBeenLastCalledWith({sourceScenePath:source,sourceMarkerId:"a",targetScenePath:target,targetMarkerId:"b"});expect(props().mapAnnotations.sceneLinks[0].connection?.peer.scenePath).toBe(target);expect(host.querySelector('.scene-link-modal')).toBeNull();
   });
   it.each(["remote", "internal"] as const)("exige Desligar antes de cambiar %s y conserva estado si falla", async (kind) => {
+    useElectronSceneMenu();
     const source = "scene:01010101-0101-4101-8101-010101010101";
     const target = "scene:02020202-0202-4202-8202-020202020202";
     const marker = { id: "a", kind: "scene-link" as const, name: "Puerta A", position: { x: 0, y: 0 }, locked: false, connection: null };
@@ -602,8 +681,8 @@ describe("App production workspace", () => {
       expect(entries[0].sceneHash).not.toBe(entries[0].confirmedSceneHash);
       await act(async()=>root.render(null));await reopened.drafts!.stop();
       const pending=fixture.create();await mount(pending);
-      await settled(()=>expect(host.textContent).toContain("¿Cómo quieres continuar?"));
-      await click(button("Recuperar estado local",element("dialog")));await settled(()=>expect(props().shapes).toHaveLength(2));
+      await settled(()=>expect(host.textContent).toContain("Cambios sin guardar"));
+      await click(button("Recuperar borrador",element("dialog")));await settled(()=>expect(props().shapes).toHaveLength(2));
       const saved=await pending.openSaved(`scene:${await pending.latestSavedScene()}`);expect(saved.scene.shapes).toHaveLength(1);
       await act(async()=>root.render(null));
     }finally{await cleanupSceneService();}
@@ -636,6 +715,7 @@ describe("App production workspace", () => {
   });
 
   it("restaura foco al menú real después de cancelar el selector de servicio",async()=>{
+    useElectronSceneMenu();
     HTMLDialogElement.prototype.showModal=function(){this.setAttribute("open","");};HTMLDialogElement.prototype.close=function(){this.removeAttribute("open");};
     const broker=new DialogBroker();const browser=createBrowserClient(new HttpTransport(vi.fn(async()=>new Response(JSON.stringify({ok:true,scenes:[],total:0}),{headers:{"content-type":"application/json"}}))),broker);
     await act(async()=>root.render(<><ClientProvider client={browser.client}><App service={{browser,confirmLeave:broker.leave,logout:async()=>{}}}/></ClientProvider><DialogHost broker={broker} browser={browser}/></>));

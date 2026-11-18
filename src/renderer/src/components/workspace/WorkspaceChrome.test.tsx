@@ -49,6 +49,11 @@ describe("Workspace chrome", () => {
     const props = header({ busy: true }); await act(async () => root.render(<WorkspaceHeader {...props} />));
     await click("Cargar escena"); await click("Abrir ventana de jugador");
     expect(props.onLoad).not.toHaveBeenCalled(); expect(props.onPlayer).not.toHaveBeenCalled();
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36");
+    const serviceProps = header({ busy: true, serviceActions: { onImport: vi.fn(), onExport: vi.fn(), onLogout: vi.fn() } });
+    await act(async () => root.render(<WorkspaceHeader {...serviceProps} />));
+    await click("Publicar escena para jugadores");
+    expect(serviceProps.onPlayer).not.toHaveBeenCalled();
   });
   it("fusiona los controles en el destino compartido sin duplicar logo y respeta suspensión", async () => {
     const target=document.createElement("div");document.body.append(target);
@@ -59,23 +64,41 @@ describe("Workspace chrome", () => {
       expect(target.querySelector(".workspace-brand")).toBeNull();
       expect(target.querySelector("header")).toBeNull();
       expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(7);
+      expect(target.querySelector('[aria-label="Publicar escena para jugadores"]')?.getAttribute("title")).toBe("Publicar escena para jugadores");
+      expect(target.querySelector('[aria-label="Menu de escena"]')?.textContent).toBe(`${props.sceneName}${props.mapName}`);
+      expect(target.querySelector('[aria-label="Acciones de escena"]')).not.toBeNull();
       expect(target.textContent).not.toContain("Cerrar sesión");
       vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36");
       await act(async()=>root.render(<WorkspaceHeader {...props}/>));
-      expect(target.querySelector(".workspace-present")).toBeNull();
-      expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(6);
+      expect(target.querySelector('[aria-label="Menu de escena"]')).toBeNull();
+      expect(target.querySelector('[aria-label="Acciones de escena"]')).toBeNull();
+      const sceneName=target.querySelector('.workspace-scene-name')!;
+      expect(sceneName.textContent).toBe(props.sceneName);
+      expect(sceneName.querySelector("span")?.getAttribute("title")).toBe(props.sceneName);
+      expect(sceneName.querySelector("svg, button, summary")).toBeNull();
+      const player=target.querySelector<HTMLButtonElement>('[aria-label="Publicar escena para jugadores"]')!;
+      expect(player.title).toBe("Publicar escena para jugadores");
+      expect(player.classList).toContain("workspace-present");
+      expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(7);
+      await act(async()=>target.querySelector<HTMLButtonElement>('.workspace-header-actions [aria-label="Guardar escena"]')!.click());
+      expect(props.onSave).toHaveBeenCalledOnce();
       const trigger=target.querySelector<HTMLButtonElement>('[aria-label="Herramientas del editor"]')!;
       await act(async()=>trigger.click());expect(trigger.getAttribute("aria-expanded")).toBe("true");
       const dice=target.querySelector<HTMLButtonElement>('[aria-label="Abrir dados"]')!;
       await act(async()=>dice.click());expect(props.onDice).toHaveBeenCalledOnce();
       expect(trigger.getAttribute("aria-expanded")).toBe("false");expect(document.activeElement).toBe(trigger);
+      await act(async()=>player.click());expect(props.onPlayer).toHaveBeenCalledOnce();
       await act(async()=>root.render(<WorkspaceHeader {...props} enabled={false}/>));
       expect(dice.closest('[hidden][inert]')).not.toBeNull();
+      expect(player.closest('[hidden][inert]')).not.toBeNull();
       await act(async()=>root.render(<WorkspaceHeader {...props} enabled={true}/>));
       expect(target.querySelector('[aria-label="Abrir dados"]')).toBe(dice);
+      expect(target.querySelector('[aria-label="Publicar escena para jugadores"]')).toBe(player);
       expect(dice.closest('[hidden]')).toBeNull();
       await act(async()=>root.render(<WorkspaceHeader {...header()}/>));
       expect(target.children).toHaveLength(0);expect(host.querySelector('.workspace-brand')).not.toBeNull();
+      expect(host.querySelector('[aria-label="Menu de escena"]')).toBeNull();
+      expect(host.querySelector('.workspace-scene-name')?.textContent).toBe(props.sceneName);
     } finally { target.remove(); }
   });
   it("routes shapes and lights through their original callbacks", async () => {

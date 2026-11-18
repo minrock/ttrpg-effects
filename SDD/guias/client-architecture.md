@@ -84,3 +84,10 @@ El cliente de recursos conserva CAS, bindings y operaciones inciertas por cuenta
 El puerto opcional `TtrpgClient.annotations` conecta mediciones/áreas de jugadores a una capa efímera del servicio. El servidor deriva autoría y medidas, limita edición al propietario y permite retirada/limpieza DM; Electron autónomo conserva herramientas locales. El overlay no entra en guardados ni exportaciones.
 
 Negociación, comandos, límites y ciclo de vida se documentan una sola vez en [mesa sincronizada](synchronized-table.md#dibujos-compartidos--sdd-55--3190). Véanse también el [contrato SDD 55](../specs/55-mediciones-compartidas/spec.md) y su [validación y gates pendientes](../specs/55-mediciones-compartidas/validacion.md).
+
+
+## Dados de jugadores — SDD 61
+
+Desde la entrega local 3.32.0, el puerto opcional `TtrpgClient.serviceDice` conecta el compositor compartido del DM y del jugador con el protocolo C-61. El jugador dispone de Mesa/Dados en su panel; todas sus tiradas son públicas. Autor y DM pueden cerrar la tirada en pantalla, y el historial conserva los resultados después del cierre. Tamaño y sonido son preferencias de cada vista. Electron autónomo conserva el puerto de dados local.
+
+La negociación, autoridad, idempotencia, cuotas y ciclo de vida están en [mesa sincronizada](synchronized-table.md#dados-de-jugadores--sdd-61); el estado real de validación se registra en [SDD 61](../specs/61-dados-jugadores/validacion.md).

@@ -5,7 +5,7 @@ import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
 import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Compass, Lock, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
+import { ChevronLeft, ChevronRight, Compass, Dices, Lock, Table2, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
 import { getTokensForRole, normalizeCameraSnapshot, type ArcanePointerBroadcast, type PlayerWindowSnapshot, type ViewportCameraSnapshot } from "../../domain/player/player-window";
 import { sortTokensByOrder } from "../../domain/tokens/tokens";
@@ -23,6 +23,9 @@ import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay
 import { usePublicDice } from "./hooks/useDiceSession";
 import { useDiceSizes } from "./hooks/useDiceSizes";
 import { DiceOverlay } from "./components/dice/DiceOverlay";
+import { ServiceDicePanel } from "./components/dice/ServiceDicePanel";
+import { DicePublicStatus } from "./components/dice/DicePublicStatus";
+import { useServiceDiceSession } from "./hooks/useServiceDiceSession";
 import type { InformationAreaHighlightBroadcast } from "../../domain/annotations/map-annotations";
 import {
   type PlayerViewportReport,
@@ -40,6 +43,8 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
   const tableToggleRef = useRef<HTMLButtonElement | null>(null);
   const tableSidebarRef = useRef<HTMLElement | null>(null);
   const [showTable, setShowTable] = useState(() => window.innerWidth >= 1100);
+  const [playerTab, setPlayerTab] = useState<"table" | "dice">("table");
+  const playerTabsRef = useRef<HTMLDivElement | null>(null);
   const closeTable = useCallback(() => { setShowTable(false); tableToggleRef.current?.focus(); }, []);
   useEffect(() => {
     const media = window.matchMedia?.("(max-width: 1099px)");
@@ -384,6 +389,15 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
 
   const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
   const { sizes: diceSizes } = useDiceSizes();
+  const serviceDice = useServiceDiceSession();
+  const usesServiceDiceTransport = isServiceClient;
+  const hasServiceDice = usesServiceDiceTransport && serviceDice.view.supported;
+  const publicMapMatches = hasServiceDice && serviceDice.publicPresentation !== null && serviceDice.view.state?.public.publishedContext?.token === serviceDice.publicPresentation.context.token && serviceDice.publicPresentation.context.sceneId === scene.id && serviceDice.publicPresentation.context.mapId === scene.activeMapId;
+  const visibleDiceEnvelope = hasServiceDice ? publicMapMatches ? serviceDice.publicEnvelope : { revision: -1, presentation: null } : usesServiceDiceTransport ? { revision: -1, presentation: null } : diceEnvelope;
+  const canDismissServicePresentation = serviceDice.closeAny || (serviceDice.publicPresentation?.author.kind === "player" && serviceDice.publicPresentation.author.publicId === serviceDice.selfAuthorId);
+  const diceAuthor = (author: { readonly kind: "dm" } | { readonly kind: "player"; readonly publicId: string; readonly alias: string; readonly discriminator: number }) => ({ id: author.kind === "dm" ? "dm" : author.publicId, label: author.kind === "dm" ? "DM" : `${author.alias} · ${author.discriminator}`, kind: author.kind });
+  const serviceDiceReady = serviceDice.view.connected && serviceDice.view.state?.public.publishedContext !== null;
+  const serviceDicePanel = hasServiceDice ? <ServiceDicePanel role={serviceDice.role} capabilities={{ chooseVisibility: serviceDice.role === "dm", showMapResult: serviceDice.role === "dm", clearHistory: serviceDice.role === "dm", closeAny: serviceDice.closeAny }} draft={serviceDice.draft} history={serviceDice.history.map(entry => ({ id: entry.id, author: diceAuthor(entry.author), visibility: entry.visibility, createdAt: entry.createdAt, status: entry.status, result: entry.result, isPresented: entry.id === serviceDice.publicPresentation?.rollId }))} historyOffset={serviceDice.historyPage?.offset} historyTotal={serviceDice.historyPage?.total} historyLimit={serviceDice.historyPage?.limit} onHistoryPageChange={offset => { void serviceDice.loadHistory(offset); }} occupancy={serviceDice.occupancy ? { ...serviceDice.occupancy, author: diceAuthor(serviceDice.occupancy.author) } : null} presentation={serviceDice.publicPresentation ? { ...serviceDice.publicPresentation, author: diceAuthor(serviceDice.publicPresentation.author), visibility: "public" } : null} selfAuthorId={serviceDice.selfAuthorId} ready={serviceDiceReady} preparing={serviceDice.preparing} uncertain={serviceDice.uncertain} onRetry={() => { void serviceDice.retry(); }} error={serviceDice.error} mapResultVisible={serviceDice.mapResultVisible} pendingDismissId={serviceDice.pendingDismissId} dismissError={serviceDice.dismissError} soundEnabled={serviceDice.soundEnabled} onSoundEnabledChange={serviceDice.setSoundEnabled} size={serviceDice.size} onSizeChange={serviceDice.setSize} onDraftChange={serviceDice.setDraft} onRoll={mode => { void serviceDice.run(mode); }} onDismiss={id => { void serviceDice.dismiss(id); }} onClearHistory={() => { void serviceDice.clearHistory(); }} onMapResultVisibleChange={visible => { void serviceDice.setMapResultVisible(visible); }} /> : null;
   const shared = useSharedAnnotations();
   const tools = usePlayerTools(viewportIdentity, scene.grid, scene.settings, shared.bridge);
   const focusHandler = useRef<(event: import("../../domain/player/attention-focus").AttentionFocusEvent) => void>(() => {});
@@ -425,7 +439,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     queuePlayerCameraReport(next, "local-navigation", true);
   };
 
-  const hasTable = !!tablePanel || !!shared.api;
+  const hasTable = !!tablePanel || !!shared.api || hasServiceDice;
   return (
     <main className={`player-shell player-workspace-root${hasTable ? " player-shell--table" : ""}${hasTable && showTable ? " player-shell--table-open" : ""}`} aria-label="TTRPG Effects jugador">
       <div ref={shellRef} className="player-map-workspace">
@@ -439,7 +453,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
         <MapViewport
           ref={viewportRef}
           key={viewportIdentity}
-          overlay={<DiceOverlay envelope={diceEnvelope} size={diceSizes.player} />}
+          overlay={<DiceOverlay envelope={visibleDiceEnvelope} finalFrame={hasServiceDice && publicMapMatches ? serviceDice.publicFinalFrame : null} size={hasServiceDice ? serviceDice.size : diceSizes.player} onDismiss={hasServiceDice && canDismissServicePresentation ? serviceDice.dismiss : undefined} reportRenderStatus={!usesServiceDiceTransport} />}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}
@@ -525,6 +539,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
           onMapAnnotationPreview={noop}
         />
       ) : null}
+      {hasServiceDice && <DicePublicStatus activity={serviceDice.publicPresentation ? { rollId: serviceDice.publicPresentation.rollId, author: diceAuthor(serviceDice.publicPresentation.author), phase: "settled", settledAt: serviceDice.publicPresentation.settledAt, result: serviceDice.publicPresentation.result } : serviceDice.occupancy ? { rollId: serviceDice.occupancy.rollId, author: diceAuthor(serviceDice.occupancy.author), phase: serviceDice.occupancy.phase, result: null } : null} selfAuthorId={serviceDice.selfAuthorId} closeAny={serviceDice.closeAny} connected={serviceDice.view.connected} pendingDismissId={serviceDice.pendingDismissId} dismissError={serviceDice.dismissError} onDismiss={id => { void serviceDice.dismiss(id); }} />}
       <span className="sr-only" role="status">{focusNotice}</span>
       {isHydrated && showTools && <PlayerTools
         notice={tools.error || shared.error || (focusNotice.includes("Se canceló") ? focusNotice : undefined)}
@@ -607,10 +622,11 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
       </div>
       {hasTable && <aside ref={tableSidebarRef} id="player-table-sidebar" className="player-table-sidebar" aria-label="Mesa del jugador" hidden={!showTable}
         onKeyDown={event => { event.stopPropagation(); if (event.key === "Escape") { event.preventDefault(); closeTable(); } }}>
-        <header className="player-table-sidebar__header"><h2>Mesa</h2></header>
+        <header className="player-table-sidebar__header"><h2>Panel del jugador</h2>{hasServiceDice && <div className="player-table-sidebar__tabs" ref={playerTabsRef} role="tablist" aria-label="Panel del jugador" onKeyDown={event => { const tabs = ["table", "dice"] as const; if (!(["ArrowLeft", "ArrowRight", "Home", "End"] as string[]).includes(event.key)) return; event.preventDefault(); event.stopPropagation(); const next = event.key === "Home" ? tabs[0] : event.key === "End" ? tabs[1] : tabs[(tabs.indexOf(playerTab) + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]; setPlayerTab(next); playerTabsRef.current?.querySelector<HTMLButtonElement>(`#player-tab-${next}`)?.focus(); }}><button type="button" role="tab" id="player-tab-table" aria-controls="player-panel-table" tabIndex={playerTab === "table" ? 0 : -1} aria-selected={playerTab === "table"} onClick={() => setPlayerTab("table")}><Table2 size={16} aria-hidden="true" />Mesa</button><button type="button" role="tab" id="player-tab-dice" aria-controls="player-panel-dice" tabIndex={playerTab === "dice" ? 0 : -1} aria-selected={playerTab === "dice"} onClick={() => setPlayerTab("dice")}><Dices size={16} aria-hidden="true" />Dados</button></div>}</header>
         <div className="player-table-sidebar__content">
-          {tablePanel}
-          {shared.api && <SharedDrawingPanel api={shared.api} view={{ ...shared.view, error: shared.error }} aligned player/>}
+          <div id="player-panel-table" role={hasServiceDice ? "tabpanel" : undefined} aria-labelledby={hasServiceDice ? "player-tab-table" : undefined} hidden={hasServiceDice && playerTab !== "table"}>{tablePanel}{shared.api && <SharedDrawingPanel api={shared.api} view={{ ...shared.view, error: shared.error }} aligned player/>}</div>
+          {hasServiceDice && <div id="player-panel-dice" role="tabpanel" aria-labelledby="player-tab-dice" hidden={playerTab !== "dice"}>{serviceDicePanel}</div>}
+          {usesServiceDiceTransport && !hasServiceDice && <p className="dice-status" role="status">Esta mesa usa una versión de dados incompatible. Actualiza el servicio o el cliente para lanzar tiradas.</p>}
         </div>
       </aside>}
       {hasTable && <button ref={tableToggleRef} type="button" className="player-table-toggle"

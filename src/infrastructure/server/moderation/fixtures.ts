@@ -25,12 +25,12 @@ export function snapshot(asset: string) {
   const scene = { ...base, map: { ...base.map, imagePath: `asset:${asset}` }, maps: base.maps.map(map => ({ ...map, map: { ...map.map, imagePath: `asset:${asset}` } })), sceneAside: { ...base.sceneAside, notes: [{ id: randomUUID(), name: "PRIVADO_CENTINELA_010", parentId: null, content: "PRIVADO_CENTINELA_010" }] } };
   return { scene, showDmFogOverlay: false, camera: { center: { x: 10, y: 20 }, zoom: 1 }, mapImageUrl: "PRIVADO_URL_010", tokenImageUrls: {} };
 }
-export function stream(port: number, game: string, cookie: string, dm = false, cursor?: string) {
+export function stream(port: number, game: string, cookie: string, dm = false, cursor?: string, query = "") {
   const events: ContextualEvent[] = []; let bytes = "", ended = false;
   let response: import("node:http").IncomingMessage;
   let changed = () => {}; const listeners = new Set<() => void>();
   changed = () => { for (const listener of listeners) listener(); };
-  const req = request({ host: "127.0.0.1", port, path: `/api/v1/${dm ? "dm/" : ""}games/${game}/table/events`, headers: { host: "localhost:8787", origin, cookie, ...(cursor ? { "Last-Event-ID": cursor } : {}) } }, res => {
+  const req = request({ host: "127.0.0.1", port, path: `/api/v1/${dm ? "dm/" : ""}games/${game}/table/events${query}`, headers: { host: "localhost:8787", origin, cookie, ...(cursor ? { "Last-Event-ID": cursor } : {}) } }, res => {
     response = res; let buffer = "";
     res.on("data", chunk => { bytes += chunk; buffer += chunk; let end: number; while ((end = buffer.indexOf("\n\n")) >= 0) { const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2); const line = frame.split("\n").find(l => l.startsWith("data: ")); if (line) events.push(JSON.parse(line.slice(6))); } changed(); });
     const finish = () => { ended = true; changed(); }; res.on("end", finish); res.on("close", finish);

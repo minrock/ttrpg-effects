@@ -4,14 +4,15 @@ function position(): number | undefined { const value: unknown = history.state?.
 /** Aceptar popstate mueve el cursor existente; solo navigate crea una entrada. */
 export function useServiceNavigation(allowLeave: () => Promise<boolean>) {
   const [path, setPath] = useState(location.pathname);
+  const [locationKey, setLocationKey] = useState(`${location.pathname}${location.search}`);
   const index = useRef(position() ?? 0), busy = useRef(false), travel = useRef<null | { target:number; done:()=>void; promise:Promise<void> }>(null);
   const allow = useRef(allowLeave); allow.current = allowLeave;
   useEffect(() => { history.replaceState({ ...history.state, [key]: index.current }, "", location.href); }, []);
-  const replace = useCallback((next: string) => { history.replaceState({ ...history.state, [key]: index.current }, "", next); setPath(next); }, []);
-  const navigate = useCallback(async (next: string, beforeCommit?: () => void) => {
+  const replace = useCallback((next: string) => { history.replaceState({ ...history.state, [key]: index.current }, "", next); setPath(location.pathname); setLocationKey(`${location.pathname}${location.search}`); }, []);
+  const navigate = useCallback(async (next: string, beforeCommit?: () => boolean | void) => {
     if (busy.current) return false;
     busy.current = true;
-    try { if (!await allow.current()) return false; while(travel.current)await travel.current.promise; beforeCommit?.(); index.current++; history.pushState({ [key]: index.current }, "", next); setPath(next); return true; }
+    try { if (!await allow.current()) return false; while(travel.current)await travel.current.promise; if (beforeCommit?.() === false) return false; index.current++; history.pushState({ [key]: index.current }, "", next); setPath(location.pathname); setLocationKey(`${location.pathname}${location.search}`); return true; }
     finally { busy.current = false; }
   }, []);
   useEffect(() => {
@@ -37,10 +38,10 @@ export function useServiceNavigation(allowLeave: () => Promise<boolean>) {
         const accepted=await allow.current();
         // Otra pulsación durante el diálogo también vuelve a la posición retenida.
         await go(index.current);
-        if(accepted){await go(target);index.current=target;setPath(next);}
+        if(accepted){await go(target);index.current=target;setPath(next);setLocationKey(`${location.pathname}${location.search}`);}
       })().finally(()=>{busy.current=false;});
     };
     window.addEventListener("popstate", pop); return () => window.removeEventListener("popstate", pop);
   }, []);
-  return { path, navigate, replace };
+  return { path, locationKey, navigate, replace };
 }

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Minus, Plus, Settings2 } from "lucide-react";
+import { Eye, EyeOff, Minus, Plus } from "lucide-react";
 import { useState, type JSX } from "react";
 import {
   getSceneCounterVisualProgress,
@@ -10,32 +10,19 @@ interface SceneCountersOverlayProps {
   readonly viewRole: "dm" | "player";
   readonly onAdjust?: (counterId: string, delta: number) => void;
   readonly onSetPlayerVisibility?: (counterId: string, isVisibleToPlayers: boolean, isLabelVisibleToPlayers: boolean) => void;
-  readonly onManage?: () => void;
 }
 
 export function SceneCountersOverlay({
   counters,
   viewRole,
   onAdjust,
-  onSetPlayerVisibility,
-  onManage
+  onSetPlayerVisibility
 }: SceneCountersOverlayProps): JSX.Element | null {
   const [counterPendingPublication, setCounterPendingPublication] = useState<SceneCounter | null>(null);
-  if (counters.length === 0 && viewRole === "player") return null;
+  if (counters.length === 0) return null;
 
   return (
     <section className={`scene-counters-overlay is-${viewRole}`} aria-label="Contadores de escena">
-      {viewRole === "dm" ? (
-        <button
-          type="button"
-          className="scene-counters-overlay__manage"
-          onClick={onManage}
-          title="Administrar contadores de escena"
-          aria-label="Administrar contadores de escena"
-        >
-          <Settings2 size={15} aria-hidden="true" />
-        </button>
-      ) : null}
       <div className="scene-counters-overlay__stack">
         {counters.map((counter) => (
           <SceneCounterBar

@@ -13,10 +13,10 @@ async function stop() { sockets.splice(0).forEach(s => s.destroy()); await new P
 async function http(path, cookie, method = "GET", data, headers = {}) { return new Promise((resolve, reject) => {
   const req = request({ host: "127.0.0.1", port: server.address().port, path, method, headers: { host: "localhost:8787", origin, cookie, "content-type": "application/json", "idempotency-key": randomUUID(), ...headers } }, res => { const chunks = []; res.on("data", chunk => chunks.push(chunk)); res.on("end", () => { const bytes = Buffer.concat(chunks); let body; try { body = JSON.parse(bytes.toString()); } catch { /* assets */ } resolve({ status: res.statusCode, body, bytes, cookie: res.headers["set-cookie"]?.[0] }); }); }); req.on("error", reject); req.end(data === undefined ? undefined : JSON.stringify(data));
 }); }
-function stream(game, cookie) {
+function stream(game, cookie, query = "") {
   let ended = false, bytes = "", count = 0; const events = [], waiters = [];
   const changed = () => { for (const f of [...waiters]) f(); };
-  const req = request({ host: "127.0.0.1", port: server.address().port, path: `/api/v1/games/${game}/table/events`, headers: { host: "localhost:8787", origin, cookie } }, res => { sockets.push(res); let buffer = ""; res.on("data", chunk => { bytes += chunk; buffer += chunk; let end; while ((end = buffer.indexOf("\n\n")) >= 0) { const block = buffer.slice(0, end); buffer = buffer.slice(end + 2); const data = block.split("\n").find(line => line.startsWith("data: ")); if (data) { events.push(JSON.parse(data.slice(6))); count++; } } changed(); }); const done = () => { ended = true; changed(); }; res.on("end", done); res.on("close", done); }); sockets.push(req); req.end();
+  const req = request({ host: "127.0.0.1", port: server.address().port, path: `/api/v1/games/${game}/table/events${query}`, headers: { host: "localhost:8787", origin, cookie } }, res => { sockets.push(res); let buffer = ""; res.on("data", chunk => { bytes += chunk; buffer += chunk; let end; while ((end = buffer.indexOf("\n\n")) >= 0) { const block = buffer.slice(0, end); buffer = buffer.slice(end + 2); const data = block.split("\n").find(line => line.startsWith("data: ")); if (data) { events.push(JSON.parse(data.slice(6))); count++; } } changed(); }); const done = () => { ended = true; changed(); }; res.on("end", done); res.on("close", done); }); sockets.push(req); req.end();
   const until = predicate => predicate() ? Promise.resolve() : new Promise((resolve, reject) => { const timeout = setTimeout(() => reject(new Error("Tiempo de stream")), 10000); const check = () => { if (predicate()) { clearTimeout(timeout); waiters.splice(waiters.indexOf(check), 1); resolve(); } }; waiters.push(check); });
   return { events, until, get ended() { return ended; }, get bytes() { return bytes; }, get count() { return count; } };
 }
@@ -33,12 +33,15 @@ try {
   const guests = []; for (const alias of ["Ana", "Ana", "Tercero"]) { const guest = await http(path + "/admission", "", "POST", { alias, secret: oldSecret }); assert.equal(guest.status, 201); guests.push(guest); }
   await backend.identity.authorized(cookie, "dm", (_, tx) => tx.assets.create(input.asset, "image/png", Buffer.from(input.png, "base64")));
   const cmd = async (family, action, payload, mapContext = null) => http(dmPath + `/${family}/${action}`, cookie, "POST", { ...ctx, command: { requestId: randomUUID(), context: mapContext, payload } });
+  const dice = async (action, command) => http(dmPath + `/dice/v1/${action}`, cookie, "POST", { ...ctx, command: { requestId: randomUUID(), ...command } });
   const published = await cmd("table", "scene", input.snapshot); assert.equal(published.status, 200); const map = published.body.state.context;
-  await cmd("dice", "context", { token: map, sceneId: "scene", mapId: "map", sceneName: "PRIVADO_DADOS_010", mapName: "PRIVADO_DADOS_010" }, map);
-  const begun = await cmd("dice", "begin", { requestId: randomUUID(), contextToken: map, draft: input.draft, d20: null }, map); assert.equal(begun.status, 200);
-  assert.equal((await cmd("dice", "complete", { rollId: begun.body.value.rollId, simulation: input.simulation }, map)).status, 200);
-  const streams = guests.map(g => stream(id, g.cookie)); await Promise.all(streams.map(s => s.until(() => s.count > 0)));
-  assert.ok(streams[1].events[0].state.dice.presentation); assert.ok(!streams[1].bytes.includes("PRIVADO")); const epoch = streams[1].events[0].epoch;
+  assert.equal((await cmd("dice", "context", { token: map, sceneId: "scene", mapId: "map", sceneName: "PRIVADO_DADOS_010", mapName: "PRIVADO_DADOS_010" }, map)).status, 426);
+  const diceState = await http(dmPath + `/dice/v1/state?openingId=${ctx.openingId}&generation=${ctx.generation}`, cookie);
+  assert.equal(diceState.status, 200); const publicToken = diceState.body.state.public.publishedContext.token;
+  const begun = await dice("begin", { contextToken: publicToken, visibility: "public", selection: { groups: [{ id: "f", damageType: "fire", dice: { d6: 1 }, modifier: 0 }], includeD20: false, d20Modifier: 0, appearance: { color: "ruby", material: "resin" }, force: 1, d20: null } }); assert.equal(begun.status, 200);
+  assert.equal((await dice("complete", { rollId: begun.body.rollId, simulation: input.simulation })).status, 200);
+  const streams = guests.map(g => stream(id, g.cookie, `?openingId=${ctx.openingId}&generation=${ctx.generation}&diceVersion=1`)); await Promise.all(streams.map(s => s.until(() => s.count > 0)));
+  assert.ok(streams[1].events[0].state.serviceDice.public.presentation); assert.ok(!streams[1].bytes.includes("PRIVADO")); const epoch = streams[1].events[0].epoch;
   const kickId = randomUUID();
   const kicked = await http(dmPath + `/participants/${guests[0].body.participantId}/kick`, cookie, "POST", { ...ctx, expectedInvitationVersion: 1 }, { "if-match": "1", "idempotency-key": kickId }); assert.equal(kicked.status, 200);
   await streams[0].until(() => streams[0].ended); assert.equal(streams[1].ended, false); assert.equal(streams[2].ended, false);
@@ -48,7 +51,7 @@ try {
   assert.equal((await http(path + "/admission", "", "POST", { alias: "Nuevo", secret: kicked.body.invitationUrl.split("#invitacion=")[1] })).status, 201);
   await stop(); backend = await openModerationBackend(input.config, { publicOrigin: origin, secret }); await listen();
   const replay = await http(dmPath + `/participants/${guests[0].body.participantId}/kick`, cookie, "POST", { ...ctx, expectedInvitationVersion: 1 }, { "if-match": "1", "idempotency-key": kickId }); assert.equal(replay.status, 200); assert.equal(replay.body.secretAvailable, false); assert.equal(replay.body.invitationUrl, undefined); assert.equal(replay.body.invitation.version, 2);
-  const restarted = await http(path + "/table/state", guests[1].cookie); assert.equal(restarted.status, 200); assert.notEqual(restarted.body.state.epoch, epoch); assert.equal(restarted.body.state.snapshot, null); assert.equal(restarted.body.state.dice.presentation, null);
+  const restarted = await http(path + `/table/state?openingId=${ctx.openingId}&generation=${ctx.generation}&diceVersion=1`, guests[1].cookie); assert.equal(restarted.status, 200); assert.notEqual(restarted.body.state.epoch, epoch); assert.equal(restarted.body.state.snapshot, null); assert.equal(restarted.body.state.serviceDice.public.presentation, null);
   assert.equal((await http(dmPath + "/opening/heartbeat", cookie, "POST", ctx)).status, 200); assert.equal((await cmd("table", "scene", input.snapshot)).status, 200);
   process.stdout.write("API compilada010: mapa/dado/SSE/kick/401/supervivientes/enlaces/restart PASS\n");
 } catch (error) { process.stderr.write("Humo compilado010 falló: " + error.message + "\n"); process.exitCode = 1; }

@@ -14,13 +14,13 @@ describe("SceneMapsSection", () => {
     createDefaultSceneMap({ id: "inactive", name: "Cripta" })
   ];
   const onSelect = vi.fn(), onRename = vi.fn(), onReorder = vi.fn(), onDelete = vi.fn();
-  const onAddMap = vi.fn(), onImportScene = vi.fn(), onReplaceMapImage = vi.fn();
+  const onAddMap = vi.fn(), onReplaceMapImage = vi.fn();
 
   function render(busy = false, overrides: Partial<ComponentProps<typeof SceneMapsSection>> = {}): void {
     act(() => root.render(<SceneMapsSection
       maps={maps} activeMapId="active" onSelect={onSelect} onRename={onRename}
       onReorder={onReorder} onDelete={onDelete} onAddMap={onAddMap}
-      onImportScene={onImportScene} onReplaceMapImage={onReplaceMapImage} isReplacingImage={busy}
+      onReplaceMapImage={onReplaceMapImage} isReplacingImage={busy}
       {...overrides}
     />));
   }
@@ -128,10 +128,10 @@ describe("SceneMapsSection", () => {
     expect(container.querySelector('[aria-label="Seleccionar Entrada"]')?.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("routes adding, importing, renaming and deleting independently of selection", () => {
+  it("routes adding, renaming and deleting independently of selection", () => {
     const commands = container.querySelectorAll<HTMLButtonElement>(".scene-maps-actions button");
+    expect(commands).toHaveLength(1);
     act(() => commands[0].click());
-    act(() => commands[1].click());
     const input = container.querySelector<HTMLInputElement>('[aria-label="Nombre de Cripta"]')!;
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "Cripta norte");
@@ -139,7 +139,6 @@ describe("SceneMapsSection", () => {
     });
     act(() => container.querySelector<HTMLButtonElement>('[aria-label="Eliminar Cripta"]')!.click());
     expect(onAddMap).toHaveBeenCalledOnce();
-    expect(onImportScene).toHaveBeenCalledOnce();
     expect(onRename).toHaveBeenCalledExactlyOnceWith("inactive", "Cripta norte");
     expect(onDelete).toHaveBeenCalledExactlyOnceWith("inactive");
     expect(onSelect).not.toHaveBeenCalled();
@@ -185,6 +184,5 @@ describe("SceneMapsSection", () => {
     const commands = container.querySelectorAll<HTMLButtonElement>(".scene-maps-actions button");
     act(() => commands.forEach((button) => button.click()));
     expect(onAddMap).toHaveBeenCalledOnce();
-    expect(onImportScene).toHaveBeenCalledOnce();
   });
 });

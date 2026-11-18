@@ -1,0 +1,4 @@
+interface:
+  display_name: "Factory"
+  short_description: "Prepara una especificación con este hilo como PM"
+  default_prompt: "Usa $factory para especificar esta necesidad con este hilo como PM: [describe el resultado que necesitas]."

@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "spec": "59-campanas-arcos-escenas",
+  "functionalRevision": "0.3",
+  "date": "2026-11-13",
+  "recordedAtUtc": "2026-11-14T02:37:55.758087+00:00",
+  "version": "3.28.1",
+  "status": "implemented-and-validated-locally-not-integrated",
+  "baseCommit": "6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598",
+  "branch": "feature/spec-59-campanas-arcos-escenas",
+  "historicalEvidence": "evidencia.json (revision 0.2; not rerun for this delta)",
+  "acceptanceCriteria": {
+    "CA-13": "verified: contextual pending-draft recovery and no global archive",
+    "CA-14": "verified: direct entry, preserved opening/invitation and explicit close without autoentry",
+    "CA-15": "verified: compact footer, full detail at 390px and Chrome 200%, Electron service/local"
+  },
+  "gates": [
+    {
+      "command": "pnpm exec vitest run src/web/ServiceApp.test.tsx src/web/GameEditor.authority.test.tsx src/web/DraftRecovery.test.tsx src/renderer/src/App.workspace.test.tsx --exclude '.local/**' --reporter=dot",
+      "passed": 90,
+      "failed": 0,
+      "log": ".local/validation/ui59/logs/ui59-final-regression.log"
+    },
+    {
+      "command": "pnpm exec vitest run src/renderer/src/App.workspace.test.tsx src/web/ServiceApp.test.tsx src/infrastructure/browser/scene-save-recovery.test.ts src/infrastructure/browser/owned-client.test.ts --exclude '.local/**' --reporter=dot",
+      "passed": 58,
+      "failed": 0,
+      "overlapsFinalGate": true,
+      "log": ".local/validation/ui59/logs/ui59-final-tests.log"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build:web (includes pnpm typecheck)",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "manualEvidence": "validacion.md#ajuste-de-experiencia-03--2026-11-13",
+  "environment": {
+    "service": "synthetic loopback 8877",
+    "database": "isolated SQLite schema 10",
+    "electron": "isolated userData profile",
+    "apiBundleMetadata": "3.27.2, reused validated spec59 backend",
+    "webAndElectronVersion": "3.28.1",
+    "operationalService8787Modified": false
+  },
+  "logs": [
+    {
+      "path": ".local/validation/ui59/logs/ui59-final-regression.log",
+      "sha256": "5dfd2ca8c9f46d4add7601aa12764fefed6e7e4fbcae10c363caca6c18ed3500",
+      "bytes": 44018
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-final-tests.log",
+      "sha256": "12b0c95d72e0b6310d79e54c38192fb61799abf6ed2f4680baeaa07753c32b3f",
+      "bytes": 28705
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-final-lint.log",
+      "sha256": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+      "bytes": 11
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-final-build-web.log",
+      "sha256": "ab0691073c56fa3b4019636286a8f67c3f13a01cf573fbc92bce52806485c81c",
+      "bytes": 3595
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-final-build-electron.log",
+      "sha256": "1917effca901f379a8285f3a68fcf3020240a9fb1ea6157b2747db9cc2054a5e",
+      "bytes": 3562
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-entry-before-switch.json",
+      "sha256": "88eda136337055f5aa5e8dba410ccfa7c783e1f4a8a3c6b5567505ea342de4e2",
+      "bytes": 1319
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-entry-after-switch.json",
+      "sha256": "88eda136337055f5aa5e8dba410ccfa7c783e1f4a8a3c6b5567505ea342de4e2",
+      "bytes": 1319
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-after-close.json",
+      "sha256": "48f8d6135670e0cd648967dec1fc7a1b3aecb907c23fba533c1f44a1fabd2855",
+      "bytes": 1320
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-electron-connected.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-electron-standalone.log",
+      "sha256": "ad0d2dbc5f7ece464e80b5d57a1b0bb3b6d1625779947ea6fc9480d7e5de01a2",
+      "bytes": 173
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-electron-standalone-final.log",
+      "sha256": "fa5d2ec5bfb1b27c4b9622c5583898eaaa14212bd6faa27e0afcf274a980b891",
+      "bytes": 173
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-integration.log",
+      "sha256": "867950e18a3c15116724bd0df6c3f5e7b27fc8d17307c873e3382f09b36fd8c9",
+      "bytes": 34736
+    },
+    {
+      "path": ".local/validation/ui59/logs/ui59-workspace.log",
+      "sha256": "5d86a7d63e6ce2afe9c75042f3244f3ef22c7a2776074736701cd80b81821bbc",
+      "bytes": 36642
+    }
+  ],
+  "screenshots": [
+    {
+      "path": ".local/validation/ui59/chrome-footer-200.png",
+      "sha256": "4dcc35d12bcce51fd5b093031e32b98465c421fc42ec51e608cf5988d6a641e2",
+      "bytes": 594231
+    },
+    {
+      "path": ".local/validation/ui59/editor-footer.png",
+      "sha256": "a020d9cd76871e004790d3832da644cb601b49fafaf6e00dfa83c4b2dfcfdcdf",
+      "bytes": 64149
+    },
+    {
+      "path": ".local/validation/ui59/electron-campaigns.png",
+      "sha256": "9cfd5a6c34dabc08d334855a09200b4d4e42402d87bcd97cc3615be17905e07c",
+      "bytes": 284663
+    },
+    {
+      "path": ".local/validation/ui59/electron-editor-footer.png",
+      "sha256": "9781c13c0543e735782325f2de72fedf398e9e2ac5ba4d0a4c496fb2c9d082b4",
+      "bytes": 510959
+    },
+    {
+      "path": ".local/validation/ui59/electron-standalone.png",
+      "sha256": "782d2d4e1b044d59e550319d106f4a57a0b05cd0670fb9fe16081c24c512bcec",
+      "bytes": 451807
+    },
+    {
+      "path": ".local/validation/ui59/footer-390.png",
+      "sha256": "b5366c09ce8e1d9165f0e529356c38dd038308f7c8678b4adbb99e5ef7bfc6b2",
+      "bytes": 39744
+    },
+    {
+      "path": ".local/validation/ui59/recovery-context.png",
+      "sha256": "e0ca6bde9afebea6ac4fc9c577e2bcc04f59ca710efac6218d0fbe6ff2ed4067",
+      "bytes": 37249
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "src/web/ServiceApp.tsx",
+      "sha256": "51450df5c1249de890428d5209b381ceb603dec1678e0fbb711c1889aa9cfeae",
+      "bytes": 11608
+    },
+    {
+      "path": "src/web/ServiceApp.test.tsx",
+      "sha256": "19c31f54b0426e78214653cb469fdac587c1013879e495428da8e910602e2396",
+      "bytes": 15691
+    },
+    {
+      "path": "src/web/GameEditor.tsx",
+      "sha256": "f08cf29a56bc72ed6cf3ccd9bac70ab837ecef77ace93ac4e3980634048436b3",
+      "bytes": 27096
+    },
+    {
+      "path": "src/web/GameEditor.authority.test.tsx",
+      "sha256": "99578b8c33a990ef8ebb09a480031f21d59be5b2cb5d618dd8dd8fb0b4e42ac9",
+      "bytes": 26223
+    },
+    {
+      "path": "src/web/GameEditor.test.tsx",
+      "sha256": "4e681a1fe45dbc9be565c4135418a24604ff6411834d723571c647a8576b4296",
+      "bytes": 4356
+    },
+    {
+      "path": "src/web/DraftRecovery.tsx",
+      "sha256": "26157d56430e6bbc20f0d88119dce60bcc2700fd781a86818d8e96782b1993d0",
+      "bytes": 8629
+    },
+    {
+      "path": "src/web/DraftRecovery.test.tsx",
+      "sha256": "fcc7b0a00e3012218864aa636cb33efc711d1770d1b9ce2cfc7e527119cf5132",
+      "bytes": 10077
+    },
+    {
+      "path": "src/web/use-service-navigation.ts",
+      "sha256": "b5a2611af5539afa8e56e7adcb4df0ae73b1db80facbfb9ae98f1d218633df95",
+      "bytes": 3003
+    },
+    {
+      "path": "src/web/workspace.ts",
+      "sha256": "f568ea54557538b194c08c20ef77bab262bc606205025fb16e4bcbf3e0c9cf1f",
+      "bytes": 803
+    },
+    {
+      "path": "src/web/service.css",
+      "sha256": "73ff4b14d2a263e4fad98b28b40fcf814111f662aa7743d347443ea78bde1cc5",
+      "bytes": 18756
+    },
+    {
+      "path": "src/renderer/src/App.tsx",
+      "sha256": "79c0450ec2f9189a22566dd3eb126f60cb178095a3515a95323ce4b2218e18b3",
+      "bytes": 214525
+    },
+    {
+      "path": "src/renderer/src/App.workspace.test.tsx",
+      "sha256": "6aa1ddfe0561c41392fc9b3a71bd059664bbf6771bdf0bc347dfe17a7a0a7375",
+      "bytes": 50954
+    },
+    {
+      "path": "src/renderer/src/components/workspace/workspace.css",
+      "sha256": "bf3a7cb4c05fad3f147184d7e002ca9d90e0e2c594be853c8b02a5adaa0978e0",
+      "bytes": 17503
+    },
+    {
+      "path": "package.json",
+      "sha256": "8f7233b0803eebdcc19f8e119b03f54929d6973a23387d659ad84c9c19868fbd",
+      "bytes": 5504
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "fa56b16658acc8fbbd5b42020761e14bdd8ab5a1c0f985479e996fdcbb719ea4",
+      "bytes": 54834
+    }
+  ],
+  "specSha256": "6f6b3cd8c92c1fb81afa414d507f053711edf821152808570adcb19c03919bac",
+  "limitations": [
+    "No repeat of 0.2 general/backend full gates; frontend-only delta.",
+    "Earlier concurrent workspace run had six timing failures; isolated32 and final90 passed. React act/bundle warnings retained.",
+    "Initial autonomous smoke failed due private harness appPath/icon; launcher fixed and uninstrumented final build passed.",
+    "Autonomous smoke covers startup/composition; file roundtrip evidence remains historical0.2.",
+    "No commit, push, merge, DMG or deployment."
+  ]
+}

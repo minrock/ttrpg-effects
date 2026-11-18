@@ -237,3 +237,14 @@ Reglas de integridad:
 - `SDD/specs/18-scene-management/spec.md` y `SDD/specs/29-multi-map-scenes/spec.md`: propiedad y persistencia de estado a nivel de escena.
 - `SDD/specs/15-player-window/spec.md`: sincronizacion de snapshots hacia Player View.
 - `SDD/specs/20-combat-turn-tracker/spec.md`: coexistencia visual y funcional con el turnero, sin dependencia de reglas de combate.
+
+
+## Retirada del acceso flotante de gestión — 2026-11-17
+
+Petición de implementación del usuario: eliminar el control de contadores señalado en la captura. El elemento identificado es el botón `Settings2` «Administrar contadores de escena» del overlay. Este ajuste retira ese acceso duplicado; la administración permanece en «Contadores» de la cabecera compartida (SDD54), incluidas sus herramientas compactas.
+
+- **FIX01-CA01:** el mapa no presenta el botón flotante de administración ni un overlay vacío cuando no hay contadores.
+- **FIX01-CA02:** la cabecera sigue abriendo el gestor y las barras existentes conservan ajuste de valores y publicación; Player View conserva sus barras de lectura. Sin cambios en datos, persistencia o contratos.
+- **FIX01-CA03:** consumidores, CSS e historia de Storybook coherentes con la retirada; comprobación visual y typecheck/lint dirigidos, patch y changelog documentados. No se requieren pruebas nuevas para esta retirada visual reversible.
+
+Estado del ajuste: implementado y validado localmente en **3.32.2**; [evidencia de FIX-01](validacion-fix-01.md). No modifica la evidencia histórica de la spec ni autoriza integración Git.

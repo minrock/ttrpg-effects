@@ -6,13 +6,16 @@ import type { PlayerWindowSnapshot, ViewportCameraSnapshot } from "../../domain/
 import type { PlayerCameraCommand, PlayerCameraReport } from "../../domain/player/player-camera-control";
 import type { TableEvent, TableState } from "../../shared/contracts/table";
 import type { ServiceRole } from "../../shared/contracts/http-api";
+import { ServiceDiceSession, type ServiceDiceActor } from "./service-dice-session";
+import type { ServiceDiceState } from "../../shared/contracts/service-dice";
 
 export class TableConflict extends Error {}
-interface Connection { focus: boolean; id: string; owner: string; role: ServiceRole; participant?: string; emit: (event: TableEvent) => void; report: PlayerCameraReport | null; ready: boolean; imageStatus: "waiting" | "loading" | "ready" | "error"; lastReport: number }
+interface Connection { focus: boolean; id: string; owner: string; role: ServiceRole; participant?: string; emit: (event: TableEvent) => void; report: PlayerCameraReport | null; ready: boolean; imageStatus: "waiting" | "loading" | "ready" | "error"; lastReport: number; serviceActor?: ServiceDiceActor; diceVersion: boolean }
 /** Transiciones síncronas: snapshot y permisos se actualizan juntos. */
 export class TableSession {
   readonly epoch: string;
   readonly dice: DiceRollSession;
+  readonly serviceDice: ServiceDiceSession;
   readonly annotations: SharedAnnotations;
   context: string | null = null;
   revision = 0;
@@ -33,6 +36,14 @@ export class TableSession {
     this.epoch = id();
     this.annotations = new SharedAnnotations(now, id, () => this.emit("annotations", null));
     this.dice = new DiceRollSession((role, payload) => this.emit("dice", payload, role), now, id);
+    this.serviceDice = new ServiceDiceSession(change => this.emitServiceDice(change.public, change.dm), now, id);
+  }
+  private emitServiceDice(publicChanged: boolean, dmChanged: boolean): void {
+    for (const connection of this.connections.values()) {
+      if (!connection.diceVersion || !connection.serviceActor) continue;
+      if (connection.role === "player" ? !publicChanged : !dmChanged) continue;
+      connection.emit(this.event("service-dice" as TableEvent["type"], connection.role, this.serviceDice.state(connection.serviceActor)) as TableEvent);
+    }
   }
   get connectionCount() { return this.connections.size; }
   get primary() { return [...this.connections.values()].find(c => c.role === "player") ?? null; }
@@ -48,6 +59,10 @@ export class TableSession {
       pointer: this.pointer && this.pointer.expiresAt > this.now() ? this.pointer : null,
       highlight: this.highlight && this.highlight.expiresAt > this.now() ? this.highlight : null };
   }
+  serviceState(actor: ServiceDiceActor): ServiceDiceState { return this.serviceDice.state(actor); }
+  stateWithService(role: ServiceRole, actor: ServiceDiceActor, connectionId?: string): TableState & { diceVersion: 1; serviceDice: ServiceDiceState } {
+    return { ...this.state(role, connectionId), diceVersion: 1, serviceDice: this.serviceDice.state(actor) };
+  }
   sizes(role: ServiceRole) { const sizes = this.dice.getSizes(); return role === "dm" ? sizes : { revision: sizes.revision, dm: 1, player: sizes.player }; }
   transportSequence(role: ServiceRole) { return ++this.sequence[role]; }
   private event(type: TableEvent["type"], role: ServiceRole, payload?: unknown): TableEvent {
@@ -59,11 +74,12 @@ export class TableSession {
       for (const c of this.connections.values()) if (c.role === audience) c.emit(event);
     }
   }
-  connect(owner: string, role: ServiceRole, emit: Connection["emit"], participant?: string, focus = false): { id: string; close: () => void } {
+  connect(owner: string, role: ServiceRole, emit: Connection["emit"], participant?: string, focus = false, serviceActor?: ServiceDiceActor, diceVersion = false): { id: string; close: () => void } {
     // HTTP reemplaza el stream anterior de esta sesión antes de conectar.
     const id = this.id();
-    this.connections.set(id, { id, owner, role, participant, focus, emit, report: null, ready: false, imageStatus: this.snapshot ? "loading" : "waiting", lastReport: -Infinity });
-    emit({ ...this.event("bootstrap", role), state: this.state(role, id) });
+    const connection: Connection = { id, owner, role, participant, focus, emit, report: null, ready: false, imageStatus: this.snapshot ? "loading" : "waiting", lastReport: -Infinity, serviceActor, diceVersion };
+    this.connections.set(id, connection);
+    emit({ ...this.event("bootstrap", role), state: diceVersion && serviceActor ? this.stateWithService(role, serviceActor, id) : this.state(role, id) } as TableEvent);
     this.emit("presence", this.presence(), "dm");
     return { id, close: () => {
       const wasPrimary = this.primary?.id === id;
@@ -73,7 +89,7 @@ export class TableSession {
       if (promoted) { promoted.report = null; promoted.ready = false; }
       this.emit("presence", this.presence(), "dm");
       // Solicitar confirmación actual sin una nueva orden ni cambiar navegación local.
-      if (promoted) promoted.emit({ ...this.event("bootstrap", "player"), state: this.state("player", promoted.id) });
+      if (promoted) promoted.emit({ ...this.event("bootstrap", "player"), state: promoted.diceVersion && promoted.serviceActor ? this.stateWithService("player", promoted.serviceActor, promoted.id) : this.state("player", promoted.id) } as TableEvent);
     } };
   }
   publish(snapshot: PlayerWindowSnapshot | null): void {
@@ -87,6 +103,8 @@ export class TableSession {
       for (const c of this.connections.values()) { c.report = null; c.ready = false; c.lastReport = -Infinity; }
       // Invalidar la finalización pendiente antes de recibir el contexto de dados nuevo.
       this.dice.setContext({ token: this.context, sceneId: "", mapId: "", sceneName: "", mapName: "" });
+      // Sin mapa activo no existe un marco físico publicado para una tirada de servicio.
+      this.serviceDice.setPublishedContext(projected && snapshot?.scene.activeMapId ? { token: this.context, sceneId: snapshot.scene.id, mapId: snapshot.scene.activeMapId, label: "Mesa publicada" } : null);
     }
     if (!changed && JSON.stringify([this.snapshot?.scene.grid, this.snapshot?.scene.settings]) !== JSON.stringify([projected?.snapshot.scene.grid, projected?.snapshot.scene.settings])) this.annotations.cancelPreviews();
     this.annotations.sceneId = snapshot?.scene.id ?? null;

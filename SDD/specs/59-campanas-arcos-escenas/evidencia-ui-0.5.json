@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "spec": "59-campanas-arcos-escenas",
+  "functionalRevision": "0.5",
+  "date": "2026-11-14",
+  "recordedAtUtc": "2026-11-14T21:13:23.338598+00:00",
+  "version": "3.29.1",
+  "status": "implemented-and-validated-locally-not-integrated",
+  "baseCommit": "6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598",
+  "branch": "fix/sidebar-administracion",
+  "historicalEvidence": [
+    "evidencia.json (0.2; not rerun)",
+    "evidencia-ui-0.3.json (not rerun)",
+    "evidencia-ui-0.4.json (not rerun)",
+    "../60-storybook-componentes-ui/evidencia/catalogo.json (3.29.0 historical index)"
+  ],
+  "acceptanceCriteria": {
+    "CA-19": "verified: structural 240px full-height administration sidebar, no former floating campaign navigation or exterior hamburger dropdown",
+    "CA-20": "verified: desktop toggle; mobile dialog, focus containment/restoration, Escape/scrim/navigation, 959↔960 transition; authority loss with open drawer tested",
+    "CA-21": "verified: DM contextual hierarchy, one active item, breadcrumbs, admin routes and legacy fallback; async title focus and no reload on shell toggle tested",
+    "CA-22": "verified: 390/959/960/1440 geometry, native Chrome 200%, connected Electron editor entry/return, 182 unchanged editor/native source hashes and regression checks",
+    "CA-23": "verified: AdminShell/AdminSidebar stories, CampaignPanel composition, 59 stories/31 docs, isolated build, checks and version/changelog"
+  },
+  "checks": {
+    "targetedRegression": {
+      "files": 7,
+      "passed": 69,
+      "command": "pnpm exec vitest run src/web/AdminShell.test.tsx src/web/ServiceApp.test.tsx src/web/campaigns/CampaignCatalog.test.tsx src/web/campaigns/CampaignPanel.test.tsx src/web/HeaderDropdown.test.tsx src/web/GameEditor.test.tsx src/web/GameEditor.authority.test.tsx --exclude '**/.local/**' --maxWorkers 4 --reporter=dot"
+    },
+    "passed": [
+      "pnpm typecheck",
+      "pnpm lint",
+      "pnpm build:web",
+      "pnpm build",
+      "pnpm build-storybook",
+      "git diff --check"
+    ],
+    "warnings": [
+      "Existing React act warnings in regression tests",
+      "Build chunk-size and module-directive warnings"
+    ]
+  },
+  "responsive": [
+    {
+      "gridColumns": "336px",
+      "headerHeight": 44,
+      "oldNavigation": 0,
+      "scrollWidth": 390,
+      "sidebar": null,
+      "viewport": {
+        "height": 900,
+        "width": 390
+      }
+    },
+    {
+      "gridColumns": "848.125px",
+      "headerHeight": 44,
+      "oldNavigation": 0,
+      "scrollWidth": 959,
+      "sidebar": null,
+      "viewport": {
+        "height": 900,
+        "width": 959
+      }
+    },
+    {
+      "gridColumns": "304px 304px",
+      "headerHeight": 44,
+      "oldNavigation": 0,
+      "scrollWidth": 960,
+      "sidebar": {
+        "height": 900,
+        "width": 240,
+        "x": 0,
+        "y": 0
+      },
+      "viewport": {
+        "height": 900,
+        "width": 960
+      }
+    },
+    {
+      "gridColumns": "522px 522px",
+      "headerHeight": 44,
+      "oldNavigation": 0,
+      "scrollWidth": 1440,
+      "sidebar": {
+        "height": 900,
+        "width": 240,
+        "x": 0,
+        "y": 0
+      },
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      }
+    }
+  ],
+  "adminFocus": {
+    "toSystems": {
+      "focus": "Sistemas y versiones",
+      "tag": "H2",
+      "drawer": false
+    },
+    "back": {
+      "drawer": false,
+      "focus": "Cuentas DM",
+      "inert": false,
+      "tag": "H2"
+    },
+    "same": {
+      "drawer": false,
+      "focus": "Cuentas DM",
+      "tag": "H2"
+    }
+  },
+  "editorSourceComparison": {
+    "files": 182,
+    "changed": []
+  },
+  "manualQA": {
+    "mobile": "390×844 dialog and sidebar fit viewport; Tab/Shift+Tab contained, Escape restores hamburger; actual API admin navigation focuses resulting h2 and clears inert",
+    "breakpoint": "959→960 open drawer closes and focuses Ocultar navegación; desktop focus within sidebar→959 focuses Mostrar navegación",
+    "zoom": "Native Chrome menu verified 200%; content and controls readable with vertical scroll and no visible horizontal clipping. Reset verified 100%; synthetic tab closed.",
+    "electron": "Connected Electron 3.29.1: campaigns→arcs→scenes→editor; admin sidebar absent in editor; existing navigation menu returns to campaigns and focuses h1.",
+    "storybook": "New AdminSidebar DM/admin/legacy variants rendered; AdminShell DM/admin responsive interactions and CampaignPanel normal rendered with no console errors observed."
+  },
+  "environment": {
+    "fixtureRoot": "/private/tmp/ttrpg-sdd59-validation-avgyi1z3",
+    "fixtureOrigin": "http://127.0.0.1:8877",
+    "apiMetadataVersion": "3.27.2 (reused schema10 QA backend; frontend/native bundles3.29.1)",
+    "operationalService8787": "not modified or restarted by this delta",
+    "storybook": "http://127.0.0.1:6006/"
+  },
+  "limits": [
+    "No new standalone Electron runtime smoke; 182 editor/main/preload source hashes unchanged from delta baseline.",
+    "No general backend, migrations, data transfer, projection/GPU or complete accessibility recertification.",
+    "No commit, push, merge, DMG or publication authorized/performed."
+  ],
+  "productSha256": {
+    "src/web/AdminShell.tsx": "c07ce67c2f06a49fcad271f10d6025ddb6408ef59b5047982f08240310ab7c59",
+    "src/web/AdminSidebar.tsx": "63b45ddbe85f4c135a3bd4adf9455aad4e91866ed38b46317c8bb74380d51766",
+    "src/web/AdminShell.test.tsx": "425d80e52ecfbfae5e49689f621ea7ea1e0cf84ee323a4929966d10681adc33a",
+    "src/web/ServiceApp.tsx": "8b559ed253aedc6f5a9fdc1145f4d4ff7c96c9c114482eb77868d06477e70648",
+    "src/web/ServiceApp.test.tsx": "2d705a4a600fe7c33dedfbf03392ef61cfef42dea155d23c4e39e6a48a835da8",
+    "src/web/service.css": "38d7b89f0b8cb4a6444b0db5dbca856f12c60516f634fb611c7aa83249cad27d",
+    "src/web/campaigns/CampaignCatalog.tsx": "04bc8142127dc165081f8bf293f768547be508d1de98837c8939a29a9356549a",
+    "src/web/campaigns/CampaignCatalog.test.tsx": "a6bd8db46beaf4d94339e76d320fe3b5073b87548b825f296af0eae7e0329836",
+    "src/web/campaigns/CampaignPanel.tsx": "bcf7339cfa0cc2422635814af7b73f4921f4e9a021b03df82e3364c143dcb501",
+    "src/web/campaigns/CampaignPanel.test.tsx": "df0b65c7c98ba885ef9172546689d9dfc1d00a015c53ac15fcc29111f24d8310",
+    "src/stories/compositions/navigation-feedback/AdminShell.stories.tsx": "9f5c1fb85c9fcf700075aae1619ef335b50f68ea39b6b434d1b35ea55ef277d9",
+    "src/stories/compositions/navigation-feedback/AdminSidebar.stories.tsx": "95a7cfeb651ba9f578a7e47770d385e7a18a1a0909cf5c0acb682739ddcbfe1d",
+    "src/stories/compositions/content/CampaignPanel.stories.tsx": "1fa92539a14fe3178fd9d551bbb9efdd6ea0d0cf505c01b9e59964d7b9d70f43",
+    ".storybook/preview.tsx": "cd7c181785b493aef9f8d87098f405a021e40a4b1a739f0ef74e11f819850602",
+    ".storybook/preview.css": "2775517bebcdd525ae9325e57d9afbcaeb5a3efcff22ecec72ad8f3320486f7d",
+    "package.json": "46d18807f428c4ad120ad110c893fd81f9ff989a12267b358ff4115b1f0892d8",
+    "CHANGELOG.md": "99b6d35761ea759a42d8fe093a9b108c667b09ec69cb500d2b85bd3c2c88dd68"
+  },
+  "privateArtifactsSha256": {
+    ".local/validation/sidebar59-05/logs/t10-final-regression.log": "478df79211cb94b49ac304de19f092f823faab6b2c198b11bc5af9bad909bc08",
+    ".local/validation/sidebar59-05/logs/t10-final-lint.log": "050c69da23536758722729aeda55a8d0fb9d557495ef6d33d70873a3b64a71c1",
+    ".local/validation/sidebar59-05/logs/t10-typecheck.log": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+    ".local/validation/sidebar59-05/logs/t10-final-build-web.log": "aa624f1f462c8a4354dd01ba0f39138a4783305277e6c9aca0074c4cd18b6569",
+    ".local/validation/sidebar59-05/logs/t10-final-build-electron.log": "8b44b57dbf9c38a438a91e4417cc46da123b089e05071d83017c2eb7c96596a9",
+    ".local/validation/sidebar59-05/logs/t10-final-build-storybook.log": "ffc1d5fed9d6cd9388f295e23463c8c974d05dd7e53fd8cb6324505480ec14b7",
+    ".local/validation/sidebar59-05/campaigns-1440.png": "9f5997bfcb2c3371891bcf6a15dfbf6730b68baf3d23750f8a0589cce84edeef",
+    ".local/validation/sidebar59-05/drawer-390.png": "7594abe64439945384a5c4dc6c07768a4f0bc8b2aac03048c22364c308b8045d",
+    ".local/validation/sidebar59-05/electron-sidebar.png": "7468a02c450a35756e579560d8c01faf9d9a0120b4b7879ae6d42270db04554c",
+    ".local/validation/sidebar59-05/electron-editor.png": "f06654c00f2fdc2186a25dcb27f978382c5c7187faf01ec01c66196953fcd30a",
+    ".local/validation/sidebar59-05/chrome-200.png": "eabb6b8c751dbaac4ea3d8e6281c256152cae1132e7d2deffcc7270e9cdaeb8e",
+    ".local/validation/sidebar59-05/chrome-200-controls.png": "610598c4c5565eba2f0feb5da768f0449d4a6b712c6c3847a4b24c6982af9c3b",
+    ".local/validation/sidebar59-05/responsive.json": "8950dafa4ac8ad81a85ffa94c619d7c8e4c7ba72cb1fc8b8bfe15a24648cae2d",
+    ".local/validation/sidebar59-05/admin-focus.json": "e4549e6dae9d1ae6e7ae39f27a9c767679964c9266e1fea675e1a0c48f3ba448",
+    ".local/validation/sidebar59-05/editor-comparison.json": "b19298e7fff31b2d03373cf58ce7028bdff230230d0b564521df17b5537038bf",
+    ".local/validation/sidebar59-05/storybook-index.json": "593e2e9444ec7da7e80dab46a5c8fa4ec875f5316ecd8cbe003e75026b6d59ae"
+  }
+}

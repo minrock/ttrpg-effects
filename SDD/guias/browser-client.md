@@ -85,3 +85,10 @@ Crear o eliminar figuras inicia la escritura local inmediatamente; el resto de e
 «Recuperar borradores de mis partidas», en el listado de partidas, incluye partidas archivadas/eliminadas y permite crear una copia en una partida compatible. Desde 3.27.0, una sola copia por cuenta/partida/escena, 20 escenas con respaldo remoto pendiente y 256 MiB por cuenta (incluyendo copias confirmadas); límite local 50 MiB por origen y sobre 10 MiB. Al agotarse espacio, exporta o descarta explícitamente una rama: no se borran otras escenas para hacer sitio. Los cambios reemplazan la copia anterior y reabrir reutiliza el mismo respaldo.
 
 El aviso del editor explica que IndexedDB contiene datos privados sin cifrado específico de la app. Puedes desactivar/eliminar el respaldo local. Caducar la cuenta conserva respaldos; cerrar sesión explícitamente elimina los locales de esa cuenta e invalida escritores antiguos. Los borradores remotos permanecen privados. Electron conectado conserva IndexedDB por origen, pero limpia credenciales antes de cargar el servicio. El entorno autónomo mantiene su guardado anterior.
+
+
+## Dados de jugadores — SDD 61
+
+Desde la entrega local 3.32.0, el puerto opcional `TtrpgClient.serviceDice` conecta el compositor compartido del DM y del jugador con el protocolo C-61. El jugador dispone de Mesa/Dados en su panel; todas sus tiradas son públicas. Autor y DM pueden cerrar la tirada en pantalla, y el historial conserva los resultados después del cierre. Tamaño y sonido son preferencias de cada vista. Electron autónomo conserva el puerto de dados local.
+
+La negociación, autoridad, idempotencia, cuotas y ciclo de vida están en [mesa sincronizada](synchronized-table.md#dados-de-jugadores--sdd-61); el estado real de validación se registra en [SDD 61](../specs/61-dados-jugadores/validacion.md).

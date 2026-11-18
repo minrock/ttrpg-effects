@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 1,
+  "spec": 59,
+  "functionalRevision": "0.2",
+  "date": "2026-11-13",
+  "recordedAtUtc": "2026-11-14T01:35:51.872900+00:00",
+  "status": "validated-locally-not-integrated",
+  "version": "3.28.0",
+  "baseCommit": "6d1f1959e92fda3c55ae6ad2b4c413d4f92e7598",
+  "branch": "feature/spec-59-campanas-arcos-escenas",
+  "environment": {
+    "data": "synthetic-only",
+    "sqlite": "isolated temporary databases",
+    "postgresql": "18, TLS 1.3, certificate verification and SCRAM",
+    "postgresTools": "pg_dump/pg_restore 18.7",
+    "platforms": [
+      "Chromium browser DM",
+      "Chrome browser DM",
+      "Electron connected DM",
+      "Browser guest",
+      "Electron standalone"
+    ],
+    "rawEvidenceDirectory": "/private/tmp/ttrpg-sdd59-validation-avgyi1z3/logs"
+  },
+  "acceptanceCriteria": [
+    "CA-01",
+    "CA-02",
+    "CA-03",
+    "CA-04",
+    "CA-05",
+    "CA-06",
+    "CA-07",
+    "CA-08",
+    "CA-09",
+    "CA-10",
+    "CA-11",
+    "CA-12"
+  ],
+  "gates": [
+    {
+      "name": "general",
+      "report": "general-final-3.28.0.json",
+      "reportSha256": "ad5d67c7d92339f535a91a67b61d3302b8ce65cb0deeb3b6f51f63a6833c1a6e",
+      "total": 1451,
+      "passed": 1451,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "database",
+      "report": "db-final.json",
+      "reportSha256": "424a71a7135f8400a236b8c4dde2c1722be964ce6f8eb16178d350a28fab6c23",
+      "total": 32,
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "identity",
+      "report": "identity-final-rebuilt.json",
+      "reportSha256": "66f29375124b0faa91fc1e42cf5fa72a67bcac2b4ef9b1225cf66113d79453a8",
+      "total": 27,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "owned",
+      "report": "owned-full-final.json",
+      "reportSha256": "6817383409fc5d14b98535a28be65d04499a2498b39c098bf2b431edb6c2a4b0",
+      "total": 80,
+      "passed": 80,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "invitations",
+      "report": "invitations-final.json",
+      "reportSha256": "3fffb22a6db649353a017ae7c5f6e906f659dad7389ecf494ee7458d3bc2a8e8",
+      "total": 36,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "moderation",
+      "report": "moderation-final.json",
+      "reportSha256": "555dd7b5aebc16e8e244a31053356b7f4c7a4d9026670dacaf7fad2f685cd1bb",
+      "total": 51,
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "preparation-directed",
+      "report": "preparation-final.json",
+      "reportSha256": "cec626845c1bcf33e1f42ecf2be1d6509c8ebf6ded32258ba42cd247187718a3",
+      "total": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "transfer-v4-directed",
+      "report": "transfer-v4-final.json",
+      "reportSha256": "8456f1fcdfcf4e4f596db21821d3e3c447719b6dcb3c2dc43bb6ea007b86e93b",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "legacy-readers-directed",
+      "report": "revision-3-final.json",
+      "reportSha256": "df3681a9c523ddba8a3edf4511a170c7dd3e541e6fb94dacc958fe12c84119f7",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    },
+    {
+      "name": "backup-restore-directed",
+      "report": "moderation-restore-final.json",
+      "reportSha256": "e5f7d0cec8a89d7958eb4b85028e42608a8436ba01e752df19393977c8d2563d",
+      "total": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "success": true
+    }
+  ],
+  "legacyV1Cases": [
+    {
+      "name": "Correcciones ronda 3 sqlite lector v1 auténtico reconstruye bindings y sistema genérico antes del backfill",
+      "status": "passed",
+      "durationMs": 8658.96
+    },
+    {
+      "name": "Correcciones ronda 3 postgres lector v1 auténtico reconstruye bindings y sistema genérico antes del backfill",
+      "status": "passed",
+      "durationMs": 9223.87
+    }
+  ],
+  "staticChecks": [
+    {
+      "command": "pnpm typecheck",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm lint",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build:web",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build",
+      "result": "passed"
+    },
+    {
+      "command": "pnpm build:service",
+      "result": "passed"
+    }
+  ],
+  "manualObservations": {
+    "browserCycles": {
+      "source": "browser-20-cycles-final.json",
+      "sha256": "d849d2031ef63f8e0b739b4397f58677bd0dc65a8a48dafd8279ff986843afb8",
+      "result": {
+        "environment": "Codex IAB Chromium",
+        "cycles": [
+          {
+            "cycle": 1,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 2,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 3,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 4,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 5,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 6,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 7,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 8,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 9,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 10,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 11,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 12,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 13,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 14,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 15,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 16,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 17,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 18,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 19,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          },
+          {
+            "cycle": 20,
+            "editor": {
+              "canvas": 1
+            },
+            "canvas": 0,
+            "focus": "ARTICLE",
+            "nodes": 192
+          }
+        ]
+      }
+    },
+    "chromeMemory": {
+      "source": "chrome-20-cycle-metrics-final.json",
+      "sha256": "4f201f5ade2bca65f90b391e5120ba4435d8e1b130d2327d21356e68ea163d5d",
+      "result": {
+        "cyclesAtLeast": 20,
+        "notes": "GC por UI DevTools después de calentamiento y en cada muestra; un tramo parcial no contado conservadoramente.",
+        "samples": [
+          {
+            "cycle": 0,
+            "metrics": [
+              "157 text JS heap size 19.9 MB",
+              "160 text DOM nodes 295",
+              "163 text JS event listeners 487"
+            ]
+          },
+          {
+            "cycle": 5,
+            "metrics": [
+              "157 text JS heap size 20.5 MB",
+              "160 text DOM nodes 295",
+              "163 text JS event listeners 485"
+            ]
+          },
+          {
+            "cycle": 10,
+            "metrics": [
+              "157 text JS heap size 21.0 MB",
+              "160 text DOM nodes 295",
+              "163 text JS event listeners 486"
+            ]
+          },
+          {
+            "cycle": 15,
+            "metrics": [
+              "157 text JS heap size 21.3 MB",
+              "160 text DOM nodes 295",
+              "163 text JS event listeners 485"
+            ]
+          },
+          {
+            "cycle": 20,
+            "metrics": [
+              "157 text JS heap size 21.3 MB",
+              "160 text DOM nodes 295",
+              "163 text JS event listeners 485"
+            ]
+          }
+        ]
+      }
+    },
+    "standaloneRoundtrip": {
+      "source": "standalone-v2-roundtrip.json",
+      "sha256": "7a93ada247e3daf0ebf5a329852983817ebd425c00b44961bd8e389587d487b4",
+      "result": {
+        "version": 2,
+        "sceneAsideIdentical": true,
+        "mapsIdentical": true,
+        "activeMapIdIdentical": true,
+        "note": "Roundtrip real Electron autónomo; posterior carga de mapa/ventana jugador verificada sin guardar encima."
+      }
+    },
+    "coverRecovery": {
+      "source": "cover-recovery-final.json",
+      "sha256": "252484e9cfcc24640ba54ef20196ace992157c0687ae478e8b512af0685b6786",
+      "result": [
+        {
+          "loaded": true,
+          "src": "/api/v1/dm/assets/5a099741-f738-4b2b-bd0e-dd666c462ae4",
+          "width": 1254
+        }
+      ]
+    }
+  },
+  "screenshots": [
+    {
+      "file": "campaign-panel-browser.jpg",
+      "sha256": "c7b7e4536335d1333f6fec516b1088fc20417b609d54d496f663389d428609ba"
+    },
+    {
+      "file": "chrome-zoom200-real.jpg",
+      "sha256": "3883985b31687dee7fb22dc80a85ca0a2e508d0274eedb7cc80472ea83002b1e"
+    },
+    {
+      "file": "chrome-zoom200-dialog-real.jpg",
+      "sha256": "edb11990ac21b065f10e33c282107749dc87d71aa4bc30c3c0424d464a090eb6"
+    },
+    {
+      "file": "guest-public-monster-final.jpg",
+      "sha256": "99cfc1684feb1b2c36db343511755c7aecc361fc8077ad4986874df8f00f862b"
+    },
+    {
+      "file": "cover-recovered-final.jpg",
+      "sha256": "02a0d8f7c6e10f60d1e2861307fc3a8f4b63976534f7b0e07d6f4a9be0af087e"
+    },
+    {
+      "file": "standalone-player-real.jpg",
+      "sha256": "61596a70c64ac2c7e38fb45cfd2c71c530c22ff5d8c6bd17dbe0ee5f8a1b68c4"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "969ab4af9f3aaec5eb450e91e5d100d1f72ba7d3fa179e963a8e0a0797d5c35b"
+    },
+    {
+      "path": "package.json",
+      "sha256": "9699bb9c4a79f5822be8caff326358275e43613921cc7d276def3646eb2f4efc"
+    },
+    {
+      "path": "src/application/services/arc-preparation.ts",
+      "sha256": "dcd034c708e2d0d8fa97288981533ce233d903a8f526f6c12b2ef285d45b42a7"
+    },
+    {
+      "path": "src/application/services/campaigns.ts",
+      "sha256": "8f676686bb917d2ecba2792ed0e6e43dd22102107c5b777b4c6ba9753d0acbf1"
+    },
+    {
+      "path": "src/application/services/owned-games.ts",
+      "sha256": "cec6ba5fd17ebf35e4c607ce8a23a44badc2fe3a1a97c33c087dc4a035bd1074"
+    },
+    {
+      "path": "src/application/services/owned-store.ts",
+      "sha256": "f0c6a875a5895e13b79b0d0cab03967a80a6406baabbb7351a45e31760043df4"
+    },
+    {
+      "path": "src/domain/campaigns/arc-preparation.test.ts",
+      "sha256": "08aafce883d9a05a84629bf55847c675235ac8da61587ff33eddf694b7a334af"
+    },
+    {
+      "path": "src/domain/campaigns/arc-preparation.ts",
+      "sha256": "0cf6ad97f3b179fa8ff22e81962e7ce2048199528ecc745f76a5eba9e679b940"
+    },
+    {
+      "path": "src/domain/campaigns/campaign.test.ts",
+      "sha256": "22d2b615f7e408d264b81ba3aad8a9bc9375fae0ddac9a386df1967b585e6dcd"
+    },
+    {
+      "path": "src/domain/campaigns/campaign.ts",
+      "sha256": "363246608738a48f51d65fdd0128305d941eb3a333faee1f65dca03fe0ec9003"
+    },
+    {
+      "path": "src/domain/campaigns/recent-arc.test.ts",
+      "sha256": "20db0c19666bf7a629b0b817cb42e6c10eb8b3cc3b1c8be662945cc0ff56f3b6"
+    },
+    {
+      "path": "src/domain/campaigns/recent-arc.ts",
+      "sha256": "e125682dab227c32575ecfb0b6460cac11b7eaf6d07bf09b66812b2a13939472"
+    },
+    {
+      "path": "src/domain/campaigns/scene-snapshot.test.ts",
+      "sha256": "d3322ca3f0b9bdadefc4abc3510a5e73cec33951577b144ff1d31aafedb4b4c0"
+    },
+    {
+      "path": "src/domain/campaigns/scene-snapshot.ts",
+      "sha256": "80f4de90ad25f8b1bd7aa0f030701b27a57bdf5942e5b41134742b2b0b9cbf4a"
+    },
+    {
+      "path": "src/infrastructure/browser/browser-client.ts",
+      "sha256": "d2085c2d4039cb46969e8f00f4e22214c66632aeccfd97da888e8b0b3f1a2752"
+    },
+    {
+      "path": "src/infrastructure/browser/campaign-client.test.ts",
+      "sha256": "9de36eb122448670d2fb1fac4132ca5c2363be3aef2b4120b35f2304d838b531"
+    },
+    {
+      "path": "src/infrastructure/browser/campaign-client.ts",
+      "sha256": "a6d005cc7e4fbc40b4d5bb35fcd7e2a64a57d233c9b26104492aa605d980c572"
+    },
+    {
+      "path": "src/infrastructure/browser/campaign-recents.test.ts",
+      "sha256": "89b7defeb26548a0b5acaa9d8cb33fb2d4e1d9b14c8395fa05166dcc33250723"
+    },
+    {
+      "path": "src/infrastructure/browser/campaign-recents.ts",
+      "sha256": "8295d3b86bdf923559176741b3e2f7643618063fc598e013bbeca94d667a54d2"
+    },
+    {
+      "path": "src/infrastructure/browser/http.ts",
+      "sha256": "e6c7b280066e74f896af7acba75fadf14079f87f304dcb98d3ab4d7782320dd2"
+    },
+    {
+      "path": "src/infrastructure/browser/owned-client.test.ts",
+      "sha256": "7e5d540367fb8f0511891573bf7a2c839233ce786c480ffc17100022cf3a0688"
+    },
+    {
+      "path": "src/infrastructure/server/database/catalog.contract.ts",
+      "sha256": "7dff35fc80b151e0a918900a48b475c9eb3a11095609787b78b7be3d360903ce"
+    },
+    {
+      "path": "src/infrastructure/server/database/migrations.ts",
+      "sha256": "1fd49c9423707961aa78959aa716cfda147aff738221d52fa2e33c3989231506"
+    },
+    {
+      "path": "src/infrastructure/server/invitations/compiled.contract.ts",
+      "sha256": "85854c25c8784a3abb5af011d71e5f9104aa9b557ed047394ec76f64a71b08f1"
+    },
+    {
+      "path": "src/infrastructure/server/invitations/edges.contract.ts",
+      "sha256": "7a48bbf1d14f2bdb37875f4333a4dfd86903279292fd2c9cde6eb27fe58e8daa"
+    },
+    {
+      "path": "src/infrastructure/server/invitations/invitations.contract.ts",
+      "sha256": "a0404453ca1b6c6c7ddfc1f12b5e08ead02f59443131baaeb5c109b689ccc0fa"
+    },
+    {
+      "path": "src/infrastructure/server/invitations/persistence.contract.ts",
+      "sha256": "34315744c0257fe7626facbba926a93e7ff00d8a5bd150958a08f43fdb2746b4"
+    },
+    {
+      "path": "src/infrastructure/server/moderation/races.contract.ts",
+      "sha256": "c137a0d39c26bbd7f127c32d5f02f1603278cc17887535d9e96ddb5cb1f1929a"
+    },
+    {
+      "path": "src/infrastructure/server/owned/arc-preparation-backfill.ts",
+      "sha256": "ef68c903f762f4bd135c062173c2c146817cf12055203f6df80e1a54e06e2fee"
+    },
+    {
+      "path": "src/infrastructure/server/owned/arc-preparation-repository.ts",
+      "sha256": "9a383d68fe07374eccc89947e785b9b6e50c0c86ab365c89fa1c0f776ba8173a"
+    },
+    {
+      "path": "src/infrastructure/server/owned/arc-preparation.contract.ts",
+      "sha256": "9cf10ed13ea7310b44fa62d7e0bc7207696bd08370b82c08ad9091c01adccdda"
+    },
+    {
+      "path": "src/infrastructure/server/owned/campaign-backfill.ts",
+      "sha256": "c8fddd7829cdf619c2f23e14dfa5eaee70f900711450ffc680de74122b8eeb51"
+    },
+    {
+      "path": "src/infrastructure/server/owned/campaign-repository.ts",
+      "sha256": "cd9809c5ea849d5d527e5e02dfea358c4be18baa50b64973fef4223877aa0ec9"
+    },
+    {
+      "path": "src/infrastructure/server/owned/campaigns.contract.ts",
+      "sha256": "9a844151eb4c51b305b39f388f51a04f70a3021fbfc78e1676134844a133ca71"
+    },
+    {
+      "path": "src/infrastructure/server/owned/corrections.contract.ts",
+      "sha256": "8708d421e5fd5621777c87fc3b17415e97b29157af020272b7518530b78526f3"
+    },
+    {
+      "path": "src/infrastructure/server/owned/draft-repository.ts",
+      "sha256": "1d22d71f940e3c683cd7ac67c684ac4cbf811683f4a2f65bf3f056e6aef656e0"
+    },
+    {
+      "path": "src/infrastructure/server/owned/owned.contract.ts",
+      "sha256": "85e9f5471ae497fa32916407bc7ed44729cda7d23fa5cff36c88b13d83dc2756"
+    },
+    {
+      "path": "src/infrastructure/server/owned/repository.ts",
+      "sha256": "f0bb3548ed297bcee95ee2940faa7a5b178c2f54c506066b654df0a880b96206"
+    },
+    {
+      "path": "src/infrastructure/server/owned/revision-3.contract.ts",
+      "sha256": "ec87eac414ad73b2658b8f0dfd7863117491db48e71aa1a6607a848b2f8ca0df"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer-catalog.ts",
+      "sha256": "371747633409aa6b506d3ae3be5e3cac467164908eab6efeaee9548640ef3c6c"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer-fixture.ts",
+      "sha256": "4fd9ca4aca43a89b5f94e1952ca0d584ce5d2e27cbc793a192c30f11a1b67751"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer.contract.ts",
+      "sha256": "529001acf936e1eb6e3888c59d88bdc8184d73ae2fdf41629479d2bbbe88ac01"
+    },
+    {
+      "path": "src/infrastructure/server/owned/transfer.ts",
+      "sha256": "acf58ebd48eb1219d9e57ad490be47dfcdaa6e92ea2fbb9924ebc0e0b6dd6c51"
+    },
+    {
+      "path": "src/renderer/src/App.tsx",
+      "sha256": "61642a88a81aee24fee361104551826463cf7a1ae158dcb05b8332e8226a6791"
+    },
+    {
+      "path": "src/renderer/src/components/aside/ArcPreparationUseSection.test.tsx",
+      "sha256": "a54f9efee844518cc11ad8626206d2bf4a59efefb7f9bb261a50c7ed988ec1f5"
+    },
+    {
+      "path": "src/renderer/src/components/aside/ArcPreparationUseSection.tsx",
+      "sha256": "56f16baf3367db207817a79656d0466caa0e6d85719a434d5f65913e6adb6d64"
+    },
+    {
+      "path": "src/renderer/src/components/aside/DmAsidePanel.test.tsx",
+      "sha256": "c056c4f11e11fe445456f344cb5e7980e946bbd93c06fad5d483e64edd94becb"
+    },
+    {
+      "path": "src/renderer/src/components/aside/DmAsidePanel.tsx",
+      "sha256": "982733af2fdf2bf2bd9b3c2f8a12e5345256ec85d1b5aeb63390e93244d6774f"
+    },
+    {
+      "path": "src/renderer/src/components/aside/MonsterDetailModal.tsx",
+      "sha256": "e9b413ee87b8f5d6bb79aecdfa21af005618146406fb8fd559d6f2304318f524"
+    },
+    {
+      "path": "src/renderer/src/components/aside/MonsterSection.tsx",
+      "sha256": "63f72b6992f6df68b6ad4fe3d00184f5acb643870fe016d34dd1b32386f9ccf6"
+    },
+    {
+      "path": "src/renderer/src/components/aside/NpcDetailModal.tsx",
+      "sha256": "65c389340d5dcc1774b146be5a51df337aac1cdd77a8b1bf458b580743e47af3"
+    },
+    {
+      "path": "src/renderer/src/components/aside/NpcSection.tsx",
+      "sha256": "bcf79738b74cc33757719c64b51ee6f2cb5a1bc77e0ee552af916026a3a30679"
+    },
+    {
+      "path": "src/renderer/src/components/aside/PreparedEditorSections.test.tsx",
+      "sha256": "1081b188478a8fe24599a369a28f2be2e00a6da28c23a574e237ffcbf40d0960"
+    },
+    {
+      "path": "src/server/arc-preparation-http.ts",
+      "sha256": "a828e0327dfe3192175f28df7d4c3c1c7bbb56dcdab90e7043218b07c74a590a"
+    },
+    {
+      "path": "src/server/campaign-http.ts",
+      "sha256": "c72e2b3ecbfcec6b3b63fe7cf4bfb2246081f262f0c86e35faab22bb802f4ba6"
+    },
+    {
+      "path": "src/server/owned-drafts.ts",
+      "sha256": "c3da27aa0d326355a5b9b96b267f57d71b55a4bb933a676054b9f9f9fc68ec19"
+    },
+    {
+      "path": "src/server/owned-http.ts",
+      "sha256": "4d028c6d5b657d14ed211aff73cd6689721850bc70dc84eb71c5887d9e921390"
+    },
+    {
+      "path": "src/server/owned-scene-service.ts",
+      "sha256": "9338e0bbfeb2e72e56c71fbe71355e96d20d38f857e4c4d1e849661d29d6a97c"
+    },
+    {
+      "path": "src/shared/api/client.ts",
+      "sha256": "dee35a71e15b886bb9eb86ebb8ab527c66365e01170f52aab88cb175988d056e"
+    },
+    {
+      "path": "src/shared/contracts/campaigns.test.ts",
+      "sha256": "dbf5947d534feddd4483b24ad5faaa2fbec1cf2c252354fa0f0ec0394a88adfe"
+    },
+    {
+      "path": "src/shared/contracts/campaigns.ts",
+      "sha256": "affe8d0c9532d8ce2b5cb48de73806c3861bfe3d5f73c2a8df7b6f4240d99ef2"
+    },
+    {
+      "path": "src/web/DraftRecovery.test.tsx",
+      "sha256": "50715d1c7f6d7300addbaab51629dd931f3616410deb84c147909cd99f0d1081"
+    },
+    {
+      "path": "src/web/DraftRecovery.tsx",
+      "sha256": "fd44a41526952cc021488b98877b6c7dd57db11332a8b608d5b4e54dae73d9bc"
+    },
+    {
+      "path": "src/web/GameEditor.authority.test.tsx",
+      "sha256": "09fa1997ed8dbc9959193c9a7c863b57b5f569f122c7b4da46d8ff58a82f9577"
+    },
+    {
+      "path": "src/web/GameEditor.tsx",
+      "sha256": "ca02e9014bada98263321060194aef097e04bc198ba4a96307d0a916529eca18"
+    },
+    {
+      "path": "src/web/GuestEntry.test.ts",
+      "sha256": "adbc32d1d590eb1fb6f2abd363a9f5ed12fab2cd02035e9e9046b29d7db92fd2"
+    },
+    {
+      "path": "src/web/GuestEntry.tsx",
+      "sha256": "78531d359aee47f385373954010d9f76227ab10641b54f22b2246a78194a2aa5"
+    },
+    {
+      "path": "src/web/ServiceApp.test.tsx",
+      "sha256": "094ce823e7b836e13659f7cfb22a7ad4e1737b6bd73e884bcd0b8cc82455f125"
+    },
+    {
+      "path": "src/web/ServiceApp.tsx",
+      "sha256": "bd1fb6769f60e62b5353fadc2c7931cc8ba4b29bb66d762426f176fe20fe7788"
+    },
+    {
+      "path": "src/web/campaigns/ArcPreparationPanel.test.tsx",
+      "sha256": "a341985e5213dd525222a4cbef54099de4226484b42cd807ac4049b475d6833b"
+    },
+    {
+      "path": "src/web/campaigns/ArcPreparationPanel.tsx",
+      "sha256": "6256691439560817a01436f162937dca207f37c1c377c30105862d956dca6075"
+    },
+    {
+      "path": "src/web/campaigns/CampaignCatalog.test.tsx",
+      "sha256": "3e952dad327e042671d62ff626dc309b4e3a83b3348ec3ccdfe7955e10d2558b"
+    },
+    {
+      "path": "src/web/campaigns/CampaignCatalog.tsx",
+      "sha256": "dfd7fdd01aabf70f3a3cbaa33bd2562a1dfb9f9eb99c890c9beed2c2d85c4008"
+    },
+    {
+      "path": "src/web/campaigns/CampaignPanel.test.tsx",
+      "sha256": "fc37ef1ae4de8accbb09c3ecbd9e091fafaad794186cf0511ecc0d071896d82d"
+    },
+    {
+      "path": "src/web/campaigns/CampaignPanel.tsx",
+      "sha256": "364c1e39cd4113f24517132bad7a1bb4c5018fab5f9fc8e1b56e6e67091719fc"
+    },
+    {
+      "path": "src/web/service.css",
+      "sha256": "73ff4b14d2a263e4fad98b28b40fcf814111f662aa7743d347443ea78bde1cc5"
+    },
+    {
+      "path": "src/web/use-service-navigation.ts",
+      "sha256": "7ff4b2c10732acfd9977b393face5860aa8db6f06b4b01b3cc02cb13932dab4f"
+    },
+    {
+      "path": "src/web/workspace.ts",
+      "sha256": "f568ea54557538b194c08c20ef77bab262bc606205025fb16e4bcbf3e0c9cf1f"
+    }
+  ],
+  "specSha256": "a83eac1c4a0654e996d0711916f2ef7c83793ab841c17080de5dc33bd94e30fa",
+  "limitations": [
+    "No commit, push, merge or DMG.",
+    "Construction validation used only synthetic data; the later local database upgrade is recorded separately under operationalFollowUp.",
+    "20-cycle memory observation is a bounded smoke test, not a guarantee for unlimited sessions.",
+    "Raw logs/screenshots are local temporary artifacts; this summary preserves results and source fingerprints."
+  ],
+  "operationalFollowUp": {
+    "date": "2026-11-13",
+    "reason": "Local API startup failed because schema 8 required migrations 9 and 10; no active writer or stale lock was present.",
+    "backup": ".local/service/backups/sdd59-before-v10-20261114T015000Z/",
+    "rehearsal": "passed on separate private copy",
+    "appliedMigrations": [
+      9,
+      10
+    ],
+    "existingTablesUnchanged": 24,
+    "integrityCheck": "ok",
+    "apiHealth": {
+      "url": "http://127.0.0.1:8787/api/v1/health",
+      "httpStatus": 200,
+      "status": "ok",
+      "version": "3.28.0"
+    },
+    "productSourceChanged": false,
+    "gitHistoryChanged": false
+  }
+}

@@ -58,9 +58,9 @@ for(const kind of ["sqlite","postgres"] as const){
     const a1=await create(users.aCookie,"A1","generic"),a2=await create(users.aCookie,"A2","dnd-55e"),b1=await create(users.bCookie,"B1","generic");
     expect((await http(port,`/games/${b1.id}`,users.aCookie)).status).toBe(404);expect((await http(port,`/games/${a1.id}`,users.adminCookie)).status).toBe(403);
     const uploaded=await http(port,"/assets",users.aCookie,"POST",png,{"content-type":"image/png"});expect(uploaded.status).toBe(201);const asset=(uploaded.json.asset as {id:string}).id;
-    const image=snapshot(asset);const stored=await http(port,"/scenes",users.aCookie,"POST",{name:"Privada A",scene:image.scene});expect(stored.status).toBe(201);const resource=stored.json.resource as {id:string;revision:number};
+    const image=snapshot(asset);const stored=await http(port,"/scenes",users.aCookie,"POST",{name:"Privada A",scene:image.scene,campaignId:a1.id});expect(stored.status).toBe(201);const resource=stored.json.resource as {id:string;revision:number};
     const definitionRef={scope:"catalog",systemId:"generic",version:1,templateId:"generic-markdown"};
-    const defined=await http(port,"/scenes",users.aCookie,"POST",{name:"Definiciones exactas",scene:{...image.scene,sceneAside:{...image.scene.sceneAside,monsters:["first","second"].map(id=>({id,name:id,templateId:"generic-markdown",notes:"# Ficha",imagePath:null,visibleToPlayer:false}))}},bindings:{monsters:{first:definitionRef,second:definitionRef}}});expect(defined.status).toBe(201);
+    const defined=await http(port,"/scenes",users.aCookie,"POST",{name:"Definiciones exactas",campaignId:a1.id,scene:{...image.scene,sceneAside:{...image.scene.sceneAside,monsters:["first","second"].map(id=>({id,name:id,templateId:"generic-markdown",notes:"# Ficha",imagePath:null,visibleToPlayer:false}))}},bindings:{monsters:{first:definitionRef,second:definitionRef}}});expect(defined.status).toBe(201);
     const definedId=(defined.json.resource as {id:string}).id;const definitions=await http(port,`/definitions/scenes/${definedId}`,users.aCookie);expect(definitions.status).toBe(200);expect(definitions.json.templates).toHaveLength(1);expect(definitions.json.monsters).toEqual({first:0,second:0});expect((await http(port,`/definitions/scenes/${definedId}`,users.bCookie)).status).toBe(404);
     for(const path of [`/scenes/${resource.id}`,`/scenes/${resource.id}/export`,`/assets/${asset}`,`/definitions/scenes/${resource.id}`])expect((await http(port,path,users.bCookie)).status).toBe(404);
     expect((await http(port,`/assets/${asset}`,users.bCookie,"HEAD")).status).toBe(404);
@@ -88,7 +88,7 @@ for(const kind of ["sqlite","postgres"] as const){
     const start=await app.backend.invitations.start(u.aCookie,game.id,null,1,randomUUID()),guest=await app.backend.invitations.guests.admit(game.id,{alias:"Restaurado",secret:invitationSecret(start)},randomUUID(),null);
     const asset=randomUUID();await app.backend.identity.authorized(u.aCookie,"dm",(_,tx)=>tx.assets.create(asset,"image/png",png));
     await app.backend.identity.authorized(u.adminCookie,"admin",(_,tx)=>tx.systems.draft({systemId:"generic",version:2},systemSeeds[0].definition,0));
-    const sourcePort=await app.listen();const saved=await http(sourcePort,"/scenes",u.aCookie,"POST",{name:"Escena de respaldo",scene:snapshot(asset).scene});expect(saved.status).toBe(201);const sceneId=(saved.json.resource as {id:string}).id;
+    const sourcePort=await app.listen();const saved=await http(sourcePort,"/scenes",u.aCookie,"POST",{name:"Escena de respaldo",scene:snapshot(asset).scene,campaignId:game.id});expect(saved.status).toBe(201);const sceneId=(saved.json.resource as {id:string}).id;
     await app.backend.identity.authorized(u.aCookie,"dm",(_,tx)=>tx.links.link(game.id,"scenes",sceneId));await app.close();
     const sourceInventory=await inventory(database);
     let restored:DatabaseConfig;
