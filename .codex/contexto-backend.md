@@ -1,6 +1,6 @@
 # Contexto técnico del backend
 
-Actualización de plataforma: SDD62, 2026-11-17, retirada de Electron implementada y validada localmente en 3.35.0. Este mapa orienta al agente; las versiones actuales se consultan en `package.json` y el contrato vigente en SDD. Revalidar rutas y comportamiento antes de cada tarea.
+Actualización de plataforma: SDD62, 2026-11-17, retirada de Electron implementada, validada e integrada en `main` en 3.35.0. Este mapa orienta al agente; las versiones actuales se consultan en `package.json` y el contrato vigente en SDD. Revalidar rutas y comportamiento antes de cada tarea.
 
 ## Stack comprobado
 

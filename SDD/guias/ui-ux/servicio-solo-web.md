@@ -1,6 +1,6 @@
 # UX-62 — Retirada de Electron en la interfaz
 
-**Consulta:** SDD 62 revisión 0.1; PM `/root`, TL `/root/tl_web_only`, 2026-11-17. **Estado de decisión:** acordada para la implementación de la petición del usuario. **Estado de implementación:** referencia previa; validación de la entrega pendiente. Esta ficha concreta el alcance de [SDD 62](../../specs/62-servicio-solo-web/spec.md) y el patrón [UI-002](catalogo.md) sin crear un diseño nuevo.
+**Consulta:** SDD 62 revisión 0.1; PM `/root`, TL `/root/tl_web_only`, 2026-11-17. **Estado de decisión:** acordada para la implementación de la petición del usuario. **Estado de implementación:** implementada, validada e integrada en 3.35.0; [evidencia de la entrega](../../specs/62-servicio-solo-web/validacion.md). Esta ficha concreta el alcance de [SDD 62](../../specs/62-servicio-solo-web/spec.md) y el patrón [UI-002](catalogo.md) sin crear un diseño nuevo.
 
 ## Resultado observable
 

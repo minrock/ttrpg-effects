@@ -1,7 +1,7 @@
 # Plan — 62 Servicio exclusivamente web
 
-**Spec fuente:** [spec.md](spec.md), revisión 0.1. **Estado:** implementado y validado localmente en 3.35.0 por builders y PM; sin integración Git. **Fecha:** 2026-11-17.
-**Base inspeccionada:** `feature/spec-62-solo-web`, `4dc2786584346e9c70120f03e4c94669f03e5880`, producto 3.34.0. Al iniciar solo existía la nueva spec sin rastrear; la ficha UX se escribió durante la consulta. La rama y la implementación fueron autorizadas; commit/push/merge/migraciones reales quedan fuera.
+**Spec fuente:** [spec.md](spec.md), revisión 0.1. **Estado:** implementado, validado e integrado en `main` en 3.35.0; cierre Git por PM. **Fecha:** 2026-11-17.
+**Base inspeccionada:** `feature/spec-62-solo-web`, `4dc2786584346e9c70120f03e4c94669f03e5880`, producto 3.34.0. Al iniciar solo existía la nueva spec sin rastrear; la ficha UX se escribió durante la consulta. La rama y la implementación fueron autorizadas inicialmente. La orden posterior «Haz comit, push y merge» amplía el permiso al cierre Git, sin despliegue ni migraciones reales.
 
 El diseño aprobado y sus restricciones se conservan como referencia. El resultado ejecutado figura en el cierre de este plan y en [validacion.md](validacion.md); TL únicamente mantiene estos artefactos documentales.
 
@@ -102,4 +102,4 @@ Backend completó la versión 3.35.0 y su changelog; frontend completó la compo
 | Chrome Storybook | Cabecera al 200 % de zoom nativo, DPR 4 y viewport/scrollWidth 840; callback Jugador; zoom restablecido al 100 % y pestaña cerrada |
 | Limpieza | Puertos 8877/6006/8787/8766 libres y lock sintético ausente; todos los servidores QA cerrados |
 
-No se reejecutaron los 219 contratos backend de 3.34.0: persistencia y autoridad no cambiaron y su evidencia continúa siendo histórica. No hubo commit, push, merge, despliegue ni operaciones sobre datos reales. La participación TL en este cierre fue documental; no ejecutó esos gates/recorridos ni inició servidores.
+No se reejecutaron los 219 contratos backend de 3.34.0: persistencia y autoridad no cambiaron y su evidencia continúa siendo histórica. Ese corte de validación precede al cierre Git autorizado: commit `e2e5b69` y merge `9521af9`, detallados en [validacion.md](validacion.md#integración-git). No hubo despliegue ni operaciones sobre datos reales. La participación TL en este cierre fue documental; no ejecutó esos gates/recorridos ni inició servidores.

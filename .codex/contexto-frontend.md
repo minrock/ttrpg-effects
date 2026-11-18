@@ -1,6 +1,6 @@
 # Contexto técnico del frontend
 
-Actualización de plataforma: SDD62, 2026-11-17, retirada de Electron implementada y validada localmente en 3.35.0. Consultar versiones actuales en `package.json` y revalidar este mapa al iniciar cada tarea. SDD conserva la autoridad funcional.
+Actualización de plataforma: SDD62, 2026-11-17, retirada de Electron implementada, validada e integrada en `main` en 3.35.0. Consultar versiones actuales en `package.json` y revalidar este mapa al iniciar cada tarea. SDD conserva la autoridad funcional.
 
 ## Stack y entradas
 

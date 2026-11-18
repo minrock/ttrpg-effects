@@ -1,6 +1,6 @@
 # Tareas técnicas — 62 Servicio exclusivamente web
 
-**Spec:** [revisión 0.1](spec.md). **Plan:** [plan.md](plan.md). **Fecha:** 2026-11-17. **Estado:** T-01–T-04 completadas localmente por builders/PM en 3.35.0; sin integración Git. TL mantiene únicamente la documentación.
+**Spec:** [revisión 0.1](spec.md). **Plan:** [plan.md](plan.md). **Fecha:** 2026-11-17. **Estado:** T-01–T-04 completadas por builders/PM en 3.35.0; entrega integrada en `main` mediante `9521af9`. TL mantiene únicamente la documentación.
 **Base:** `feature/spec-62-solo-web` / `4dc2786584346e9c70120f03e4c94669f03e5880` (3.34.0). **Decisiones pendientes:** ninguna para el alcance actual. **UX:** [UX-62](../../guias/ui-ux/servicio-solo-web.md).
 
 ## Mapa
@@ -106,4 +106,4 @@ T-01/T-02/T-03 fueron completadas por sus responsables y T-04 cerró gates, QA y
 
 QA del PM: campaña/arco/escena, guardado y recarga, recuperación IndexedDB de edición pendiente y guardado posterior; publicación, invitado, dos tiradas públicas cerradas por autor y DM con historial conservado; editor 1440/390 px, ausencia de overflow y Escape/foco; cabecera Storybook en Chrome al 200 % real con callback Jugador y posterior restauración/cierre de pestaña. Todos los servidores QA fueron cerrados: puertos 8877/6006/8787/8766 libres y lock sintético ausente. Ver detalle y límites en [validacion.md](validacion.md).
 
-Los 219 contratos backend de 3.34.0 no se reejecutaron; no hubo cambios de persistencia/autoridad ni operaciones sobre datos reales. Commit, push, merge y despliegue permanecen fuera del cierre. TL comprobó únicamente coherencia documental, rutas, fronteras, cobertura e IDs, consultó UX-62 y actualizó estos estados con los resultados comunicados por el PM; no ejecutó producto, pruebas ni servidores.
+Los 219 contratos backend de 3.34.0 no se reejecutaron; no hubo cambios de persistencia/autoridad ni operaciones sobre datos reales. El cierre Git autorizado posteriormente se registra en [validacion.md](validacion.md#integración-git); no incluye despliegue. TL comprobó únicamente coherencia documental, rutas, fronteras, cobertura e IDs, consultó UX-62 y actualizó estos estados con los resultados comunicados por el PM; no ejecutó producto, pruebas ni servidores.

@@ -1,10 +1,10 @@
 # Validación — SDD62, servicio exclusivamente web
 
 **Revisión:** 0.1. **Versión:** 3.35.0. **Fecha:** 2026-11-17.
-**Estado:** implementada y validada localmente; sin commit, push, merge ni despliegue.
+**Estado:** implementada, validada e integrada en `main`; sin despliegue.
 **Rama:** `feature/spec-62-solo-web`, base `4dc2786` (3.34.0).
 
-La autorización cubre implementación y validación con datos sintéticos. No incluye migraciones sobre datos reales. Los logs y fixtures operativos quedan privados bajo `.local/validation/web-only/`; no se incorporan credenciales ni contenido de partidas a la documentación.
+La autorización inicial cubre implementación y validación con datos sintéticos; la orden posterior «Haz comit, push y merge» autoriza también el cierre Git. No incluye despliegue ni migraciones sobre datos reales. Los logs y fixtures operativos quedan privados bajo `.local/validation/web-only/`; no se incorporan credenciales ni contenido de partidas a la documentación.
 
 ## Resultado por criterio
 
@@ -65,4 +65,21 @@ Los smokes usan variables de proceso de la fixture, sin modificar `.env` real. `
 
 La API CUA se detuvo mediante el harness privado con verificación de PID/comando. El servidor estático Storybook PID 43367 se cerró con SIGTERM. Al finalizar: puertos 8787/8877/6006/8766 sin listeners, sin watcher/API/Storybook propios activos, `control.lock` y `run.json` sintéticos ausentes. Viewport y zoom restaurados; pestañas QA cerradas. PostgreSQL preexistente del usuario no se detuvo.
 
-El resultado está en el checkout autorizado y construido en `out/api`/`out/web`. No hay commit/push/merge ni despliegue de esta entrega.
+El resultado está integrado en `main` y construido en `out/api`/`out/web`. El cierre Git posterior se detalla a continuación; no constituye despliegue.
+
+## Integración Git
+
+El 2026-11-17 el usuario ordenó «Haz comit, push y merge». Se registró la retirada en `e2e5b69356e7679e0cf36aedb2b7042d2a3e209f` y se publicó `feature/spec-62-solo-web`. El merge sin conflictos `9521af9ade456bf93e7c4716688048d495744157` incorpora en `main` tanto SDD62 como la consolidación 3.34.0 (`4dc2786`), que todavía no estaba integrada. `git ls-remote` confirmó ambos destinos publicados. La versión se mantiene en 3.35.0; el cierre documental posterior no cambia producto ni versión.
+
+Controles posteriores al merge, sobre el mismo árbol de producto de la rama:
+
+| Comando | Resultado |
+| --- | --- |
+| `pnpm lint` | PASS, exit 0 |
+| `pnpm test --exclude '**/.local/**' --maxWorkers 4` | PASS: 166 archivos, 1417 pruebas, 38.40 s |
+| `pnpm build` | PASS, exit 0; incluye TypeScript y genera API/frontend web |
+| `git diff --check` | PASS |
+
+Logs privados: `.local/validation/web-only/integration-{lint,test,build}.log`. Storybook y los recorridos de navegador conservan la evidencia anterior del mismo código; no se repitieron ni se atribuyen nuevas pruebas PostgreSQL/TLS. Persisten los avisos no bloqueantes de canvas en jsdom y tamaño de chunks.
+
+La revisión de staging no incorporó `.env`, `.env.electron`, datos de `.local`, bases, secretos ni salidas de build. No se inició ningún servidor durante este cierre. Comprobación final: puertos 8787/8877/6006/8766 sin listeners, sin procesos propios API/watcher/Storybook y sin `control.lock`/`run.json` sintéticos. No hubo despliegue ni migraciones sobre datos reales.

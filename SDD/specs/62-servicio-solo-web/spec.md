@@ -1,8 +1,8 @@
 # 62 — Servicio exclusivamente web
 
-**Estado:** Implementada y validada localmente, sin integración. **Revisión:** 0.1. **Fecha:** 2026-11-17. **Tipo:** cambio de plataforma.
+**Estado:** Implementada, validada e integrada en `main` (3.35.0). **Revisión:** 0.1. **Fecha:** 2026-11-17. **Tipo:** cambio de plataforma.
 **Dependencias:** SDD41–52 (cliente, API, identidad, persistencia y operación), SDD54, SDD58–61.
-**Orden:** el usuario solicita eliminar Electron y conservar únicamente el servicio web. La implementación está solicitada; la rama `feature/spec-62-solo-web` fue autorizada desde `4dc2786` (3.34.0). No autoriza commit, push, merge ni migraciones reales.
+**Orden:** el usuario solicita eliminar Electron y conservar únicamente el servicio web. La implementación está solicitada; la rama `feature/spec-62-solo-web` fue autorizada desde `4dc2786` (3.34.0). La orden posterior «Haz comit, push y merge» autoriza el cierre Git; no incluye despliegue ni migraciones reales.
 **Versión:** 3.35.0; fuente oficial `package.json`. **Evidencia:** [validacion.md](validacion.md).
 
 ## Problema y objetivo
@@ -58,4 +58,4 @@ Se reutilizan `src/web`, el editor bajo `src/renderer/src`, dominio, aplicación
 
 ## Entrega
 
-[Plan](plan.md) y [tareas](tareas.md) preparados por TL para esta revisión; implementación ejecutada por builders y validación coordinada por PM. [Validación](validacion.md) registra resultados y límites. La implementación se entrega sin integrar ni publicar hasta autorización aplicable.
+[Plan](plan.md) y [tareas](tareas.md) preparados por TL para esta revisión; implementación ejecutada por builders y validación coordinada por PM. [Validación](validacion.md) registra resultados y límites. La orden posterior de integración se ejecutó mediante el merge `9521af9`; [evidencia Git](validacion.md#integración-git).
