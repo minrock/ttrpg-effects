@@ -3,7 +3,7 @@
 import { act, type ComponentProps } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TtrpgApi } from "../../preload/ttrpg-api";
+import type { TtrpgApi } from "../../shared/api/ttrpg-api";
 import type { PlayerWindowSnapshot, ViewportCameraSnapshot } from "../../domain/player/player-window";
 import type { PlayerCameraCommand } from "../../domain/player/player-camera-control";
 import { createDefaultSceneMap, createSceneWithMap } from "../../domain/sessions/scene-maps";
@@ -12,7 +12,7 @@ import { TableSession } from "../../application/services/table-session";
 import { randomUUID } from "node:crypto";
 import { PlayerApp } from "./PlayerApp";
 import { ClientProvider } from "./client/ClientProvider";
-import { createClient, LOCAL_CAPABILITIES } from "../../shared/api/client";
+import { createClient, type TtrpgClient } from "../../shared/api/client";
 
 type ViewportProps = ComponentProps<typeof MapViewport>;
 const viewport = vi.hoisted(() => ({
@@ -60,6 +60,7 @@ describe("PlayerApp map image replacement", () => {
   let root: Root;
   let onScene: (value: PlayerWindowSnapshot) => void;
   let onCameraCommand: (value: PlayerCameraCommand) => void;
+  let client: TtrpgClient;
   const reportCamera = vi.fn<TtrpgApi["reportPlayerCamera"]>();
   const reportImage = vi.fn<TtrpgApi["reportPlayerMapImageStatus"]>();
   const notifyReady = vi.fn<TtrpgApi["notifyPlayerContentReady"]>();
@@ -118,24 +119,22 @@ describe("PlayerApp map image replacement", () => {
       onPlayerInformationAreaHighlight: () => offHighlight,
       reportPlayerCamera: reportCamera, reportPlayerMapImageStatus: reportImage, notifyPlayerContentReady: notifyReady
     } satisfies Partial<TtrpgApi>;
-    Object.defineProperty(window, "ttrpg", { configurable: true, value: api });
+    client = createClient(api as unknown as TtrpgApi, { scenes: false, images: false, libraries: false, player: true, dice: false }, "service");
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
-    await act(async () => root.render(<PlayerApp />));
+    await act(async () => root.render(<ClientProvider client={client}><PlayerApp /></ClientProvider>));
     await flushReports();
   });
 
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
-    Reflect.deleteProperty(window, "ttrpg");
     vi.clearAllTimers();
     vi.useRealTimers();
   });
 
   it("reconfirma textura y ready de servicio tras bootstrap sin reiniciar cámara ni viewport", async () => {
-    const client=createClient(window.ttrpg!,LOCAL_CAPABILITIES,"service");
     await act(async()=>root.render(<ClientProvider client={client}><PlayerApp/></ClientProvider>));
     await ready();
     const localCamera={center:{x:800,y:900},zoom:2};await navigate(localCamera);
@@ -155,7 +154,8 @@ describe("PlayerApp map image replacement", () => {
     await ready();
     expect(container.querySelector(".player-loading")).toBeNull();
     expect(notifyReady).toHaveBeenCalledOnce();
-    expect(reportImage).toHaveBeenCalledExactlyOnceWith({ imageUrl: initial.mapImageUrl, ok: true });
+    expect(reportImage).toHaveBeenCalledTimes(2);
+    expect(reportImage).toHaveBeenLastCalledWith({ imageUrl: initial.mapImageUrl, ok: true });
     expect(props().fogPresentation).toBe("player-blocking");
     expect(props().hiddenTokenPolicy).toBe("hide");
   });
@@ -180,11 +180,12 @@ describe("PlayerApp map image replacement", () => {
     expect(viewport.applyCamera).toHaveBeenCalledTimes(cameraApplications);
     expect(props().isZoomLocked).toBe(false);
     expect(container.querySelector(".player-zoom-indicator")?.textContent).toContain("250%");
-    expect(container.querySelector(".player-loading")).toBeNull();
+    expect(container.querySelector(".player-loading")).not.toBeNull();
     expect(viewport.mount).toHaveBeenCalledOnce();
     expect(viewport.unmount).not.toHaveBeenCalled();
     expect(viewport.visibleImageUrl).toBe(initial.mapImageUrl);
     await ready();
+    expect(container.querySelector(".player-loading")).toBeNull();
     expect(notifyReady).toHaveBeenCalledTimes(2);
     expect(reportImage).toHaveBeenLastCalledWith({ imageUrl: replacement.mapImageUrl, ok: true });
     expect(reportCamera).toHaveBeenLastCalledWith(expect.objectContaining({ camera: localCamera }));
@@ -318,9 +319,10 @@ describe("PlayerApp map image replacement", () => {
     expect(notifyReady).not.toHaveBeenCalled();
     expect(container.querySelector(".player-loading")).not.toBeNull();
     await ready();
-    expect(reportImage).toHaveBeenCalledExactlyOnceWith({ imageUrl, ok: true });
+    expect(reportImage).toHaveBeenCalledTimes(2);
+    expect(reportImage).toHaveBeenLastCalledWith({ imageUrl, ok: true });
     await act(async () => obsoleteCompletion());
-    expect(reportImage).toHaveBeenCalledTimes(1);
+    expect(reportImage).toHaveBeenCalledTimes(2);
     expect(container.querySelector(".player-loading")).toBeNull();
   });
 

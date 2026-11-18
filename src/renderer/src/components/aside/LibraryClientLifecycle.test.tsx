@@ -23,7 +23,7 @@ type Result = { ok: true; entries: Entry[] };
 
 describe.each(cases)("$name library client lifecycle", ({ method, entry, content }) => {
   let root: Root, host: HTMLDivElement;
-  const capabilities = { scenes: false, images: true, libraries: true, player: false, dice: false, nativeMenus: false };
+  const capabilities = { scenes: false, images: true, libraries: true, player: false, dice: false };
   function client(search: () => Promise<Result>, resolveImage: (path: string) => Promise<string | null> = async path => `https://example.test/${path}`): TtrpgClient {
     // Deliberately partial test double; the production API remains required.
     return createClient({ [method]: search, resolveAsideUrl: resolveImage } as unknown as TtrpgApi, capabilities);

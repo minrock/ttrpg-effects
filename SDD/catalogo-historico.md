@@ -2,7 +2,7 @@
 
 Documentos trasladados desde `specs/`, conservando el contenido y actualizando rutas. Sus estados y checklists son los registrados en cada entrega, no una certificación nueva del código actual. La numeración original salta de 20 a 22; no se ha inventado una spec 21.
 
-Las reglas de Electron local siguen aplicando a ese modo. Las diferencias del servicio se definen en las specs 41–54 y en [el estado vigente](estado-actual.md). Los planes antiguos pueden conservar tareas pendientes de su fecha; no convertirlas automáticamente en backlog nuevo.
+Las reglas de Electron local describen el producto de esas entregas. SDD62 retira ambos modos Electron; la plataforma actual se define en [el estado vigente](estado-actual.md). Los planes antiguos pueden conservar tareas pendientes de su fecha; no convertirlas automáticamente en backlog nuevo.
 
 | Spec | Título original | Plan |
 | --- | --- | --- |

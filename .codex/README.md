@@ -5,7 +5,7 @@ El hilo principal asume el rol PM al invocar Factory o Build. TL, UI/UX y builde
 | Perfil | Modelo / razonamiento | Responsabilidad |
 | --- | --- | --- |
 | [backend_builder](agents/backend_builder.toml) | GPT-5.6 Terra / high | API HTTP/SSE, seguridad y SQLite/PostgreSQL |
-| [frontend_builder](agents/frontend_builder.toml) | GPT-5.6 Terra / high | React navegador/Electron, clientes y PixiJS |
+| [frontend_builder](agents/frontend_builder.toml) | GPT-5.6 Terra / high | React navegador, clientes HTTP/SSE y PixiJS |
 | [ui_ux](agents/ui_ux.toml) | GPT-6 Sol / high | Componentes, interacción, consistencia, investigación visual, catálogo y prototipos |
 | [technical_lead](agents/technical_lead.toml) | GPT-6 Astra / high | Plan técnico y tareas desde specs; consulta UX y devuelve al PM, sin ejecutar builders |
 | [pm](agents/pm.toml) | Modelo del hilo principal | Contrato de rol leído por Factory/Build; especificación, User Ask, coordinación y despacho exclusivo de builders |
@@ -72,7 +72,7 @@ Spec fuente: [ruta, revisión y criterios de aceptación].
 Contexto: [decisiones, dependencias, base de código y restricciones].
 Salida: plan.md + tareas.md en la carpeta de la spec.
 Interlocutores: [ID real de PM/principal e ID disponible de ui_ux].
-Revisa reutilización de núcleo, seguridad, Electron/API y clientes.
+Revisa reutilización de núcleo, seguridad, API y clientes web.
 Devuelve tareas delimitadas, dependencias, propiedad de archivos,
 tandas paralelas justificadas, pruebas y decisiones pendientes para PM.
 No invoques ni contactes builders; el PM decide alcance y ejecución.

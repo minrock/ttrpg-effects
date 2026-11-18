@@ -25,7 +25,6 @@ function existingConfig(path) {
 try {
   if (Number(process.versions.node.split('.')[0]) !== 24) throw new Error('La configuración requiere Node.js 24.');
   const api = existingConfig('.env');
-  existingConfig('.env.electron');
   const driver = api?.TTRPG_DB_DRIVER ?? process.env.TTRPG_DB_DRIVER ?? 'sqlite';
   if (!['sqlite', 'postgres'].includes(driver)) throw new Error('TTRPG_DB_DRIVER inválido.');
   if (driver === 'postgres' && api === null) throw new Error('Prepara manualmente .env para PostgreSQL; consulta la guía de persistencia.');
@@ -58,14 +57,10 @@ try {
     ].join('\n');
     writeFileSync('.env', contents, { flag: 'wx', mode: 0o600 });
   }
-  const clientOrigin = api?.TTRPG_PUBLIC_ORIGIN ?? 'http://127.0.0.1:8787';
-  const parsedOrigin = new URL(clientOrigin);
-  if (parsedOrigin.origin !== clientOrigin || !['http:', 'https:'].includes(parsedOrigin.protocol) || parsedOrigin.protocol === 'http:' && !['localhost','127.0.0.1','[::1]'].includes(parsedOrigin.hostname)) throw new Error('TTRPG_PUBLIC_ORIGIN debe ser un origen raíz seguro.');
-  if (!existsSync('.env.electron')) {
-    writeFileSync('.env.electron', `# Cliente Electron: service usa la API; local usa archivos locales.\nTTRPG_ELECTRON_MODE=service\nTTRPG_SERVICE_URL=${clientOrigin}\n`, { flag: 'wx', mode: 0o600 });
-  }
+  const publicOrigin = api?.TTRPG_PUBLIC_ORIGIN ?? 'http://127.0.0.1:8787';
+  const parsedOrigin = new URL(publicOrigin);
+  if (parsedOrigin.origin !== publicOrigin || !['http:', 'https:'].includes(parsedOrigin.protocol) || parsedOrigin.protocol === 'http:' && !['localhost','127.0.0.1','[::1]'].includes(parsedOrigin.hostname)) throw new Error('TTRPG_PUBLIC_ORIGIN debe ser un origen raíz seguro.');
   chmodSync('.env', 0o600);
-  chmodSync('.env.electron', 0o600);
   console.log('Configuración privada conservada; directorios internos 700 y archivos 600.');
   if (api && (!api.TTRPG_AUTH_SECRET || api.TTRPG_IDENTITY_ENABLED === 'false')) {
     throw new Error('Configuración anterior incompleta: conserva una copia y añade un secreto independiente TTRPG_AUTH_SECRET; retira TTRPG_IDENTITY_ENABLED=false. Las claves anteriores ya no autorizan. Consulta docs/service-operations.md.');

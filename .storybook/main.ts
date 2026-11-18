@@ -4,7 +4,7 @@ import { normalizePath, type Plugin } from "vite";
 const checkout = normalizePath(process.cwd());
 const forbiddenModule = (id: string): boolean => {
   const moduleId = normalizePath(id.split("?")[0]);
-  return moduleId.includes("/src/render/") || moduleId.includes("/src/main/") || moduleId.includes("/src/preload/") || moduleId.includes("/src/server/") || moduleId.includes("/src/infrastructure/server/") || moduleId.includes("/src/renderer/src/ui-lab/") ||
+  return moduleId.includes("/src/render/") || moduleId.includes("/src/server/") || moduleId.includes("/src/infrastructure/server/") || moduleId.includes("/src/renderer/src/ui-lab/") ||
     /\/node_modules\/(?:pixi\.js\/|@pixi\/|three\/|cannon-es\/)/.test(moduleId) ||
     /\/src\/renderer\/src\/(?:App|PlayerApp)\.tsx$/.test(moduleId) ||
     /\/src\/renderer\/src\/components\/(?:MapViewport|SharedDrawingPanel)\.tsx$/.test(moduleId) ||

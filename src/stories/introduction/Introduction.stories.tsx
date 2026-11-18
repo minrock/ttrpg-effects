@@ -4,7 +4,7 @@ function Introduction() {
   return <article className="storybook-introduction">
     <header>
       <h1>Catálogo de componentes de TTRPG Effects</h1>
-      <p>Referencia ejecutable de la interfaz React vigente. Usa datos sintéticos y no inicia sesión, API, Electron ni motores de mapa o dados.</p>
+      <p>Referencia ejecutable de la interfaz React vigente. Usa datos sintéticos y no inicia sesión, API ni motores de mapa o dados.</p>
     </header>
     <section>
       <h2>Cómo encontrar y reutilizar</h2>

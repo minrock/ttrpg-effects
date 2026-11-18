@@ -9,7 +9,6 @@ describe("Workspace chrome", () => {
   let root: Root, host: HTMLDivElement;
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Electron/39.0.0 Safari/537.36");
     host = document.createElement("div"); document.body.append(host); root = createRoot(host);
   });
   afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); });
@@ -19,8 +18,8 @@ describe("Workspace chrome", () => {
   }
   async function click(name: string): Promise<void> { await act(async () => button(name).click()); }
   function header(overrides: Partial<ComponentProps<typeof WorkspaceHeader>> = {}): ComponentProps<typeof WorkspaceHeader> {
-    return { sceneName: "Escena guardada", mapName: "Mapa", busy: false, canCreate: true, battleActive: false,
-      explorerVisible: true, inspectorVisible: true, onNew: vi.fn(), onLoad: vi.fn(), onSave: vi.fn(),
+    return { sceneName: "Escena guardada", busy: false, battleActive: false,
+      explorerVisible: true, inspectorVisible: true, onSave: vi.fn(),
       onPlayer: vi.fn(), onBattle: vi.fn(), onCounters: vi.fn(), onDice: vi.fn(), onExplorer: vi.fn(), onInspector: vi.fn(), ...overrides };
   }
   function tools(overrides: Partial<ComponentProps<typeof WorkspaceTools>> = {}): ComponentProps<typeof WorkspaceTools> {
@@ -30,34 +29,31 @@ describe("Workspace chrome", () => {
       onArea: vi.fn(), onLink: vi.fn(), onLabel: vi.fn(), onToken: vi.fn(), onPointer: vi.fn(), onFog: vi.fn(), onFogCells: vi.fn(),
       onSettings: vi.fn(), onConfirmDrawing: vi.fn(), ...overrides };
   }
-  it("delegates real scene actions and closes the scene menu", async () => {
+  it("delegates web editor actions without desktop scene controls", async () => {
     const props = header(); await act(async () => root.render(<WorkspaceHeader {...props} />));
-    const details = host.querySelector("details")!; details.open = true;
-    await click("Cargar escena"); expect(props.onLoad).toHaveBeenCalledOnce(); expect(details.open).toBe(false);
-    await click("Abrir ventana de jugador"); expect(props.onPlayer).toHaveBeenCalledOnce();
+    await click("Publicar escena para jugadores"); expect(props.onPlayer).toHaveBeenCalledOnce();
     await click("Abrir dados"); expect(props.onDice).toHaveBeenCalledOnce();
     await click("Alternar explorador"); expect(props.onExplorer).toHaveBeenCalledOnce();
   });
-  it("returns keyboard focus to the scene trigger on Escape", async () => {
-    await act(async () => root.render(<WorkspaceHeader {...header()} />));
-    const details = host.querySelector("details")!; details.open = true;
-    const target = button("Cargar escena"); target.focus();
-    await act(async () => target.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
-    expect(details.open).toBe(false); expect(document.activeElement).toBe(details.querySelector("summary"));
+  it("returns keyboard focus to the editor tools trigger on Escape", async () => {
+    const target = document.createElement("div"); document.body.append(target);
+    try {
+      await act(async () => root.render(<WorkspaceHeader {...header({ portalTarget: target })} />));
+      const trigger = target.querySelector<HTMLButtonElement>('[aria-label="Herramientas del editor"]')!;
+      await act(async () => trigger.click());
+      const save = target.querySelector<HTMLButtonElement>('[aria-label="Guardar escena"]')!; save.focus();
+      await act(async () => save.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+      expect(trigger.getAttribute("aria-expanded")).toBe("false"); expect(document.activeElement).toBe(trigger);
+    } finally { target.remove(); }
   });
-  it("does not run file or projection actions while busy", async () => {
+  it("does not run save or publication actions while busy", async () => {
     const props = header({ busy: true }); await act(async () => root.render(<WorkspaceHeader {...props} />));
-    await click("Cargar escena"); await click("Abrir ventana de jugador");
-    expect(props.onLoad).not.toHaveBeenCalled(); expect(props.onPlayer).not.toHaveBeenCalled();
-    vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36");
-    const serviceProps = header({ busy: true, serviceActions: { onImport: vi.fn(), onExport: vi.fn(), onLogout: vi.fn() } });
-    await act(async () => root.render(<WorkspaceHeader {...serviceProps} />));
-    await click("Publicar escena para jugadores");
-    expect(serviceProps.onPlayer).not.toHaveBeenCalled();
+    await click("Guardar escena"); await click("Publicar escena para jugadores");
+    expect(props.onSave).not.toHaveBeenCalled(); expect(props.onPlayer).not.toHaveBeenCalled();
   });
   it("fusiona los controles en el destino compartido sin duplicar logo y respeta suspensión", async () => {
     const target=document.createElement("div");document.body.append(target);
-    const props=header({portalTarget:target,enabled:true,serviceActions:{onImport:vi.fn(),onExport:vi.fn(),onLogout:vi.fn()}});
+    const props=header({portalTarget:target,enabled:true});
     try {
       await act(async()=>root.render(<WorkspaceHeader {...props}/>));
       expect(host.querySelector(".workspace-header")).toBeNull();
@@ -65,16 +61,9 @@ describe("Workspace chrome", () => {
       expect(target.querySelector("header")).toBeNull();
       expect(target.querySelectorAll('.workspace-header-actions button')).toHaveLength(7);
       expect(target.querySelector('[aria-label="Publicar escena para jugadores"]')?.getAttribute("title")).toBe("Publicar escena para jugadores");
-      expect(target.querySelector('[aria-label="Menu de escena"]')?.textContent).toBe(`${props.sceneName}${props.mapName}`);
-      expect(target.querySelector('[aria-label="Acciones de escena"]')).not.toBeNull();
-      expect(target.textContent).not.toContain("Cerrar sesión");
-      vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 Chrome/142.0.0.0 Safari/537.36");
-      await act(async()=>root.render(<WorkspaceHeader {...props}/>));
-      expect(target.querySelector('[aria-label="Menu de escena"]')).toBeNull();
-      expect(target.querySelector('[aria-label="Acciones de escena"]')).toBeNull();
       const sceneName=target.querySelector('.workspace-scene-name')!;
       expect(sceneName.textContent).toBe(props.sceneName);
-      expect(sceneName.querySelector("span")?.getAttribute("title")).toBe(props.sceneName);
+      expect(sceneName.getAttribute("title")).toBe(props.sceneName);
       expect(sceneName.querySelector("svg, button, summary")).toBeNull();
       const player=target.querySelector<HTMLButtonElement>('[aria-label="Publicar escena para jugadores"]')!;
       expect(player.title).toBe("Publicar escena para jugadores");
@@ -97,7 +86,6 @@ describe("Workspace chrome", () => {
       expect(dice.closest('[hidden]')).toBeNull();
       await act(async()=>root.render(<WorkspaceHeader {...header()}/>));
       expect(target.children).toHaveLength(0);expect(host.querySelector('.workspace-brand')).not.toBeNull();
-      expect(host.querySelector('[aria-label="Menu de escena"]')).toBeNull();
       expect(host.querySelector('.workspace-scene-name')?.textContent).toBe(props.sceneName);
     } finally { target.remove(); }
   });

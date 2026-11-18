@@ -1,6 +1,8 @@
 # Estado actual y decisiones vigentes
 
-**Cierre vigente — 2026-11-17, versión 3.34.0.** Consolida los cambios locales de SDD59 (hasta revisión 0.10), SDD60 y SDD61, junto con las correcciones documentadas de SDD33, SDD54 y SDD58. Commit y push autorizados por el usuario en `feature/escenas-propias-por-arco`; integración a `main` pendiente. [Validación de consolidación](validaciones/2026-11-17-cierre-3.34.0.md). El esquema sigue en 12 y `.ttrpgscene` conserva v2 con lectura de v1; no se aplican nuevas migraciones a datos reales. El servicio local queda detenido por instrucción del usuario. La propuesta Django/PostgreSQL + Node/caché permanece como análisis, sin implementación. Los cortes de entrega siguientes son históricos y no sustituyen este estado.
+**Entrega local vigente — 2026-11-17, versión 3.35.0.** [SDD62](specs/62-servicio-solo-web/spec.md) retira Electron y deja navegador + API Node.js. Implementada y validada en `feature/spec-62-solo-web`, sin commit/push/merge. [Evidencia](specs/62-servicio-solo-web/validacion.md):1417 pruebas, checks/builds, recorridos DM/jugador y procesos QA cerrados. Datos reales y formatos intactos; no incorpora Django/Redis ni escalado horizontal.
+
+**Cierre anterior — 2026-11-17, versión 3.34.0.** Consolida los cambios locales de SDD59 (hasta revisión 0.10), SDD60 y SDD61, junto con las correcciones documentadas de SDD33, SDD54 y SDD58. Commit y push autorizados por el usuario en `feature/escenas-propias-por-arco`; integración a `main` pendiente. [Validación de consolidación](validaciones/2026-11-17-cierre-3.34.0.md). El esquema sigue en 12 y `.ttrpgscene` conserva v2 con lectura de v1; no se aplican nuevas migraciones a datos reales. El servicio local queda detenido por instrucción del usuario. La propuesta Django/PostgreSQL + Node/caché permanece como análisis, sin implementación. Los cortes de entrega siguientes son históricos y no sustituyen este estado.
 
 Corte: 2026-11-12. Entrega 3.25.0: cierre autorizado en `main` de SDD 58 (guardado y recuperación), correcciones de auditoría 3.23.0, celda de calibración/alineación de SDD 04 y reconstrucción automática del servicio. Conserva las entregas SDD 55–57 y la trazabilidad inicial de SDD 41–52. Las pruebas y límites se registran por entrega; integración no equivale a despliegue.
 
@@ -8,21 +10,21 @@ Cierre autorizado 3.27.2: vigilancia de desarrollo del servicio, corrección del
 
 ## Producto disponible
 
-TTRPG Effects tiene dos modos: Electron autónomo para preparar/proyectar mesas con datos locales, y servicio privado API + frontend compartido entre navegador y Electron conectado. En servicio, las cuentas admin gestionan DMs y sistemas; cada DM prepara sus partidas y comparte una apertura con jugadores sin cuenta mediante enlace y alias.
+La implementación local de SDD62 deja TTRPG Effects como servicio privado Node.js HTTP/SSE y cliente React/Pixi en navegador, validada conforme a [SDD62](specs/62-servicio-solo-web/validacion.md). Retira Electron autónomo y conectado. Las cuentas admin gestionan DMs y sistemas; cada DM prepara campañas/arcos/escenas y comparte una apertura con jugadores sin cuenta mediante enlace y alias.
 
-Una partida fija una versión de sistema. El catálogo separa reglas, datos y presentación, con módulos compilados. La proyección pública excluye información privada del DM. Las herramientas visuales y reglas del editor local se reutilizan mediante contratos de cliente, no mediante privilegios de Node en el navegador.
+Una partida fija una versión de sistema. El catálogo separa reglas, datos y presentación, con módulos compilados. La proyección pública excluye información privada del DM. Las herramientas visuales y reglas del editor se consumen mediante un cliente explícito; el navegador no tiene privilegios de Node.
 
 ## Qué decisión reemplaza a cuál
 
 | Tema | Decisión vigente | Antecedente sustituido |
 | --- | --- | --- |
-| Plataforma | Electron local + navegador + Electron servicio | Electron como opción todavía tentativa en los requisitos iniciales |
+| Plataforma | Navegador + API Node.js; retirada local de Electron en SDD62 | Electron autónomo y Electron conectado al servicio |
 | Acceso del servicio | Cuentas admin/DM y cookies de invitado por partida | Dos claves globales de 002–005 |
 | Alta DM | Solo admin; no autorregistro ni correo automático | Crear usuarios libremente o enviar invitaciones por SMTP |
 | Alta admin | CLI local, varios correos únicos; bootstrap solo base vacía | Un único administrador y alta exclusivamente inicial de 007 |
 | Contraseña | 10–128 puntos de código, máximo 512 bytes, sin recortar | Mínimo 15 |
 | Contraseña de admin por CLI | Elegida y confirmada: definitiva; Enter: generada temporal y cambio obligatorio | Obligar a cambiar siempre la contraseña que el operador acaba de elegir |
-| Persistencia | SQLite local; PostgreSQL con TLS en producción | SQLite como único almacén del servicio |
+| Persistencia | SQLite del servicio; PostgreSQL con TLS en producción | SQLite como único almacén del servicio |
 | Propiedad | Datos por DM; admin no es dueño de sus mesas | Bibliotecas y escenas globales |
 | Plantillas en servicio | Solo admin edita/publica; deshabilitar sin borrar | Edición de plantillas por DM y borrado de catálogo |
 | Versión de sistema | Referencia exacta retenida y hash; módulos compilados | Resolver a la última versión o ejecutar plugins externos |
@@ -32,7 +34,7 @@ Una partida fija una versión de sistema. El catálogo separa reglas, datos y pr
 | Arranque API | `pnpm start:api` compila inicialmente y vigila cambios; `start:api:built` ejecuta el build estable | Reiniciar sobre una compilación fallida o antes de liberar SQLite |
 | Menú | Una fila compartida, herramientas agrupadas en ancho estrecho | Cabecera de servicio y toolbar del editor apiladas |
 
-Electron autónomo conserva su gestión local de plantillas. Las restricciones administrativas son del servicio; no se trasladan silenciosamente al modo local.
+Los perfiles, bases y archivos privados de instalaciones Electron anteriores no se eliminan; su ejecución y empaquetado se retiran del código vigente. El catálogo de plantillas usa las reglas del servicio.
 
 ## Integración y evidencia
 
@@ -44,11 +46,11 @@ Las pruebas registradas en builds antiguos pertenecen a su código y fecha. La c
 
 ## Invariantes para las próximas specs
 
-- Mantener dominio independiente de React, Pixi, Electron y SQL; las vistas invocan servicios/puertos.
+- Mantener dominio independiente de React, Pixi, HTTP y SQL; las vistas invocan servicios/puertos.
 - Autorizar por cuenta/propietario/apertura en el servidor, incluyendo revalidación al confirmar y entregar datos; una capacidad UI no autoriza.
 - Mantener publicaciones inmutables y versiones retenidas; deshabilitar impide nuevos usos y conserva instancias existentes.
 - No borrar bases ni restablecer usuarios durante configuración/arranque. `.local/service` y env son privados e ignorados.
-- Conservar formato `.ttrpgscene` v2 y lector/migrador v1; en SDD 59, `export-owned` escribe v4, `export-legacy` conserva v3 y los lectores aceptan v1–v4; es otro formato y no transporta cuentas, aperturas ni borradores. La entrega 3.28.0 sigue sin integrar.
+- Conservar formato `.ttrpgscene` v2 y lector/migrador v1; la transferencia operativa escribe v5 y sus lectores aceptan v1–v5. Son formatos distintos; la transferencia no transporta cuentas, aperturas ni borradores.
 - Un proceso API por base; reiniciar conserva persistencia pero vacía proyección/cámaras/dados. No prometer recuperación de ese estado efímero.
 - La niebla no evita que el jugador inspeccione los píxeles de una imagen de mapa ya descargada. No usarla como control de confidencialidad.
 - Cambios de código requieren evidencia nueva y permiso de integración; una decisión técnica anterior no concede permisos Git.
@@ -168,3 +170,8 @@ Petición2026-11-17 aceptada en [SDD59 revisión0.10](specs/59-campanas-arcos-es
 
 
 **Incorporación0.10 completada:** 2026-11-17, servicio local3.33.0 activo8787;33archivos aplicados, SQLite12 y30tablas preservadas, configuración sin cambios. Backup íntegro privado y [evidenciaT20](specs/59-campanas-arcos-escenas/validacion-ui-0.10.md#cierre-operativo-t-20--2026-11-17). Sustituye el estado pendiente anterior; sinmergeGit.
+
+
+## Entrega local — SDD62: servicio exclusivamente web
+
+Petición del 2026-11-17: eliminar Electron autónomo/conectado y conservar el producto web. [Spec62 revisión0.1](specs/62-servicio-solo-web/spec.md), rama autorizada `feature/spec-62-solo-web` desde cierre 3.34.0. La retirada conserva React/Pixi, API Node.js, datos y formatos; no implementa Django/Redis ni múltiples réplicas de runtime sobre la misma base. Implementación y validación local completas en 3.35.0; [evidencia](specs/62-servicio-solo-web/validacion.md). Sin integración.

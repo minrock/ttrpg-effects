@@ -28,18 +28,9 @@
 .workspace-brand img { width: 29px; height: 29px; object-fit: contain; }
 .workspace-brand strong { font: 650 14px var(--editor-font); white-space: nowrap; }
 .workspace-brand strong span { font-weight: 400; }
-.workspace-scene-menu, .workspace-scene-name { position: relative; min-width: 0; padding-left: 18px; border-left: 1px solid var(--editor-border); }
+.workspace-scene-name { position: relative; min-width: 0; padding-left: 18px; border-left: 1px solid var(--editor-border); }
 .workspace-scene-name { display: flex; align-items: center; }
 .workspace-scene-name > span { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 550; }
-.workspace-scene-menu summary { display: flex; align-items: center; gap: 18px; cursor: pointer; list-style: none; }
-.workspace-scene-menu summary::-webkit-details-marker { display: none; }
-.workspace-scene-menu summary > span { display: grid; gap: 3px; min-width: 0; }
-.workspace-scene-menu summary small, .workspace-scene-menu summary strong { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.workspace-scene-menu summary small { color: var(--editor-muted); font-size: 10px; }
-.workspace-scene-menu summary strong { font-size: 12px; font-weight: 550; }
-.workspace-scene-actions { position: absolute; top: 44px; left: 0; width: 230px; padding: 5px; background: #26292d; border: 1px solid #50565d; border-radius: 5px; box-shadow: 0 8px 24px #0006; }
-.workspace-scene-actions button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 10px; color: #e0e6e3; background: transparent; border: 0; border-radius: 3px; font-size: 12px; text-align: left; }
-.workspace-scene-actions button:hover:not(:disabled) { background: #ffffff0c; }
 .workspace-header-actions { display: flex; align-items: center; gap: 5px; margin-left: auto; flex-shrink: 0; }
 .workspace-header-separator { width: 1px; height: 22px; background: var(--editor-border); margin: 0 5px; }
 .vtt-interface .workspace-icon { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 4px; color: #b4bbc2; background: transparent; flex-shrink: 0; }
@@ -129,9 +120,8 @@
   .vtt-interface .dm-aside-panel { left: 51px; }
   .vtt-interface .control-sidebar { right: 0; }
   .vtt-interface .workspace-header { gap: 12px; }
-  .workspace-scene-menu, .workspace-scene-name { padding-left: 12px; }
+  .workspace-scene-name { padding-left: 12px; }
   .workspace-scene-name > span { max-width: 200px; }
-  .workspace-scene-menu summary small, .workspace-scene-menu summary strong { max-width: 200px; }
   .vtt-interface .aside-visibility-toggle, .vtt-interface .sidebar-visibility-toggle { display: none; }
 }
 @media (max-width: 700px) {
@@ -142,13 +132,8 @@
   .workspace-header-actions { gap: 1px; }
   .vtt-interface .workspace-header-actions .workspace-icon { width: 27px; height: 32px; }
   .workspace-present { width: 30px; padding: 0; margin-left: 3px; }
-  .workspace-scene-menu, .workspace-scene-name { padding-left: 0; border: 0; flex: 1; }
+  .workspace-scene-name { padding-left: 0; border: 0; flex: 1; }
   .workspace-scene-name > span { max-width: 100%; font-size: 11px; }
-  .workspace-scene-menu summary { gap: 3px; }
-  .workspace-scene-menu summary small, .workspace-scene-menu summary strong { max-width: 100%; }
-  .workspace-scene-menu summary strong { font-size: 11px; }
-  .workspace-scene-menu summary small { font-size: 9px; }
-  .workspace-scene-actions { width: min(230px, calc(100vw - 60px)); }
   .workspace-context-tools { left: 61px; max-width: calc(100% - 75px); }
   .workspace-camera-dock { right: 8px; bottom: 10px; max-width: calc(100% - 16px); }
   .vtt-interface .scene-status { height: 25px; }

@@ -4,7 +4,7 @@
 
 > **SDD 56 / 3.20.0, integrada en main:** cámaras independientes. El DM usa foco efímero para cambiar el centro sin tocar el zoom. `camera` y `camera-command` se rechazan; el foco nunca forma parte del bootstrap. [Contrato y validación](../specs/56-camaras-libres-foco-atencion/plan.md).
 
-La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. Electron local conservaIPC.
+La API administra una proyección efímera por partida/apertura. El VTTReact/Pixi y dados son comunes a los clientes. Reinicio conserva guardados, sesiones y plazos, pero vacía estado visual hasta publicación explícita. La UI es exclusivamente web desde SDD62.
 
 ## Conectar jugadores
 
@@ -80,7 +80,7 @@ La [guía contextual](moderation.md) define protocolo2, aislamiento de cámaras/
 
 ## Dibujos compartidos — SDD 55 / 3.19.1
 
-En servicio, mediciones, caminos, círculos, conos y rectángulos/cuadrados de jugadores se comparten en una capa efímera independiente de la escena. Cada jugador modifica/limpia los propios; el DM puede retirarlos o limpiar la capa con confirmación. Alias y discriminador provienen de la admisión autenticada. En el DM, «Dibujos de jugadores» comparte la pestaña Mesa del lateral derecho con participantes e invitaciones; ambos menús se despliegan dentro del lateral y usan su desplazamiento, sin flotantes independientes. El jugador accede a su alias, sistema, estado de conexión, salida y «Visible para la mesa» desde el lateral derecho retráctil (pestaña con chevrón en el borde derecho, como en el DM). Escape lo cierra; en pantallas estrechas comienza cerrado. El panel muestra nombres completos; las etiquetas del mapa acortan nombres largos. Electron autónomo conserva herramientas locales.
+En servicio, mediciones, caminos, círculos, conos y rectángulos/cuadrados de jugadores se comparten en una capa efímera independiente de la escena. Cada jugador modifica/limpia los propios; el DM puede retirarlos o limpiar la capa con confirmación. Alias y discriminador provienen de la admisión autenticada. En el DM, «Dibujos de jugadores» comparte la pestaña Mesa del lateral derecho con participantes e invitaciones; ambos menús se despliegan dentro del lateral y usan su desplazamiento, sin flotantes independientes. El jugador accede a su alias, sistema, estado de conexión, salida y «Visible para la mesa» desde el lateral derecho retráctil (pestaña con chevrón en el borde derecho, como en el DM). Escape lo cierra; en pantallas estrechas comienza cerrado. El panel muestra nombres completos; las etiquetas del mapa acortan nombres largos. Las herramientas locales del navegador se mantienen.
 
 La extensión `annotationsVersion=1` se solicita junto a `openingId`/`generation` en `table/state` y `table/events`. Añade `annotations` (versión, tiempo de servidor, secuencia, escena de origen, autor propio e items) fuera de `snapshot.scene`; clientes antiguos no reciben eventos nuevos. Los comandos usan POST `table/annotations` bajo los namespaces contextual DM/invitado existentes, con contexto/requestId y revisión de figura. El servidor deriva las medidas con las reglas publicadas. El adaptador expone el puerto opcional `TtrpgClient.annotations`, sin ampliar IPC privilegiado.
 
@@ -110,6 +110,6 @@ La proyección de jugador incluye únicamente estado e historial públicos. Las 
 
 Una nueva publicación retira la presentación anterior y conserva el historial de esa apertura. Navegar por una escena privada DM no cancela una pública. Salir o revocar cancela reservas pendientes de ese participante; no retira resultados ya aceptados. Cerrar/reabrir/expirar la apertura o descartar su runtime libera estado, recibos y logs. No se escriben tiradas en SQL ni en `.ttrpgscene`.
 
-Las rutas de dados anteriores de la tabla superior describen el protocolo histórico. En el servicio con C-61 las mutaciones legacy requieren actualizar cliente (426), mientras las capacidades no soportadas mantienen la vista base de mesa disponible. Electron autónomo conserva su sesión y proyección local anteriores.
+Las rutas de dados anteriores de la tabla superior describen el protocolo histórico. En el servicio con C-61 las mutaciones legacy requieren actualizar cliente (426), mientras las capacidades no soportadas mantienen la vista base de mesa disponible. Desde SDD62 no existe cliente autónomo; los contratos históricos se conservan como antecedentes del protocolo.
 
 La apertura inicial de SSE espera la decisión de capacidades de dados como máximo 1,5 s. Si no responde, se cancela esa consulta y continúa la mesa base; una respuesta tardía no altera una sesión nueva. Sin negociación, bootstrap conserva sobre contextual v2 con estado interno v1; sólo la extensión negociada usa estado contextual v2.

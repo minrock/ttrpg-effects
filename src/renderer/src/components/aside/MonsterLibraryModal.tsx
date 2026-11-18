@@ -58,7 +58,7 @@ export function MonsterLibraryModal({
     setFeedback(null);
     setIsLoading(librariesApi !== undefined);
     if (librariesApi === undefined) {
-      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
+      setFeedback({ message: "La API del servicio no está disponible.", kind: "error" });
       return;
     }
     async function refresh(): Promise<void> {
@@ -115,7 +115,7 @@ export function MonsterLibraryModal({
 
   async function saveNewMonster(): Promise<void> {
     if (librariesApi === undefined) {
-      setFeedback({ message: "La API de preload no esta disponible.", kind: "error" });
+      setFeedback({ message: "La API del servicio no está disponible.", kind: "error" });
       return;
     }
 

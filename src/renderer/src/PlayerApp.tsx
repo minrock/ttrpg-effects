@@ -3,7 +3,7 @@ import { isContextualArea } from "../../domain/shapes/shapes";
 import { attentionFrame, focusCamera, localEntryCamera } from "../../domain/player/attention-focus";
 import { useSharedAnnotations } from "./hooks/useSharedAnnotations";
 import { SharedDrawingPanel } from "./components/workspace/SharedDrawingPanel";
-import { useTtrpgApi, useTtrpgClient } from "./client/ClientProvider";
+import { useTtrpgApi } from "./client/ClientProvider";
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Compass, Dices, Lock, Table2, Unlock, Wrench, ZoomIn, ZoomOut } from "lucide-react";
 import { createDefaultScene } from "../../domain/sessions/default-scene";
@@ -20,8 +20,6 @@ import { PlayerAsideOverlay } from "./components/aside/PlayerAsideOverlay";
 import { createDefaultSceneAside } from "../../domain/sessions/scene-aside";
 import { CombatTurnBar } from "./components/combat/CombatTurnBar";
 import { SceneCountersOverlay } from "./components/counters/SceneCountersOverlay";
-import { usePublicDice } from "./hooks/useDiceSession";
-import { useDiceSizes } from "./hooks/useDiceSizes";
 import { DiceOverlay } from "./components/dice/DiceOverlay";
 import { ServiceDicePanel } from "./components/dice/ServiceDicePanel";
 import { DicePublicStatus } from "./components/dice/DicePublicStatus";
@@ -38,7 +36,6 @@ const EMPTY_LINK_STATUSES = {};
 
 export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavailableMessage?: string; readonly tablePanel?: ReactNode } = {}): JSX.Element {
   const playerApi = useTtrpgApi("player");
-  const isServiceClient = useTtrpgClient()?.assetReferences === "service";
   const shellRef = useRef<HTMLDivElement | null>(null);
   const tableToggleRef = useRef<HTMLButtonElement | null>(null);
   const tableSidebarRef = useRef<HTMLElement | null>(null);
@@ -225,7 +222,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
         : null;
     if (nextMapLoadKey === null) {
       setIsViewportReady(true);
-    } else if (changesViewport || mapLoadKeyRef.current === null || (isServiceClient && mapLoadKeyRef.current !== nextMapLoadKey)) {
+    } else if (changesViewport || mapLoadKeyRef.current === null || mapLoadKeyRef.current !== nextMapLoadKey) {
       setIsViewportReady(false);
       loadedImageUrlRef.current = null;
     }
@@ -244,7 +241,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     } else if (changesViewport) {
       setCamera(latestPlayerCameraRef.current);
     }
-  }, [isServiceClient]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -362,18 +359,17 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     }
     loadedImageUrlRef.current = imageUrl;
     setIsViewportReady(true);
-    if (!isServiceClient) setPublicationRevision(value => value + 1);
     void playerApi?.reportPlayerMapImageStatus({ imageUrl, ok: true });
-  }, [viewportIdentity, playerApi, isServiceClient]);
+  }, [viewportIdentity, playerApi]);
   const handlePlayerMapError = useCallback(({ imageUrl, error }: { imageUrl: string; error: string }): void => {
     if (!isCameraReporterActiveRef.current || viewportIdentity !== viewportIdentityRef.current ||
       imageUrl !== requestedImageUrlRef.current) return;
     loadedImageUrlRef.current = null;
     setIsViewportReady(true);
     void playerApi?.reportPlayerMapImageStatus({ imageUrl, ok: false, error: error.slice(0, 500) });
-  }, [viewportIdentity, playerApi, isServiceClient]);
+  }, [viewportIdentity, playerApi]);
 
-  const serviceReadyImageUrl = isServiceClient ? mapImageUrl : null;
+  const serviceReadyImageUrl = mapImageUrl;
   useEffect(() => {
     if (isHydrated && isViewportReady) {
       if (mapImageUrl && loadedImageUrlRef.current !== mapImageUrl) return;
@@ -387,13 +383,10 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
     }
   }, [isHydrated, isViewportReady, queuePlayerCameraReport, playerApi, publicationRevision, serviceReadyImageUrl, mapImageUrl]);
 
-  const diceEnvelope = usePublicDice(scene.activeMapId, viewportIdentity ?? "", isHydrated && isViewportReady);
-  const { sizes: diceSizes } = useDiceSizes();
   const serviceDice = useServiceDiceSession();
-  const usesServiceDiceTransport = isServiceClient;
-  const hasServiceDice = usesServiceDiceTransport && serviceDice.view.supported;
+  const hasServiceDice = serviceDice.view.supported;
   const publicMapMatches = hasServiceDice && serviceDice.publicPresentation !== null && serviceDice.view.state?.public.publishedContext?.token === serviceDice.publicPresentation.context.token && serviceDice.publicPresentation.context.sceneId === scene.id && serviceDice.publicPresentation.context.mapId === scene.activeMapId;
-  const visibleDiceEnvelope = hasServiceDice ? publicMapMatches ? serviceDice.publicEnvelope : { revision: -1, presentation: null } : usesServiceDiceTransport ? { revision: -1, presentation: null } : diceEnvelope;
+  const visibleDiceEnvelope = hasServiceDice && publicMapMatches ? serviceDice.publicEnvelope : { revision: -1, presentation: null };
   const canDismissServicePresentation = serviceDice.closeAny || (serviceDice.publicPresentation?.author.kind === "player" && serviceDice.publicPresentation.author.publicId === serviceDice.selfAuthorId);
   const diceAuthor = (author: { readonly kind: "dm" } | { readonly kind: "player"; readonly publicId: string; readonly alias: string; readonly discriminator: number }) => ({ id: author.kind === "dm" ? "dm" : author.publicId, label: author.kind === "dm" ? "DM" : `${author.alias} · ${author.discriminator}`, kind: author.kind });
   const serviceDiceReady = serviceDice.view.connected && serviceDice.view.state?.public.publishedContext !== null;
@@ -402,7 +395,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
   const tools = usePlayerTools(viewportIdentity, scene.grid, scene.settings, shared.bridge);
   const focusHandler = useRef<(event: import("../../domain/player/attention-focus").AttentionFocusEvent) => void>(() => {});
   focusHandler.current = event => {
-    if ((!isServiceClient && event.expiresAt <= Date.now()) || !isHydrated || !isViewportReady || event.frame !== focusFrameRef.current) return;
+    if (!isHydrated || !isViewportReady || event.frame !== focusFrameRef.current) return;
     if (mapImageUrl && loadedImageUrlRef.current !== mapImageUrl) return;
     const interrupted = tools.points.length > 0;
     if (tools.isDrawing) tools.cancel();
@@ -453,7 +446,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
         <MapViewport
           ref={viewportRef}
           key={viewportIdentity}
-          overlay={<DiceOverlay envelope={visibleDiceEnvelope} finalFrame={hasServiceDice && publicMapMatches ? serviceDice.publicFinalFrame : null} size={hasServiceDice ? serviceDice.size : diceSizes.player} onDismiss={hasServiceDice && canDismissServicePresentation ? serviceDice.dismiss : undefined} reportRenderStatus={!usesServiceDiceTransport} />}
+          overlay={<DiceOverlay envelope={visibleDiceEnvelope} finalFrame={hasServiceDice && publicMapMatches ? serviceDice.publicFinalFrame : null} size={serviceDice.size} onDismiss={hasServiceDice && canDismissServicePresentation ? serviceDice.dismiss : undefined} reportRenderStatus={false} />}
           map={mapState}
           grid={scene.grid}
           settings={scene.settings}
@@ -626,7 +619,7 @@ export function PlayerApp({ unavailableMessage, tablePanel }: { readonly unavail
         <div className="player-table-sidebar__content">
           <div id="player-panel-table" role={hasServiceDice ? "tabpanel" : undefined} aria-labelledby={hasServiceDice ? "player-tab-table" : undefined} hidden={hasServiceDice && playerTab !== "table"}>{tablePanel}{shared.api && <SharedDrawingPanel api={shared.api} view={{ ...shared.view, error: shared.error }} aligned player/>}</div>
           {hasServiceDice && <div id="player-panel-dice" role="tabpanel" aria-labelledby="player-tab-dice" hidden={playerTab !== "dice"}>{serviceDicePanel}</div>}
-          {usesServiceDiceTransport && !hasServiceDice && <p className="dice-status" role="status">Esta mesa usa una versión de dados incompatible. Actualiza el servicio o el cliente para lanzar tiradas.</p>}
+          {!hasServiceDice && <p className="dice-status" role="status">Esta mesa usa una versión de dados incompatible. Actualiza el servicio o el cliente para lanzar tiradas.</p>}
         </div>
       </aside>}
       {hasTable && <button ref={tableToggleRef} type="button" className="player-table-toggle"

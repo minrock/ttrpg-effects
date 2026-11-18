@@ -36,7 +36,6 @@ const monster = z.object({ ...commonEntry, name: z.string(), system: z.string(),
 const npc = z.object({ ...commonEntry, name: z.string(), notes: z.string() });
 const character = z.object({ ...commonEntry, characterName: z.string(), playerName: z.string(), level: z.string(), species: z.string(), classes: z.string(), stats: z.object({ strength:z.string(),constitution:z.string(),dexterity:z.string(),intelligence:z.string(),wisdom:z.string(),charisma:z.string() }), initiative:z.string(),armorClass:z.string(),passivePerception:z.string(),hitPoints:z.string(),spellSaveDc:z.string(),speeds:z.string(),notes:z.string() });
 const asset = z.object({ ok, asset: z.object({ id, reference: z.string(), url: z.string(), mimeType: z.string(), byteLength: z.number() }) });
-const inactive = () => () => {};
 type BrowserSceneSummary = Pick<import("../../shared/contracts/http-api").SceneSummary, "id" | "name">;
 export interface BrowserDialogs {
   selectScene(): Promise<string | null>;
@@ -236,7 +235,6 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     searchPlayerCharacterLibrary:characters.search,getPlayerCharacterLibraryEntry:characters.get,savePlayerCharacterLibraryEntry:characters.save,
     openMapImage:openImage,openTokenImage:openImage,openAsideImage:openImage,resolveMapUrl:resolveUrl,resolveTokenUrl:resolveUrl,resolveAsideUrl:resolveUrl,
     selectReplacementMapImage:async()=>{try {const selected=await upload();return selected?{status:"ready",imagePath:selected.imagePath,imageUrl:selected.imageUrl}:{status:"cancelled"};}catch(error){return {status:"error",error:error instanceof Error?error.message:"No se pudo subir la imagen."};}},
-    onRecentSceneOpen:inactive,onOpenMonsterTemplateManager:inactive,
     ...table.api
   };
   return {
@@ -266,7 +264,7 @@ export function createBrowserClient(http: HttpTransport, dialogs: BrowserDialogs
     },
     latestSavedScene:async()=> owned?(await http.request(`/games/${owned.gameId}/last-scene`,z.object({ok,sceneId:z.uuid().nullable()}))).sceneId:null,
     openSaved: async(reference:string)=>load(reference),
-    client:createClient(api,{scenes:true,images:true,libraries:true,templateAdministration:!owned,player:true,dice:true,nativeMenus:false},"service",owned?{
+    client:createClient(api,{scenes:true,images:true,libraries:true,templateAdministration:!owned,player:true,dice:true},"service",owned?{
       forMonster:(id,templateId,available)=>{const retained=retainedTemplates.get(id);return retained&&retained.id===templateId?[retained,...available.filter(t=>t.id!==retained.id)]:available;},
       validateLibraryUse:async(id)=>{const entry=await monsters.get(id);if(!entry.ok)throw new Error(entry.error);const ref=versions.get(`monsters/${id}`)?.bindings?.root;if(!ref||ref.scope!=="catalog"||ref.systemId!==owned.configuration.ref.systemId||ref.version!==owned.configuration.ref.version||owned.configuration.availability!=="enabled"||owned.version.templates[ref.templateId]?.availability!=="enabled")throw new Error("Esta ficha conserva una presentación privada, deshabilitada o de otra versión. Puedes editar su instancia existente, pero no crear un vínculo nuevo en esta partida.");}
     }:undefined,owned?table.annotations:undefined,arcPreparation,table.serviceDice),

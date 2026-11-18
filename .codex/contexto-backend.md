@@ -1,6 +1,6 @@
 # Contexto técnico del backend
 
-Inspección: 2026-11-13, producto 3.27.2. Este mapa orienta al agente; las versiones actuales se consultan en `package.json` y el contrato vigente en SDD. Revalidar rutas y comportamiento antes de cada tarea.
+Actualización de plataforma: SDD62, 2026-11-17, retirada de Electron implementada y validada localmente en 3.35.0. Este mapa orienta al agente; las versiones actuales se consultan en `package.json` y el contrato vigente en SDD. Revalidar rutas y comportamiento antes de cada tarea.
 
 ## Stack comprobado
 
@@ -17,7 +17,7 @@ Inspección: 2026-11-13, producto 3.27.2. Este mapa orienta al agente; las versi
 | Imágenes | Sharp 0.35.5 para validación/decodificación | `src/infrastructure/server/image-validation.ts` |
 | Build y pruebas | pnpm, Vite 7.3.3, Vitest 4, ESLint y TypeScript | `package.json`, `src/server/vite.config.ts` |
 
-No hay framework web Express/Nest ni Socket.IO en la composición actual. React y PixiJS pertenecen al cliente; Electron tiene además su modo local y su frontera IPC.
+No hay framework web Express/Nest ni Socket.IO en la composición actual. React y PixiJS pertenecen al navegador. Desde SDD62 no hay runtime ni frontera IPC de Electron.
 
 ## Recorrido y límites
 
@@ -46,4 +46,4 @@ La suite general usa `pnpm test`. Para un recorrido amplio en este checkout, exc
 
 Los cinco scripts `test:db`, `test:identity`, `test:owned`, `test:invitations` y `test:moderation` seleccionan contratos adicionales. Revisar sus configs y fixtures. Requieren PostgreSQL real temporal/TLS y variables de prueba como `TTRPG_TEST_DATABASE_URL` y `TTRPG_TEST_DB_CA_FILE`; algunos también requieren `pnpm build:api`. Usar checkout aislado sin `.env`, nunca borrar el `.env` del usuario para satisfacer el arnés. Reportar gates pendientes si ese entorno no está disponible.
 
-`pnpm start:api` inicia el watcher de desarrollo: compila inicialmente y reconstruye/reinicia al cambiar fuentes. `pnpm build:service` genera API/web estable y `pnpm start:api:built` lo ejecuta. Estos comandos pueden cargar la configuración real: no son un sustituto de las fixtures temporales para probar cambios.
+`pnpm dev` / `pnpm start:api` inicia el watcher de desarrollo: compila inicialmente y reconstruye/reinicia al cambiar fuentes. `pnpm build` / `pnpm build:service` genera API/web estable y `pnpm start` / `pnpm start:api:built` lo ejecuta. Estos comandos pueden cargar la configuración real: no son un sustituto de las fixtures temporales para probar cambios.

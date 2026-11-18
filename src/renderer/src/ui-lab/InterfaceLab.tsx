@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent, type ComponentType, type ReactNode } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Circle, CloudFog, Crosshair, Dices, Eye, EyeOff, Flame, Focus, FolderOpen, GripVertical, Hand, ImagePlus, Layers, Lightbulb, Link2, Map, MapPin, Maximize2, Minus, Monitor, Moon, MoreHorizontal, MousePointer2, MoveRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, Plus, RotateCcw, Ruler, Search, Settings2, Shapes, SlidersHorizontal, Sun, Sunset, Trash2, Triangle, Users, Waves, X, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, BookOpen, Check, ChevronDown, ChevronRight, Circle, CloudFog, Crosshair, Eye, EyeOff, Flame, Focus, FolderOpen, GripVertical, Hand, ImagePlus, Layers, Lightbulb, Link2, Map, MapPin, Maximize2, Minus, Monitor, Moon, MoreHorizontal, MousePointer2, MoveRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, Plus, RotateCcw, Ruler, Search, Settings2, Shapes, SlidersHorizontal, Sun, Sunset, Trash2, Triangle, Users, Waves, X, Zap } from "lucide-react";
 import type { SceneDocument, SceneEffect } from "../../../domain/sessions/scene-document";
 import { addSceneMap, createDefaultSceneMap, renameSceneMap, reorderSceneMaps, setActiveSceneMap, syncActiveMapFromRuntimeFields, upsertSceneMap } from "../../../domain/sessions/scene-maps";
 import { updateAnimatedFireEffect } from "../../../domain/effects/fire";
@@ -13,7 +13,6 @@ import { LightningProperties } from "../components/LightningProperties";
 import { CompassOverlay } from "../components/CompassOverlay";
 import { LabCanvas, type LabTool } from "./LabCanvas";
 import { createLabScene } from "./fixture";
-import { LabDice } from "./LabDice";
 
 const mapImage = new URL("../../../../assets/lab/cloister-map.png", import.meta.url).href;
 const brandImage = new URL("../../../../assets/logo/ttrpg-effects-icon.png", import.meta.url).href;
@@ -71,7 +70,7 @@ export function InterfaceLab() {
   const [tool, setTool] = useState<LabTool>("select"), [shape, setShape] = useState<Shape>("circle");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 1100), [rightOpen, setRightOpen] = useState(() => window.innerWidth >= 900);
-  const [leftTab, setLeftTab] = useState<"scene" | "map">("scene"), [rightTab, setRightTab] = useState<"properties" | "dice">("properties");
+  const [leftTab, setLeftTab] = useState<"scene" | "map">("scene"), [rightTab, setRightTab] = useState<"properties">("properties");
   const [collection, setCollection] = useState<"maps" | "notes" | "entities">("maps");
   const [query, setQuery] = useState("");
   const [camera, setCamera] = useState<ViewportCameraSnapshot>({ center: { x: 0, y: 0 }, zoom: .7 });
@@ -91,7 +90,6 @@ export function InterfaceLab() {
   const objectList = [...scene.lights.map(item => ({ id: item.id, name: objectNames[item.id] ?? "Luz", icon: Lightbulb, visible: item.visible, group: "Luz" })), ...scene.effects.map(item => ({ id: item.id, name: objectNames[item.id] ?? (item.kind === "fire" ? "Fuego" : item.kind === "lightning" ? "Relampago" : "Efecto"), icon: item.kind === "fire" ? Flame : item.kind === "lightning" ? Zap : Waves, visible: item.visible, group: "Efecto" })), ...scene.shapes.map(item => ({ id: item.id, name: objectNames[item.id] ?? "Area de medida", icon: Shapes, visible: true, group: "Area" }))];
   const selectedName = objectList.find(item => item.id === selectedId)?.name ?? annotationTitle ?? scene.name;
   const matches = (text: string) => text.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-  const diceContext = useMemo(() => ({ token: `lab:${scene.id}`, sceneId: "ui-lab", mapId: scene.id, sceneName: "El monasterio del rio", mapName: scene.name }), [scene.id, scene.name]);
   const playerScene = useMemo(() => createPlayerSceneSnapshot(scene), [scene]);
   const updateEffect = (next: SceneEffect) => setScene({ ...scene, effects: scene.effects.map(item => item.id === next.id ? next : item) });
   const changeShape = (patch: ShapePatch) => setScene({ ...scene, shapes: scene.shapes.map(item => item.id === selectedId ? updateShape(item, patch) : item) });
@@ -165,7 +163,7 @@ export function InterfaceLab() {
         {sceneMenu && <><button className="lab-menu-dismiss" aria-label="Cerrar menu de escena" onClick={() => setSceneMenu(false)} /><div className="lab-menu" role="menu"><button role="menuitem" onClick={() => pickImage(false)}><ImagePlus size={16} />Agregar mapa</button><button role="menuitem" onClick={() => pickImage(true)}><FolderOpen size={16} />Actualizar imagen del mapa</button><hr /><button role="menuitem" onClick={reset}><RotateCcw size={16} />Restablecer demo</button></div></>}
       </div>
       <div className="lab-session-state"><span />Sesion local</div>
-      <div className="lab-top-actions"><IconButton icon={BookOpen} label="Notas de la escena" onClick={() => { setLeftTab("scene"); setCollection("notes"); setLeftOpen(true); if (window.innerWidth < 1100) setRightOpen(false); }} /><IconButton icon={Dices} label="Abrir dados" active={rightOpen && rightTab === "dice"} onClick={() => { setRightTab("dice"); setRightOpen(true); if (window.innerWidth < 1100) setLeftOpen(false); }} /><span className="lab-top-divider" /><button className="lab-present" aria-label="Vista del jugador" onClick={() => setPreview(true)}><Monitor size={16} /><span>Vista del jugador</span></button></div>
+      <div className="lab-top-actions"><IconButton icon={BookOpen} label="Notas de la escena" onClick={() => { setLeftTab("scene"); setCollection("notes"); setLeftOpen(true); if (window.innerWidth < 1100) setRightOpen(false); }} /><span className="lab-top-divider" /><button className="lab-present" aria-label="Vista del jugador" onClick={() => setPreview(true)}><Monitor size={16} /><span>Vista del jugador</span></button></div>
     </header>
     <div className="lab-workspace">
       <nav className="lab-tool-rail" aria-label="Herramientas del mapa">
@@ -210,7 +208,7 @@ export function InterfaceLab() {
       </main>
       <aside className={`lab-inspector${rightOpen ? " is-open" : ""}`} aria-label="Inspector" hidden={!rightOpen}>
         <div className="lab-panel-heading"><span>INSPECTOR</span><IconButton icon={PanelRightClose} label="Plegar inspector" onClick={toggleRight} /></div>
-        <Tabs label="Panel derecho" value={rightTab} onChange={setRightTab} options={[{ id: "properties", label: "Propiedades", icon: SlidersHorizontal }, { id: "dice", label: "Dados", icon: Dices }]} />
+        <Tabs label="Panel derecho" value={rightTab} onChange={setRightTab} options={[{ id: "properties", label: "Propiedades", icon: SlidersHorizontal }]} />
         <div className="lab-inspector-scroll">
           {rightTab === "properties" && <>
             <div className="lab-inspector-title"><span className={`lab-type-icon${effect?.kind === "fire" ? " is-fire" : ""}`}>{effect?.kind === "fire" ? <Flame size={20} /> : light ? <Lightbulb size={20} /> : environment ? <Sun size={20} /> : <Map size={20} />}</span><div><small>{environment ? "AMBIENTE" : selectedId ? "SELECCION" : "MAPA ACTIVO"}</small><h2>{environment ? "Luz y atmosfera" : selectedName}</h2></div>{selectedId && <IconButton icon={X} label="Quitar seleccion" onClick={() => setSelectedId(null)} />}</div>
@@ -233,7 +231,6 @@ export function InterfaceLab() {
                   </>}
             {(effect || light || selectedShape) && !environment && <div className="lab-inspector-delete"><button onClick={removeSelected}><Trash2 size={14} />Eliminar del mapa</button></div>}
           </>}
-          <LabDice active={rightTab === "dice"} viewport={viewport} context={diceContext} />
         </div>
         <footer className="lab-inspector-footer"><button aria-pressed={environment} onClick={() => { setEnvironment(value => !value); setRightTab("properties"); }}><Sun size={15} />Ambiente<ChevronRight size={14} /></button></footer>
       </aside>

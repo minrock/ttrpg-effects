@@ -16,7 +16,7 @@ SDD/
   estado-actual.md          Base vigente, decisiones y límites
   arquitectura.md           Clientes, servidor, persistencia y datos
   flujo.md                  Planificación → implementación → evidencia
-  specs/00-… a 61-…/        spec.md; plan.md + tareas.md al planificar construcción
+  specs/00-… a 62-…/        spec.md; plan.md + tareas.md al planificar construcción
   specs/templates/          Plantillas de planificación
   guias/                    Contratos detallados y operación
   retirada-factory.md       Conservación de criterios y trazabilidad de la organización retirada
@@ -68,6 +68,10 @@ El registro histórico conserva los 12 trabajos integrados; las specs 41–52 co
 | [60 — Storybook de componentes UI](specs/60-storybook-componentes-ui/spec.md) | Implementada y validada localmente en 3.29.0; pendiente de integración | [Plan](specs/60-storybook-componentes-ui/plan.md) · [Inventario](specs/60-storybook-componentes-ui/inventario.md) · [Validación](specs/60-storybook-componentes-ui/validacion.md) |
 | [61 — Dados de jugadores e historial público](specs/61-dados-jugadores/spec.md) | Revisión 0.1 implementada y validada localmente en 3.32.0; sin merge | [Plan](specs/61-dados-jugadores/plan.md) · [Tareas](specs/61-dados-jugadores/tareas.md) · [Validación](specs/61-dados-jugadores/validacion.md) |
 
+## Retirada de Electron — SDD62
+
+[Servicio exclusivamente web](specs/62-servicio-solo-web/spec.md), revisión 0.1 solicitada el 2026-11-17: retirar ambos modos Electron y conservar editor/jugador por navegador y API Node.js. Rama autorizada `feature/spec-62-solo-web`; implementación y [validación local](specs/62-servicio-solo-web/validacion.md) completas en 3.35.0, sin integración. No incluye Django, Redis, escalado horizontal ni migraciones reales.
+
 ## Guías técnicas y operativas
 
 El [catálogo UI/UX](guias/ui-ux/catalogo.md) registra patrones de interacción, componentes reutilizables y acuerdos de diseño, distinguiendo propuestas de implementaciones verificadas.
@@ -88,7 +92,7 @@ El [catálogo UI/UX](guias/ui-ux/catalogo.md) registra patrones de interacción,
 
 ## Siguiente planificación
 
-La siguiente numeración disponible es **62** tras reservar la spec 61; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 62: …» y después autorizar su implementación. La organización de agentes no está predeterminada.
+La siguiente numeración disponible es **63** tras reservar la spec 62; comprueba el índice antes de reservarla. Las ideas futuras de [estado actual](estado-actual.md#pendiente-de-especificar) no son tareas autorizadas ni se agregaron automáticamente a la cola. Puedes pedir «planifica SDD 63: …» y después autorizar su implementación. La organización de agentes no está predeterminada.
 
 ## Procedencia de las entregas
 

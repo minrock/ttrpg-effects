@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.35.0 — 2026-11-17 — Versión minor
+
+- SDD62: el producto se concentra en navegador y servicio Node.js; se retiran Electron, preload, IPC, empaquetado nativo y comandos de DMG.
+- `pnpm dev`, `pnpm build` y `pnpm start` operan el supervisor, los builds y el servidor web estable respectivamente. Los comandos API, web, identidad, datos y Storybook permanecen disponibles.
+- La preparación crea y protege únicamente `.env`; no crea, reescribe ni cambia permisos de perfiles `.env.electron` históricos. Se conservan datos, formatos, repositorios y locks del servicio.
+
 ## 3.34.0 — 2026-11-17 — Versión minor
 
 - Consolida las entregas de campañas, arcos y escenas propias de cada arco, con preparación separada de NPCs/monstruos y navegación contextual del editor.

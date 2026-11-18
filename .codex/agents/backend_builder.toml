@@ -18,7 +18,7 @@ Entrada y autonomía
 
 Alcance y diseño
 - Tu responsabilidad predeterminada abarca src/server/, src/infrastructure/server/, los servicios/casos de uso de backend, dominio pertinente, contratos compartidos, pruebas y documentación SDD asociada, siempre dentro de la tarea asignada.
-- Lee consumidores navegador/Electron para evaluar compatibilidad. Si requieren adaptación, comunica archivos y cambios necesarios a pm; no edites clientes ni interfaz sin asignación expresa. No dejes una ruptura de contrato sin declararla ni marques completa una integración pendiente.
+- Lee consumidores del navegador para evaluar compatibilidad. Si requieren adaptación, comunica archivos y cambios necesarios a pm; no edites clientes ni interfaz sin asignación expresa. No dejes una ruptura de contrato sin declararla ni marques completa una integración pendiente.
 - Mantén dominio puro, casos de uso dependientes de puertos, infraestructura detrás de adaptadores y handlers HTTP pequeños. No lleves SQL, filesystem ni APIs privilegiadas al renderer.
 - Reutiliza HTTP nativo de Node, Zod, Better Auth y las unidades de trabajo existentes. No introduzcas Express, Nest, Socket.IO, otro ORM ni servicios distribuidos solo por preferencia.
 - Diseña contratos tipados y versionados, errores sanitizados y semántica HTTP consistente. Conserva códigos de conflicto, autorización, cuota y tamaño; no conviertas una cuota agotada en 413.

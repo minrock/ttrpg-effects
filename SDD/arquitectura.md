@@ -5,19 +5,16 @@
 ```mermaid
 flowchart LR
   Navegador --> Web[React + editor compartido]
-  ElectronServicio[Electron servicio sin preload] --> Web
   Web --> HTTP[API HTTP + SSE contextual]
   HTTP --> Casos[Identidad / partidas / catálogo / invitaciones / moderación]
   Casos --> Puertos[Puertos y transacciones]
   Puertos --> SQLite[SQLite local]
   Puertos --> PostgreSQL[PostgreSQL producción con TLS]
-  ElectronLocal[Electron autónomo] --> Preload[Preload e IPC tipados]
-  Preload --> Local[Persistencia y proyección locales]
 ```
 
 Composición del servidor en [src/server/index.ts](../src/server/index.ts) y [moderation-backend.ts](../src/server/moderation-backend.ts); reglas/casos de uso en `src/domain` y `src/application/services`; adaptadores en `src/infrastructure/server`. `src/web` contiene pantallas de acceso, cuentas, sistemas, partidas e invitados. `src/renderer/src` y `src/render` conservan editor y motor visual compartidos.
 
-Electron local mantiene `contextIsolation`, `sandbox`, preload limitado y `nodeIntegration: false`. Electron servicio carga solo el origen permitido, sin puente privilegiado ni fallback a ventana local. El renderer no manipula DB ni archivos del servidor.
+Desde [SDD62](specs/62-servicio-solo-web/spec.md), el navegador es la única plataforma de interfaz. ClientProvider recibe un cliente explícito o null; no existe preload ni fallback nativo. El renderer no manipula DB, archivos ni secretos del servidor. Las pantallas React/Pixi se conservan bajo `src/renderer/src` sin implicar un runtime desktop.
 
 ## Modelo lógico y autoridad
 
@@ -35,7 +32,7 @@ Electron local mantiene `contextIsolation`, `sandbox`, preload limitado y `nodeI
 | Credencial invitada: `guest_credentials` | Hash, participante, apertura/generación y vencimiento. Expulsar revoca todas las del objetivo. |
 | Operaciones/auditoría | `owned_operations`, `guest_operations`, `owned_imports`, auditorías de identidad/invitación/moderación: deduplicación y resultados, sin conservar el secreto recuperable de una invitación. |
 
-El esquema físico y constraints están en [migrations.ts](../src/infrastructure/server/database/migrations.ts). Orden vigente: 1 catálogo, 2 identidad, 3 propiedad/aperturas, 4 sistemas retenidos, 5 invitaciones/participantes, 6 moderación, 7 múltiples administradores. No editar migraciones ya aplicadas para implementar una nueva decisión.
+El esquema físico y constraints están en [migrations.ts](../src/infrastructure/server/database/migrations.ts). El esquema vigente llega a la migración 12: conserva catálogo, identidad, propiedad/aperturas, versiones retenidas, invitaciones/moderación, administradores, borradores y campañas/arcos con escenas exclusivas. La secuencia exacta y checksums se consultan en las migraciones. No editar migraciones ya aplicadas para implementar una nueva decisión.
 
 ## Fronteras HTTP y de datos
 
@@ -51,4 +48,8 @@ Contratos exactos, cuotas, estados y códigos HTTP en [API](guias/private-api.md
 
 SQLite y PostgreSQL comparten puertos asíncronos y transacciones, con drivers separados. Un único proceso API mantiene autoridad por base. Escenas, assets, identidad y admisiones persisten; proyección, conexiones, cámaras y dados son efímeros. Reiniciar requiere publicar de nuevo, sin inventar presencia desde una fila de apertura.
 
-`.ttrpgscene` v2 es intercambio de escena, con lectura/migración v1; no es backup de cuentas, sistemas o blobs. En la implementación local de SDD 59, `export-owned` escribe el paquete funcional operativo v4, `export-legacy` conserva v3 y los lectores aceptan v1–v4. El paquete v4 conserva contenido, catálogo, bindings, campañas, arcos, asociaciones y preparación sin credenciales, aperturas ni borradores. Su estado de integración figura en [SDD 59](specs/59-campanas-arcos-escenas/validacion.md). El respaldo integral de DB sí contiene identidad y exige permisos privados e invalidación de accesos al restaurar. Consulta [operación](guias/service-operations.md).
+`.ttrpgscene` v2 es intercambio de escena, con lectura/migración v1; no es backup de cuentas, sistemas o blobs. En SDD59, `export-owned` escribe el paquete funcional operativo v5, `export-legacy` conserva v3 y los lectores aceptan v1–v5. El paquete conserva contenido, catálogo, bindings, campañas, arcos, asociaciones y preparación con marcas de borrado/reservas, sin credenciales, aperturas ni borradores. Su estado de integración figura en [SDD 59](specs/59-campanas-arcos-escenas/validacion.md). El respaldo integral de DB sí contiene identidad y exige permisos privados e invalidación de accesos al restaurar. Consulta [operación](guias/service-operations.md).
+
+## Instalaciones y escalado
+
+Los builds API/frontend son independientes y se ejecutan como servicio Node.js y recursos web, sin empaquetado nativo. Instalaciones separadas requieren base o directorio, secreto y host/origen propios; el puerto del mismo hostname no separa cookies. Se mantiene un runtime por base y proyección en memoria. No se añaden réplicas compartidas, Django, Redis ni un bus distribuido con SDD62. Los perfiles y datos desktop históricos no se migran ni borran automáticamente.

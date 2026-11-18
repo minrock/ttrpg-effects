@@ -8,7 +8,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "electron.vite.config.ts"],
+    files: ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}"],
     languageOptions: {
       parserOptions: {
         projectService: true,

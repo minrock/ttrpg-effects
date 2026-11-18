@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SceneDocument } from "../../../domain/sessions/scene-document";
 import { addSceneMap, createDefaultSceneMap, createSceneWithMap, setActiveSceneMap } from "../../../domain/sessions/scene-maps";
 import { prepareMapImageResource } from "../../../render/pixi/map-image-resource";
+import { createClient, type TtrpgClient } from "../../../shared/api/client";
+import type { TtrpgApi } from "../../../shared/api/ttrpg-api";
+import { ClientProvider } from "../client/ClientProvider";
 import { useMapImageReplacement } from "./useMapImageReplacement";
 
 vi.mock("../../../render/pixi/map-image-resource", () => ({ prepareMapImageResource: vi.fn() }));
@@ -18,6 +21,8 @@ describe("spec 36 review regressions", () => {
   let setImageUrl: (url: string | null) => void;
   const releaseCandidate = vi.fn();
   const selectReplacementMapImage = vi.fn();
+  const resolveMapUrl = vi.fn(async (path: string) => `map-asset://${path}?revision=retry`);
+  let client: TtrpgClient;
 
   function Harness() {
     const [current, setCurrent] = useState(() => addSceneMap(createSceneWithMap(createDefaultSceneMap({
@@ -50,21 +55,20 @@ describe("spec 36 review regressions", () => {
       width: 400, height: 200,
       release: url.includes("revision=new") ? releaseCandidate : vi.fn()
     }));
-    Object.defineProperty(window, "ttrpg", { configurable: true, value: {
+    client = createClient({
       selectReplacementMapImage,
-      resolveMapUrl: vi.fn(async (path: string) => `map-asset://${path}?revision=retry`),
+      resolveMapUrl,
       onPlayerMapImageStatus: () => () => {}
-    } });
+    } as unknown as TtrpgApi, { scenes: false, images: true, libraries: false, player: true, dice: false });
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
-    act(() => root.render(<Harness />));
+    act(() => root.render(<ClientProvider client={client}><Harness /></ClientProvider>));
   });
 
   afterEach(() => {
     act(() => root.unmount());
     host.remove();
-    Reflect.deleteProperty(window, "ttrpg");
   });
 
   it("does not infer old dimensions by fetching an uncached inactive same-path image", async () => {
@@ -111,7 +115,7 @@ describe("spec 36 review regressions", () => {
 
   it("cancels a replacement started while a player retry is resolving", async () => {
     let resolve!: (url: string) => void;
-    vi.mocked(window.ttrpg!.resolveMapUrl).mockReturnValueOnce(new Promise<string>((done) => { resolve = done; }));
+    resolveMapUrl.mockReturnValueOnce(new Promise<string>((done) => { resolve = done; }));
     let retry!: Promise<void>;
     act(() => { retry = hook.retryPlayer(); });
     await act(async () => { await hook.begin("a"); });

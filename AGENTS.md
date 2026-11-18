@@ -5,11 +5,11 @@ Este archivo define convenciones de arquitectura, desarrollo y seguridad para TT
 ## Stack base
 
 - Gestor de paquetes: `pnpm`.
-- Aplicacion desktop: Electron.
+- Aplicación exclusivamente web: navegador React + servicio Node.js HTTP/SSE (SDD 62).
 - Frontend: React + TypeScript, salvo decision explicita distinta.
 - Bundler/dev server: Vite.
 - Motor visual recomendado: PixiJS para mapa, capas, luces, sprites y efectos.
-- Base de datos local: SQLite.
+- Persistencia del servicio: SQLite local y PostgreSQL con TLS en producción.
 - Formato de escena portable dentro de la app: JSON versionado con extension `.ttrpgscene`.
 
 ## Comandos esperados
@@ -33,7 +33,7 @@ No introducir `npm`, `yarn` o lockfiles alternativos sin una decision explicita.
 - Siempre que vayas a comenzar a trabajar con un bug inicia creando una rama fix/.*
 - Siempre espera a la orden de mergear para llevar los cambios a main.
 - **Nunca ejecutes `git add`, `git commit`, `git push` ni ninguna operacion de escritura en el repositorio sin permiso explicito del usuario en esa sesion. Espera siempre la orden antes de escribir en el historial de git.**
-- Cada vez que se mergee un nuevo spec a main, ejecutar `./scripts/build-dmg.sh` para generar un nuevo DMG instalable. El DMG queda en `dist/`.
+- Cada vez que se integre una spec en main, ejecutar los checks y `pnpm build` para generar API y frontend web en `out/api` y `out/web`. No existe empaquetado DMG desde SDD 62; despliegue requiere autorización aplicable.
 
 ## Especificaciones SDD
 
@@ -45,7 +45,7 @@ La planificación y la evidencia se mantienen en SDD. La fábrica anterior fue r
 
 ## Versionado y changelog
 
-La version de la aplicacion vive en `package.json` y debe ser la unica fuente de verdad para builds, empaquetado y nombre/version del DMG.
+La versión de la aplicación vive en `package.json` y debe ser la única fuente de verdad para los builds de API y frontend web.
 
 Usar versionado semantico:
 
@@ -59,7 +59,7 @@ Reglas operativas:
 - Al finalizar un bugfix, actualizar `package.json` con bump patch y registrar la entrada en `CHANGELOG.md`.
 - Al introducir un cambio incompatible del formato `.ttrpgscene`, actualizar `package.json` con bump major, documentar la incompatibilidad/migracion en `CHANGELOG.md` y actualizar los specs/planes afectados.
 - Cada entrada de `CHANGELOG.md` debe indicar fecha, tipo de cambio y resumen de cambios principales.
-- El script `./scripts/build-dmg.sh` debe leer la version desde `package.json`; no hardcodear versiones en scripts de build.
+- Los builds de API y frontend deben leer la versión desde `package.json`; no hardcodear versiones en scripts.
 
 ## Principios de arquitectura
 
@@ -77,12 +77,11 @@ La estructura puede evolucionar, pero debe preservar estas fronteras:
 
 ```text
 src/
-  main/
-    app/
-    ipc/
-    windows/
-  preload/
-    index.ts
+  server/
+  web/
+  shared/
+    api/
+    contracts/
   renderer/
     app/
     components/
@@ -109,27 +108,13 @@ src/
     tools/
 ```
 
-### `main`
+### `server`
 
-Responsable de:
+Responsable de componer API HTTP/SSE, identidad, autorización, repositorios y ciclo de vida del servicio. Valida entradas y revalida autoridad al confirmar escrituras y entregar eventos. No contiene lógica visual.
 
-- Crear ventanas.
-- Registrar IPC.
-- Acceder a APIs nativas.
-- Dialogos de abrir/guardar archivos.
-- Crear y configurar servicios de infraestructura.
+### `web`
 
-No debe contener logica visual ni reglas de medicion.
-
-### `preload`
-
-Responsable de:
-
-- Exponer una API pequena y tipada al renderer.
-- Usar `contextBridge`.
-- Envolver `ipcRenderer.invoke` o `ipcRenderer.send` en funciones especificas.
-
-No debe exponer `ipcRenderer`, `fs`, `path`, objetos Electron completos ni APIs genericas al renderer.
+Responsable de acceso, administración, invitaciones y composición del editor/jugador con clientes HTTP explícitos. No accede al sistema de archivos del servidor ni recibe capacidades nativas.
 
 ### `renderer`
 
@@ -140,7 +125,7 @@ Responsable de:
 - Controles, menus, paneles y formularios.
 - Integracion con el render canvas mediante APIs bien definidas.
 
-No debe acceder directamente a Node.js, SQLite, filesystem o Electron internals.
+No debe acceder directamente a Node.js, SQLite, filesystem ni secretos del servidor; usa clientes explícitos y APIs web.
 
 ### `domain`
 
@@ -151,7 +136,7 @@ Responsable de:
 - Calculos de coordenadas.
 - Validaciones puras.
 
-Debe ser testeable sin Electron, DOM ni PixiJS.
+Debe ser testeable sin servidor HTTP, DOM ni PixiJS.
 
 ### `application`
 
@@ -168,73 +153,23 @@ Responsable de:
 - SQLite.
 - Repositorios.
 - File system.
-- Adaptadores a Electron.
+- Adaptadores HTTP/SSE y puertos de almacenamiento.
 - Carga/decodificacion de assets.
 
-## Seguridad Electron
+## Seguridad del navegador y HTTP/SSE
 
-Electron combina navegador, Node.js y APIs nativas. Tratar el renderer como superficie no confiable.
-
-Configuracion recomendada para ventanas:
-
-```ts
-webPreferences: {
-  preload: preloadPath,
-  contextIsolation: true,
-  nodeIntegration: false,
-  sandbox: true
-}
-```
-
-Reglas:
-
-- Mantener `contextIsolation: true`.
-- Mantener `nodeIntegration: false`.
-- Preferir `sandbox: true` si no bloquea una necesidad concreta.
-- Usar `preload` + `contextBridge` para exponer APIs.
-- Exponer una funcion por accion, no un canal IPC generico.
-- Validar todos los inputs recibidos por IPC.
-- Validar el `sender` de mensajes IPC cuando aplique.
-- No cargar contenido remoto en la app salvo decision explicita y controles de seguridad.
-- Definir una Content Security Policy para el renderer.
-- No usar `eval`, `new Function` ni contenido HTML no sanitizado.
-- No abrir URLs externas sin pasar por `shell.openExternal` desde main y con allowlist si aplica.
-- No guardar secretos en el renderer.
-
-Ejemplo de API preload aceptable:
-
-```ts
-contextBridge.exposeInMainWorld("ttrpg", {
-  openMapImage: () => ipcRenderer.invoke("map:open-image"),
-  saveScene: (scene) => ipcRenderer.invoke("scene:save", scene),
-  loadScene: () => ipcRenderer.invoke("scene:load")
-});
-```
-
-Ejemplo no aceptable:
-
-```ts
-contextBridge.exposeInMainWorld("electron", {
-  ipcRenderer,
-  fs,
-  send: (channel, payload) => ipcRenderer.send(channel, payload)
-});
-```
-
-## IPC
-
-- Nombrar canales por dominio y accion: `scene:save`, `scene:load`, `map:open-image`.
-- Preferir `ipcMain.handle` + `ipcRenderer.invoke` para operaciones request/response.
-- Usar `webContents.send` solo para eventos push desde main al renderer.
-- No usar IPC sincrono.
-- Validar payloads con esquemas compartidos.
-- Devolver errores serializables y amigables.
-- No enviar objetos grandes por IPC si puede enviarse una ruta, id o referencia.
-- No pasar objetos DOM, `File`, `ImageBitmap` u objetos no serializables hacia main.
+- Tratar al navegador como superficie no confiable. Roles, propiedad, apertura y permisos se verifican en el servidor.
+- Mantener CSP, sanitización y controles Host/Origin; no añadir CORS comodín ni `unsafe-eval` para resolver errores de UI.
+- No guardar secretos del servidor en el frontend ni en variables VITE.
+- Los componentes reciben un cliente explícito mediante ClientProvider; no hay `window.ttrpg`, preload ni fallback privilegiado.
+- Validar payloads con esquemas compartidos y devolver errores serializables y amigables.
+- Mantener revisión optimista, idempotencia, revocación y separación de datos privados/públicos.
+- Acotar mensajes, buffers y conexiones; cerrar SSE, listeners, timers y recursos al perder autoridad o desmontar.
+- Selección y descarga de archivos usan APIs del navegador; los recursos del servidor se referencian por IDs autorizados, nunca rutas arbitrarias.
 
 ## SQLite y persistencia
 
-SQLite sera la DB local inicial, pero debe quedar detras de puertos/interfaces para permitir otros motores en el futuro.
+SQLite local y PostgreSQL productivo deben permanecer detrás de puertos/interfaces compartidos. No cambiar de motor ni migrar datos reales sin el alcance y autorización correspondientes.
 
 Reglas:
 
@@ -278,7 +213,7 @@ El archivo `.ttrpgscene` sigue siendo JSON de intercambio/guardado de escena. SQ
 - Guardar coordenadas en espacio de mundo, no en pantalla.
 - Separar camara de mapa.
 - Separar escala calibrada de zoom de navegacion si la implementacion lo permite.
-- Guardar rutas locales de imagen en el MVP, no copiar imagenes dentro del archivo de escena.
+- En servicio, referenciar imágenes por IDs opacos autorizados; conservar lectura de referencias históricas del formato sin permitir acceso arbitrario al servidor.
 - Manejar rutas rotas con errores recuperables.
 - Usar ids estables para formas, luces, efectos y futuros tokens.
 
@@ -319,11 +254,11 @@ El archivo `.ttrpgscene` sigue siendo JSON de intercambio/guardado de escena. SQ
 - Evitar `any`; si es inevitable, encapsularlo y justificarlo.
 - Modelar unidades con tipos explicitos cuando sea util.
 - Preferir tipos de dominio sobre objetos sueltos.
-- Compartir tipos seguros entre main, preload y renderer mediante modulos comunes, no mediante imports circulares.
+- Compartir tipos seguros entre cliente y servidor mediante `src/shared`, sin imports circulares ni infraestructura privilegiada en el navegador.
 
 ## Validacion
 
-- Validar datos externos: archivos de escena, payloads IPC, inputs de usuario, rutas y configuraciones.
+- Validar datos externos: archivos de escena, payloads HTTP/SSE, inputs de usuario, rutas y configuraciones.
 - Usar esquemas versionados para `.ttrpgscene`.
 - Rechazar o migrar versiones incompatibles con mensajes claros.
 - No confiar en datos guardados aunque sean locales.
@@ -343,7 +278,7 @@ Tipos de test:
 
 - Unit tests para dominio.
 - Integration tests para repositorios y casos de uso.
-- Tests visuales/manuales para render y Electron.
+- Tests visuales/manuales en navegador para editor, jugador, render y controles.
 - Smoke test para `pnpm dev` cuando sea viable.
 
 ## Assets
@@ -361,32 +296,22 @@ Tipos de test:
 - Mantener PRs/cambios pequeños por spec.
 - Cada spec implementada debe actualizar documentacion si cambia una decision.
 - No introducir dependencias pesadas sin justificar su rol.
-- Revisar warnings de Electron en consola durante desarrollo.
+- Revisar errores de consola/red del navegador y del servicio durante desarrollo.
 
-## Empaquetado macOS
+## Construcción y operación web
 
-El proyecto incluye un pipeline de empaquetado para macOS con `electron-builder`.
-
-Para generar un DMG instalable:
-
-```bash
-./scripts/build-dmg.sh
-```
-
-El DMG resultante queda en `dist/`. No incluye firma de codigo (uso personal/interno). Si macOS bloquea la app al abrirla, hacer clic derecho → Abrir la primera vez.
-
-Pendiente si se decide distribuir ampliamente:
-- Code signing con certificado Developer ID Application.
-- Notarizacion en macOS.
-- Builds para otras plataformas (Windows, Linux).
+- `pnpm dev` inicia el supervisor de desarrollo de API y frontend; requiere configuración y esquema preparados explícitamente.
+- `pnpm build` construye API y web. `pnpm start` ejecuta el build estable.
+- `pnpm build:api`, `pnpm build:web` y Storybook permiten trabajar sobre salidas independientes.
+- Un único proceso API conserva la autoridad por base de datos; no quitar los locks para admitir réplicas sin una nueva arquitectura de sesión compartida.
+- Instalaciones independientes requieren bases/directorios, secretos y hosts/orígenes propios. Cambiar solo el puerto del mismo host no aísla las cookies.
+- La proyección de juego y conexiones siguen en memoria. Retirar Electron no añade Django, Redis ni recuperación distribuida.
+- Conservar `.env`, bases, respaldos, perfiles e instaladores antiguos del usuario; no borrarlos al retirar fuentes desktop.
+- Las reglas vigentes sustituyen el empaquetado nativo de las specs históricas, que conservan su evidencia.
 
 ## Referencias
 
-- Electron Security: https://www.electronjs.org/docs/tutorial/security/
-- Electron Process Model: https://www.electronjs.org/docs/latest/tutorial/process-model
-- Electron Context Isolation: https://www.electronjs.org/docs/latest/tutorial/context-isolation
-- Electron contextBridge: https://www.electronjs.org/docs/latest/api/context-bridge
-- Electron IPC: https://www.electronjs.org/docs/latest/tutorial/ipc
-- Electron ipcMain: https://www.electronjs.org/docs/latest/api/ipc-main
-- Electron ipcRenderer: https://www.electronjs.org/docs/latest/api/ipc-renderer
-- Electron Code Signing: https://www.electronjs.org/docs/latest/tutorial/code-signing
+- Arquitectura vigente: `SDD/arquitectura.md`.
+- Operación: `SDD/guias/service-operations.md`.
+- Cliente: `SDD/guias/client-architecture.md`.
+- Retirada de Electron: `SDD/specs/62-servicio-solo-web/spec.md`.

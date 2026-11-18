@@ -11,7 +11,6 @@ export interface ClientCapabilities {
   readonly templateAdministration?: boolean;
   readonly player: boolean;
   readonly dice: boolean;
-  readonly nativeMenus: boolean;
 }
 
 export interface TtrpgClient {
@@ -24,17 +23,13 @@ export interface TtrpgClient {
     forMonster(id: string, templateId: string | null, available: readonly MonsterTemplate[]): readonly MonsterTemplate[];
     validateLibraryUse(id: string): Promise<void>;
   };
-  /** Opcional: un cliente autónomo conserva sus bibliotecas y no inventa jerarquía remota. */
+/** Opcional: el cliente conserva sus bibliotecas y no inventa jerarquía remota. */
   readonly arcPreparation?: {
     list(selection: { readonly campaignId: string; readonly arcId: string }, query?: CampaignPageQuery): Promise<CampaignPage<PreparedEntityDto>>;
     snapshot(prepared: PreparedEntityDto): PreparedEntitySnapshot;
     reserve(selection: { readonly campaignId: string; readonly arcId: string; readonly sceneId: string }, preparedId: string, idempotencyKey: string): Promise<ScenePreparationReservationDto>;
   };
 }
-
-export const LOCAL_CAPABILITIES: ClientCapabilities = Object.freeze({
-  scenes: true, images: true, libraries: true, player: true, dice: true, nativeMenus: true
-});
 
 /** The full contract stays required; only tests/labs may provide partial doubles. */
 export function createClient(api: TtrpgApi, capabilities: ClientCapabilities, assetReferences?: "service", presentations?: TtrpgClient["presentations"], annotations?: TtrpgClient["annotations"], arcPreparation?: TtrpgClient["arcPreparation"], serviceDice?: ServiceDiceClient): TtrpgClient {
